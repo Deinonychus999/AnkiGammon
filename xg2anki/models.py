@@ -1,0 +1,179 @@
+"""Data models for backgammon positions, moves, and decisions."""
+
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import List, Optional, Tuple
+
+
+class Player(Enum):
+    """Player identifier."""
+    X = "X"  # Top player
+    O = "O"  # Bottom player
+
+
+class CubeState(Enum):
+    """Doubling cube state."""
+    CENTERED = "centered"
+    X_OWNS = "x_owns"
+    O_OWNS = "o_owns"
+
+
+class DecisionType(Enum):
+    """Type of decision."""
+    CHECKER_PLAY = "checker_play"
+    CUBE_ACTION = "cube_action"
+
+
+@dataclass
+class Position:
+    """
+    Represents a backgammon position.
+
+    Board representation:
+    - points[0] = bar for X (top player)
+    - points[1-24] = board points (point 24 is X's home, point 1 is O's home)
+    - points[25] = bar for O (bottom player)
+
+    Positive numbers = X checkers, negative numbers = O checkers
+    """
+    points: List[int] = field(default_factory=lambda: [0] * 26)
+    x_off: int = 0  # Checkers borne off by X
+    o_off: int = 0  # Checkers borne off by O
+
+    def __post_init__(self):
+        """Validate position."""
+        if len(self.points) != 26:
+            raise ValueError("Position must have exactly 26 points (0=X bar, 1-24=board, 25=O bar)")
+
+    @classmethod
+    def from_xgid(cls, xgid: str) -> 'Position':
+        """
+        Parse a position from XGID format.
+        XGID format: e.g., "XGID=-b----E-C---eE---c-e----B-:1:0:1:63:0:0:0:0:10"
+        """
+        # Import here to avoid circular dependency
+        from xg2anki.utils.xgid import parse_xgid
+        position, _ = parse_xgid(xgid)
+        return position
+
+    def to_xgid(
+        self,
+        cube_value: int = 1,
+        cube_owner: 'CubeState' = None,
+        dice: Optional[Tuple[int, int]] = None,
+        on_roll: 'Player' = None,
+        score_x: int = 0,
+        score_o: int = 0,
+        match_length: int = 0,
+    ) -> str:
+        """Convert position to XGID format."""
+        # Import here to avoid circular dependency
+        from xg2anki.utils.xgid import encode_xgid
+        if cube_owner is None:
+            cube_owner = CubeState.CENTERED
+        if on_roll is None:
+            on_roll = Player.O
+        return encode_xgid(
+            self,
+            cube_value=cube_value,
+            cube_owner=cube_owner,
+            dice=dice,
+            on_roll=on_roll,
+            score_x=score_x,
+            score_o=score_o,
+            match_length=match_length,
+        )
+
+    def copy(self) -> 'Position':
+        """Create a deep copy of the position."""
+        return Position(
+            points=self.points.copy(),
+            x_off=self.x_off,
+            o_off=self.o_off
+        )
+
+
+@dataclass
+class Move:
+    """
+    Represents a candidate move with its analysis.
+    """
+    notation: str  # e.g., "13/9 6/5" or "double/take"
+    equity: float  # Equity of this move
+    error: float = 0.0  # Error compared to best move (0 for best move)
+    rank: int = 1  # Rank among candidates (1 = best)
+    resulting_position: Optional[Position] = None  # Position after this move (if available)
+
+    def __str__(self) -> str:
+        """Human-readable representation."""
+        if self.rank == 1:
+            return f"{self.notation} (Equity: {self.equity:.3f})"
+        else:
+            return f"{self.notation} (Equity: {self.equity:.3f}, Error: {self.error:.3f})"
+
+
+@dataclass
+class Decision:
+    """
+    Represents a single decision point from XG analysis.
+    """
+    # Position information
+    position: Position
+    position_image_path: Optional[str] = None  # Path to board image (from HTML export)
+    xgid: Optional[str] = None
+
+    # Game context
+    on_roll: Player = Player.O
+    dice: Optional[Tuple[int, int]] = None  # None for cube decisions
+    score_x: int = 0
+    score_o: int = 0
+    match_length: int = 0  # 0 for money games
+    cube_value: int = 1
+    cube_owner: CubeState = CubeState.CENTERED
+
+    # Decision analysis
+    decision_type: DecisionType = DecisionType.CHECKER_PLAY
+    candidate_moves: List[Move] = field(default_factory=list)
+
+    # Source metadata
+    source_file: Optional[str] = None
+    game_number: Optional[int] = None
+    move_number: Optional[int] = None
+
+    def get_best_move(self) -> Optional[Move]:
+        """Get the best move (rank 1)."""
+        for move in self.candidate_moves:
+            if move.rank == 1:
+                return move
+        return self.candidate_moves[0] if self.candidate_moves else None
+
+    def get_metadata_text(self) -> str:
+        """Get formatted metadata for card display."""
+        dice_str = f"{self.dice[0]}{self.dice[1]}" if self.dice else "N/A"
+        match_str = f"{self.match_length}pt" if self.match_length > 0 else "Money"
+        # Show em dash when cube is centered, otherwise show value with owner
+        if self.cube_owner == CubeState.CENTERED:
+            cube_str = "—"
+        else:
+            cube_str = f"{self.cube_value}"
+            if self.cube_owner == CubeState.X_OWNS:
+                cube_str += " (X)"
+            elif self.cube_owner == CubeState.O_OWNS:
+                cube_str += " (O)"
+
+        # Map Player enum to color names
+        # Player.O = BOTTOM player (typically plays with white checkers from bottom)
+        # Player.X = TOP player (typically plays with black checkers from top)
+        player_name = "White" if self.on_roll == Player.O else "Black"
+
+        return (
+            f"{player_name} | "
+            f"Dice: {dice_str} | "
+            f"Score: {self.score_x}-{self.score_o} | "
+            f"Cube: {cube_str} | "
+            f"Match: {match_str}"
+        )
+
+    def __str__(self) -> str:
+        """Human-readable representation."""
+        return f"Decision({self.decision_type.value}, {self.get_metadata_text()})"

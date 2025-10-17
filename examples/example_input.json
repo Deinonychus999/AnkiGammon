@@ -1,0 +1,30 @@
+[
+  {
+    "xgid": "XGID=---BBBBAAA---Ac-bbccbAA-A-:1:1:-1:63:4:3:0:5:8",
+    "moves": [
+      {"notation": "13/7 8/5", "equity": 0.234, "error": 0.0, "rank": 1},
+      {"notation": "24/18 13/10", "equity": 0.221, "error": 0.013, "rank": 2},
+      {"notation": "13/10 13/7", "equity": 0.218, "error": 0.016, "rank": 3},
+      {"notation": "24/21 13/7", "equity": 0.215, "error": 0.019, "rank": 4},
+      {"notation": "8/2 6/3", "equity": 0.210, "error": 0.024, "rank": 5}
+    ]
+  },
+  {
+    "xgid": "XGID=--aBBBBAA----Ac-bbcDbAA-A-:1:0:1:52:4:3:0:5:8",
+    "moves": [
+      {"notation": "13/8 6/4", "equity": 0.156, "error": 0.0, "rank": 1},
+      {"notation": "24/19 6/4", "equity": 0.143, "error": 0.013, "rank": 2},
+      {"notation": "13/11 13/8", "equity": 0.138, "error": 0.018, "rank": 3},
+      {"notation": "24/22 24/19", "equity": 0.135, "error": 0.021, "rank": 4},
+      {"notation": "6/1 5/3", "equity": 0.131, "error": 0.025, "rank": 5}
+    ]
+  },
+  {
+    "xgid": "XGID=---BBBBAAa---Ac-bbcCbAA-A-:2:1:1:D:4:3:0:5:8",
+    "moves": [
+      {"notation": "Double/Take", "equity": 0.678, "error": 0.0, "rank": 1},
+      {"notation": "Double/Drop", "equity": 0.645, "error": 0.033, "rank": 2},
+      {"notation": "No Double", "equity": 0.623, "error": 0.055, "rank": 3}
+    ]
+  }
+]

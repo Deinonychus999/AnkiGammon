@@ -1,0 +1,12 @@
+# Core dependencies
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
+genanki>=0.13.0
+Pillow>=10.0.0
+requests>=2.31.0
+
+# CLI
+click>=8.1.0
+
+# Optional for binary parsing
+numpy>=1.24.0

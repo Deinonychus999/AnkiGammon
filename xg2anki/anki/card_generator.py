@@ -1,0 +1,393 @@
+"""Generate Anki card content from XG decisions."""
+
+import random
+import string
+from pathlib import Path
+from typing import List, Dict, Optional, Tuple
+from PIL import Image
+
+from xg2anki.models import Decision, Move
+from xg2anki.renderer.board_renderer import BoardRenderer
+from xg2anki.utils.move_parser import MoveParser
+
+
+class CardGenerator:
+    """
+    Generates Anki card content from XG decisions.
+
+    Supports two variants:
+    1. Simple: Shows question only (no options)
+    2. Text MCQ: Shows move notation as text options
+    """
+
+    def __init__(
+        self,
+        output_dir: Path,
+        show_options: bool = False,
+        renderer: Optional[BoardRenderer] = None
+    ):
+        """
+        Initialize the card generator.
+
+        Args:
+            output_dir: Directory to save generated images
+            show_options: If True, show multiple choice options (text only)
+            renderer: Board renderer instance (creates default if None)
+        """
+        self.output_dir = Path(output_dir)
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+
+        self.show_options = show_options
+        self.renderer = renderer or BoardRenderer()
+
+        # Create media directory
+        self.media_dir = self.output_dir / "media"
+        self.media_dir.mkdir(exist_ok=True)
+
+    def generate_card(self, decision: Decision, card_id: Optional[str] = None) -> Dict[str, any]:
+        """
+        Generate an Anki card from a decision.
+
+        Args:
+            decision: The decision to create a card for
+            card_id: Optional card ID (generated if not provided)
+
+        Returns:
+            Dictionary with card data:
+            {
+                'front': HTML for card front,
+                'back': HTML for card back,
+                'media_files': List of media file paths,
+                'tags': List of tags
+            }
+        """
+        if card_id is None:
+            card_id = self._generate_id()
+
+        # Generate position image (before move)
+        position_image = self._get_or_render_position_image(decision, card_id)
+
+        # Prepare candidate moves (top 5)
+        candidates = decision.candidate_moves[:5]
+        if len(candidates) < 5:
+            # Pad with empty moves if needed
+            candidates = candidates + [None] * (5 - len(candidates))
+
+        # Shuffle candidates for MCQ
+        shuffled_candidates, answer_index = self._shuffle_candidates(candidates)
+
+        # Generate card front
+        if self.show_options:
+            front_html = self._generate_text_mcq_front(
+                decision, position_image, shuffled_candidates
+            )
+        else:
+            front_html = self._generate_simple_front(
+                decision, position_image
+            )
+
+        # Generate resulting position image (after best move)
+        best_move = decision.get_best_move()
+        result_image = self._render_resulting_position(decision, best_move, f"{card_id}_result")
+
+        # Generate card back
+        back_html = self._generate_back(
+            decision, result_image, candidates, answer_index, self.show_options
+        )
+
+        # Collect media files
+        media_files = [position_image, result_image]
+
+        # Generate tags
+        tags = self._generate_tags(decision)
+
+        return {
+            'front': front_html,
+            'back': back_html,
+            'media_files': media_files,
+            'tags': tags,
+        }
+
+    def _generate_simple_front(
+        self,
+        decision: Decision,
+        position_image: str
+    ) -> str:
+        """Generate HTML for simple front (no options)."""
+        metadata = decision.get_metadata_text()
+
+        html = f"""
+<div class="card-front">
+    <div class="position-image">
+        <img src="{Path(position_image).name}" alt="Position" />
+    </div>
+    <div class="metadata">{metadata}</div>
+    <div class="question">
+        <h3>What is the best move?</h3>
+    </div>
+</div>
+"""
+        return html
+
+    def _generate_text_mcq_front(
+        self,
+        decision: Decision,
+        position_image: str,
+        candidates: List[Optional[Move]]
+    ) -> str:
+        """Generate HTML for text-based MCQ front."""
+        metadata = decision.get_metadata_text()
+
+        # Format candidate options
+        options_html = []
+        letters = ['A', 'B', 'C', 'D', 'E']
+        for i, candidate in enumerate(candidates):
+            if candidate:
+                options_html.append(
+                    f"<div class='option'><strong>{letters[i]}.</strong> {candidate.notation}</div>"
+                )
+            else:
+                options_html.append(
+                    f"<div class='option'><strong>{letters[i]}.</strong> —</div>"
+                )
+
+        html = f"""
+<div class="card-front">
+    <div class="position-image">
+        <img src="{Path(position_image).name}" alt="Position" />
+    </div>
+    <div class="metadata">{metadata}</div>
+    <div class="question">
+        <h3>What is the best move?</h3>
+        <div class="options">
+            {''.join(options_html)}
+        </div>
+    </div>
+</div>
+"""
+        return html
+
+    def _generate_back(
+        self,
+        decision: Decision,
+        position_image: str,
+        candidates: List[Optional[Move]],
+        answer_index: int,
+        show_options: bool
+    ) -> str:
+        """Generate HTML for card back."""
+        metadata = decision.get_metadata_text()
+
+        # Build move table
+        table_rows = []
+        letters = ['A', 'B', 'C', 'D', 'E']
+
+        for i, move in enumerate(candidates):
+            if not move:
+                continue
+
+            rank_class = "best-move" if move.rank == 1 else ""
+            table_rows.append(f"""
+<tr class="{rank_class}">
+    <td>{move.rank}</td>
+    <td>{move.notation}</td>
+    <td>{move.equity:.3f}</td>
+    <td>{move.error:.3f}</td>
+</tr>
+""")
+
+        # Generate answer section
+        best_move = decision.get_best_move()
+        best_notation = best_move.notation if best_move else "Unknown"
+
+        if show_options:
+            # Show letter-based answer for MCQ
+            correct_letter = letters[answer_index] if answer_index < len(letters) else "?"
+            answer_html = f"""
+    <div class="answer">
+        <h3>Correct Answer: <span class="answer-letter">{correct_letter}</span></h3>
+        <p class="best-move-notation">{best_notation}</p>
+    </div>
+"""
+        else:
+            # Show simple answer for non-MCQ
+            answer_html = f"""
+    <div class="answer">
+        <h3>Best Move:</h3>
+        <p class="best-move-notation">{best_notation}</p>
+    </div>
+"""
+
+        html = f"""
+<div class="card-back">
+    <div class="position-image">
+        <img src="{Path(position_image).name}" alt="Position" />
+    </div>
+    <div class="metadata">{metadata}</div>
+{answer_html}
+    <div class="analysis">
+        <h4>Top Moves Analysis:</h4>
+        <table class="moves-table">
+            <thead>
+                <tr>
+                    <th>Rank</th>
+                    <th>Move</th>
+                    <th>Equity</th>
+                    <th>Error</th>
+                </tr>
+            </thead>
+            <tbody>
+                {''.join(table_rows)}
+            </tbody>
+        </table>
+    </div>
+    {self._generate_source_info(decision)}
+</div>
+"""
+        return html
+
+    def _generate_source_info(self, decision: Decision) -> str:
+        """Generate source information HTML."""
+        parts = []
+        if decision.xgid:
+            parts.append(f"<code>{decision.xgid}</code>")
+        if decision.source_file:
+            parts.append(f"Source: {decision.source_file}")
+        if decision.game_number:
+            parts.append(f"Game #{decision.game_number}")
+        if decision.move_number:
+            parts.append(f"Move #{decision.move_number}")
+
+        if parts:
+            return f"""
+<div class="source-info">
+    <p>{'<br>'.join(parts)}</p>
+</div>
+"""
+        return ""
+
+    def _generate_tags(self, decision: Decision) -> List[str]:
+        """Generate tags for the card."""
+        tags = ["xg2anki", "backgammon"]
+
+        # Add decision type tag
+        tags.append(decision.decision_type.value)
+
+        # Add match/money tag
+        if decision.match_length > 0:
+            tags.append(f"match_{decision.match_length}pt")
+        else:
+            tags.append("money_game")
+
+        # Add cube value tag
+        if decision.cube_value > 1:
+            tags.append(f"cube_{decision.cube_value}")
+
+        return tags
+
+    def _get_or_render_position_image(self, decision: Decision, card_id: str) -> str:
+        """Get existing position image or render a new one."""
+        import time
+        import random
+
+        # Use timestamp AND random suffix in filename to bust Anki's media cache
+        # Anki aggressively caches media, so we need truly unique names
+        timestamp = int(time.time() * 1000)  # milliseconds for more uniqueness
+        random_suffix = ''.join(random.choices('abcdefghijklmnopqrstuvwxyz0123456789', k=8))
+        name_base = f"{card_id}_{timestamp}_{random_suffix}"
+
+        # If decision has an existing image path, use it
+        if decision.position_image_path and Path(decision.position_image_path).exists():
+            # Copy to media directory
+            src_path = Path(decision.position_image_path)
+            dst_path = self.media_dir / f"{name_base}_position.png"
+
+            # Always copy to ensure fresh file with new timestamp name
+            Image.open(src_path).save(dst_path)
+
+            return str(dst_path)
+
+        # Otherwise, render the position
+        img_path = self.media_dir / f"{name_base}_position.png"
+        self.renderer.render(
+            position=decision.position,
+            on_roll=decision.on_roll,
+            dice=decision.dice,
+            cube_value=decision.cube_value,
+            cube_owner=decision.cube_owner,
+            output_path=str(img_path)
+        )
+        return str(img_path)
+
+    def _render_resulting_position(
+        self,
+        decision: Decision,
+        move: Move,
+        img_id: str
+    ) -> str:
+        """Render the resulting position after a move."""
+        import time
+        import random
+
+        # Add timestamp AND random suffix to bust Anki's cache
+        # Anki aggressively caches media, so we need truly unique names
+        timestamp = int(time.time() * 1000)
+        random_suffix = ''.join(random.choices('abcdefghijklmnopqrstuvwxyz0123456789', k=8))
+        img_path = self.media_dir / f"{img_id}_{timestamp}_{random_suffix}.png"
+
+        # If move already has resulting position, use it
+        if move.resulting_position:
+            resulting_pos = move.resulting_position
+        else:
+            # Apply move to position
+            resulting_pos = MoveParser.apply_move(
+                decision.position,
+                move.notation,
+                decision.on_roll
+            )
+
+        # Render the resulting position from the SAME perspective (same player at bottom)
+        # Show dice with transparency to indicate the move has been made
+        self.renderer.render(
+            position=resulting_pos,
+            on_roll=decision.on_roll,  # Keep same player at bottom (not opponent)
+            dice=decision.dice,  # Show the same dice
+            dice_opacity=0.3,  # Make dice semi-transparent to show move is complete
+            cube_value=decision.cube_value,
+            cube_owner=decision.cube_owner,
+            output_path=str(img_path)
+        )
+
+        return str(img_path)
+
+    def _shuffle_candidates(
+        self,
+        candidates: List[Optional[Move]]
+    ) -> Tuple[List[Optional[Move]], int]:
+        """
+        Shuffle candidates for MCQ and return answer index.
+
+        Returns:
+            (shuffled_candidates, answer_index_of_best_move)
+        """
+        # Find best move (rank 1)
+        best_idx = 0
+        for i, candidate in enumerate(candidates):
+            if candidate and candidate.rank == 1:
+                best_idx = i
+                break
+
+        # Create shuffled list
+        indices = list(range(len(candidates)))
+        random.shuffle(indices)
+
+        shuffled = [candidates[i] for i in indices]
+
+        # Find new position of best move
+        answer_idx = indices.index(best_idx)
+
+        return shuffled, answer_idx
+
+    def _generate_id(self) -> str:
+        """Generate a random ID for a card."""
+        return ''.join(random.choices(string.ascii_lowercase + string.digits, k=12))

@@ -1,75 +1,47 @@
 # XG2Anki
 
-Convert eXtreme Gammon (XG) positions and analysis into Anki flashcards for backgammon study.
+Convert eXtreme Gammon (XG) backgammon analysis into Anki flashcards for effective study.
 
 ## Features
 
-- **XG text export input format**:
-  - Direct copy/paste from eXtreme Gammon
-  - Includes XGID, ASCII board, and rollout data
-- **Flexible output options**:
-  - `.apkg` file (ready to import into Anki)
-  - CSV + media folder (manual import)
-  - Direct push to Anki via Anki-Connect
-- **Two card variants**:
-  - Text MCQ: Shows move notation (e.g., "13/9 6/5")
-  - Image MCQ: Shows visual board state after each candidate move
-- **Complete decision analysis**: Top 5 moves with equities and error calculations
-- **Automatic board rendering**: Generates board images from positions
+- **Direct XG export support** - Copy/paste positions from eXtreme Gammon
+- **Smart rendering** - Automatic board image generation from XGID
+- **Two output formats**:
+  - AnkiConnect: Push directly to Anki (default, recommended)
+  - APKG: Self-contained package for manual import
+- **Interactive mode** - Paste positions directly, no file management needed
+- **Complete analysis** - Top 5 moves with equities and error calculations
 
-## Installation
+## Quick Start
 
+### Install
 ```bash
 pip install -r requirements.txt
 ```
 
-## Quick Start
-
-Copy analysis directly from eXtreme Gammon:
-
-1. In XG, select and copy your position analysis (Ctrl+C or Edit > Copy Position)
-2. Paste into a text file (e.g., `my_analysis.txt`)
-3. Run:
-   ```bash
-   python -m xg2anki my_analysis.txt
-   ```
-4. Import the generated `.apkg` into Anki!
-
-See [XG_EXPORT_GUIDE.md](XG_EXPORT_GUIDE.md) for details.
-
-## Usage Examples
-
-### Basic usage (generates APKG):
+### Interactive Mode (Easiest)
 ```bash
-python -m xg2anki my_analysis.txt
+python -m xg2anki
+```
+Then paste XG positions when prompted.
+
+### File-Based Mode
+```bash
+# Push directly to Anki (requires AnkiConnect addon)
+python -m xg2anki analysis.txt
+
+# Or generate APKG file
+python -m xg2anki analysis.txt --format apkg
 ```
 
-### With image-based choices:
-```bash
-python -m xg2anki my_analysis.txt --image-choices
-```
+## Getting Positions from XG
 
-### Export to CSV:
-```bash
-python -m xg2anki my_analysis.txt --format csv
-```
+1. In eXtreme Gammon, analyze a position
+2. Edit > Copy Position (or Ctrl+C)
+3. Paste into a text file or interactive mode
+4. Run xg2anki
 
-### Push directly to Anki (requires Anki-Connect):
-```bash
-python -m xg2anki my_analysis.txt --format ankiconnect
-```
-
-### Custom deck name:
-```bash
-python -m xg2anki my_analysis.txt --deck-name "Backgammon::Expert Positions"
-```
-
-## Input Format
-
-### XG Text Export Format
-
-The XG text export format includes XGID, ASCII board diagram, and rollout data:
-
+**Example XG export format:**
 ```
 XGID=---BBBBAAA---Ac-bbccbAA-A-:1:1:-1:63:4:3:0:5:8
 
@@ -84,64 +56,97 @@ Score is X:3 O:4 5 pt.(s) match.
       Opponent: 20.54% (G:2.22% B:0.06%)
 ```
 
-**How to get this format:**
-1. In eXtreme Gammon, analyze a position
-2. Go to Edit > Copy Position (or press Ctrl+C)
-3. Paste into a text file
-4. Save and run xg2anki on that file
+## Output Formats
 
-See [XG_EXPORT_GUIDE.md](XG_EXPORT_GUIDE.md) for detailed instructions.
+### AnkiConnect (Default - Recommended)
 
-## Output
+Push cards directly to running Anki:
+```bash
+python -m xg2anki analysis.txt
+```
 
-Each XG decision becomes one Anki card:
+**Prerequisites:**
+- Install [AnkiConnect addon](https://ankiweb.net/shared/info/2055492159)
+- Anki must be running
 
-### Front (Text MCQ)
-- Board image showing the position
-- Metadata: player on roll, dice, score, cube state, match length
-- Multiple choice: 5 candidate moves (labeled A-E, shuffled)
+**Advantages:**
+- No manual import
+- Automatic duplicate detection
+- Instant feedback
 
-### Front (Image MCQ)
-- Initial board position
-- Metadata
-- 2×3 grid showing resulting positions for each candidate move (A-E)
+### APKG
 
-### Back
-- Position image and metadata
-- Ranked table of top 5 moves with equity and error
-- Correct answer highlighted
-- Source information (XGID, game/move numbers if available)
+Generate a package file for manual import:
+```bash
+python -m xg2anki analysis.txt --format apkg
+```
 
-## Documentation
-
-- **[XG_EXPORT_GUIDE.md](XG_EXPORT_GUIDE.md)** - How to use XG text exports (RECOMMENDED!)
-- [USAGE.md](USAGE.md) - Comprehensive usage guide
-- [QUICK_START.md](QUICK_START.md) - 5-minute tutorial
-- [examples/](examples/) - Example input files
-- [tests/](tests/) - Basic tests
+Import into Anki: File → Import → Select the .apkg file
 
 ## Command-Line Options
 
 ```
-Usage: xg2anki [OPTIONS] INPUT_FILE
+Usage: xg2anki [OPTIONS] [INPUT_FILE]
 
 Options:
-  --format [apkg|csv|ankiconnect]  Output format (default: apkg)
-  -o, --output PATH                Output directory
-  --deck-name TEXT                 Anki deck name (default: XG Backgammon)
-  --image-choices                  Use image-based MCQ variant
-  -i, --interactive                Run in interactive mode
-  --help                           Show help message
+  --format [ankiconnect|apkg]   Output format (default: ankiconnect)
+  -o, --output PATH             Output directory
+  --deck-name TEXT              Anki deck name (default: XG Backgammon)
+  --show-options                Show text move options on card front
+  -i, --interactive             Run in interactive mode
+  --help                        Show help message
 ```
+
+## Card Format
+
+Each XG position becomes one Anki card:
+
+**Front:**
+- Board image showing the position
+- Metadata: player on roll, dice, score, cube, match length
+- Multiple choice: 5 candidate moves (labeled A-E, shuffled)
+
+**Back:**
+- Position image and metadata
+- Ranked table of top 5 moves with equity and error
+- Correct answer highlighted
+- Source XGID for reference
+
+## Examples
+
+```bash
+# Interactive mode
+python -m xg2anki
+
+# Push to Anki (default)
+python -m xg2anki positions.txt
+
+# Generate APKG file
+python -m xg2anki positions.txt --format apkg
+
+# Custom deck name
+python -m xg2anki positions.txt --deck-name "Opening Plays"
+
+# Show text options on front
+python -m xg2anki positions.txt --show-options
+```
+
+## Troubleshooting
+
+**"Cannot connect to Anki-Connect"**
+- Install AnkiConnect addon: https://ankiweb.net/shared/info/2055492159
+- Make sure Anki is running
+- Check firewall isn't blocking localhost:8765
+
+**"No decisions found in input file"**
+- Ensure file includes XGID lines
+- Make sure move analysis includes equity values (eq:)
+- Copy the full position from XG (Edit > Copy Position)
 
 ## Requirements
 
 - Python 3.8+
-- See requirements.txt for dependencies
-
-## Contributing
-
-Contributions welcome! Feel free to open issues or submit pull requests.
+- Dependencies: genanki, Pillow, click, requests
 
 ## License
 
