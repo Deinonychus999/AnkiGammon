@@ -21,7 +21,8 @@ wheels/
 *.egg
 MANIFEST
 *.manifest
-*.spec
+# Keep xg2anki.spec (PyInstaller config) - don't ignore it!
+# *.spec
 
 # Virtual environments
 venv/

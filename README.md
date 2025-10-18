@@ -12,32 +12,43 @@ Convert eXtreme Gammon (XG) backgammon analysis into Anki flashcards for effecti
 - **Interactive mode** - Paste positions directly, no file management needed
 - **Complete analysis** - Top 5 moves with equities and error calculations
 
-## Quick Start
+## Installation
 
-### Install
+### Option 1: Standalone Executable (Recommended)
+
+1. Run `build_executable.bat` to create `xg2anki.exe`
+2. Double-click to run - no Python installation needed!
+
+### Option 2: Development Install
+
 ```bash
+git clone https://github.com/yourusername/xg2anki.git
+cd xg2anki
 pip install -r requirements.txt
+python -m xg2anki
 ```
+
+## Quick Start
 
 ### Interactive Mode (Easiest)
 ```bash
-python -m xg2anki
+xg2anki
 ```
 Then paste XG positions when prompted.
 
 ### File-Based Mode
 ```bash
 # Push directly to Anki (requires AnkiConnect addon)
-python -m xg2anki analysis.txt
+xg2anki analysis.txt
 
 # Or generate APKG file
-python -m xg2anki analysis.txt --format apkg
+xg2anki analysis.txt --format apkg
 ```
 
 ## Getting Positions from XG
 
 1. In eXtreme Gammon, analyze a position
-2. Edit > Copy Position (or Ctrl+C)
+2. Press Ctrl+C to copy the analysis
 3. Paste into a text file or interactive mode
 4. Run xg2anki
 
@@ -141,12 +152,98 @@ python -m xg2anki positions.txt --show-options
 **"No decisions found in input file"**
 - Ensure file includes XGID lines
 - Make sure move analysis includes equity values (eq:)
-- Copy the full position from XG (Edit > Copy Position)
+- Copy the full position from XG (press Ctrl+C)
+
+## For Developers
+
+### Building the Executable
+
+**Quick Build:**
+
+```bash
+build_executable.bat
+```
+
+The executable will be in the `dist/` folder.
+
+**Manual Build (if script doesn't work):**
+```bash
+# Install PyInstaller
+pip install pyinstaller
+
+# Clean previous builds
+rm -rf build dist
+
+# Build
+pyinstaller xg2anki.spec
+```
+
+### Testing Builds
+
+Before distributing:
+
+```bash
+# Test the executable works
+cd dist
+./xg2anki --help
+
+# Test interactive mode
+./xg2anki
+
+# Test with a sample file
+./xg2anki ../examples/example_xg_export.txt
+```
+
+### Project Structure
+
+- `xg2anki/` - Main package code
+  - `parsers/` - XG text format parsers
+  - `renderer/` - Board image generation
+  - `anki/` - Anki card generation and export
+  - `utils/` - XGID encoding/decoding
+- `tests/` - Unit tests
+- `xg2anki.spec` - PyInstaller configuration
+- `build_executable.bat/.sh` - Build scripts
+
+### Settings Storage
+
+User preferences (color scheme, deck name, etc.) are stored in:
+- `C:\Users\YourName\.xg2anki\config.json`
+
+This ensures settings persist even when using the standalone executable.
+
+### Troubleshooting Build Issues
+
+**ImportError during build:**
+- Add missing module to `hiddenimports` in `xg2anki.spec`
+
+**"Module not found" when running executable:**
+- Check the module is in `hiddenimports`
+- Try: `pyinstaller --collect-all xg2anki xg2anki.spec`
+
+**Executable too large:**
+- Remove unused dependencies from requirements.txt
+- Add more items to `excludes` in xg2anki.spec
+
+**Executable won't run:**
+- Test on clean machine without Python installed
+- Check Windows Defender / antivirus isn't blocking it
+- Look at build warnings: `pyinstaller xg2anki.spec > build.log 2>&1`
+
+**Security Note:**
+- Some antivirus software may flag PyInstaller executables as suspicious (false positive)
+- This is common with PyInstaller - nothing to worry about
+- Users may need to add an exception in their antivirus
+- To reduce false positives:
+  1. Sign your executable (Windows: with a code signing certificate)
+  2. Build on clean systems
+  3. Upload to VirusTotal to show it's clean
 
 ## Requirements
 
-- Python 3.8+
-- Dependencies: genanki, Pillow, click, requests
+- Python 3.8+ (for development/pip install)
+- Dependencies: genanki, Pillow, click, requests, beautifulsoup4, lxml, numpy
+- For standalone executable: No requirements, Python is bundled
 
 ## License
 
