@@ -439,7 +439,8 @@ class BoardRenderer:
         text_width = text_bbox[2] - text_bbox[0]
         text_height = text_bbox[3] - text_bbox[1]
         text_x = x - text_width / 2
-        text_y = y - text_height / 2
+        # Better vertical centering - adjust for font baseline offset
+        text_y = y - text_height / 2 - text_bbox[1]
 
         # Use contrasting color for text
         text_color = self.COLOR_CHECKER_O if color == self.COLOR_CHECKER_X else self.COLOR_CHECKER_X
@@ -575,7 +576,7 @@ class BoardRenderer:
         # Draw value - show 64 when centered, otherwise show actual value
         text = "64" if cube_owner == CubeState.CENTERED else str(cube_value)
         try:
-            font = ImageFont.truetype("arial.ttf", 28)
+            font = ImageFont.truetype("arial.ttf", 32)  # Increased from 28
         except:
             font = ImageFont.load_default()
 
@@ -583,7 +584,8 @@ class BoardRenderer:
         text_width = text_bbox[2] - text_bbox[0]
         text_height = text_bbox[3] - text_bbox[1]
         text_x = cube_x + (cube_size - text_width) / 2
-        text_y = cube_y + (cube_size - text_height) / 2
+        # Better vertical centering - adjust for font baseline offset
+        text_y = cube_y + (cube_size - text_height) / 2 - text_bbox[1]
 
         draw.text((text_x, text_y), text, fill="#000000", font=font)
 

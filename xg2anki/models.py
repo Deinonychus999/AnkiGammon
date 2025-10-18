@@ -155,20 +155,16 @@ class Decision:
         """Get formatted metadata for card display."""
         dice_str = f"{self.dice[0]}{self.dice[1]}" if self.dice else "N/A"
         match_str = f"{self.match_length}pt" if self.match_length > 0 else "Money"
-        # Show em dash when cube is centered, otherwise show value with owner
+        # Show em dash when cube is centered, otherwise just show value
         if self.cube_owner == CubeState.CENTERED:
             cube_str = "—"
         else:
             cube_str = f"{self.cube_value}"
-            if self.cube_owner == CubeState.X_OWNS:
-                cube_str += " (X)"
-            elif self.cube_owner == CubeState.O_OWNS:
-                cube_str += " (O)"
 
         # Map Player enum to color names
-        # Player.O = BOTTOM player (typically plays with white checkers from bottom)
-        # Player.X = TOP player (typically plays with black checkers from top)
-        player_name = "White" if self.on_roll == Player.O else "Black"
+        # Player.X = TOP player (plays with white checkers from top)
+        # Player.O = BOTTOM player (plays with black checkers from bottom)
+        player_name = "White" if self.on_roll == Player.X else "Black"
 
         return (
             f"{player_name} | "
