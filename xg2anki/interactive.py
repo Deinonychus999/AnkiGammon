@@ -184,7 +184,15 @@ class InteractiveSession:
             if not lines:
                 return False
             text = "\n".join(trim_trailing_empty_lines(lines)).strip()
-            return 'XGID=' in text and 'eq:' in text
+            # Check for XGID and either:
+            # - Checker play: has 'eq:' in move lines
+            # - Cube decision: has 'Cubeful Equities:' or 'Best Cube action:' or both 'Double' and 'Take'/'Pass'
+            has_xgid = 'XGID=' in text
+            has_checker_play = 'eq:' in text
+            has_cube_decision = ('Cubeful Equities:' in text or
+                               'Best Cube action:' in text or
+                               ('Double' in text and ('Take' in text or 'Pass' in text or 'Drop' in text)))
+            return has_xgid and (has_checker_play or has_cube_decision)
 
         def finalize_current_position(announce: bool = True) -> bool:
             nonlocal current_position_lines, consecutive_empty_lines, position_number

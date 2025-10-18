@@ -281,6 +281,10 @@ class XGTextParser:
         if not moves:
             moves = XGTextParser._parse_moves_fallback(text)
 
+        # If still no moves, try parsing as cube decision
+        if not moves:
+            moves = XGTextParser._parse_cube_decision(text)
+
         # Calculate errors if not already set
         if moves and len(moves) > 1:
             best_equity = moves[0].equity
@@ -315,6 +319,181 @@ class XGTextParser:
                 error=0.0,
                 rank=rank
             ))
+
+        return moves
+
+    @staticmethod
+    def _parse_cube_decision(text: str) -> List[Move]:
+        """
+        Parse cube decision analysis from text.
+
+        Format:
+            Cubeful Equities:
+                   No redouble:     +0.172
+                   Redouble/Take:   -0.361 (-0.533)
+                   Redouble/Pass:   +1.000 (+0.828)
+
+            Best Cube action: No redouble / Take
+                         OR: Too good to redouble / Pass
+
+        Generates all 5 cube options:
+        - No double/redouble
+        - Double/Take (Redouble/Take)
+        - Double/Pass (Redouble/Pass)
+        - Too good/Take
+        - Too good/Pass
+        """
+        moves = []
+
+        # Look for "Cubeful Equities:" section
+        if 'Cubeful Equities:' not in text:
+            return moves
+
+        # Parse the 3 equity values from "Cubeful Equities:" section
+        # Pattern to match cube decision lines:
+        # "       No redouble:     +0.172"
+        # "       Redouble/Take:   -0.361 (-0.533)"
+        # "       Redouble/Pass:   +1.000 (+0.828)"
+        pattern = re.compile(
+            r'^\s*(No (?:redouble|double)|(?:Re)?[Dd]ouble/(?:Take|Pass|Drop)):\s*([+-]?\d+\.\d+)(?:\s*\(([+-]\d+\.\d+)\))?',
+            re.MULTILINE | re.IGNORECASE
+        )
+
+        # Store parsed equities by normalized action
+        equity_map = {}
+        for match in pattern.finditer(text):
+            notation = match.group(1).strip()
+            equity = float(match.group(2))
+
+            # Normalize notation
+            normalized = XGTextParser._clean_move_notation(notation)
+            equity_map[normalized] = equity
+
+        if not equity_map:
+            return moves
+
+        # Parse "Best Cube action:" to determine which is actually best
+        best_action_match = re.search(
+            r'Best Cube action:\s*(.+?)(?:\n|$)',
+            text,
+            re.IGNORECASE
+        )
+
+        best_action_text = None
+        if best_action_match:
+            best_action_text = best_action_match.group(1).strip()
+
+        # Determine if we're using "double" or "redouble" terminology
+        # Check if any parsed notation contains "redouble"
+        use_redouble = any('redouble' in match.group(1).lower()
+                          for match in pattern.finditer(text))
+
+        # Generate all 5 cube options with appropriate terminology
+        double_term = "Redouble" if use_redouble else "Double"
+
+        # Define all 5 possible cube options
+        # All options should show opponent's recommended response
+        all_options = [
+            f"No {double_term}/Take",
+            f"{double_term}/Take",
+            f"{double_term}/Pass",
+            f"Too good/Take",
+            f"Too good/Pass"
+        ]
+
+        # Assign equities and determine best move
+        # The equities we have from XG are: No double, Double/Take, Double/Pass
+        # We need to infer equities for "Too good" options
+
+        no_double_eq = equity_map.get("No Double", None)
+        double_take_eq = equity_map.get("Double/Take", None)
+        double_pass_eq = equity_map.get("Double/Pass", None)
+
+        # Build option list with equities
+        option_equities = {}
+        if no_double_eq is not None:
+            # "No Double/Take" means we don't double and opponent would take if we did
+            option_equities[f"No {double_term}/Take"] = no_double_eq
+        if double_take_eq is not None:
+            option_equities[f"{double_term}/Take"] = double_take_eq
+        if double_pass_eq is not None:
+            option_equities[f"{double_term}/Pass"] = double_pass_eq
+
+        # For "Too good" options, use the same equity as the corresponding action
+        # Too good/Take means we're too good to double, so opponent should drop
+        # This has the same practical equity as Double/Pass
+        if double_pass_eq is not None:
+            option_equities["Too good/Take"] = double_pass_eq
+            option_equities["Too good/Pass"] = double_pass_eq
+
+        # Determine which is the best option based on "Best Cube action:" text
+        # Format can be:
+        #   "No redouble / Take" means "No redouble/Take" (we don't double, opponent would take)
+        #   "Redouble / Take" means "Redouble/Take" (we double, opponent takes)
+        #   "Too good to redouble / Pass" means "Too good/Pass"
+        best_notation = None
+        if best_action_text:
+            text_lower = best_action_text.lower()
+            if 'too good' in text_lower:
+                # "Too good to redouble / Take" or "Too good to redouble / Pass"
+                # The part after the slash is what opponent would do
+                if 'take' in text_lower:
+                    best_notation = "Too good/Take"
+                elif 'pass' in text_lower or 'drop' in text_lower:
+                    best_notation = "Too good/Pass"
+            elif ('no double' in text_lower or 'no redouble' in text_lower):
+                # "No redouble / Take" means we don't double, opponent would take
+                best_notation = f"No {double_term}/Take"
+            elif ('double' in text_lower or 'redouble' in text_lower):
+                # This is tricky: "Redouble / Take" vs "No redouble / Take"
+                # We already handled "No redouble" above, so this must be actual double
+                if 'take' in text_lower:
+                    best_notation = f"{double_term}/Take"
+                elif 'pass' in text_lower or 'drop' in text_lower:
+                    best_notation = f"{double_term}/Pass"
+
+        # Create Move objects for all 5 options
+        for i, option in enumerate(all_options):
+            equity = option_equities.get(option, 0.0)
+            moves.append(Move(
+                notation=option,
+                equity=equity,
+                error=0.0,  # Will calculate below
+                rank=0  # Will assign ranks below
+            ))
+
+        # Sort by equity (highest first) to determine ranking
+        moves.sort(key=lambda m: m.equity, reverse=True)
+
+        # Assign ranks: best move gets rank 1, rest get 2-5 based on equity
+        if best_notation:
+            # Best move was identified from "Best Cube action:" line
+            rank_counter = 1
+            for move in moves:
+                if move.notation == best_notation:
+                    move.rank = 1
+                else:
+                    # Assign ranks 2-5 based on equity order, skipping the best
+                    if rank_counter == 1:
+                        rank_counter = 2
+                    move.rank = rank_counter
+                    rank_counter += 1
+        else:
+            # Best wasn't identified, rank purely by equity
+            for i, move in enumerate(moves):
+                move.rank = i + 1
+
+        # Calculate errors relative to best move
+        if moves:
+            best_move = next((m for m in moves if m.rank == 1), moves[0])
+            best_equity = best_move.equity
+
+            for move in moves:
+                if move.rank != 1:
+                    move.error = abs(best_equity - move.equity)
+
+        # Sort by rank for output
+        moves.sort(key=lambda m: m.rank)
 
         return moves
 

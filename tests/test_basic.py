@@ -13,6 +13,7 @@ from xg2anki.utils.xgid import parse_xgid, encode_xgid
 from xg2anki.utils.move_parser import MoveParser
 from xg2anki.renderer.board_renderer import BoardRenderer
 from xg2anki.interactive import InteractiveSession
+from xg2anki.parsers.xg_text_parser import XGTextParser
 
 
 class TestXGIDParsing(unittest.TestCase):
@@ -208,6 +209,136 @@ class TestBoardRenderer(unittest.TestCase):
         self.assertEqual(renderer._map_point_index(6, True), 18)
         self.assertEqual(renderer._map_point_index(13, True), 1)
         self.assertEqual(renderer._map_point_index(24, True), 12)
+
+
+class TestXGTextParser(unittest.TestCase):
+    """Test XG text parser."""
+
+    def test_parse_cube_decision(self):
+        """Test parsing cube decision analysis."""
+        text = """XGID=--BBbBB-----aE----Be-c-bb-:1:-1:-1:00:0:0:0:0:8
+
+X:Player 1   O:Player 2
+Score is X:0 O:0. Unlimited Game
+Cube: 2, X own cube
+X on roll, cube action
+
+Analyzed in 2-ply
+Player Winning Chances:   49.42% (G:11.68% B:0.07%)
+Opponent Winning Chances: 50.58% (G:10.58% B:0.22%)
+
+Cubeless Equities: No Double=-0.002, Double=-0.004
+
+Cubeful Equities:
+       No redouble:     +0.172
+       Redouble/Take:   -0.361 (-0.533)
+       Redouble/Pass:   +1.000 (+0.828)
+
+Best Cube action: No redouble / Take
+
+eXtreme Gammon Version: 2.10"""
+
+        decisions = XGTextParser.parse_string(text)
+        self.assertEqual(len(decisions), 1)
+
+        decision = decisions[0]
+        self.assertEqual(decision.decision_type, DecisionType.CUBE_ACTION)
+        self.assertEqual(decision.cube_value, 2)
+        # Should have all 5 cube options
+        self.assertEqual(len(decision.candidate_moves), 5)
+
+        # Check best move (rank 1)
+        best_move = decision.get_best_move()
+        self.assertEqual(best_move.notation, "No Redouble/Take")
+        self.assertAlmostEqual(best_move.equity, 0.172, places=3)
+        self.assertEqual(best_move.rank, 1)
+
+        # Verify all 5 options are present
+        notations = [m.notation for m in decision.candidate_moves]
+        self.assertIn("No Redouble/Take", notations)
+        self.assertIn("Redouble/Take", notations)
+        self.assertIn("Redouble/Pass", notations)
+        self.assertIn("Too good/Take", notations)
+        self.assertIn("Too good/Pass", notations)
+
+    def test_parse_too_good_cube_decision(self):
+        """Test parsing 'Too good' cube decision analysis."""
+        text = """XGID=--BBbBB-----a-----Be-c-bbE:1:-1:-1:00:0:0:0:0:8
+
+X:Player 1   O:Player 2
+Score is X:0 O:0. Unlimited Game
+Cube: 2, X own cube
+X on roll, cube action
+
+Analyzed in 2-ply
+Player Winning Chances:   88.42% (G:81.23% B:13.70%)
+Opponent Winning Chances: 11.58% (G:1.09% B:0.02%)
+
+Cubeless Equities: No Double=+1.707, Double=+3.413
+
+Cubeful Equities:
+       No redouble:     +1.761
+       Redouble/Take:   +3.332 (+1.570)
+       Redouble/Pass:   +1.000 (-0.761)
+
+Best Cube action: Too good to redouble / Pass
+
+eXtreme Gammon Version: 2.10"""
+
+        decisions = XGTextParser.parse_string(text)
+        self.assertEqual(len(decisions), 1)
+
+        decision = decisions[0]
+        self.assertEqual(decision.decision_type, DecisionType.CUBE_ACTION)
+        self.assertEqual(decision.cube_value, 2)
+        self.assertEqual(len(decision.candidate_moves), 5)
+
+        # Check best move is "Too good/Pass"
+        best_move = decision.get_best_move()
+        self.assertEqual(best_move.notation, "Too good/Pass")
+        self.assertEqual(best_move.rank, 1)
+
+        # Verify all 5 options are present with "Redouble" terminology
+        notations = [m.notation for m in decision.candidate_moves]
+        self.assertIn("No Redouble/Take", notations)
+        self.assertIn("Redouble/Take", notations)
+        self.assertIn("Redouble/Pass", notations)
+        self.assertIn("Too good/Take", notations)
+        self.assertIn("Too good/Pass", notations)
+
+    def test_parse_checker_play(self):
+        """Test parsing checker play analysis."""
+        text = """XGID=--BBbBB-----aE----Be-c-bb-:1:-1:-1:54:0:0:0:0:8
+
+X:Player 1   O:Player 2
+Score is X:0 O:0. Unlimited Game
+Cube: 2, X own cube
+X to play 54
+
+    1. 3-ply       13/4                         eq:+0.165
+      Player:   49.07% (G:13.31% B:0.11%)
+      Opponent: 50.93% (G:10.59% B:0.24%)
+
+    2. 3-ply       13/9 6/1                     eq:+0.026 (-0.140)
+      Player:   44.31% (G:10.20% B:0.06%)
+      Opponent: 55.69% (G:10.99% B:0.24%)
+
+eXtreme Gammon Version: 2.10"""
+
+        decisions = XGTextParser.parse_string(text)
+        self.assertEqual(len(decisions), 1)
+
+        decision = decisions[0]
+        self.assertEqual(decision.decision_type, DecisionType.CHECKER_PLAY)
+        self.assertEqual(decision.dice, (5, 4))
+        self.assertEqual(len(decision.candidate_moves), 2)
+
+        # Check moves
+        self.assertEqual(decision.candidate_moves[0].notation, "13/4")
+        self.assertAlmostEqual(decision.candidate_moves[0].equity, 0.165, places=3)
+
+        self.assertEqual(decision.candidate_moves[1].notation, "13/9 6/1")
+        self.assertAlmostEqual(decision.candidate_moves[1].error, 0.140, places=3)
 
 
 class TestInteractiveSession(unittest.TestCase):
