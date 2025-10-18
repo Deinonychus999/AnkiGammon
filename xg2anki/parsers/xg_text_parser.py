@@ -261,11 +261,14 @@ class XGTextParser:
             error_str = match.group(4)
 
             # Parse error (if present in parentheses)
+            # For checker play, preserve the sign (negative means worse than best)
             if error_str:
-                error = abs(float(error_str))
+                xg_error = float(error_str)  # Preserve sign from XG
+                error = abs(xg_error)  # Internal error (always positive)
             else:
                 # First move has no error
-                error = 0.0 if rank == 1 else 0.0
+                xg_error = 0.0
+                error = 0.0
 
             # Clean up notation
             notation = XGTextParser._clean_move_notation(notation)
@@ -274,7 +277,9 @@ class XGTextParser:
                 notation=notation,
                 equity=equity,
                 error=error,
-                rank=rank
+                rank=rank,
+                xg_error=xg_error,  # Store XG's error with sign
+                xg_notation=notation  # For checker play, XG notation same as regular notation
             ))
 
         # If we didn't find moves with the standard pattern, try alternative patterns
@@ -359,18 +364,26 @@ class XGTextParser:
             re.MULTILINE | re.IGNORECASE
         )
 
-        # Store parsed equities by normalized action
-        equity_map = {}
-        for match in pattern.finditer(text):
+        # Store parsed equities and XG errors in order they appear
+        # This preserves XG's original order (No double, Double/Take, Double/Pass)
+        xg_moves_data = []  # List of (normalized_notation, equity, xg_error, xg_order)
+        for i, match in enumerate(pattern.finditer(text), 1):
             notation = match.group(1).strip()
             equity = float(match.group(2))
+            error_str = match.group(3)
+
+            # Parse XG's error (in parentheses) - preserve the sign (+ or -)
+            xg_error = float(error_str) if error_str else 0.0
 
             # Normalize notation
             normalized = XGTextParser._clean_move_notation(notation)
-            equity_map[normalized] = equity
+            xg_moves_data.append((normalized, equity, xg_error, i))
 
-        if not equity_map:
+        if not xg_moves_data:
             return moves
+
+        # Build equity map for easy lookup
+        equity_map = {data[0]: data[1] for data in xg_moves_data}
 
         # Parse "Best Cube action:" to determine which is actually best
         best_action_match = re.search(
@@ -452,14 +465,42 @@ class XGTextParser:
                 elif 'pass' in text_lower or 'drop' in text_lower:
                     best_notation = f"{double_term}/Pass"
 
+        # Build a lookup for XG move data
+        xg_data_map = {data[0]: data for data in xg_moves_data}
+
         # Create Move objects for all 5 options
         for i, option in enumerate(all_options):
             equity = option_equities.get(option, 0.0)
+            # Mark "Too good" options as synthetic (not from XG's analysis)
+            is_from_xg = not option.startswith("Too good")
+
+            # Get XG's error, order, and original notation for this move if it's from XG
+            xg_error_val = None
+            xg_order = None
+            xg_notation_val = None
+            if is_from_xg:
+                # Look up the original notation (without /Take suffix for No Double)
+                base_notation = option.replace(f"No {double_term}/Take", "No Double")
+                base_notation = base_notation.replace(f"{double_term}/Take", "Double/Take")
+                base_notation = base_notation.replace(f"{double_term}/Pass", "Double/Pass")
+
+                if base_notation in xg_data_map:
+                    _, _, xg_error_val, xg_order = xg_data_map[base_notation]
+                    # Store the XG notation with proper terminology
+                    if base_notation == "No Double":
+                        xg_notation_val = f"No {double_term.lower()}"
+                    else:
+                        xg_notation_val = base_notation.replace("Double", double_term)
+
             moves.append(Move(
                 notation=option,
                 equity=equity,
-                error=0.0,  # Will calculate below
-                rank=0  # Will assign ranks below
+                error=0.0,  # Will calculate below (error relative to best)
+                rank=0,  # Will assign ranks below
+                xg_rank=xg_order,  # Order in XG's Cubeful Equities section
+                xg_error=xg_error_val,  # Error as shown by XG
+                xg_notation=xg_notation_val,  # Original XG notation for analysis table
+                from_xg_analysis=is_from_xg
             ))
 
         # Sort by equity (highest first) to determine ranking
@@ -483,7 +524,7 @@ class XGTextParser:
             for i, move in enumerate(moves):
                 move.rank = i + 1
 
-        # Calculate errors relative to best move
+        # Calculate errors relative to best move (for our internal use)
         if moves:
             best_move = next((m for m in moves if m.rank == 1), moves[0])
             best_equity = best_move.equity

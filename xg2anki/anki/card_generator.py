@@ -180,21 +180,36 @@ class CardGenerator:
         """Generate HTML for card back."""
         metadata = decision.get_metadata_text()
 
-        # Build move table
+        # Build move table - only show moves from XG's analysis
         table_rows = []
         letters = ['A', 'B', 'C', 'D', 'E']
 
-        for i, move in enumerate(candidates):
-            if not move:
-                continue
+        # Sort candidates by xg_rank for display in analysis table
+        # (candidates are shuffled for MCQ, but analysis table should show XG's order)
+        sorted_candidates = sorted(
+            [m for m in candidates if m and m.from_xg_analysis],
+            key=lambda m: m.xg_rank if m.xg_rank is not None else 999
+        )
 
+        for i, move in enumerate(sorted_candidates):
+            # Use xg_rank for order (preserves XG's Cubeful Equities order)
+            # Use xg_error for display (XG's error values, not our calculated ones)
+            # Use xg_notation for display (e.g., "No double" not "No double/Take")
+            # Highlight if this is the overall best move (rank == 1)
             rank_class = "best-move" if move.rank == 1 else ""
+            display_rank = move.xg_rank if move.xg_rank is not None else (i + 1)
+            display_error = move.xg_error if move.xg_error is not None else move.error
+            display_notation = move.xg_notation if move.xg_notation is not None else move.notation
+
+            # Format error with explicit + sign (matching XG's format)
+            error_str = f"{display_error:+.3f}" if display_error != 0 else "0.000"
+
             table_rows.append(f"""
 <tr class="{rank_class}">
-    <td>{move.rank}</td>
-    <td>{move.notation}</td>
+    <td>{display_rank}</td>
+    <td>{display_notation}</td>
     <td>{move.equity:.3f}</td>
-    <td>{move.error:.3f}</td>
+    <td>{error_str}</td>
 </tr>
 """)
 

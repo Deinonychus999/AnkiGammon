@@ -98,11 +98,15 @@ class Move:
     """
     Represents a candidate move with its analysis.
     """
-    notation: str  # e.g., "13/9 6/5" or "double/take"
+    notation: str  # e.g., "13/9 6/5" or "double/take" (for MCQ and answer display)
     equity: float  # Equity of this move
     error: float = 0.0  # Error compared to best move (0 for best move)
-    rank: int = 1  # Rank among candidates (1 = best)
+    rank: int = 1  # Rank among all candidates (including synthetic, 1 = best)
+    xg_rank: Optional[int] = None  # Order in XG's "Cubeful Equities:" section (1-3)
+    xg_error: Optional[float] = None  # Error as shown by XG (relative to first option in Cubeful Equities)
+    xg_notation: Optional[str] = None  # Original notation from XG (e.g., "No double" not "No double/Take")
     resulting_position: Optional[Position] = None  # Position after this move (if available)
+    from_xg_analysis: bool = True  # True if from XG's analysis, False if synthetically generated
 
     def __str__(self) -> str:
         """Human-readable representation."""
