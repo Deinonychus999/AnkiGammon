@@ -152,13 +152,17 @@ def _parse_position_string(pos_str: str, turn: int) -> Position:
     Parse the position encoding part of XGID.
 
     Format: 26 characters
-    - Char 0: bar for player NOT on roll
-    - Chars 1-24: points 1-24 (from perspective of player on roll)
-    - Char 25: bar for player on roll
+    - Char 0: X's bar (TOP player) - ALWAYS, regardless of turn
+    - Chars 1-24: points 1-24 (perspective depends on turn)
+    - Char 25: O's bar (BOTTOM player) - ALWAYS, regardless of turn
 
-    CRITICAL: The encoding perspective depends on whose turn it is!
-    - When turn=1 (O on roll): lowercase='X', uppercase='O', encoding from O's perspective
-    - When turn=-1 (X on roll): lowercase='O', uppercase='X', encoding from X's perspective (REVERSED!)
+    CRITICAL: The encoding perspective for BOARD POINTS depends on whose turn it is!
+    - When turn=1 (O on roll): lowercase='X', uppercase='O', points in standard order
+    - When turn=-1 (X on roll): lowercase='X', uppercase='O', points in REVERSED order
+
+    Bar positions are always the same:
+    - Char 0 is always X's bar
+    - Char 25 is always O's bar
 
     In our internal model, we always use:
     - points[0] = X's bar (TOP player in standard orientation)
@@ -170,32 +174,26 @@ def _parse_position_string(pos_str: str, turn: int) -> Position:
 
     position = Position()
 
+    # Bar positions are ALWAYS the same regardless of turn
+    # Char 0: X's bar
+    # Char 25: O's bar
+    position.points[0] = _decode_checker_count(pos_str[0], turn)
+    position.points[25] = _decode_checker_count(pos_str[25], turn)
+
     if turn == 1:
         # O is on roll - encoding is from O's perspective (standard)
-        # Char 0: X's bar
         # Chars 1-24: points 1-24
-        # Char 25: O's bar
-        position.points[0] = _decode_checker_count(pos_str[0], turn)
         for i in range(1, 25):
             position.points[i] = _decode_checker_count(pos_str[i], turn)
-        position.points[25] = _decode_checker_count(pos_str[25], turn)
     else:
         # X is on roll - encoding is from X's perspective (FLIPPED!)
         # We need to flip the board to get to our internal model
-        # Char 0: O's bar (in XG encoding) -> maps to our points[25]
         # Chars 1-24: points from X's perspective -> need to reverse
-        # Char 25: X's bar (in XG encoding) -> maps to our points[0]
-
-        # X's bar (from char 25 in XGID)
-        position.points[0] = _decode_checker_count(pos_str[25], turn)
 
         # Board points - reverse the numbering and swap players
         for i in range(1, 25):
             # Point i in our model comes from point (25-i) in the XGID
             position.points[i] = _decode_checker_count(pos_str[25 - i], turn)
-
-        # O's bar (from char 0 in XGID)
-        position.points[25] = _decode_checker_count(pos_str[0], turn)
 
     # Calculate borne-off checkers (each player starts with 15)
     total_x = sum(count for count in position.points if count > 0)

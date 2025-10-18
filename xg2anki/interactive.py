@@ -212,12 +212,12 @@ class InteractiveSession:
                 click.echo(click.style(f"\n  Position #{position_number - 1} saved!", fg='green'))
                 click.echo()
                 click.echo(click.style(f"Position #{position_number}:", fg='yellow', bold=True))
-                click.echo(click.style("(Paste position and press Enter twice, or type 'done')", fg='cyan'))
+                click.echo(click.style("(Paste position or type 'done')", fg='cyan'))
 
             return True
 
         click.echo(click.style(f"Position #{position_number}:", fg='yellow', bold=True))
-        click.echo(click.style("(Paste position and press Enter twice to finish, or type command)", fg='cyan'))
+        click.echo(click.style("(Paste position to finish or type command)", fg='cyan'))
 
         while True:
             try:
