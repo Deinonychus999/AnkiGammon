@@ -32,6 +32,9 @@ CARD_CSS = """
     background-color: var(--canvas-elevated);
     border: 1px solid var(--border);
     border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .question h3 {

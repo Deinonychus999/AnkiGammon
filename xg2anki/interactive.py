@@ -30,7 +30,7 @@ class InteractiveSession:
             if choice == '1':
                 self.create_new_deck()
             elif choice == '2':
-                self.change_color_scheme()
+                self.show_options_menu()
             elif choice == '3':
                 self.show_help()
             elif choice == '4':
@@ -51,13 +51,41 @@ class InteractiveSession:
         """Show main menu and get user choice."""
         click.echo(click.style("Main Menu:", fg='yellow', bold=True))
         click.echo("  1. Create new deck")
-        click.echo(f"  2. Change color scheme (current: {self.color_scheme})")
+        click.echo("  2. Options")
         click.echo("  3. Help")
         click.echo("  4. Exit")
         click.echo()
 
         return click.prompt(click.style("Choose an option", fg='green'),
                           type=str, default='1')
+
+    def show_options_menu(self):
+        """Show options submenu for configuring settings."""
+        while True:
+            click.echo()
+            click.echo(click.style("=" * 60, fg='cyan'))
+            click.echo(click.style("  Options", fg='cyan', bold=True))
+            click.echo(click.style("=" * 60, fg='cyan'))
+            click.echo()
+            click.echo(f"  1. Color scheme (current: {self.color_scheme})")
+            click.echo(f"  2. Show move options (current: {'Yes' if self.settings.show_options else 'No'})")
+            click.echo("  3. Back to main menu")
+            click.echo()
+
+            choice = click.prompt(
+                click.style("Choose an option", fg='green'),
+                type=str,
+                default='3'
+            )
+
+            if choice == '1':
+                self.change_color_scheme()
+            elif choice == '2':
+                self.toggle_show_options()
+            elif choice == '3':
+                break
+            else:
+                click.echo(click.style("\n  Invalid choice. Please try again.\n", fg='red'))
 
     def change_color_scheme(self):
         """Allow user to change the board color scheme."""
@@ -91,7 +119,27 @@ class InteractiveSession:
         click.echo(click.style(f"  Color scheme changed to: {self.color_scheme.title()}", fg='green'))
         click.echo(click.style(f"  (Saved as default)", fg='cyan'))
         click.echo()
-        input(click.style("Press Enter to continue...", fg='green'))
+
+    def toggle_show_options(self):
+        """Toggle the 'show move options' setting."""
+        click.echo()
+        click.echo(click.style("=" * 60, fg='cyan'))
+        click.echo(click.style("  Show Move Options", fg='cyan', bold=True))
+        click.echo(click.style("=" * 60, fg='cyan'))
+        click.echo()
+        click.echo("When enabled, flashcards will show multiple choice options.")
+        click.echo("When disabled, only the board position will be shown.")
+        click.echo()
+
+        new_value = click.confirm(
+            click.style("Show move options on flashcards?", fg='green'),
+            default=self.settings.show_options
+        )
+
+        self.settings.show_options = new_value
+
+        click.echo()
+        click.echo(click.style(f"  Setting saved: {'Show options' if new_value else 'Hide options'}", fg='green'))
         click.echo()
 
     def show_help(self):
@@ -115,7 +163,8 @@ class InteractiveSession:
         click.echo("     - ASCII board diagram")
         click.echo("     - Move analysis with equities")
         click.echo()
-        input(click.style("Press Enter to continue...", fg='green'))
+        click.echo(click.style("Press Enter to continue...", fg='green'), nl=False)
+        input()
         click.echo()
 
     def create_new_deck(self):
@@ -127,16 +176,12 @@ class InteractiveSession:
         click.echo()
 
         # Get deck name
+        click.echo(click.style("Note: Using an existing deck name will append cards to that deck.", fg='cyan'))
+        click.echo()
         deck_name = click.prompt(
             click.style("Deck name", fg='green'),
-            default="XG Backgammon",
+            default=self.settings.deck_name,
             type=str
-        )
-
-        # Get options preference
-        show_options = click.confirm(
-            click.style("Show move options (multiple choice)?", fg='green'),
-            default=True
         )
 
         # Get output format
@@ -200,7 +245,7 @@ class InteractiveSession:
         # Note: show_options is passed as-is, where True means show text options (image_choices=False)
         # The export functions will handle this correctly
         click.echo()
-        self.export_deck(decisions, deck_name, output_format, show_options, self.color_scheme)
+        self.export_deck(decisions, deck_name, output_format, self.settings.show_options, self.color_scheme)
 
     def collect_positions(self) -> List[str]:
         """
@@ -369,14 +414,16 @@ class InteractiveSession:
             click.echo(click.style("=" * 60, fg='green'))
             click.echo()
 
-            input(click.style("Press Enter to return to main menu...", fg='green'))
+            click.echo(click.style("Press Enter to return to main menu...", fg='green'), nl=False)
+            input()
             click.echo()
 
         except Exception as e:
             click.echo()
             click.echo(click.style(f"Error creating deck: {e}", fg='red'))
             click.echo()
-            input(click.style("Press Enter to continue...", fg='yellow'))
+            click.echo(click.style("Press Enter to continue...", fg='yellow'), nl=False)
+            input()
 
 
 def run_interactive():

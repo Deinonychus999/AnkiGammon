@@ -114,13 +114,40 @@ class CardGenerator:
             'tags': tags,
         }
 
+    def _get_metadata_html(self, decision: Decision) -> str:
+        """
+        Get metadata HTML with colored player indicator.
+
+        Returns HTML with inline colored circle representing the checker color.
+        """
+        # Get base metadata text (includes "White" or "Black")
+        base_metadata = decision.get_metadata_text()
+
+        # Get actual checker color from the renderer's color scheme
+        if decision.on_roll == Player.X:
+            checker_color = self.renderer.color_scheme.checker_x
+        else:
+            checker_color = self.renderer.color_scheme.checker_o
+
+        # Replace "White" or "Black" with colored circle
+        # Use HTML entity for circle (●) with inline style
+        colored_circle = f'<span style="color: {checker_color}; font-size: 1.8em;">●</span>'
+
+        # Replace the player name with the colored circle
+        if decision.on_roll == Player.X:
+            metadata_html = base_metadata.replace("White", colored_circle)
+        else:
+            metadata_html = base_metadata.replace("Black", colored_circle)
+
+        return metadata_html
+
     def _generate_simple_front(
         self,
         decision: Decision,
         position_image: str
     ) -> str:
         """Generate HTML for simple front (no options)."""
-        metadata = decision.get_metadata_text()
+        metadata = self._get_metadata_html(decision)
 
         html = f"""
 <div class="card-front">
@@ -142,7 +169,7 @@ class CardGenerator:
         candidates: List[Optional[Move]]
     ) -> str:
         """Generate HTML for text-based MCQ front."""
-        metadata = decision.get_metadata_text()
+        metadata = self._get_metadata_html(decision)
 
         # Format candidate options
         options_html = []
@@ -178,7 +205,7 @@ class CardGenerator:
         show_options: bool
     ) -> str:
         """Generate HTML for card back."""
-        metadata = decision.get_metadata_text()
+        metadata = self._get_metadata_html(decision)
 
         # Build move table - only show moves from XG's analysis
         table_rows = []
