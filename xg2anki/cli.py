@@ -124,17 +124,19 @@ def parse_input(input_file: str, input_format: str):
     return XGTextParser.parse_file(str(input_path))
 
 
-def export_apkg(decisions, output_dir, deck_name, show_options):
+def export_apkg(decisions, output_dir, deck_name, show_options, color_scheme="classic"):
     """Export to APKG format."""
     click.echo(f"Generating APKG file...")
     click.echo(f"  Deck name: {deck_name}")
     click.echo(f"  Show options: {'Yes' if show_options else 'No'}")
+    click.echo(f"  Color scheme: {color_scheme}")
 
     exporter = ApkgExporter(output_dir, deck_name)
     output_file = exporter.export(
         decisions,
         output_file="xg_deck.apkg",
-        show_options=show_options
+        show_options=show_options,
+        color_scheme=color_scheme
     )
 
     click.echo()
@@ -146,11 +148,12 @@ def export_apkg(decisions, output_dir, deck_name, show_options):
     click.echo(f"  3. Select: {output_file}")
 
 
-def export_ankiconnect(decisions, output_dir, deck_name, show_options):
+def export_ankiconnect(decisions, output_dir, deck_name, show_options, color_scheme="classic"):
     """Export via Anki-Connect."""
     click.echo(f"Connecting to Anki...")
     click.echo(f"  Deck name: {deck_name}")
     click.echo(f"  Show options: {'Yes' if show_options else 'No'}")
+    click.echo(f"  Color scheme: {color_scheme}")
 
     client = AnkiConnect(deck_name=deck_name)
 
@@ -189,7 +192,8 @@ def export_ankiconnect(decisions, output_dir, deck_name, show_options):
     results = client.export_decisions(
         decisions,
         output_dir=output_dir,
-        show_options=show_options
+        show_options=show_options,
+        color_scheme=color_scheme
     )
 
     click.echo()

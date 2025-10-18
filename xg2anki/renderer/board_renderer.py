@@ -5,28 +5,18 @@ from typing import Optional, Tuple
 import math
 
 from xg2anki.models import Position, Player, CubeState
+from xg2anki.renderer.color_schemes import ColorScheme, CLASSIC
 
 
 class BoardRenderer:
     """Renders backgammon positions as PNG images."""
-
-    # Color scheme
-    COLOR_BOARD_LIGHT = "#DEB887"  # Burlywood
-    COLOR_BOARD_DARK = "#8B4513"   # SaddleBrown
-    COLOR_POINT_LIGHT = "#F5DEB3"  # Wheat
-    COLOR_POINT_DARK = "#8B4513"   # SaddleBrown
-    COLOR_CHECKER_X = "#FFFFFF"    # White (X = TOP player)
-    COLOR_CHECKER_O = "#000000"    # Black (O = BOTTOM player)
-    COLOR_CHECKER_BORDER = "#333333"
-    COLOR_BAR = "#654321"          # Dark brown
-    COLOR_TEXT = "#000000"
-    COLOR_BEAROFF = "#DEB887"
 
     def __init__(
         self,
         width: int = 900,  # Increased from 800 to make room
         height: int = 600,
         point_height_ratio: float = 0.45,  # Increased from 0.35 to make triangles longer
+        color_scheme: ColorScheme = CLASSIC,
     ):
         """
         Initialize the board renderer.
@@ -35,10 +25,24 @@ class BoardRenderer:
             width: Image width in pixels
             height: Image height in pixels
             point_height_ratio: Height of points as ratio of board height
+            color_scheme: ColorScheme object defining board colors
         """
         self.width = width
         self.height = height
         self.point_height_ratio = point_height_ratio
+        self.color_scheme = color_scheme
+
+        # Set color attributes from scheme for backward compatibility
+        self.COLOR_BOARD_LIGHT = color_scheme.board_light
+        self.COLOR_BOARD_DARK = color_scheme.board_dark
+        self.COLOR_POINT_LIGHT = color_scheme.point_light
+        self.COLOR_POINT_DARK = color_scheme.point_dark
+        self.COLOR_CHECKER_X = color_scheme.checker_x
+        self.COLOR_CHECKER_O = color_scheme.checker_o
+        self.COLOR_CHECKER_BORDER = color_scheme.checker_border
+        self.COLOR_BAR = color_scheme.bar
+        self.COLOR_TEXT = color_scheme.text
+        self.COLOR_BEAROFF = color_scheme.bearoff
 
         # Calculate dimensions with space for cube (left) and bear-off (right)
         self.margin = 20

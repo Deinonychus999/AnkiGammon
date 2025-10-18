@@ -60,7 +60,8 @@ class ApkgExporter:
         self,
         decisions: List[Decision],
         output_file: str = "xg_deck.apkg",
-        show_options: bool = False
+        show_options: bool = False,
+        color_scheme: str = "classic"
     ) -> str:
         """
         Export decisions to an APKG file.
@@ -69,14 +70,23 @@ class ApkgExporter:
             decisions: List of Decision objects
             output_file: Output filename
             show_options: Show multiple choice options (text-based)
+            color_scheme: Board color scheme name
 
         Returns:
             Path to generated APKG file
         """
+        # Create renderer with color scheme
+        from xg2anki.renderer.color_schemes import get_scheme
+        from xg2anki.renderer.board_renderer import BoardRenderer
+
+        scheme = get_scheme(color_scheme)
+        renderer = BoardRenderer(color_scheme=scheme)
+
         # Create card generator
         card_gen = CardGenerator(
             output_dir=self.output_dir,
-            show_options=show_options
+            show_options=show_options,
+            renderer=renderer
         )
 
         # Generate cards

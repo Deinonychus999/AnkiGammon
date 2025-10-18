@@ -16,6 +16,7 @@ class InteractiveSession:
     def __init__(self):
         self.positions_text: List[str] = []
         self.current_buffer = []
+        self.color_scheme = "classic"  # Default color scheme
 
     def run(self):
         """Run the interactive session."""
@@ -27,8 +28,10 @@ class InteractiveSession:
             if choice == '1':
                 self.create_new_deck()
             elif choice == '2':
-                self.show_help()
+                self.change_color_scheme()
             elif choice == '3':
+                self.show_help()
+            elif choice == '4':
                 click.echo("\nGoodbye!")
                 sys.exit(0)
             else:
@@ -46,12 +49,43 @@ class InteractiveSession:
         """Show main menu and get user choice."""
         click.echo(click.style("Main Menu:", fg='yellow', bold=True))
         click.echo("  1. Create new deck")
-        click.echo("  2. Help")
-        click.echo("  3. Exit")
+        click.echo(f"  2. Change color scheme (current: {self.color_scheme})")
+        click.echo("  3. Help")
+        click.echo("  4. Exit")
         click.echo()
 
         return click.prompt(click.style("Choose an option", fg='green'),
                           type=str, default='1')
+
+    def change_color_scheme(self):
+        """Allow user to change the board color scheme."""
+        from xg2anki.renderer.color_schemes import list_schemes
+
+        click.echo()
+        click.echo(click.style("=" * 60, fg='cyan'))
+        click.echo(click.style("  Color Scheme Selection", fg='cyan', bold=True))
+        click.echo(click.style("=" * 60, fg='cyan'))
+        click.echo()
+
+        schemes = list_schemes()
+        click.echo("Available color schemes:")
+        for i, scheme in enumerate(schemes, 1):
+            current = " (current)" if scheme == self.color_scheme else ""
+            click.echo(f"  {i}. {scheme.title()}{current}")
+        click.echo()
+
+        choice = click.prompt(
+            click.style(f"Choose a scheme (1-{len(schemes)})", fg='green'),
+            type=click.IntRange(1, len(schemes)),
+            default=schemes.index(self.color_scheme) + 1 if self.color_scheme in schemes else 1
+        )
+
+        self.color_scheme = schemes[choice - 1]
+        click.echo()
+        click.echo(click.style(f"  Color scheme changed to: {self.color_scheme.title()}", fg='green'))
+        click.echo()
+        input(click.style("Press Enter to continue...", fg='green'))
+        click.echo()
 
     def show_help(self):
         """Show help information."""
@@ -159,7 +193,7 @@ class InteractiveSession:
         # Note: show_options is passed as-is, where True means show text options (image_choices=False)
         # The export functions will handle this correctly
         click.echo()
-        self.export_deck(decisions, deck_name, output_format, show_options)
+        self.export_deck(decisions, deck_name, output_format, show_options, self.color_scheme)
 
     def collect_positions(self) -> List[str]:
         """
@@ -212,7 +246,7 @@ class InteractiveSession:
                 click.echo(click.style(f"\n  Position #{position_number - 1} saved!", fg='green'))
                 click.echo()
                 click.echo(click.style(f"Position #{position_number}:", fg='yellow', bold=True))
-                click.echo(click.style("(Paste position or type 'done')", fg='cyan'))
+                click.echo(click.style("(Paste position or type 'done', 'show' or 'abort')", fg='cyan'))
 
             return True
 
@@ -306,7 +340,7 @@ class InteractiveSession:
         click.echo()
 
     def export_deck(self, decisions: List[Decision], deck_name: str,
-                   output_format: str, show_options: bool):
+                   output_format: str, show_options: bool, color_scheme: str = "classic"):
         """Export the deck using the specified format."""
         # Import here to avoid circular imports
         from xg2anki.cli import export_apkg, export_ankiconnect
@@ -318,9 +352,9 @@ class InteractiveSession:
             click.echo(click.style("Generating deck...", fg='cyan'))
 
             if output_format == 'apkg':
-                export_apkg(decisions, output_dir, deck_name, show_options)
+                export_apkg(decisions, output_dir, deck_name, show_options, color_scheme)
             elif output_format == 'ankiconnect':
-                export_ankiconnect(decisions, output_dir, deck_name, show_options)
+                export_ankiconnect(decisions, output_dir, deck_name, show_options, color_scheme)
 
             click.echo()
             click.echo(click.style("=" * 60, fg='green'))

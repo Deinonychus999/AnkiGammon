@@ -180,7 +180,8 @@ class AnkiConnect:
         self,
         decisions: List[Decision],
         output_dir: Path,
-        show_options: bool = False
+        show_options: bool = False,
+        color_scheme: str = "classic"
     ) -> Dict[str, Any]:
         """
         Export decisions directly to Anki via Anki-Connect.
@@ -189,6 +190,7 @@ class AnkiConnect:
             decisions: List of Decision objects
             output_dir: Directory for temporary media files
             show_options: Show multiple choice options (text-based)
+            color_scheme: Board color scheme name
 
         Returns:
             Dictionary with export statistics
@@ -201,10 +203,18 @@ class AnkiConnect:
         self.create_model()
         self.create_deck()
 
+        # Create renderer with color scheme
+        from xg2anki.renderer.color_schemes import get_scheme
+        from xg2anki.renderer.board_renderer import BoardRenderer
+
+        scheme = get_scheme(color_scheme)
+        renderer = BoardRenderer(color_scheme=scheme)
+
         # Create card generator
         card_gen = CardGenerator(
             output_dir=output_dir,
-            show_options=show_options
+            show_options=show_options,
+            renderer=renderer
         )
 
         # Generate and add cards
