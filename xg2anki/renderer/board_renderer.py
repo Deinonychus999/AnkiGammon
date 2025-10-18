@@ -120,8 +120,9 @@ class BoardRenderer:
         # Draw points
         self._draw_points(draw, board_x, board_y)
 
-        # Determine if we should flip the orientation so the player on roll is at the bottom
-        flipped = (on_roll == Player.X)
+        # Don't flip the board - always show from O's perspective
+        # (XG positions are already encoded correctly for this)
+        flipped = False
 
         # Draw checkers
         self._draw_checkers(draw, position, board_x, board_y, flipped)

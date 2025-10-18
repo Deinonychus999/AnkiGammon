@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import List, Dict, Optional, Tuple
 from PIL import Image
 
-from xg2anki.models import Decision, Move
+from xg2anki.models import Decision, Move, Player
 from xg2anki.renderer.board_renderer import BoardRenderer
 from xg2anki.utils.move_parser import MoveParser
 

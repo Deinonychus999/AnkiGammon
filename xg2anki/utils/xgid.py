@@ -77,7 +77,11 @@ def parse_xgid(xgid: str) -> Tuple[Position, dict]:
     max_cube = int(parts[9]) if len(parts) > 9 else 8
 
     # Parse position
-    position = _parse_position_string(position_str)
+    # CRITICAL: The position encoding depends on whose turn it is!
+    # When turn=1 (BOTTOM/O on roll), the encoding is from O's perspective
+    # When turn=-1 (TOP/X on roll), the encoding is from X's perspective
+    # We need to pass the turn to correctly interpret the position
+    position = _parse_position_string(position_str, turn)
 
     # Parse metadata
     metadata = {}
@@ -87,13 +91,24 @@ def parse_xgid(xgid: str) -> Tuple[Position, dict]:
     metadata['cube_value'] = cube_value
 
     # Cube owner
-    # -1 = TOP player (X), 0 = centered, 1 = BOTTOM player (O)
-    if cube_position == -1:
-        cube_state = CubeState.X_OWNS
-    elif cube_position == 1:
-        cube_state = CubeState.O_OWNS
-    else:
+    # CRITICAL: Like the position encoding, cube ownership is relative to perspective!
+    # -1 = TOP player, 0 = centered, 1 = BOTTOM player
+    # When turn=1 (O on roll): TOP=X, BOTTOM=O
+    # When turn=-1 (X on roll): TOP=O, BOTTOM=X (SWAPPED!)
+    if cube_position == 0:
         cube_state = CubeState.CENTERED
+    elif turn == 1:
+        # O's perspective (standard)
+        if cube_position == -1:
+            cube_state = CubeState.X_OWNS  # TOP = X
+        else:  # cube_position == 1
+            cube_state = CubeState.O_OWNS  # BOTTOM = O
+    else:  # turn == -1
+        # X's perspective (SWAPPED!)
+        if cube_position == -1:
+            cube_state = CubeState.O_OWNS  # TOP = O (in X's perspective)
+        else:  # cube_position == 1
+            cube_state = CubeState.X_OWNS  # BOTTOM = X (in X's perspective)
     metadata['cube_owner'] = cube_state
 
     # Turn: 1 = BOTTOM player (O), -1 = TOP player (X)
@@ -132,34 +147,55 @@ def parse_xgid(xgid: str) -> Tuple[Position, dict]:
     return position, metadata
 
 
-def _parse_position_string(pos_str: str) -> Position:
+def _parse_position_string(pos_str: str, turn: int) -> Position:
     """
     Parse the position encoding part of XGID.
 
     Format: 26 characters
-    - Char 0: TOP player's bar
-    - Chars 1-24: points 1-24 (bottom player's perspective)
-    - Char 25: BOTTOM player's bar
+    - Char 0: bar for player NOT on roll
+    - Chars 1-24: points 1-24 (from perspective of player on roll)
+    - Char 25: bar for player on roll
 
-    In our internal model:
-    - points[0] = X's bar (TOP player)
-    - points[1-24] = board points
-    - points[25] = O's bar (BOTTOM player)
+    CRITICAL: The encoding perspective depends on whose turn it is!
+    - When turn=1 (O on roll): lowercase='X', uppercase='O', encoding from O's perspective
+    - When turn=-1 (X on roll): lowercase='O', uppercase='X', encoding from X's perspective (REVERSED!)
+
+    In our internal model, we always use:
+    - points[0] = X's bar (TOP player in standard orientation)
+    - points[1-24] = board points (point 1 = O's home, point 24 = X's home)
+    - points[25] = O's bar (BOTTOM player in standard orientation)
     """
     if len(pos_str) != 26:
         raise ValueError(f"Position string must be 26 characters, got {len(pos_str)}")
 
     position = Position()
 
-    # Char 0: TOP player's bar -> our points[0] (X's bar)
-    position.points[0] = _decode_checker_count(pos_str[0])
+    if turn == 1:
+        # O is on roll - encoding is from O's perspective (standard)
+        # Char 0: X's bar
+        # Chars 1-24: points 1-24
+        # Char 25: O's bar
+        position.points[0] = _decode_checker_count(pos_str[0], turn)
+        for i in range(1, 25):
+            position.points[i] = _decode_checker_count(pos_str[i], turn)
+        position.points[25] = _decode_checker_count(pos_str[25], turn)
+    else:
+        # X is on roll - encoding is from X's perspective (FLIPPED!)
+        # We need to flip the board to get to our internal model
+        # Char 0: O's bar (in XG encoding) -> maps to our points[25]
+        # Chars 1-24: points from X's perspective -> need to reverse
+        # Char 25: X's bar (in XG encoding) -> maps to our points[0]
 
-    # Chars 1-24: board points
-    for i in range(1, 25):
-        position.points[i] = _decode_checker_count(pos_str[i])
+        # X's bar (from char 25 in XGID)
+        position.points[0] = _decode_checker_count(pos_str[25], turn)
 
-    # Char 25: BOTTOM player's bar -> our points[25] (O's bar)
-    position.points[25] = _decode_checker_count(pos_str[25])
+        # Board points - reverse the numbering and swap players
+        for i in range(1, 25):
+            # Point i in our model comes from point (25-i) in the XGID
+            position.points[i] = _decode_checker_count(pos_str[25 - i], turn)
+
+        # O's bar (from char 0 in XGID)
+        position.points[25] = _decode_checker_count(pos_str[0], turn)
 
     # Calculate borne-off checkers (each player starts with 15)
     total_x = sum(count for count in position.points if count > 0)
@@ -171,22 +207,34 @@ def _parse_position_string(pos_str: str) -> Position:
     return position
 
 
-def _decode_checker_count(char: str) -> int:
+def _decode_checker_count(char: str, turn: int) -> int:
     """
     Decode a single character to checker count.
 
-    '-' = 0 (empty)
-    'a'-'p' = 1-16 (TOP player checkers - X in our model, positive)
-    'A'-'P' = 1-16 (BOTTOM player checkers - O in our model, negative)
+    The interpretation depends on whose turn it is:
+    - When turn=1 (O on roll): lowercase='X' (positive), uppercase='O' (negative)
+    - When turn=-1 (X on roll): lowercase='X' (positive), uppercase='O' (negative) - SAME!
+
+    CRITICAL: The uppercase/lowercase mapping to players does NOT change based on turn!
+    What changes is the POINT NUMBERING (handled in _parse_position_string).
+
+    Args:
+        char: The character to decode
+        turn: 1 if O on roll, -1 if X on roll
+
+    Returns:
+        Checker count (positive for X, negative for O, 0 for empty)
     """
     if char == '-':
         return 0
     elif 'a' <= char <= 'p':
-        # TOP player (X) - positive in our model
-        return ord(char) - ord('a') + 1
+        count = ord(char) - ord('a') + 1
+        # lowercase ALWAYS = X (positive), regardless of turn
+        return count  # X checkers (positive)
     elif 'A' <= char <= 'P':
-        # BOTTOM player (O) - negative in our model
-        return -(ord(char) - ord('A') + 1)
+        count = ord(char) - ord('A') + 1
+        # uppercase ALWAYS = O (negative), regardless of turn
+        return -count  # O checkers (negative)
     else:
         raise ValueError(f"Invalid position character: {char}")
 

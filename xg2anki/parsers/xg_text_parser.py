@@ -74,8 +74,14 @@ class XGTextParser:
         # Parse game info (players, score, cube, etc.)
         game_info = XGTextParser._parse_game_info(analysis_section)
         if game_info:
-            # Update metadata with parsed info
-            metadata.update(game_info)
+            # Update metadata with parsed info, but DON'T overwrite XGID data!
+            # XGID data is authoritative because it accounts for perspective correctly
+            # The ASCII board representation may show cube ownership from a flipped perspective
+            for key, value in game_info.items():
+                if key not in metadata or key == 'decision_type':
+                    # Only add if not already in metadata (from XGID)
+                    # Exception: decision_type can only come from ASCII parsing
+                    metadata[key] = value
 
         # Parse move analysis
         moves = XGTextParser._parse_moves(analysis_section)
