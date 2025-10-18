@@ -102,11 +102,63 @@ The card back shows moves in **XG's original order** (not shuffled MCQ order):
 - **`utils/xgid.py`**: XGID encoding/decoding with perspective handling
 - **`parsers/xg_text_parser.py`**: Parses XG text exports, handles cube decisions
 - **`renderer/board_renderer.py`**: Generates backgammon board images with PIL
+- **`renderer/color_schemes.py`**: Defines color schemes for board rendering (6 built-in schemes: classic, forest, ocean, desert, sunset, midnight)
 - **`anki/card_generator.py`**: Creates MCQ flashcard HTML
 - **`anki/ankiconnect.py`**: Sends cards to Anki via AnkiConnect API
 - **`anki/apkg_exporter.py`**: Generates .apkg files using genanki
-- **`cli.py`**: Command-line interface
-- **`interactive.py`**: Interactive mode for collecting positions
+- **`cli.py`**: Command-line interface with `--color-scheme` option
+- **`interactive.py`**: Interactive mode for collecting positions with color scheme selection
+- **`settings.py`**: Settings persistence (saves user preferences like color scheme to `~/.xg2anki/config.json`)
+
+#### Color Schemes (renderer/color_schemes.py)
+
+The application supports customizable board color schemes:
+
+**Available Schemes:**
+- `classic` - Traditional brown/beige board
+- `forest` - Green/brown nature theme
+- `ocean` - Blue/teal water theme
+- `desert` - Tan/orange sand theme
+- `sunset` - Purple/orange evening theme
+- `midnight` - Dark blue/purple night theme
+
+**Color Scheme Properties:**
+Each `ColorScheme` dataclass defines 10 colors:
+- `board_light`, `board_dark` - Board background and borders
+- `point_light`, `point_dark` - Triangle point colors
+- `checker_x`, `checker_o` - Checker colors for X (top) and O (bottom) players
+- `checker_border` - Checker outline color
+- `bar` - Center bar color
+- `text` - Text color for labels
+- `bearoff` - Bear-off tray background
+
+**Usage:**
+- In CLI: `python -m xg2anki --color-scheme ocean analysis.txt`
+- In interactive mode: Option 2 from main menu
+- User's selection is saved to `~/.xg2anki/config.json` and persisted across sessions
+
+#### Settings Persistence (settings.py)
+
+User preferences are automatically saved to `~/.xg2anki/config.json`:
+
+**Saved Settings:**
+- `default_color_scheme` - Last selected color scheme (default: "classic")
+- `deck_name` - Default deck name (default: "XG Backgammon")
+- `show_options` - Whether to show options on cards (default: true)
+
+**Settings API:**
+```python
+from xg2anki.settings import get_settings
+
+settings = get_settings()
+settings.color_scheme = "forest"  # Automatically saved
+print(settings.color_scheme)  # Loads from config file
+```
+
+**Fallback Behavior:**
+- Missing config file → uses defaults
+- Corrupted config file → silently falls back to defaults
+- CLI `--color-scheme` argument → overrides saved preference for that run only
 
 ## Common Patterns
 
@@ -115,6 +167,13 @@ The card back shows moves in **XG's original order** (not shuffled MCQ order):
 1. Create parser in `parsers/` implementing `parse_file()` → `List[Decision]`
 2. Add format detection in `cli.py:parse_input()`
 3. Update `--input-format` option in CLI
+
+### Adding a New Color Scheme
+
+1. Define new `ColorScheme` object in `renderer/color_schemes.py`
+2. Add to `SCHEMES` dictionary with a lowercase key name
+3. Update `--color-scheme` choices in `cli.py` (line 45)
+4. The scheme will automatically appear in interactive mode's color scheme menu
 
 ### Modifying Card Layout
 
@@ -128,3 +187,11 @@ Always use the internal Position model (points[0-25]). When reading/writing XGID
 - Use `parse_xgid()` to convert XGID → (Position, metadata)
 - Use `encode_xgid()` or `Position.to_xgid()` to convert back
 - Never manually flip positions; XGID parsing handles perspective automatically
+
+### Working with Settings
+
+Always use the global settings instance via `get_settings()`:
+- Automatically loads from `~/.xg2anki/config.json`
+- Changes are immediately persisted to disk
+- Thread-safe singleton pattern
+- Gracefully handles missing/corrupted config files

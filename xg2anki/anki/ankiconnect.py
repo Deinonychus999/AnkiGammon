@@ -181,7 +181,8 @@ class AnkiConnect:
         decisions: List[Decision],
         output_dir: Path,
         show_options: bool = False,
-        color_scheme: str = "classic"
+        color_scheme: str = "classic",
+        cleanup_media: bool = True
     ) -> Dict[str, Any]:
         """
         Export decisions directly to Anki via Anki-Connect.
@@ -191,6 +192,7 @@ class AnkiConnect:
             output_dir: Directory for temporary media files
             show_options: Show multiple choice options (text-based)
             color_scheme: Board color scheme name
+            cleanup_media: Delete media files after upload (default: True)
 
         Returns:
             Dictionary with export statistics
@@ -221,6 +223,7 @@ class AnkiConnect:
         added = 0
         skipped = 0
         errors = []
+        all_media_files = []
 
         for i, decision in enumerate(decisions):
             try:
@@ -238,8 +241,15 @@ class AnkiConnect:
                 else:
                     skipped += 1
 
+                # Track media files for cleanup
+                all_media_files.extend(card_data['media_files'])
+
             except Exception as e:
                 errors.append(f"Card {i}: {str(e)}")
+
+        # Clean up media files if requested
+        if cleanup_media and all_media_files:
+            self._cleanup_media_files(all_media_files, output_dir)
 
         return {
             'added': added,
@@ -247,3 +257,41 @@ class AnkiConnect:
             'errors': errors,
             'total': len(decisions)
         }
+
+    def _cleanup_media_files(self, media_files: List[str], output_dir: Path) -> None:
+        """
+        Delete temporary media files after upload.
+
+        Args:
+            media_files: List of media file paths
+            output_dir: Output directory to clean up
+        """
+        import os
+        import shutil
+
+        # Delete individual media files
+        for media_file in media_files:
+            try:
+                path = Path(media_file)
+                if path.exists():
+                    path.unlink()
+            except Exception:
+                # Ignore cleanup errors
+                pass
+
+        # Try to remove the media directory if it's empty
+        try:
+            media_dir = output_dir / "media"
+            if media_dir.exists() and not any(media_dir.iterdir()):
+                media_dir.rmdir()
+        except Exception:
+            # Ignore cleanup errors
+            pass
+
+        # Try to remove the output directory if it's empty
+        try:
+            if output_dir.exists() and not any(output_dir.iterdir()):
+                output_dir.rmdir()
+        except Exception:
+            # Ignore cleanup errors
+            pass

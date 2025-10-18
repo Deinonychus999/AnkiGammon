@@ -8,6 +8,7 @@ import click
 
 from xg2anki.parsers.xg_text_parser import XGTextParser
 from xg2anki.models import Decision
+from xg2anki.settings import get_settings
 
 
 class InteractiveSession:
@@ -16,7 +17,8 @@ class InteractiveSession:
     def __init__(self):
         self.positions_text: List[str] = []
         self.current_buffer = []
-        self.color_scheme = "classic"  # Default color scheme
+        self.settings = get_settings()
+        self.color_scheme = self.settings.color_scheme  # Load saved color scheme
 
     def run(self):
         """Run the interactive session."""
@@ -81,8 +83,13 @@ class InteractiveSession:
         )
 
         self.color_scheme = schemes[choice - 1]
+
+        # Save the color scheme preference
+        self.settings.color_scheme = self.color_scheme
+
         click.echo()
         click.echo(click.style(f"  Color scheme changed to: {self.color_scheme.title()}", fg='green'))
+        click.echo(click.style(f"  (Saved as default)", fg='cyan'))
         click.echo()
         input(click.style("Press Enter to continue...", fg='green'))
         click.echo()

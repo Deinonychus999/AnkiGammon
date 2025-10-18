@@ -7,6 +7,7 @@ from pathlib import Path
 from xg2anki.parsers.xg_text_parser import XGTextParser
 from xg2anki.anki.apkg_exporter import ApkgExporter
 from xg2anki.anki.ankiconnect import AnkiConnect
+from xg2anki.settings import get_settings
 
 
 @click.command()
@@ -40,12 +41,18 @@ from xg2anki.anki.ankiconnect import AnkiConnect
     help='Input file format (default: auto-detect)'
 )
 @click.option(
+    '--color-scheme',
+    type=click.Choice(['classic', 'forest', 'ocean', 'desert', 'sunset', 'midnight'], case_sensitive=False),
+    default=None,
+    help='Board color scheme (default: saved preference or classic)'
+)
+@click.option(
     '--interactive',
     '-i',
     is_flag=True,
     help='Run in interactive mode (default when no input file provided)'
 )
-def main(input_file, format, output, deck_name, show_options, input_format, interactive):
+def main(input_file, format, output, deck_name, show_options, input_format, color_scheme, interactive):
     """
     Convert eXtreme Gammon (XG) positions/analysis into Anki flashcards.
 
@@ -99,13 +106,18 @@ def main(input_file, format, output, deck_name, show_options, input_format, inte
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    # Get color scheme (use CLI argument, fallback to saved preference, then to "classic")
+    if color_scheme is None:
+        settings = get_settings()
+        color_scheme = settings.color_scheme
+
     # Export based on format
     try:
         if format == 'apkg':
-            export_apkg(decisions, output_dir, deck_name, show_options)
+            export_apkg(decisions, output_dir, deck_name, show_options, color_scheme)
 
         elif format == 'ankiconnect':
-            export_ankiconnect(decisions, output_dir, deck_name, show_options)
+            export_ankiconnect(decisions, output_dir, deck_name, show_options, color_scheme)
 
     except Exception as e:
         click.echo(f"Error during export: {e}", err=True)
