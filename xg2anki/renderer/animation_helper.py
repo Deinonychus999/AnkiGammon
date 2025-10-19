@@ -43,6 +43,10 @@ class AnimationHelper:
 
             from_str, to_str = part.split('/')
 
+            # Remove asterisk (hit indicator) from notation
+            from_str = from_str.rstrip('*')
+            to_str = to_str.rstrip('*')
+
             # Parse "from" point
             if from_str.lower() == 'bar':
                 # Bar position depends on player

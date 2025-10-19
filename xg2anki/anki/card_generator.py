@@ -92,7 +92,7 @@ class CardGenerator:
                 decision, position_svg
             )
 
-        # Generate resulting position SVG (only for non-interactive mode or best move)
+        # Generate resulting position SVGs
         move_result_svgs = {}
         best_move = decision.get_best_move()
 
@@ -103,13 +103,17 @@ class CardGenerator:
             else:
                 result_svg = None
         else:
-            # Interactive mode: we'll animate checkers on the original board
+            # Interactive mode: generate result SVGs for all moves (for proper number display)
+            for candidate in candidates:
+                if candidate:
+                    result_svg_for_move = self._render_resulting_position_svg(decision, candidate)
+                    move_result_svgs[candidate.notation] = result_svg_for_move
             result_svg = None
 
         # Generate card back
         back_html = self._generate_back(
             decision, position_svg, result_svg, candidates, shuffled_candidates,
-            answer_index, self.show_options
+            answer_index, self.show_options, move_result_svgs
         )
 
         # Generate tags
@@ -326,7 +330,8 @@ class CardGenerator:
         candidates: List[Optional[Move]],
         shuffled_candidates: List[Optional[Move]],
         answer_index: int,
-        show_options: bool
+        show_options: bool,
+        move_result_svgs: Dict[str, str] = None
     ) -> str:
         """Generate HTML for card back."""
         metadata = self._get_metadata_html(decision)
@@ -442,7 +447,7 @@ class CardGenerator:
 
         if self.interactive_moves:
             # Generate animation scripts
-            animation_scripts = self._generate_checker_animation_scripts(decision, candidates)
+            animation_scripts = self._generate_checker_animation_scripts(decision, candidates, move_result_svgs or {})
             html += animation_scripts
 
         return html
@@ -450,7 +455,8 @@ class CardGenerator:
     def _generate_checker_animation_scripts(
         self,
         decision: Decision,
-        candidates: List[Optional[Move]]
+        candidates: List[Optional[Move]],
+        move_result_svgs: Dict[str, str]
     ) -> str:
         """
         Generate JavaScript for animating actual checker movements on the board.
@@ -458,6 +464,7 @@ class CardGenerator:
         Args:
             decision: The decision with the original position
             candidates: List of candidate moves
+            move_result_svgs: Dictionary mapping move notation to result SVG
 
         Returns:
             HTML script tags with animation code
@@ -527,14 +534,16 @@ class CardGenerator:
             move_data[candidate.notation] = move_animations
 
         move_data_json = json.dumps(move_data)
+        move_result_svgs_json = json.dumps(move_result_svgs)
 
         # Generate animation JavaScript
         script = f"""
 <script>
 // Checker movement animation system
 (function() {{
-    const ANIMATION_DURATION = 600; // milliseconds
+    const ANIMATION_DURATION = 200; // milliseconds
     const moveData = {move_data_json};
+    const moveResultSVGs = {move_result_svgs_json};
     let isAnimating = false;
     let cancelCurrentAnimation = false;
     let currentSelectedRow = null;
@@ -723,6 +732,7 @@ class CardGenerator:
         }}
 
         // Animate each checker movement sequentially
+        let totalAnimationTime = 0;
         for (const anim of animations) {{
             // Check if we should cancel
             if (cancelCurrentAnimation) {{
@@ -746,10 +756,25 @@ class CardGenerator:
                     ANIMATION_DURATION
                 );
 
+                totalAnimationTime += ANIMATION_DURATION;
+
                 // If cancelled, stop processing
                 if (result === 'cancelled') {{
                     break;
                 }}
+            }}
+        }}
+
+        // Add delay proportional to animation time (100% extra buffer to ensure animations complete)
+        const bufferDelay = Math.max(300, totalAnimationTime * 1.0);
+        await new Promise(resolve => setTimeout(resolve, bufferDelay));
+
+        // After animation completes, replace with result SVG if available
+        const resultSVG = moveResultSVGs[moveNotation];
+        if (resultSVG && !cancelCurrentAnimation) {{
+            const board = document.getElementById('animated-board');
+            if (board) {{
+                board.innerHTML = resultSVG;
             }}
         }}
 

@@ -141,7 +141,7 @@ class AnkiConnect:
             },
             'tags': tags,
             'options': {
-                'allowDuplicate': False
+                'allowDuplicate': True
             }
         }
 
