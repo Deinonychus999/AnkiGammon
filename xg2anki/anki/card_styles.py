@@ -277,4 +277,139 @@ button.toggle-btn:active {
     background-color: #2d7fbc;
     color: #ffffff;
 }
+
+/* ===================================================================
+   INTERACTIVE MCQ STYLES
+   =================================================================== */
+
+/* Front Side: Clickable Options */
+.mcq-option {
+    cursor: pointer;
+    padding: 12px 16px;
+    margin: 10px 0;
+    background-color: var(--canvas-elevated);
+    border: 2px solid var(--border);
+    border-radius: 6px;
+    font-size: 16px;
+    transition: all 0.2s ease;
+    user-select: none;  /* Prevent text selection on click */
+}
+
+.mcq-option:hover {
+    background-color: rgba(100, 150, 255, 0.1);
+    border-color: #4da6ff;
+    transform: translateX(4px);
+}
+
+.mcq-option.selected-flash {
+    background-color: rgba(100, 150, 255, 0.3);
+    border-color: #4da6ff;
+    border-width: 3px;
+}
+
+/* Hint text below options */
+.mcq-hint {
+    margin-top: 20px;
+    font-size: 13px;
+    color: #999;
+    font-style: italic;
+    text-align: center;
+}
+
+/* Back Side: Feedback Messages */
+.mcq-feedback-container {
+    margin: 20px 0;
+    padding: 20px;
+    border-radius: 8px;
+    font-size: 16px;
+}
+
+.mcq-feedback-correct,
+.mcq-feedback-incorrect,
+.mcq-feedback-neutral {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.feedback-icon {
+    font-size: 40px;
+    font-weight: bold;
+    flex-shrink: 0;
+}
+
+.feedback-text {
+    flex-grow: 1;
+}
+
+/* Correct feedback (green) */
+.mcq-feedback-correct {
+    background-color: rgba(76, 175, 80, 0.15);
+    border: 2px solid #4caf50;
+}
+
+.mcq-feedback-correct .feedback-icon {
+    color: #4caf50;
+}
+
+.mcq-feedback-correct .feedback-text {
+    color: #2e7d32;
+}
+
+/* Incorrect feedback (red) */
+.mcq-feedback-incorrect {
+    background-color: rgba(244, 67, 54, 0.15);
+    border: 2px solid #f44336;
+}
+
+.mcq-feedback-incorrect .feedback-icon {
+    color: #f44336;
+}
+
+.mcq-feedback-incorrect .feedback-text {
+    color: #c62828;
+}
+
+/* Neutral feedback (no selection) */
+.mcq-feedback-neutral {
+    background-color: rgba(158, 158, 158, 0.1);
+    border: 2px solid #9e9e9e;
+    padding: 15px;
+}
+
+.mcq-feedback-neutral .feedback-text {
+    color: var(--text-fg);
+}
+
+/* Dark mode adjustments */
+.night_mode .mcq-feedback-correct {
+    background-color: rgba(76, 175, 80, 0.25);
+}
+
+.night_mode .mcq-feedback-incorrect {
+    background-color: rgba(244, 67, 54, 0.25);
+}
+
+.night_mode .mcq-feedback-neutral {
+    background-color: rgba(158, 158, 158, 0.2);
+}
+
+/* Highlight user's selected move in analysis table */
+tr.user-correct {
+    background-color: rgba(76, 175, 80, 0.15) !important;
+    border-left: 3px solid #4caf50;
+}
+
+tr.user-incorrect {
+    background-color: rgba(244, 67, 54, 0.15) !important;
+    border-left: 3px solid #f44336;
+}
+
+.night_mode tr.user-correct {
+    background-color: rgba(76, 175, 80, 0.25) !important;
+}
+
+.night_mode tr.user-incorrect {
+    background-color: rgba(244, 67, 54, 0.25) !important;
+}
 """

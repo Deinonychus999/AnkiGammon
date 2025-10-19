@@ -32,7 +32,7 @@ class CardGenerator:
 
         Args:
             output_dir: Directory to save generated images
-            show_options: If True, show multiple choice options (text only)
+            show_options: If True, show interactive MCQ with clickable options
             interactive_moves: If True, render positions for all moves (clickable analysis)
             renderer: Board renderer instance (creates default if None)
         """
@@ -87,7 +87,7 @@ class CardGenerator:
 
         # Generate card front
         if self.show_options:
-            front_html = self._generate_text_mcq_front(
+            front_html = self._generate_interactive_mcq_front(
                 decision, position_image, shuffled_candidates
             )
         else:
@@ -120,8 +120,8 @@ class CardGenerator:
 
         # Generate card back
         back_html = self._generate_back(
-            decision, position_image, result_image, candidates, answer_index,
-            self.show_options, move_result_images
+            decision, position_image, result_image, candidates, shuffled_candidates,
+            answer_index, self.show_options, move_result_images
         )
 
         # Collect media files
@@ -185,39 +185,171 @@ class CardGenerator:
 """
         return html
 
-    def _generate_text_mcq_front(
+    def _generate_interactive_mcq_front(
         self,
         decision: Decision,
         position_image: str,
         candidates: List[Optional[Move]]
     ) -> str:
-        """Generate HTML for text-based MCQ front."""
+        """Generate interactive quiz MCQ front with clickable options."""
         metadata = self._get_metadata_html(decision)
+        letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J']
 
-        # Format candidate options
+        # Build clickable options with data attributes
         options_html = []
-        letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J']  # Support up to 10 options
         for i, candidate in enumerate(candidates):
             if candidate:
-                options_html.append(
-                    f"<div class='option'><strong>{letters[i]}.</strong> {candidate.notation}</div>"
-                )
+                options_html.append(f"""
+<div class='mcq-option' data-option-letter='{letters[i]}'>
+    <strong>{letters[i]}.</strong> {candidate.notation}
+</div>
+""")
 
         html = f"""
-<div class="card-front">
+<div class="card-front interactive-mcq-front">
     <div class="position-image">
         <img src="{Path(position_image).name}" alt="Position" />
     </div>
     <div class="metadata">{metadata}</div>
     <div class="question">
         <h3>What is the best move?</h3>
-        <div class="options">
+        <div class="mcq-options">
             {''.join(options_html)}
         </div>
+        <p class="mcq-hint">Click an option to see if you're correct</p>
     </div>
 </div>
+
+<script>
+{self._generate_mcq_front_javascript()}
+</script>
 """
         return html
+
+    def _generate_mcq_front_javascript(self) -> str:
+        """Generate JavaScript for interactive MCQ front side."""
+        return """
+(function() {
+    const options = document.querySelectorAll('.mcq-option');
+
+    options.forEach(option => {
+        option.addEventListener('click', function() {
+            const selectedLetter = this.dataset.optionLetter;
+
+            // Store selection in sessionStorage (primary method)
+            try {
+                sessionStorage.setItem('xg2anki-mcq-choice', selectedLetter);
+            } catch (e) {
+                // Fallback: use URL hash
+                window.location.hash = 'choice-' + selectedLetter;
+            }
+
+            // Visual feedback before flip
+            this.classList.add('selected-flash');
+
+            // Trigger Anki flip to back side
+            setTimeout(function() {
+                if (typeof pycmd !== 'undefined') {
+                    pycmd('ans');  // Anki desktop
+                } else if (typeof AnkiDroidJS !== 'undefined') {
+                    AnkiDroidJS.ankiShowAnswer();  // AnkiDroid
+                } else {
+                    // Fallback: simulate spacebar press (works on AnkiMobile)
+                    const event = new KeyboardEvent('keydown', { keyCode: 32 });
+                    document.dispatchEvent(event);
+                }
+            }, 200);  // 200ms delay for visual feedback
+        });
+    });
+})();
+"""
+
+    def _generate_mcq_back_javascript(self, correct_letter: str) -> str:
+        """Generate JavaScript for interactive MCQ back side."""
+        return f"""
+<script>
+(function() {{
+    // Get user's selected answer from storage
+    let selectedLetter = null;
+
+    // Try sessionStorage first
+    try {{
+        selectedLetter = sessionStorage.getItem('xg2anki-mcq-choice');
+        // Clear after reading to avoid persisting across cards
+        sessionStorage.removeItem('xg2anki-mcq-choice');
+    }} catch (e) {{
+        // Fallback: read from URL hash
+        const hash = window.location.hash;
+        if (hash.startsWith('#choice-')) {{
+            selectedLetter = hash.replace('#choice-', '');
+            // Clear hash
+            window.location.hash = '';
+        }}
+    }}
+
+    const correctLetter = '{correct_letter}';
+    const feedbackContainer = document.getElementById('mcq-feedback');
+    const standardAnswer = document.getElementById('mcq-standard-answer');
+
+    // Get move mapping from data attribute
+    let moveMap = {{}};
+    if (standardAnswer && standardAnswer.dataset.moveMap) {{
+        try {{
+            moveMap = JSON.parse(standardAnswer.dataset.moveMap);
+        }} catch (e) {{}}
+    }}
+
+    if (selectedLetter) {{
+        feedbackContainer.style.display = 'block';
+        // Hide standard answer section to avoid redundancy
+        if (standardAnswer) standardAnswer.style.display = 'none';
+
+        const selectedMove = moveMap[selectedLetter] || '';
+        const correctMove = moveMap[correctLetter] || '';
+
+        if (selectedLetter === correctLetter) {{
+            // Correct answer
+            feedbackContainer.innerHTML = `
+                <div class="mcq-feedback-correct">
+                    <div class="feedback-icon">✓</div>
+                    <div class="feedback-text">
+                        <strong>${{selectedLetter}} is Correct!</strong>
+                    </div>
+                </div>
+            `;
+        }} else {{
+            // Incorrect answer
+            feedbackContainer.innerHTML = `
+                <div class="mcq-feedback-incorrect">
+                    <div class="feedback-icon">✗</div>
+                    <div class="feedback-text">
+                        <div><strong>${{selectedLetter}} is Incorrect</strong> (${{selectedMove}}).</div>
+                        <div style="margin-top: 8px;"><strong>Correct answer: ${{correctLetter}}</strong></div>
+                        <div>${{correctMove}}</div>
+                    </div>
+                </div>
+            `;
+        }}
+
+        // Highlight selected move in analysis table
+        const moveRows = document.querySelectorAll('.moves-table tbody tr');
+        moveRows.forEach(row => {{
+            const moveCell = row.cells[1]; // Move notation is in second column
+            if (moveCell) {{
+                const moveText = moveCell.textContent.trim();
+                if (moveText === selectedMove) {{
+                    row.classList.add(selectedLetter === correctLetter ? 'user-correct' : 'user-incorrect');
+                }}
+            }}
+        }});
+    }} else {{
+        // No selection (user flipped manually without clicking)
+        // Keep standard answer visible for traditional workflow
+        feedbackContainer.style.display = 'none';
+    }}
+}})();
+</script>
+"""
 
     def _generate_back(
         self,
@@ -225,6 +357,7 @@ class CardGenerator:
         original_position_image: str,
         result_position_image: str,
         candidates: List[Optional[Move]],
+        shuffled_candidates: List[Optional[Move]],
         answer_index: int,
         show_options: bool,
         move_result_images: Dict[str, str]
@@ -280,10 +413,21 @@ class CardGenerator:
         best_notation = best_move.notation if best_move else "Unknown"
 
         if show_options:
-            # Show letter-based answer for MCQ
+            # Interactive MCQ: Add feedback section + standard answer (hidden when feedback is shown)
             correct_letter = letters[answer_index] if answer_index < len(letters) else "?"
+
+            # Create JSON mapping of letters to move notations for JavaScript
+            import json
+            letter_to_move = {}
+            for i, move in enumerate(shuffled_candidates):
+                if move and i < len(letters):
+                    letter_to_move[letters[i]] = move.notation
+
             answer_html = f"""
-    <div class="answer">
+    <div class="mcq-feedback-container" id="mcq-feedback" style="display: none;">
+        <!-- Populated by JavaScript based on user's choice -->
+    </div>
+    <div class="answer" id="mcq-standard-answer" data-correct-answer="{correct_letter}" data-move-map='{json.dumps(letter_to_move)}'>
         <h3>Correct Answer: <span class="answer-letter">{correct_letter}</span></h3>
         <p class="best-move-notation">{best_notation}</p>
     </div>
@@ -303,15 +447,10 @@ class CardGenerator:
 
         # Generate position viewer HTML based on interactive_moves setting
         if self.interactive_moves:
+            # Interactive moves: show position image but no toggle controls
             position_viewer_html = f"""
-    <div class="position-viewer">
-        <div class="position-image">
-            <img id="position-display" src="{result_img_name}" alt="Position" data-original="{original_img_name}" data-current="{result_img_name}" />
-        </div>
-        <div class="position-label">
-            <span id="position-status">After best move</span>
-            <button id="toggle-position" class="toggle-btn">Show original position</button>
-        </div>
+    <div class="position-image">
+        <img id="position-display" src="{result_img_name}" alt="Position" data-original="{original_img_name}" data-current="{result_img_name}" />
     </div>"""
             analysis_title = '<h4>Top Moves Analysis: <span class="click-hint">(click a move to see the resulting position)</span></h4>'
             table_body_id = 'id="moves-tbody"'
@@ -349,6 +488,10 @@ class CardGenerator:
 </div>
 """
 
+        # Add interactive MCQ JavaScript if enabled
+        if show_options:
+            html += self._generate_mcq_back_javascript(correct_letter)
+
         # Add JavaScript for interactive mode
         if self.interactive_moves:
             html += """
@@ -356,72 +499,37 @@ class CardGenerator:
 (function() {
     // Get elements
     const positionImg = document.getElementById('position-display');
-    const statusLabel = document.getElementById('position-status');
-    const toggleBtn = document.getElementById('toggle-position');
     const moveRows = document.querySelectorAll('.move-row');
 
     // Track state
-    let showingOriginal = false;
     const originalImg = positionImg.dataset.original;
     const bestMoveImg = positionImg.dataset.current;
     let currentSelectedRow = null;
 
-    // Initialize - highlight best move row
+    // Initialize - highlight best move row and show best move result
     const bestMoveRow = document.querySelector('.move-row.best-move');
     if (bestMoveRow) {
         bestMoveRow.classList.add('selected');
         currentSelectedRow = bestMoveRow;
     }
 
-    // Toggle button handler
-    toggleBtn.addEventListener('click', function() {
-        showingOriginal = !showingOriginal;
-
-        if (showingOriginal) {
-            positionImg.src = originalImg;
-            statusLabel.textContent = 'Original position';
-            toggleBtn.textContent = 'Show resulting position';
-
-            // Deselect all rows
-            moveRows.forEach(row => row.classList.remove('selected'));
-            currentSelectedRow = null;
-        } else {
-            positionImg.src = bestMoveImg;
-            statusLabel.textContent = 'After best move';
-            toggleBtn.textContent = 'Show original position';
-
-            // Re-select best move row
-            if (bestMoveRow) {
-                bestMoveRow.classList.add('selected');
-                currentSelectedRow = bestMoveRow;
-            }
-        }
-    });
-
     // Click handler for move rows
     moveRows.forEach(row => {
         row.addEventListener('click', function() {
             const resultImage = this.dataset.resultImage;
-            const moveNotation = this.dataset.moveNotation;
 
             if (!resultImage) return;
 
-            // If clicking the same row, toggle to original
-            if (currentSelectedRow === this && !showingOriginal) {
-                showingOriginal = true;
+            // If clicking the same row, toggle to original position
+            if (currentSelectedRow === this) {
                 positionImg.src = originalImg;
-                statusLabel.textContent = 'Original position';
-                toggleBtn.textContent = 'Show resulting position';
                 this.classList.remove('selected');
                 currentSelectedRow = null;
                 return;
             }
 
             // Show this move's resulting position
-            showingOriginal = false;
             positionImg.src = resultImage;
-            statusLabel.textContent = 'After: ' + moveNotation;
-            toggleBtn.textContent = 'Show original position';
 
             // Update selection
             moveRows.forEach(r => r.classList.remove('selected'));
