@@ -1,5 +1,6 @@
 """Helper for generating GSAP-based checker movement animations."""
 
+import re
 from typing import List, Tuple, Dict, Optional
 from xg2anki.models import Position, Move, Player
 from xg2anki.utils.move_parser import MoveParser
@@ -32,6 +33,14 @@ class AnimationHelper:
             if '/' not in part:
                 continue
 
+            # Check for repetition notation like "6/4(4)" meaning "move 4 checkers from 6 to 4"
+            repetition_count = 1
+            repetition_match = re.search(r'\((\d+)\)$', part)
+            if repetition_match:
+                repetition_count = int(repetition_match.group(1))
+                # Remove the repetition notation from the part
+                part = re.sub(r'\(\d+\)$', '', part)
+
             from_str, to_str = part.split('/')
 
             # Parse "from" point
@@ -60,7 +69,9 @@ class AnimationHelper:
                 except ValueError:
                     continue
 
-            moves.append((from_point, to_point))
+            # Add the move repetition_count times (handles notation like "6/4(4)")
+            for _ in range(repetition_count):
+                moves.append((from_point, to_point))
 
         return moves
 

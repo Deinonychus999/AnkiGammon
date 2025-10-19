@@ -25,6 +25,7 @@ class MoveParser:
             "13/9 6/5" -> [(13, 9), (6, 5)]
             "bar/22" -> [(0, 22)]  # X entering from bar
             "6/off" -> [(6, 26)]  # Bearing off
+            "6/4(4)" -> [(6, 4), (6, 4), (6, 4), (6, 4)]  # Repetition notation
         """
         notation = notation.strip().lower()
 
@@ -40,6 +41,14 @@ class MoveParser:
         for part in parts:
             if not part or '/' not in part:
                 continue
+
+            # Check for repetition notation like "6/4(4)" meaning "move 4 checkers from 6 to 4"
+            repetition_count = 1
+            repetition_match = re.search(r'\((\d+)\)$', part)
+            if repetition_match:
+                repetition_count = int(repetition_match.group(1))
+                # Remove the repetition notation from the part
+                part = re.sub(r'\(\d+\)$', '', part)
 
             # Parse from/to
             from_str, to_str = part.split('/', 1)
@@ -69,7 +78,9 @@ class MoveParser:
                 except ValueError:
                     continue
 
-            moves.append((from_point, to_point))
+            # Add the move repetition_count times (handles notation like "6/4(4)")
+            for _ in range(repetition_count):
+                moves.append((from_point, to_point))
 
         return moves
 

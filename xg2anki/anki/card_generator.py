@@ -485,14 +485,18 @@ class CardGenerator:
 
             for from_point, to_point in movements:
                 # Get starting coordinates (top of stack at from_point)
+                # Cap at max visible checkers (5 for points, 3 for bar)
                 from_count = abs(current_position.points[from_point]) if 0 <= from_point <= 25 else 0
-                from_index = max(0, from_count - 1)  # Top checker index
+                from_max_visible = 3 if (from_point == 0 or from_point == 25) else 5
+                from_index = min(max(0, from_count - 1), from_max_visible - 1)  # Top visible checker
                 start_x, start_y = self.animation_controller.get_point_coordinates(from_point, from_index)
 
                 # Get ending coordinates (where it lands at to_point - on top of existing checkers)
+                # Cap at max visible checkers to avoid landing above visible stack
                 if to_point >= 0 and to_point <= 25:
                     to_count = abs(current_position.points[to_point])
-                    to_index = to_count  # Will land on top of existing checkers
+                    to_max_visible = 3 if (to_point == 0 or to_point == 25) else 5
+                    to_index = min(to_count, to_max_visible - 1)  # Land on last visible position
                     end_x, end_y = self.animation_controller.get_point_coordinates(to_point, to_index)
                 else:
                     # Bear-off or special case
@@ -532,6 +536,7 @@ class CardGenerator:
     const ANIMATION_DURATION = 600; // milliseconds
     const moveData = {move_data_json};
     let isAnimating = false;
+    let cancelCurrentAnimation = false;
     let currentSelectedRow = null;
     let originalBoardHTML = null;
 
@@ -558,12 +563,108 @@ class CardGenerator:
         return svg.querySelectorAll('.checker[data-point="' + pointNum + '"]');
     }}
 
+    // Get the checker count text element at a point (if it exists)
+    function getCheckerCountText(svg, pointNum) {{
+        const checkers = getCheckersAtPoint(svg, pointNum);
+        if (checkers.length === 0) return null;
+
+        // Search for text element near any checker at this point
+        const allTexts = svg.querySelectorAll('text.checker-text');
+        for (const checker of checkers) {{
+            const checkerCx = parseFloat(checker.getAttribute('cx'));
+            const checkerCy = parseFloat(checker.getAttribute('cy'));
+
+            for (const text of allTexts) {{
+                const textX = parseFloat(text.getAttribute('x'));
+                const textY = parseFloat(text.getAttribute('y'));
+
+                if (Math.abs(checkerCx - textX) < 5 && Math.abs(checkerCy - textY) < 5) {{
+                    return text;
+                }}
+            }}
+        }}
+
+        return null;
+    }}
+
+    // Update checker count display for a point (with count adjustment)
+    function updateCheckerCount(svg, pointNum, countAdjustment) {{
+        const checkers = getCheckersAtPoint(svg, pointNum);
+        const countText = getCheckerCountText(svg, pointNum);
+
+        // Determine actual current count
+        let currentCount;
+        if (countText) {{
+            currentCount = parseInt(countText.textContent);
+        }} else {{
+            currentCount = checkers.length;
+        }}
+
+        // Apply adjustment
+        const newCount = currentCount + countAdjustment;
+
+        // Determine threshold based on point type
+        const isBar = (pointNum === 0 || pointNum === 25);
+        const threshold = isBar ? 3 : 5;
+
+        if (newCount <= threshold) {{
+            // No count needed, remove if exists
+            if (countText) {{
+                countText.remove();
+            }}
+            return;
+        }}
+
+        // Need to show count - find the target checker (at threshold - 1 index)
+        const checkersArray = Array.from(checkers);
+        const targetChecker = checkersArray[threshold - 1];
+
+        if (!targetChecker) return;
+
+        const cx = parseFloat(targetChecker.getAttribute('cx'));
+        const cy = parseFloat(targetChecker.getAttribute('cy'));
+
+        // Get checker color to determine text color (inverse)
+        const isX = targetChecker.classList.contains('checker-x');
+        const textColor = isX ? '{self.renderer.color_scheme.checker_o}' : '{self.renderer.color_scheme.checker_x}';
+        const fontSize = {self.renderer.checker_radius} * 1.2;
+
+        if (countText) {{
+            // Update existing text
+            countText.textContent = newCount;
+            countText.setAttribute('x', cx);
+            countText.setAttribute('y', cy);
+            // Move to end of parent to ensure it's on top (SVG z-index)
+            const parent = countText.parentNode;
+            parent.removeChild(countText);
+            parent.appendChild(countText);
+        }} else {{
+            // Create new text element
+            const textElement = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            textElement.setAttribute('class', 'checker-text');
+            textElement.setAttribute('x', cx);
+            textElement.setAttribute('y', cy);
+            textElement.setAttribute('font-size', fontSize);
+            textElement.setAttribute('fill', textColor);
+            textElement.textContent = newCount;
+
+            // Append to parent (end of DOM) to ensure it appears on top
+            targetChecker.parentNode.appendChild(textElement);
+        }}
+    }}
+
     // Animate a single checker from start to end coordinates
     function animateChecker(checker, startX, startY, endX, endY, duration) {{
         return new Promise((resolve) => {{
             const startTime = performance.now();
 
             function animate(currentTime) {{
+                // Check if animation was cancelled
+                if (cancelCurrentAnimation) {{
+                    resolve('cancelled');
+                    return;
+                }}
+
                 const elapsed = currentTime - startTime;
                 const progress = Math.min(elapsed / duration, 1);
 
@@ -583,7 +684,7 @@ class CardGenerator:
                 if (progress < 1) {{
                     requestAnimationFrame(animate);
                 }} else {{
-                    resolve();
+                    resolve('completed');
                 }}
             }}
 
@@ -593,11 +694,18 @@ class CardGenerator:
 
     // Animate a move
     async function animateMove(moveNotation) {{
-        if (isAnimating) return;
+        // If already animating, cancel the current animation
+        if (isAnimating) {{
+            cancelCurrentAnimation = true;
+            // Wait a bit for the cancellation to take effect
+            await new Promise(resolve => setTimeout(resolve, 50));
+        }}
 
         const animations = moveData[moveNotation];
         if (!animations || animations.length === 0) return;
 
+        // Reset cancellation flag and set animating flag
+        cancelCurrentAnimation = false;
         isAnimating = true;
 
         // Reset board to original position before animating
@@ -616,6 +724,11 @@ class CardGenerator:
 
         // Animate each checker movement sequentially
         for (const anim of animations) {{
+            // Check if we should cancel
+            if (cancelCurrentAnimation) {{
+                break;
+            }}
+
             const checkers = getCheckersAtPoint(svg, anim.from_point);
 
             if (checkers.length > 0) {{
@@ -626,12 +739,17 @@ class CardGenerator:
                 checker.setAttribute('data-point', anim.to_point);
 
                 // Animate movement
-                await animateChecker(
+                const result = await animateChecker(
                     checker,
                     anim.start_x, anim.start_y,
                     anim.end_x, anim.end_y,
                     ANIMATION_DURATION
                 );
+
+                // If cancelled, stop processing
+                if (result === 'cancelled') {{
+                    break;
+                }}
             }}
         }}
 
