@@ -297,9 +297,7 @@ class CardGenerator:
                 <div class="mcq-feedback-incorrect">
                     <div class="feedback-icon">✗</div>
                     <div class="feedback-text">
-                        <div><strong>${{selectedLetter}} is Incorrect</strong> (${{selectedMove}}).</div>
-                        <div style="margin-top: 8px;"><strong>Correct answer: ${{correctLetter}}</strong></div>
-                        <div>${{correctMove}}</div>
+                        <strong>${{selectedLetter}} is Incorrect</strong> (${{selectedMove}}) <span class="feedback-separator">•</span> <strong>Correct: ${{correctLetter}}</strong> (${{correctMove}})
                     </div>
                 </div>
             `;

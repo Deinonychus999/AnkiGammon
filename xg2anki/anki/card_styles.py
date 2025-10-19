@@ -352,6 +352,7 @@ button.toggle-btn:active {
 .mcq-feedback-correct {
     background-color: rgba(76, 175, 80, 0.15);
     border: 2px solid #4caf50;
+    padding: 15px 20px;
 }
 
 .mcq-feedback-correct .feedback-icon {
@@ -366,6 +367,7 @@ button.toggle-btn:active {
 .mcq-feedback-incorrect {
     background-color: rgba(244, 67, 54, 0.15);
     border: 2px solid #f44336;
+    padding: 15px 20px;
 }
 
 .mcq-feedback-incorrect .feedback-icon {
@@ -374,6 +376,12 @@ button.toggle-btn:active {
 
 .mcq-feedback-incorrect .feedback-text {
     color: #c62828;
+}
+
+.feedback-separator {
+    margin: 0 12px;
+    color: #999;
+    font-weight: bold;
 }
 
 /* Neutral feedback (no selection) */
