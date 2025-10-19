@@ -77,14 +77,12 @@ class ApkgExporter:
         Returns:
             Path to generated APKG file
         """
-        # Create renderer with color scheme and antialiasing
+        # Create renderer with color scheme
         from xg2anki.renderer.color_schemes import get_scheme
-        from xg2anki.renderer.board_renderer import BoardRenderer
-        from xg2anki.settings import get_settings
+        from xg2anki.renderer.svg_board_renderer import SVGBoardRenderer
 
         scheme = get_scheme(color_scheme)
-        settings = get_settings()
-        renderer = BoardRenderer(color_scheme=scheme, antialias_scale=settings.antialias_scale)
+        renderer = SVGBoardRenderer(color_scheme=scheme)
 
         # Create card generator
         card_gen = CardGenerator(
@@ -95,7 +93,6 @@ class ApkgExporter:
         )
 
         # Generate cards
-        media_files = []
         for i, decision in enumerate(decisions):
             card_data = card_gen.generate_card(decision, card_id=f"card_{i}")
 
@@ -109,13 +106,9 @@ class ApkgExporter:
             # Add to deck
             self.deck.add_note(note)
 
-            # Collect media files
-            media_files.extend(card_data['media_files'])
-
-        # Create package
+        # Create package (no media files needed - SVG is embedded)
         output_path = self.output_dir / output_file
         package = genanki.Package(self.deck)
-        package.media_files = media_files
 
         # Write APKG
         package.write_to_file(str(output_path))

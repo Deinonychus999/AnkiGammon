@@ -55,8 +55,8 @@ python -m unittest tests.test_basic.TestXGIDParsing
 
 1. **Input Parsing** (`parsers/xg_text_parser.py`) → Parses XG text export into `Decision` objects
 2. **Position Encoding** (`utils/xgid.py`) → Handles XGID format for position representation
-3. **Board Rendering** (`renderer/board_renderer.py`) → Generates PNG images of positions
-4. **Card Generation** (`anki/card_generator.py`) → Creates Anki card HTML with MCQ format
+3. **Board Rendering** (`renderer/svg_board_renderer.py`) → Generates SVG markup of positions
+4. **Card Generation** (`anki/card_generator.py`) → Creates Anki card HTML with embedded SVG and MCQ format
 5. **Export** → Either AnkiConnect API (`anki/ankiconnect.py`) or APKG file (`anki/apkg_exporter.py`)
 
 ### Critical Architecture Details
@@ -116,9 +116,9 @@ The card back shows moves in **XG's original order** (not shuffled MCQ order):
 - **`models.py`**: Core data classes (Position, Decision, Move, Player, CubeState, DecisionType)
 - **`utils/xgid.py`**: XGID encoding/decoding with perspective handling
 - **`parsers/xg_text_parser.py`**: Parses XG text exports, handles cube decisions
-- **`renderer/board_renderer.py`**: Generates backgammon board images with PIL
+- **`renderer/svg_board_renderer.py`**: Generates backgammon board SVG markup (replaces old PNG renderer)
 - **`renderer/color_schemes.py`**: Defines color schemes for board rendering (6 built-in schemes: classic, forest, ocean, desert, sunset, midnight)
-- **`anki/card_generator.py`**: Creates MCQ flashcard HTML
+- **`anki/card_generator.py`**: Creates MCQ flashcard HTML with embedded SVG boards
 - **`anki/ankiconnect.py`**: Sends cards to Anki via AnkiConnect API
 - **`anki/apkg_exporter.py`**: Generates .apkg files using genanki
 - **`cli.py`**: Command-line interface with `--color-scheme` option
@@ -160,11 +160,7 @@ User preferences are automatically saved to `~/.xg2anki/config.json`:
 - `default_color_scheme` - Last selected color scheme (default: "classic")
 - `deck_name` - Default deck name (default: "XG Backgammon")
 - `show_options` - Whether to show options on cards (default: true)
-- `antialias_scale` - Antialiasing quality level (default: 3, range: 1-4)
-  - 1 = Off (fastest)
-  - 2 = 2x (good quality)
-  - 3 = 3x (excellent quality, recommended)
-  - 4 = 4x (maximum quality)
+- `interactive_moves` - Whether to enable interactive move visualization (default: false)
 
 **Settings API:**
 ```python
@@ -172,7 +168,7 @@ from xg2anki.settings import get_settings
 
 settings = get_settings()
 settings.color_scheme = "forest"  # Automatically saved
-settings.antialias_scale = 2  # Set to 2x antialiasing
+settings.interactive_moves = True  # Enable interactive move visualization
 print(settings.color_scheme)  # Loads from config file
 ```
 

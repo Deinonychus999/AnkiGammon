@@ -16,12 +16,22 @@ CARD_CSS = """
     padding: 20px;
 }
 
-.position-image img {
+.position-svg svg,
+.position-svg-container svg {
     max-width: 100%;
     height: auto;
     border: 2px solid var(--border);
     border-radius: 8px;
     margin: 10px 0;
+    display: block;
+}
+
+.position-viewer {
+    position: relative;
+}
+
+.position-svg-container {
+    min-height: 200px;
 }
 
 .metadata {
@@ -232,10 +242,6 @@ CARD_CSS = """
 }
 
 /* Position viewer controls */
-.position-viewer {
-    position: relative;
-}
-
 .position-label {
     display: flex;
     justify-content: space-between;

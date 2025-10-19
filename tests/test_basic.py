@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from xg2anki.models import Position, Player, CubeState, Decision, Move, DecisionType
 from xg2anki.utils.xgid import parse_xgid, encode_xgid
 from xg2anki.utils.move_parser import MoveParser
-from xg2anki.renderer.board_renderer import BoardRenderer
+from xg2anki.renderer.svg_board_renderer import SVGBoardRenderer
 from xg2anki.interactive import InteractiveSession
 from xg2anki.parsers.xg_text_parser import XGTextParser
 
@@ -193,22 +193,26 @@ class TestDecision(unittest.TestCase):
         self.assertIn("2", text)
 
 
-class TestBoardRenderer(unittest.TestCase):
-    """Test basic board renderer orientation helpers."""
+class TestSVGBoardRenderer(unittest.TestCase):
+    """Test SVG board renderer."""
 
-    def test_map_point_index_flip(self):
-        """Ensure point mapping rotates board by half when flipped."""
-        renderer = BoardRenderer()
+    def test_render_svg_generates_valid_markup(self):
+        """Ensure SVG renderer generates valid SVG markup."""
+        renderer = SVGBoardRenderer()
 
-        # No flip keeps indices unchanged
-        self.assertEqual(renderer._map_point_index(1, False), 1)
-        self.assertEqual(renderer._map_point_index(24, False), 24)
+        # Create a simple position
+        position = Position()
+        position.points[1] = -2
+        position.points[24] = 2
 
-        # Flip rotates indices by 12 points (half board)
-        self.assertEqual(renderer._map_point_index(1, True), 13)
-        self.assertEqual(renderer._map_point_index(6, True), 18)
-        self.assertEqual(renderer._map_point_index(13, True), 1)
-        self.assertEqual(renderer._map_point_index(24, True), 12)
+        # Render to SVG
+        svg = renderer.render_svg(position, Player.O, dice=(3, 5))
+
+        # Check that it's valid SVG
+        self.assertIn('<svg', svg)
+        self.assertIn('viewBox="0 0 900 600"', svg)
+        self.assertIn('</svg>', svg)
+        self.assertGreater(len(svg), 5000)  # Should be a reasonable size
 
 
 class TestXGTextParser(unittest.TestCase):

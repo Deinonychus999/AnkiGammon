@@ -1,7 +1,6 @@
 """Anki-Connect integration for direct note creation in Anki."""
 
 import json
-import base64
 import requests
 from pathlib import Path
 from typing import List, Dict, Any
@@ -119,25 +118,19 @@ class AnkiConnect:
         self,
         front: str,
         back: str,
-        tags: List[str],
-        media_files: List[str]
+        tags: List[str]
     ) -> int:
         """
         Add a note to Anki.
 
         Args:
-            front: Front HTML
-            back: Back HTML
+            front: Front HTML (with embedded SVG)
+            back: Back HTML (with embedded SVG)
             tags: List of tags
-            media_files: List of media file paths
 
         Returns:
             Note ID
         """
-        # Store media files in Anki
-        for media_file in media_files:
-            self._store_media_file(media_file)
-
         # Create note
         note = {
             'deckName': self.deck_name,
@@ -154,47 +147,23 @@ class AnkiConnect:
 
         return self.invoke('addNote', note=note)
 
-    def _store_media_file(self, file_path: str) -> None:
-        """
-        Store a media file in Anki's collection.
-
-        Args:
-            file_path: Path to media file
-        """
-        path = Path(file_path)
-        if not path.exists():
-            return
-
-        # Read file and encode as base64
-        with open(path, 'rb') as f:
-            data = base64.b64encode(f.read()).decode('utf-8')
-
-        # Store in Anki
-        self.invoke(
-            'storeMediaFile',
-            filename=path.name,
-            data=data
-        )
-
     def export_decisions(
         self,
         decisions: List[Decision],
         output_dir: Path,
         show_options: bool = False,
         color_scheme: str = "classic",
-        interactive_moves: bool = False,
-        cleanup_media: bool = True
+        interactive_moves: bool = False
     ) -> Dict[str, Any]:
         """
         Export decisions directly to Anki via Anki-Connect.
 
         Args:
             decisions: List of Decision objects
-            output_dir: Directory for temporary media files
+            output_dir: Directory for configuration (no media files needed)
             show_options: Show multiple choice options (text-based)
             color_scheme: Board color scheme name
             interactive_moves: Enable interactive move visualization
-            cleanup_media: Delete media files after upload (default: True)
 
         Returns:
             Dictionary with export statistics
@@ -209,14 +178,10 @@ class AnkiConnect:
 
         # Create renderer with color scheme
         from xg2anki.renderer.color_schemes import get_scheme
-        from xg2anki.renderer.board_renderer import BoardRenderer
+        from xg2anki.renderer.svg_board_renderer import SVGBoardRenderer
 
         scheme = get_scheme(color_scheme)
-
-        # Get antialiasing setting from settings
-        from xg2anki.settings import get_settings
-        settings = get_settings()
-        renderer = BoardRenderer(color_scheme=scheme, antialias_scale=settings.antialias_scale)
+        renderer = SVGBoardRenderer(color_scheme=scheme)
 
         # Create card generator
         card_gen = CardGenerator(
@@ -230,7 +195,6 @@ class AnkiConnect:
         added = 0
         skipped = 0
         errors = []
-        all_media_files = []
 
         for i, decision in enumerate(decisions):
             try:
@@ -239,8 +203,7 @@ class AnkiConnect:
                 note_id = self.add_note(
                     front=card_data['front'],
                     back=card_data['back'],
-                    tags=card_data['tags'],
-                    media_files=card_data['media_files']
+                    tags=card_data['tags']
                 )
 
                 if note_id:
@@ -248,15 +211,8 @@ class AnkiConnect:
                 else:
                     skipped += 1
 
-                # Track media files for cleanup
-                all_media_files.extend(card_data['media_files'])
-
             except Exception as e:
                 errors.append(f"Card {i}: {str(e)}")
-
-        # Clean up media files if requested
-        if cleanup_media and all_media_files:
-            self._cleanup_media_files(all_media_files, output_dir)
 
         return {
             'added': added,
@@ -264,41 +220,3 @@ class AnkiConnect:
             'errors': errors,
             'total': len(decisions)
         }
-
-    def _cleanup_media_files(self, media_files: List[str], output_dir: Path) -> None:
-        """
-        Delete temporary media files after upload.
-
-        Args:
-            media_files: List of media file paths
-            output_dir: Output directory to clean up
-        """
-        import os
-        import shutil
-
-        # Delete individual media files
-        for media_file in media_files:
-            try:
-                path = Path(media_file)
-                if path.exists():
-                    path.unlink()
-            except Exception:
-                # Ignore cleanup errors
-                pass
-
-        # Try to remove the media directory if it's empty
-        try:
-            media_dir = output_dir / "media"
-            if media_dir.exists() and not any(media_dir.iterdir()):
-                media_dir.rmdir()
-        except Exception:
-            # Ignore cleanup errors
-            pass
-
-        # Try to remove the output directory if it's empty
-        try:
-            if output_dir.exists() and not any(output_dir.iterdir()):
-                output_dir.rmdir()
-        except Exception:
-            # Ignore cleanup errors
-            pass
