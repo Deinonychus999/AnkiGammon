@@ -418,4 +418,85 @@ tr.user-incorrect {
 .night_mode tr.user-incorrect {
     background-color: rgba(244, 67, 54, 0.25) !important;
 }
+
+/* ===================================================================
+   ANIMATION STYLES
+   =================================================================== */
+
+/* Position viewer animation container */
+.position-viewer {
+    position: relative;
+    overflow: hidden;
+}
+
+.position-svg-container {
+    transition: opacity 0.3s ease-in-out;
+}
+
+/* Smooth fade transitions for position switching */
+.position-svg-container.fade-out {
+    opacity: 0;
+}
+
+.position-svg-container.fade-in {
+    opacity: 1;
+}
+
+/* Animation controls */
+.animation-controls {
+    margin: 15px 0;
+}
+
+button.animate-btn {
+    padding: 8px 16px;
+    background-color: #ff9800;
+    color: #ffffff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: bold;
+    transition: background-color 0.2s ease;
+    text-decoration: none;
+}
+
+button.animate-btn:hover {
+    background-color: #f57c00;
+    color: #ffffff;
+}
+
+button.animate-btn:active {
+    background-color: #e65100;
+    color: #ffffff;
+}
+
+button.animate-btn:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+}
+
+/* Checker animation styles */
+.checker {
+    transition: all 0.3s ease-in-out;
+}
+
+/* Support for GSAP animations */
+.checker-animated {
+    will-change: transform, opacity;
+}
+
+/* Animation overlay for temporary animation layer */
+#anim-svg-temp {
+    pointer-events: none;
+    z-index: 100;
+}
+
+/* Smooth transitions for SVG visibility */
+.position-svg-container[style*="display: none"] {
+    display: none !important;
+}
+
+.position-svg-container[style*="display: block"] {
+    display: block !important;
+}
 """

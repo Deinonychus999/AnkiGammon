@@ -154,11 +154,11 @@ class InteractiveSession:
         click.echo()
         click.echo("When enabled, card backs will include clickable move visualization:")
         click.echo("  - Click any move in the analysis table to see the resulting position")
+        click.echo("  - Smooth animated transitions between positions")
         click.echo("  - Toggle between original and resulting positions")
         click.echo()
         click.echo(click.style("Note:", fg='yellow'), nl=False)
-        click.echo(" This generates additional images (5x more files per card),")
-        click.echo("       which increases file size and rendering time.")
+        click.echo(" This generates additional SVG boards (5x more per card).")
         click.echo()
 
         new_value = click.confirm(

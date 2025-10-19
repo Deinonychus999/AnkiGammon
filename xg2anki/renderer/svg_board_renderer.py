@@ -296,8 +296,8 @@ class SVGBoardRenderer:
 
                 cx = x + self.point_width / 2
 
-                # Add animation data attributes if provided
-                checker_attrs = f'data-point="{point_idx}"'
+                # Add animation data attributes
+                checker_attrs = f'data-point="{point_idx}" data-checker-index="{checker_num}"'
                 if move_data:
                     checker_attrs += f' data-move-info=\'{json.dumps(move_data)}\''
 
@@ -313,8 +313,9 @@ class SVGBoardRenderer:
                     y = y_base - self.checker_radius - 4 * (self.checker_radius * 2 + 2)
 
                 cx = x + self.point_width / 2
+                checker_attrs = f'data-point="{point_idx}" data-checker-index="4"'
                 svg_parts.append(
-                    self._draw_checker_with_number(cx, y, player, num_checkers)
+                    self._draw_checker_with_number(cx, y, player, num_checkers, checker_attrs)
                 )
 
         # Draw bar checkers
@@ -330,14 +331,14 @@ class SVGBoardRenderer:
 <circle class="checker {player_class}" cx="{cx}" cy="{cy}" r="{self.checker_radius}" {extra_attrs}/>
 '''
 
-    def _draw_checker_with_number(self, cx: float, cy: float, player: Player, number: int) -> str:
+    def _draw_checker_with_number(self, cx: float, cy: float, player: Player, number: int, extra_attrs: str = "") -> str:
         """Draw a checker with a number on it."""
         player_class = "checker-x" if player == Player.X else "checker-o"
         text_color = (self.color_scheme.checker_o if player == Player.X
                      else self.color_scheme.checker_x)
 
         return f'''
-<circle class="checker {player_class}" cx="{cx}" cy="{cy}" r="{self.checker_radius}"/>
+<circle class="checker {player_class}" cx="{cx}" cy="{cy}" r="{self.checker_radius}" {extra_attrs}/>
 <text class="checker-text" x="{cx}" y="{cy}"
       font-size="{self.checker_radius * 1.2}" fill="{text_color}">{number}</text>
 '''
@@ -389,20 +390,26 @@ class SVGBoardRenderer:
         svg_parts = []
         max_visible = min(count, 3)
 
+        # Bar point: 0 for X (top), 25 for O (bottom)
+        bar_point = 0 if player == Player.X else 25
+
         for i in range(max_visible):
             if top:
                 y = board_y + self.point_height + i * (self.checker_radius * 2 + 2)
             else:
                 y = board_y + self.board_height - self.point_height - i * (self.checker_radius * 2 + 2)
 
+            # Add data attributes for animation
+            checker_attrs = f'data-point="{bar_point}" data-checker-index="{i}"'
+
             if i == max_visible - 1 and count > max_visible:
                 # Last visible checker - show count
                 svg_parts.append(
-                    self._draw_checker_with_number(center_x, y, player, count)
+                    self._draw_checker_with_number(center_x, y, player, count, checker_attrs)
                 )
             else:
                 svg_parts.append(
-                    self._draw_checker(center_x, y, player)
+                    self._draw_checker(center_x, y, player, checker_attrs)
                 )
 
         return ''.join(svg_parts)

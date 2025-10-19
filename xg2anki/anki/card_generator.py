@@ -1,5 +1,6 @@
 """Generate Anki card content from XG decisions."""
 
+import json
 import random
 import string
 from pathlib import Path
@@ -7,7 +8,9 @@ from typing import List, Dict, Optional, Tuple
 
 from xg2anki.models import Decision, Move, Player
 from xg2anki.renderer.svg_board_renderer import SVGBoardRenderer
+from xg2anki.renderer.animation_controller import AnimationController
 from xg2anki.utils.move_parser import MoveParser
+from xg2anki.settings import get_settings
 
 
 class CardGenerator:
@@ -24,7 +27,8 @@ class CardGenerator:
         output_dir: Path,
         show_options: bool = False,
         interactive_moves: bool = False,
-        renderer: Optional[SVGBoardRenderer] = None
+        renderer: Optional[SVGBoardRenderer] = None,
+        animation_controller: Optional[AnimationController] = None
     ):
         """
         Initialize the card generator.
@@ -34,6 +38,7 @@ class CardGenerator:
             show_options: If True, show interactive MCQ with clickable options
             interactive_moves: If True, render positions for all moves (clickable analysis)
             renderer: SVG board renderer instance (creates default if None)
+            animation_controller: Animation controller instance (creates default if None)
         """
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -41,6 +46,8 @@ class CardGenerator:
         self.show_options = show_options
         self.interactive_moves = interactive_moves
         self.renderer = renderer or SVGBoardRenderer()
+        self.animation_controller = animation_controller or AnimationController()
+        self.settings = get_settings()
 
     def generate_card(self, decision: Decision, card_id: Optional[str] = None) -> Dict[str, any]:
         """
@@ -85,29 +92,24 @@ class CardGenerator:
                 decision, position_svg
             )
 
-        # Generate resulting position SVGs
+        # Generate resulting position SVG (only for non-interactive mode or best move)
         move_result_svgs = {}
         best_move = decision.get_best_move()
 
-        if self.interactive_moves:
-            # Render all candidate move positions for interactive visualization
-            for candidate in candidates:
-                if candidate:
-                    result_svg = self._render_resulting_position_svg(decision, candidate)
-                    move_result_svgs[candidate.notation] = result_svg
-            result_svg = move_result_svgs.get(best_move.notation) if best_move else None
-        else:
-            # Only render the best move's resulting position
+        if not self.interactive_moves:
+            # Only render the best move's resulting position (no animation)
             if best_move:
                 result_svg = self._render_resulting_position_svg(decision, best_move)
-                move_result_svgs[best_move.notation] = result_svg
             else:
                 result_svg = None
+        else:
+            # Interactive mode: we'll animate checkers on the original board
+            result_svg = None
 
         # Generate card back
         back_html = self._generate_back(
             decision, position_svg, result_svg, candidates, shuffled_candidates,
-            answer_index, self.show_options, move_result_svgs
+            answer_index, self.show_options
         )
 
         # Generate tags
@@ -324,8 +326,7 @@ class CardGenerator:
         candidates: List[Optional[Move]],
         shuffled_candidates: List[Optional[Move]],
         answer_index: int,
-        show_options: bool,
-        move_result_svgs: Dict[str, str]
+        show_options: bool
     ) -> str:
         """Generate HTML for card back."""
         metadata = self._get_metadata_html(decision)
@@ -349,9 +350,7 @@ class CardGenerator:
 
             if self.interactive_moves:
                 row_class = f"{rank_class} move-row"
-                svg_content = move_result_svgs.get(move.notation, '')
-                svg_id = f"svg-{id(svg_content)}"
-                row_attrs = f'data-move-notation="{move.notation}" data-svg-id="{svg_id}"'
+                row_attrs = f'data-move-notation="{move.notation}"'
             else:
                 row_class = rank_class
                 row_attrs = ""
@@ -396,24 +395,14 @@ class CardGenerator:
 
         # Generate position viewer HTML
         if self.interactive_moves:
-            # Store all result SVGs in hidden divs and show one at a time
-            svg_containers = []
-            for notation, svg in move_result_svgs.items():
-                svg_id = f"svg-{id(svg)}"
-                display_style = "display: none;" if svg != result_position_svg else ""
-                svg_containers.append(f'''
-    <div class="position-svg-container" id="{svg_id}" style="{display_style}">
-        {svg}
-    </div>''')
-
+            # Interactive mode: single board with animated checkers
             position_viewer_html = f'''
     <div class="position-viewer">
-        <div class="position-svg-container" id="original-svg" style="display: none;">
+        <div class="position-svg-animated" id="animated-board">
             {original_position_svg}
         </div>
-        {''.join(svg_containers)}
     </div>'''
-            analysis_title = '<h4>Top Moves Analysis: <span class="click-hint">(click a move to see the resulting position)</span></h4>'
+            analysis_title = '<h4>Top Moves Analysis: <span class="click-hint">(click a move to see it animated)</span></h4>'
             table_body_id = 'id="moves-tbody"'
         else:
             position_viewer_html = f'''
@@ -452,52 +441,246 @@ class CardGenerator:
             html += self._generate_mcq_back_javascript(correct_letter)
 
         if self.interactive_moves:
-            html += """
+            # Generate animation scripts
+            animation_scripts = self._generate_checker_animation_scripts(decision, candidates)
+            html += animation_scripts
+
+        return html
+
+    def _generate_checker_animation_scripts(
+        self,
+        decision: Decision,
+        candidates: List[Optional[Move]]
+    ) -> str:
+        """
+        Generate JavaScript for animating actual checker movements on the board.
+
+        Args:
+            decision: The decision with the original position
+            candidates: List of candidate moves
+
+        Returns:
+            HTML script tags with animation code
+        """
+        # Build move data with coordinates for each checker movement
+        move_data = {}
+
+        for candidate in candidates:
+            if not candidate:
+                continue
+
+            # Parse move notation to get individual checker movements
+            from xg2anki.renderer.animation_helper import AnimationHelper
+            movements = AnimationHelper.parse_move_notation(candidate.notation, decision.on_roll)
+
+            if not movements:
+                continue
+
+            # Calculate coordinates for each movement
+            # We need to track the position state as we animate
+            move_animations = []
+
+            # Create a copy of the position to track changes during the move
+            current_position = decision.position.copy()
+
+            for from_point, to_point in movements:
+                # Get starting coordinates (top of stack at from_point)
+                from_count = abs(current_position.points[from_point]) if 0 <= from_point <= 25 else 0
+                from_index = max(0, from_count - 1)  # Top checker index
+                start_x, start_y = self.animation_controller.get_point_coordinates(from_point, from_index)
+
+                # Get ending coordinates (where it lands at to_point - on top of existing checkers)
+                if to_point >= 0 and to_point <= 25:
+                    to_count = abs(current_position.points[to_point])
+                    to_index = to_count  # Will land on top of existing checkers
+                    end_x, end_y = self.animation_controller.get_point_coordinates(to_point, to_index)
+                else:
+                    # Bear-off or special case
+                    end_x, end_y = self.animation_controller.get_point_coordinates(to_point, 0)
+
+                move_animations.append({
+                    'from_point': from_point,
+                    'to_point': to_point,
+                    'start_x': start_x,
+                    'start_y': start_y,
+                    'end_x': end_x,
+                    'end_y': end_y
+                })
+
+                # Update position for next movement calculation
+                if 0 <= from_point <= 25:
+                    if current_position.points[from_point] > 0:
+                        current_position.points[from_point] -= 1
+                    elif current_position.points[from_point] < 0:
+                        current_position.points[from_point] += 1
+
+                if 0 <= to_point <= 25:
+                    if decision.on_roll == Player.X:
+                        current_position.points[to_point] += 1
+                    else:
+                        current_position.points[to_point] -= 1
+
+            move_data[candidate.notation] = move_animations
+
+        move_data_json = json.dumps(move_data)
+
+        # Generate animation JavaScript
+        script = f"""
 <script>
-(function() {
-    const moveRows = document.querySelectorAll('.move-row');
-    const svgContainers = document.querySelectorAll('.position-svg-container');
+// Checker movement animation system
+(function() {{
+    const ANIMATION_DURATION = 600; // milliseconds
+    const moveData = {move_data_json};
+    let isAnimating = false;
     let currentSelectedRow = null;
+    let originalBoardHTML = null;
 
-    // Initialize - highlight best move row
-    const bestMoveRow = document.querySelector('.move-row.best-move');
-    if (bestMoveRow) {
-        bestMoveRow.classList.add('selected');
-        currentSelectedRow = bestMoveRow;
-    }
+    // Store original board HTML for reset
+    function storeOriginalBoard() {{
+        const board = document.getElementById('animated-board');
+        if (board) {{
+            originalBoardHTML = board.innerHTML;
+        }}
+    }}
 
-    moveRows.forEach(row => {
-        row.addEventListener('click', function() {
-            const svgId = this.dataset.svgId;
+    // Reset board to original state
+    function resetBoard() {{
+        if (originalBoardHTML) {{
+            const board = document.getElementById('animated-board');
+            if (board) {{
+                board.innerHTML = originalBoardHTML;
+            }}
+        }}
+    }}
 
-            if (!svgId) return;
+    // Helper to find checkers at a specific point
+    function getCheckersAtPoint(svg, pointNum) {{
+        return svg.querySelectorAll('.checker[data-point="' + pointNum + '"]');
+    }}
 
-            // If clicking the same row, toggle to original
-            if (currentSelectedRow === this) {
-                svgContainers.forEach(c => c.style.display = 'none');
-                document.getElementById('original-svg').style.display = 'block';
-                this.classList.remove('selected');
-                currentSelectedRow = null;
-                return;
-            }
+    // Animate a single checker from start to end coordinates
+    function animateChecker(checker, startX, startY, endX, endY, duration) {{
+        return new Promise((resolve) => {{
+            const startTime = performance.now();
 
-            // Show this move's resulting position
-            svgContainers.forEach(c => c.style.display = 'none');
-            document.getElementById('original-svg').style.display = 'none';
-            const targetSvg = document.getElementById(svgId);
-            if (targetSvg) targetSvg.style.display = 'block';
+            function animate(currentTime) {{
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
 
-            // Update selection
-            moveRows.forEach(r => r.classList.remove('selected'));
-            this.classList.add('selected');
-            currentSelectedRow = this;
-        });
-    });
-})();
+                // Easing function (ease-in-out)
+                const eased = progress < 0.5
+                    ? 2 * progress * progress
+                    : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+
+                // Interpolate position
+                const currentX = startX + (endX - startX) * eased;
+                const currentY = startY + (endY - startY) * eased;
+
+                // Update checker position
+                checker.setAttribute('cx', currentX);
+                checker.setAttribute('cy', currentY);
+
+                if (progress < 1) {{
+                    requestAnimationFrame(animate);
+                }} else {{
+                    resolve();
+                }}
+            }}
+
+            requestAnimationFrame(animate);
+        }});
+    }}
+
+    // Animate a move
+    async function animateMove(moveNotation) {{
+        if (isAnimating) return;
+
+        const animations = moveData[moveNotation];
+        if (!animations || animations.length === 0) return;
+
+        isAnimating = true;
+
+        // Reset board to original position before animating
+        resetBoard();
+
+        // Small delay to ensure DOM update
+        await new Promise(resolve => setTimeout(resolve, 50));
+
+        const board = document.getElementById('animated-board');
+        const svg = board.querySelector('svg');
+
+        if (!svg) {{
+            isAnimating = false;
+            return;
+        }}
+
+        // Animate each checker movement sequentially
+        for (const anim of animations) {{
+            const checkers = getCheckersAtPoint(svg, anim.from_point);
+
+            if (checkers.length > 0) {{
+                // Animate the LAST checker (top of stack, at pointy end)
+                const checker = checkers[checkers.length - 1];
+
+                // Update data-point attribute to new position
+                checker.setAttribute('data-point', anim.to_point);
+
+                // Animate movement
+                await animateChecker(
+                    checker,
+                    anim.start_x, anim.start_y,
+                    anim.end_x, anim.end_y,
+                    ANIMATION_DURATION
+                );
+            }}
+        }}
+
+        isAnimating = false;
+    }}
+
+    // Initialize when DOM is ready
+    function initialize() {{
+        // Store the original board state
+        storeOriginalBoard();
+
+        // Set up click handlers for move rows
+        const moveRows = document.querySelectorAll('.move-row');
+
+        // Initialize - highlight best move row
+        const bestMoveRow = document.querySelector('.move-row.best-move');
+        if (bestMoveRow) {{
+            bestMoveRow.classList.add('selected');
+            currentSelectedRow = bestMoveRow;
+        }}
+
+        moveRows.forEach(row => {{
+            row.addEventListener('click', function() {{
+                const moveNotation = this.dataset.moveNotation;
+
+                if (!moveNotation) return;
+
+                // Update selection highlighting
+                moveRows.forEach(r => r.classList.remove('selected'));
+                this.classList.add('selected');
+                currentSelectedRow = this;
+
+                // Trigger animation
+                animateMove(moveNotation);
+            }});
+        }});
+    }}
+
+    // Run initialization
+    if (document.readyState === 'loading') {{
+        document.addEventListener('DOMContentLoaded', initialize);
+    }} else {{
+        initialize();
+    }}
+}})();
 </script>
 """
 
-        return html
+        return script
 
     def _generate_source_info(self, decision: Decision) -> str:
         """Generate source information HTML."""
