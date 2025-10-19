@@ -16,6 +16,7 @@ class Settings:
         "default_color_scheme": "classic",
         "deck_name": "XG Backgammon",
         "show_options": True,
+        "antialias_scale": 3,
     }
 
     def __init__(self, config_path: Optional[Path] = None):
@@ -96,6 +97,18 @@ class Settings:
     def show_options(self, value: bool) -> None:
         """Set whether to show options on cards."""
         self.set("show_options", value)
+
+    @property
+    def antialias_scale(self) -> int:
+        """Get the antialiasing scale (1=off, 2-4=quality levels)."""
+        return self._settings.get("antialias_scale", 3)
+
+    @antialias_scale.setter
+    def antialias_scale(self, value: int) -> None:
+        """Set the antialiasing scale."""
+        # Clamp value between 1 and 4
+        value = max(1, min(4, int(value)))
+        self.set("antialias_scale", value)
 
 
 # Global settings instance

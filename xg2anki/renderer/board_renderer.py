@@ -17,6 +17,7 @@ class BoardRenderer:
         height: int = 600,
         point_height_ratio: float = 0.45,  # Increased from 0.35 to make triangles longer
         color_scheme: ColorScheme = CLASSIC,
+        antialias_scale: int = 3,  # Render at 3x resolution for antialiasing
     ):
         """
         Initialize the board renderer.
@@ -26,9 +27,16 @@ class BoardRenderer:
             height: Image height in pixels
             point_height_ratio: Height of points as ratio of board height
             color_scheme: ColorScheme object defining board colors
+            antialias_scale: Supersampling factor (2-4 recommended, 1=disabled)
         """
-        self.width = width
-        self.height = height
+        self.target_width = width
+        self.target_height = height
+        self.antialias_scale = max(1, antialias_scale)
+
+        # Render at higher resolution for antialiasing
+        self.width = width * self.antialias_scale
+        self.height = height * self.antialias_scale
+
         self.point_height_ratio = point_height_ratio
         self.color_scheme = color_scheme
 
@@ -45,13 +53,14 @@ class BoardRenderer:
         self.COLOR_BEAROFF = color_scheme.bearoff
 
         # Calculate dimensions with space for cube (left) and bear-off (right)
-        self.margin = 20
-        self.cube_area_width = 70  # Space on left for cube
-        self.bearoff_area_width = 100  # Space on right for bear-off
+        # All dimensions are scaled for antialiasing
+        self.margin = 20 * self.antialias_scale
+        self.cube_area_width = 70 * self.antialias_scale  # Space on left for cube
+        self.bearoff_area_width = 100 * self.antialias_scale  # Space on right for bear-off
 
         # Playing area (the actual board)
-        self.playing_width = width - 2 * self.margin - self.cube_area_width - self.bearoff_area_width
-        self.board_height = height - 2 * self.margin
+        self.playing_width = self.width - 2 * self.margin - self.cube_area_width - self.bearoff_area_width
+        self.board_height = self.height - 2 * self.margin
 
         # Bar width (center divider)
         self.bar_width = self.playing_width * 0.08
@@ -64,7 +73,7 @@ class BoardRenderer:
         self.point_height = self.board_height * point_height_ratio
 
         # Checker size - increased to take advantage of longer points
-        self.checker_radius = min(self.point_width * 0.45, 25)
+        self.checker_radius = min(self.point_width * 0.45, 25 * self.antialias_scale)
 
     def render(
         self,
@@ -109,7 +118,7 @@ class BoardRenderer:
             [board_x, board_y, board_x + self.playing_width, board_y + self.board_height],
             fill=self.COLOR_BOARD_LIGHT,
             outline=self.COLOR_BOARD_DARK,
-            width=3
+            width=3 * self.antialias_scale
         )
 
         # Draw bar
@@ -118,7 +127,7 @@ class BoardRenderer:
             [bar_x, board_y, bar_x + self.bar_width, board_y + self.board_height],
             fill=self.COLOR_BAR,
             outline=self.COLOR_BOARD_DARK,
-            width=2
+            width=2 * self.antialias_scale
         )
 
         # Draw points
@@ -147,6 +156,13 @@ class BoardRenderer:
         # Draw pip counts
         self._draw_pip_counts(draw, position, board_x, board_y, flipped)
 
+        # Downscale for antialiasing if needed
+        if self.antialias_scale > 1:
+            img = img.resize(
+                (self.target_width, self.target_height),
+                Image.Resampling.LANCZOS  # High-quality downsampling
+            )
+
         if output_path:
             img.save(output_path)
 
@@ -155,7 +171,7 @@ class BoardRenderer:
     def _draw_points(self, draw: ImageDraw.Draw, board_x: int, board_y: int):
         """Draw the triangular points with numbers."""
         try:
-            font_point_num = ImageFont.truetype("arial.ttf", 10)
+            font_point_num = ImageFont.truetype("arial.ttf", 10 * self.antialias_scale)
         except:
             font_point_num = ImageFont.load_default()
 
@@ -169,28 +185,28 @@ class BoardRenderer:
                 y_base = board_y + self.board_height
                 y_tip = y_base - self.point_height
                 color = self.COLOR_POINT_DARK if i % 2 == 0 else self.COLOR_POINT_LIGHT
-                label_y = y_base + 3  # Below the base
+                label_y = y_base + 3 * self.antialias_scale  # Below the base
             elif i < 12:
                 # Bottom left quadrant (points 7-12)
                 x = board_x + (11 - i) * self.point_width
                 y_base = board_y + self.board_height
                 y_tip = y_base - self.point_height
                 color = self.COLOR_POINT_LIGHT if i % 2 == 0 else self.COLOR_POINT_DARK
-                label_y = y_base + 3  # Below the base
+                label_y = y_base + 3 * self.antialias_scale  # Below the base
             elif i < 18:
                 # Top left quadrant (points 13-18)
                 x = board_x + (i - 12) * self.point_width
                 y_base = board_y
                 y_tip = y_base + self.point_height
                 color = self.COLOR_POINT_DARK if i % 2 == 0 else self.COLOR_POINT_LIGHT
-                label_y = y_base - 13  # Above the base
+                label_y = y_base - 15 * self.antialias_scale  # Above the base
             else:
                 # Top right quadrant (points 19-24)
                 x = board_x + self.half_width + self.bar_width + (i - 18) * self.point_width
                 y_base = board_y
                 y_tip = y_base + self.point_height
                 color = self.COLOR_POINT_LIGHT if i % 2 == 0 else self.COLOR_POINT_DARK
-                label_y = y_base - 13  # Above the base
+                label_y = y_base - 15 * self.antialias_scale  # Above the base
 
             # Draw triangle
             points_triangle = [
@@ -198,7 +214,7 @@ class BoardRenderer:
                 (x + self.point_width, y_base),
                 (x + self.point_width / 2, y_tip)
             ]
-            draw.polygon(points_triangle, fill=color, outline=self.COLOR_BOARD_DARK)
+            draw.polygon(points_triangle, fill=color, outline=self.COLOR_BOARD_DARK, width=self.antialias_scale)
 
             # Draw point number
             label_text = str(point_num)
@@ -317,14 +333,14 @@ class BoardRenderer:
     ):
         """Draw bear-off trays with stacked checker representations."""
         # Bear-off area is to the RIGHT of the playing board
-        bearoff_x = board_x + self.playing_width + 10
-        bearoff_width = self.bearoff_area_width - 20
+        bearoff_x = board_x + self.playing_width + 10 * self.antialias_scale
+        bearoff_width = self.bearoff_area_width - 20 * self.antialias_scale
 
         # Checker dimensions - thin vertical rectangles
-        checker_width = 10  # Twice as wide
-        checker_height = 50  # Twice as tall
-        checker_spacing_x = 3  # Horizontal spacing
-        checker_spacing_y = 4  # Vertical spacing
+        checker_width = 10 * self.antialias_scale
+        checker_height = 50 * self.antialias_scale
+        checker_spacing_x = 3 * self.antialias_scale
+        checker_spacing_y = 4 * self.antialias_scale
         checkers_per_row = 5
 
         # Determine which player is at the top/bottom based on orientation
@@ -340,15 +356,15 @@ class BoardRenderer:
             return self.COLOR_CHECKER_X if player == Player.X else self.COLOR_CHECKER_O
 
         # Top tray
-        tray_top = board_y + 10
-        tray_bottom = board_y + self.board_height / 2 - 10
+        tray_top = board_y + 10 * self.antialias_scale
+        tray_bottom = board_y + self.board_height / 2 - 10 * self.antialias_scale
 
         # Draw tray background
         draw.rectangle(
             [bearoff_x, tray_top, bearoff_x + bearoff_width, tray_bottom],
             fill=self.COLOR_BEAROFF,
             outline=self.COLOR_BOARD_DARK,
-            width=2
+            width=2 * self.antialias_scale
         )
 
         # Draw stacked checkers for the player on top
@@ -358,7 +374,7 @@ class BoardRenderer:
             # Calculate total width needed for 5 checkers
             row_width = checkers_per_row * checker_width + (checkers_per_row - 1) * checker_spacing_x
             start_x = bearoff_x + (bearoff_width - row_width) / 2
-            start_y = tray_bottom - 10 - checker_height  # Start from bottom of tray
+            start_y = tray_bottom - 10 * self.antialias_scale - checker_height  # Start from bottom of tray
 
             for i in range(top_count):
                 # Which row (0=bottom, 1=middle, 2=top)
@@ -376,19 +392,19 @@ class BoardRenderer:
                     [x, y, x + checker_width, y + checker_height],
                     fill=get_color(top_player),
                     outline=self.COLOR_CHECKER_BORDER,
-                    width=1
+                    width=self.antialias_scale
                 )
 
         # Bottom tray
-        tray_top = board_y + self.board_height / 2 + 10
-        tray_bottom = board_y + self.board_height - 10
+        tray_top = board_y + self.board_height / 2 + 10 * self.antialias_scale
+        tray_bottom = board_y + self.board_height - 10 * self.antialias_scale
 
         # Draw tray background
         draw.rectangle(
             [bearoff_x, tray_top, bearoff_x + bearoff_width, tray_bottom],
             fill=self.COLOR_BEAROFF,
             outline=self.COLOR_BOARD_DARK,
-            width=2
+            width=2 * self.antialias_scale
         )
 
         # Draw stacked checkers for the player on bottom
@@ -398,7 +414,7 @@ class BoardRenderer:
             # Calculate total width needed for 5 checkers
             row_width = checkers_per_row * checker_width + (checkers_per_row - 1) * checker_spacing_x
             start_x = bearoff_x + (bearoff_width - row_width) / 2
-            start_y = tray_bottom - 10 - checker_height  # Start from bottom of tray
+            start_y = tray_bottom - 10 * self.antialias_scale - checker_height  # Start from bottom of tray
 
             for i in range(bottom_count):
                 # Which row (0=bottom, 1=middle, 2=top)
@@ -422,13 +438,13 @@ class BoardRenderer:
     def _draw_checker(self, draw: ImageDraw.Draw, x: float, y: float, color: str):
         """Draw a single checker."""
         r = self.checker_radius
-        draw.ellipse([x - r, y - r, x + r, y + r], fill=color, outline=self.COLOR_CHECKER_BORDER, width=2)
+        draw.ellipse([x - r, y - r, x + r, y + r], fill=color, outline=self.COLOR_CHECKER_BORDER, width=2 * self.antialias_scale)
 
     def _draw_checker_with_number(self, draw: ImageDraw.Draw, x: float, y: float, color: str, number: int):
         """Draw a checker with a number on it."""
         self._draw_checker(draw, x, y, color)
 
-        # Draw number
+        # Draw number (already scaled via checker_radius which uses scaled dimensions)
         text = str(number)
         try:
             font = ImageFont.truetype("arial.ttf", int(self.checker_radius * 1.2))
@@ -457,8 +473,8 @@ class BoardRenderer:
         base_img: Image.Image = None
     ):
         """Draw dice with optional transparency."""
-        die_size = 50  # Increased from 30
-        die_spacing = 15  # Increased spacing
+        die_size = 50 * self.antialias_scale
+        die_spacing = 15 * self.antialias_scale
 
         # Position dice on the playing field (NOT on the bar)
         # Always place dice on the RIGHT half of the board (traditional backgammon placement)
@@ -501,7 +517,7 @@ class BoardRenderer:
     def _draw_die(self, draw: ImageDraw.Draw, x: int, y: int, size: int, value: int):
         """Draw a single die."""
         # Draw die background
-        draw.rectangle([x, y, x + size, y + size], fill="#FFFFFF", outline="#000000", width=2)
+        draw.rectangle([x, y, x + size, y + size], fill="#FFFFFF", outline="#000000", width=2 * self.antialias_scale)
 
         # Draw pips
         pip_radius = size // 10
@@ -539,11 +555,11 @@ class BoardRenderer:
         flipped: bool
     ):
         """Draw the doubling cube."""
-        cube_size = 50
+        cube_size = 50 * self.antialias_scale
 
         # Cube area is to the LEFT of the playing board
-        cube_area_x = self.margin + 10
-        cube_area_center = cube_area_x + (self.cube_area_width - 20) / 2
+        cube_area_x = self.margin + 10 * self.antialias_scale
+        cube_area_center = cube_area_x + (self.cube_area_width - 20 * self.antialias_scale) / 2
 
         # Position cube based on owner
         if cube_owner == CubeState.CENTERED:
@@ -554,29 +570,29 @@ class BoardRenderer:
             # Bottom player - left area, at the very bottom
             cube_x = cube_area_center - cube_size / 2
             if flipped:
-                cube_y = board_y + 10
+                cube_y = board_y + 10 * self.antialias_scale
             else:
-                cube_y = board_y + self.board_height - cube_size - 10
+                cube_y = board_y + self.board_height - cube_size - 10 * self.antialias_scale
         else:  # X_OWNS
             # Top player - left area, at the very top
             cube_x = cube_area_center - cube_size / 2
             if flipped:
-                cube_y = board_y + self.board_height - cube_size - 10
+                cube_y = board_y + self.board_height - cube_size - 10 * self.antialias_scale
             else:
-                cube_y = board_y + 10
+                cube_y = board_y + 10 * self.antialias_scale
 
         # Draw cube
         draw.rectangle(
             [cube_x, cube_y, cube_x + cube_size, cube_y + cube_size],
             fill="#FFD700",  # Gold
             outline="#000000",
-            width=2
+            width=2 * self.antialias_scale
         )
 
         # Draw value - show 64 when centered, otherwise show actual value
         text = "64" if cube_owner == CubeState.CENTERED else str(cube_value)
         try:
-            font = ImageFont.truetype("arial.ttf", 32)  # Increased from 28
+            font = ImageFont.truetype("arial.ttf", 32 * self.antialias_scale)
         except:
             font = ImageFont.load_default()
 
@@ -692,7 +708,7 @@ class BoardRenderer:
     ):
         """Draw pip counts for both players."""
         try:
-            font = ImageFont.truetype("arial.ttf", 12)
+            font = ImageFont.truetype("arial.ttf", 12 * self.antialias_scale)
         except:
             font = ImageFont.load_default()
 
@@ -700,20 +716,22 @@ class BoardRenderer:
         x_pips = self._calculate_pip_count(position, Player.X)
         o_pips = self._calculate_pip_count(position, Player.O)
 
-        # Draw X's pip count (top right area, near bear-off)
+        # Draw X's pip count (top right area, in top bear-off tray)
         x_text = f"Pip: {x_pips}"
-        bearoff_x = board_x + self.playing_width + 10
+        bearoff_text_x = board_x + self.playing_width + 15 * self.antialias_scale
+        x_bearoff_top = board_y + 10 * self.antialias_scale
 
-        # Draw O's pip count (bottom right area, at top of O's bear-off tray)
+        # Draw O's pip count (bottom right area, in bottom bear-off tray)
         o_text = f"Pip: {o_pips}"
-        o_bearoff_top = board_y + self.board_height / 2 + 10
+        o_bearoff_top = board_y + self.board_height / 2 + 10 * self.antialias_scale
+
         if flipped:
             # When flipped, swap display positions
-            draw.text((bearoff_x + 5, o_bearoff_top + 7), x_text, fill=self.COLOR_TEXT, font=font)
-            draw.text((bearoff_x + 5, board_y + 20), o_text, fill=self.COLOR_TEXT, font=font)
+            draw.text((bearoff_text_x, o_bearoff_top + 12 * self.antialias_scale), x_text, fill=self.COLOR_TEXT, font=font)
+            draw.text((bearoff_text_x, x_bearoff_top + 12 * self.antialias_scale), o_text, fill=self.COLOR_TEXT, font=font)
         else:
-            draw.text((bearoff_x + 5, board_y + 20), x_text, fill=self.COLOR_TEXT, font=font)
-            draw.text((bearoff_x + 5, o_bearoff_top + 7), o_text, fill=self.COLOR_TEXT, font=font)
+            draw.text((bearoff_text_x, x_bearoff_top + 12 * self.antialias_scale), x_text, fill=self.COLOR_TEXT, font=font)
+            draw.text((bearoff_text_x, o_bearoff_top + 12 * self.antialias_scale), o_text, fill=self.COLOR_TEXT, font=font)
 
     def _flip_position(self, position: Position) -> Position:
         """

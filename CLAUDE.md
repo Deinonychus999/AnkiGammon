@@ -160,6 +160,11 @@ User preferences are automatically saved to `~/.xg2anki/config.json`:
 - `default_color_scheme` - Last selected color scheme (default: "classic")
 - `deck_name` - Default deck name (default: "XG Backgammon")
 - `show_options` - Whether to show options on cards (default: true)
+- `antialias_scale` - Antialiasing quality level (default: 3, range: 1-4)
+  - 1 = Off (fastest)
+  - 2 = 2x (good quality)
+  - 3 = 3x (excellent quality, recommended)
+  - 4 = 4x (maximum quality)
 
 **Settings API:**
 ```python
@@ -167,6 +172,7 @@ from xg2anki.settings import get_settings
 
 settings = get_settings()
 settings.color_scheme = "forest"  # Automatically saved
+settings.antialias_scale = 2  # Set to 2x antialiasing
 print(settings.color_scheme)  # Loads from config file
 ```
 

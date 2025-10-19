@@ -75,12 +75,14 @@ class ApkgExporter:
         Returns:
             Path to generated APKG file
         """
-        # Create renderer with color scheme
+        # Create renderer with color scheme and antialiasing
         from xg2anki.renderer.color_schemes import get_scheme
         from xg2anki.renderer.board_renderer import BoardRenderer
+        from xg2anki.settings import get_settings
 
         scheme = get_scheme(color_scheme)
-        renderer = BoardRenderer(color_scheme=scheme)
+        settings = get_settings()
+        renderer = BoardRenderer(color_scheme=scheme, antialias_scale=settings.antialias_scale)
 
         # Create card generator
         card_gen = CardGenerator(

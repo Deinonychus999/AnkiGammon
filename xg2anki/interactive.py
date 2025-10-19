@@ -69,13 +69,19 @@ class InteractiveSession:
             click.echo()
             click.echo(f"  1. Color scheme (current: {self.color_scheme})")
             click.echo(f"  2. Show move options (current: {'Yes' if self.settings.show_options else 'No'})")
-            click.echo("  3. Back to main menu")
+
+            # Format antialiasing display
+            aa_scale = self.settings.antialias_scale
+            aa_display = {1: "Off", 2: "2x", 3: "3x", 4: "4x"}.get(aa_scale, f"{aa_scale}x")
+            click.echo(f"  3. Antialiasing quality (current: {aa_display})")
+
+            click.echo("  4. Back to main menu")
             click.echo()
 
             choice = click.prompt(
                 click.style("Choose an option", fg='green'),
                 type=str,
-                default='3'
+                default='4'
             )
 
             if choice == '1':
@@ -83,6 +89,8 @@ class InteractiveSession:
             elif choice == '2':
                 self.toggle_show_options()
             elif choice == '3':
+                self.change_antialiasing()
+            elif choice == '4':
                 break
             else:
                 click.echo(click.style("\n  Invalid choice. Please try again.\n", fg='red'))
@@ -140,6 +148,40 @@ class InteractiveSession:
 
         click.echo()
         click.echo(click.style(f"  Setting saved: {'Show options' if new_value else 'Hide options'}", fg='green'))
+        click.echo()
+
+    def change_antialiasing(self):
+        """Allow user to change the antialiasing quality."""
+        click.echo()
+        click.echo(click.style("=" * 60, fg='cyan'))
+        click.echo(click.style("  Antialiasing Quality", fg='cyan', bold=True))
+        click.echo(click.style("=" * 60, fg='cyan'))
+        click.echo()
+        click.echo("Antialiasing smooths edges in board images for better quality.")
+        click.echo("Higher values produce smoother images but take longer to render.")
+        click.echo()
+        click.echo("Quality levels:")
+        current_mark = {1: " (current)", 2: " (current)", 3: " (current)", 4: " (current)"}.get(
+            self.settings.antialias_scale, ""
+        )
+        click.echo(f"  1. Off (fastest){current_mark if self.settings.antialias_scale == 1 else ''}")
+        click.echo(f"  2. 2x (good){current_mark if self.settings.antialias_scale == 2 else ''}")
+        click.echo(f"  3. 3x (excellent - recommended){current_mark if self.settings.antialias_scale == 3 else ''}")
+        click.echo(f"  4. 4x (maximum){current_mark if self.settings.antialias_scale == 4 else ''}")
+        click.echo()
+
+        choice = click.prompt(
+            click.style("Choose quality level (1-4)", fg='green'),
+            type=click.IntRange(1, 4),
+            default=self.settings.antialias_scale
+        )
+
+        self.settings.antialias_scale = choice
+
+        quality_names = {1: "Off", 2: "2x", 3: "3x", 4: "4x"}
+        click.echo()
+        click.echo(click.style(f"  Antialiasing set to: {quality_names[choice]}", fg='green'))
+        click.echo(click.style(f"  (Saved as default)", fg='cyan'))
         click.echo()
 
     def show_help(self):

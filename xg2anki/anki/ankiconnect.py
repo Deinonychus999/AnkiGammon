@@ -210,7 +210,11 @@ class AnkiConnect:
         from xg2anki.renderer.board_renderer import BoardRenderer
 
         scheme = get_scheme(color_scheme)
-        renderer = BoardRenderer(color_scheme=scheme)
+
+        # Get antialiasing setting from settings
+        from xg2anki.settings import get_settings
+        settings = get_settings()
+        renderer = BoardRenderer(color_scheme=scheme, antialias_scale=settings.antialias_scale)
 
         # Create card generator
         card_gen = CardGenerator(
