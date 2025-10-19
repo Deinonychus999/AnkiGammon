@@ -17,6 +17,7 @@ class Settings:
         "deck_name": "XG Backgammon",
         "show_options": True,
         "antialias_scale": 3,
+        "interactive_moves": False,
     }
 
     def __init__(self, config_path: Optional[Path] = None):
@@ -109,6 +110,16 @@ class Settings:
         # Clamp value between 1 and 4
         value = max(1, min(4, int(value)))
         self.set("antialias_scale", value)
+
+    @property
+    def interactive_moves(self) -> bool:
+        """Get whether to enable interactive move visualization."""
+        return self._settings.get("interactive_moves", False)
+
+    @interactive_moves.setter
+    def interactive_moves(self, value: bool) -> None:
+        """Set whether to enable interactive move visualization."""
+        self.set("interactive_moves", value)
 
 
 # Global settings instance

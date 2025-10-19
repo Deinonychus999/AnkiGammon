@@ -75,13 +75,15 @@ class InteractiveSession:
             aa_display = {1: "Off", 2: "2x", 3: "3x", 4: "4x"}.get(aa_scale, f"{aa_scale}x")
             click.echo(f"  3. Antialiasing quality (current: {aa_display})")
 
-            click.echo("  4. Back to main menu")
+            click.echo(f"  4. Interactive moves (current: {'Yes' if self.settings.interactive_moves else 'No'})")
+
+            click.echo("  5. Back to main menu")
             click.echo()
 
             choice = click.prompt(
                 click.style("Choose an option", fg='green'),
                 type=str,
-                default='4'
+                default='5'
             )
 
             if choice == '1':
@@ -91,6 +93,8 @@ class InteractiveSession:
             elif choice == '3':
                 self.change_antialiasing()
             elif choice == '4':
+                self.toggle_interactive_moves()
+            elif choice == '5':
                 break
             else:
                 click.echo(click.style("\n  Invalid choice. Please try again.\n", fg='red'))
@@ -178,9 +182,38 @@ class InteractiveSession:
 
         self.settings.antialias_scale = choice
 
-        quality_names = {1: "Off", 2: "2x", 3: "3x", 4: "4x"}
         click.echo()
-        click.echo(click.style(f"  Antialiasing set to: {quality_names[choice]}", fg='green'))
+        aa_display = {1: "Off", 2: "2x", 3: "3x", 4: "4x"}.get(choice, f"{choice}x")
+        click.echo(click.style(f"  Antialiasing set to: {aa_display}", fg='green'))
+        click.echo(click.style(f"  (Saved as default)", fg='cyan'))
+        click.echo()
+
+    def toggle_interactive_moves(self):
+        """Toggle the 'interactive moves' setting."""
+        click.echo()
+        click.echo(click.style("=" * 60, fg='cyan'))
+        click.echo(click.style("  Interactive Move Visualization", fg='cyan', bold=True))
+        click.echo(click.style("=" * 60, fg='cyan'))
+        click.echo()
+        click.echo("When enabled, card backs will include clickable move visualization:")
+        click.echo("  - Click any move in the analysis table to see the resulting position")
+        click.echo("  - Toggle between original and resulting positions")
+        click.echo()
+        click.echo(click.style("Note:", fg='yellow'), nl=False)
+        click.echo(" This generates additional images (5x more files per card),")
+        click.echo("       which increases file size and rendering time.")
+        click.echo()
+
+        new_value = click.confirm(
+            click.style("Enable interactive move visualization?", fg='green'),
+            default=self.settings.interactive_moves
+        )
+
+        self.settings.interactive_moves = new_value
+
+        click.echo()
+        click.echo(click.style(f"  Setting saved: {'Interactive moves enabled' if new_value else 'Interactive moves disabled'}", fg='green'))
+        click.echo()
         click.echo(click.style(f"  (Saved as default)", fg='cyan'))
         click.echo()
 
@@ -287,7 +320,14 @@ class InteractiveSession:
         # Note: show_options is passed as-is, where True means show text options (image_choices=False)
         # The export functions will handle this correctly
         click.echo()
-        self.export_deck(decisions, deck_name, output_format, self.settings.show_options, self.color_scheme)
+        self.export_deck(
+            decisions,
+            deck_name,
+            output_format,
+            self.settings.show_options,
+            self.color_scheme,
+            self.settings.interactive_moves
+        )
 
     def collect_positions(self) -> List[str]:
         """
@@ -434,7 +474,8 @@ class InteractiveSession:
         click.echo()
 
     def export_deck(self, decisions: List[Decision], deck_name: str,
-                   output_format: str, show_options: bool, color_scheme: str = "classic"):
+                   output_format: str, show_options: bool, color_scheme: str = "classic",
+                   interactive_moves: bool = False):
         """Export the deck using the specified format."""
         # Import here to avoid circular imports
         from xg2anki.cli import export_apkg, export_ankiconnect
@@ -446,9 +487,9 @@ class InteractiveSession:
             click.echo(click.style("Generating deck...", fg='cyan'))
 
             if output_format == 'apkg':
-                export_apkg(decisions, output_dir, deck_name, show_options, color_scheme)
+                export_apkg(decisions, output_dir, deck_name, show_options, color_scheme, interactive_moves)
             elif output_format == 'ankiconnect':
-                export_ankiconnect(decisions, output_dir, deck_name, show_options, color_scheme)
+                export_ankiconnect(decisions, output_dir, deck_name, show_options, color_scheme, interactive_moves)
 
             click.echo()
             click.echo(click.style("=" * 60, fg='green'))

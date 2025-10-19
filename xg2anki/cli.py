@@ -47,12 +47,17 @@ from xg2anki.settings import get_settings
     help='Board color scheme (default: saved preference or classic)'
 )
 @click.option(
+    '--interactive-moves',
+    is_flag=True,
+    help='Enable interactive move visualization (clickable moves in analysis table)'
+)
+@click.option(
     '--interactive',
     '-i',
     is_flag=True,
     help='Run in interactive mode (default when no input file provided)'
 )
-def main(input_file, format, output, deck_name, show_options, input_format, color_scheme, interactive):
+def main(input_file, format, output, deck_name, show_options, input_format, color_scheme, interactive_moves, interactive):
     """
     Convert eXtreme Gammon (XG) positions/analysis into Anki flashcards.
 
@@ -114,10 +119,10 @@ def main(input_file, format, output, deck_name, show_options, input_format, colo
     # Export based on format
     try:
         if format == 'apkg':
-            export_apkg(decisions, output_dir, deck_name, show_options, color_scheme)
+            export_apkg(decisions, output_dir, deck_name, show_options, color_scheme, interactive_moves)
 
         elif format == 'ankiconnect':
-            export_ankiconnect(decisions, output_dir, deck_name, show_options, color_scheme)
+            export_ankiconnect(decisions, output_dir, deck_name, show_options, color_scheme, interactive_moves)
 
     except Exception as e:
         click.echo(f"Error during export: {e}", err=True)
@@ -136,19 +141,21 @@ def parse_input(input_file: str, input_format: str):
     return XGTextParser.parse_file(str(input_path))
 
 
-def export_apkg(decisions, output_dir, deck_name, show_options, color_scheme="classic"):
+def export_apkg(decisions, output_dir, deck_name, show_options, color_scheme="classic", interactive_moves=False):
     """Export to APKG format."""
     click.echo(f"Generating APKG file...")
     click.echo(f"  Deck name: {deck_name}")
     click.echo(f"  Show options: {'Yes' if show_options else 'No'}")
     click.echo(f"  Color scheme: {color_scheme}")
+    click.echo(f"  Interactive moves: {'Yes' if interactive_moves else 'No'}")
 
     exporter = ApkgExporter(output_dir, deck_name)
     output_file = exporter.export(
         decisions,
         output_file="xg_deck.apkg",
         show_options=show_options,
-        color_scheme=color_scheme
+        color_scheme=color_scheme,
+        interactive_moves=interactive_moves
     )
 
     click.echo()
@@ -160,12 +167,13 @@ def export_apkg(decisions, output_dir, deck_name, show_options, color_scheme="cl
     click.echo(f"  3. Select: {output_file}")
 
 
-def export_ankiconnect(decisions, output_dir, deck_name, show_options, color_scheme="classic"):
+def export_ankiconnect(decisions, output_dir, deck_name, show_options, color_scheme="classic", interactive_moves=False):
     """Export via Anki-Connect."""
     click.echo(f"Connecting to Anki...")
     click.echo(f"  Deck name: {deck_name}")
     click.echo(f"  Show options: {'Yes' if show_options else 'No'}")
     click.echo(f"  Color scheme: {color_scheme}")
+    click.echo(f"  Interactive moves: {'Yes' if interactive_moves else 'No'}")
 
     client = AnkiConnect(deck_name=deck_name)
 
@@ -205,7 +213,8 @@ def export_ankiconnect(decisions, output_dir, deck_name, show_options, color_sch
         decisions,
         output_dir=output_dir,
         show_options=show_options,
-        color_scheme=color_scheme
+        color_scheme=color_scheme,
+        interactive_moves=interactive_moves
     )
 
     click.echo()

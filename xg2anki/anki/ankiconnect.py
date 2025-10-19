@@ -182,6 +182,7 @@ class AnkiConnect:
         output_dir: Path,
         show_options: bool = False,
         color_scheme: str = "classic",
+        interactive_moves: bool = False,
         cleanup_media: bool = True
     ) -> Dict[str, Any]:
         """
@@ -192,6 +193,7 @@ class AnkiConnect:
             output_dir: Directory for temporary media files
             show_options: Show multiple choice options (text-based)
             color_scheme: Board color scheme name
+            interactive_moves: Enable interactive move visualization
             cleanup_media: Delete media files after upload (default: True)
 
         Returns:
@@ -220,6 +222,7 @@ class AnkiConnect:
         card_gen = CardGenerator(
             output_dir=output_dir,
             show_options=show_options,
+            interactive_moves=interactive_moves,
             renderer=renderer
         )
 

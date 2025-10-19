@@ -61,7 +61,8 @@ class ApkgExporter:
         decisions: List[Decision],
         output_file: str = "xg_deck.apkg",
         show_options: bool = False,
-        color_scheme: str = "classic"
+        color_scheme: str = "classic",
+        interactive_moves: bool = False
     ) -> str:
         """
         Export decisions to an APKG file.
@@ -71,6 +72,7 @@ class ApkgExporter:
             output_file: Output filename
             show_options: Show multiple choice options (text-based)
             color_scheme: Board color scheme name
+            interactive_moves: Enable interactive move visualization
 
         Returns:
             Path to generated APKG file
@@ -88,6 +90,7 @@ class ApkgExporter:
         card_gen = CardGenerator(
             output_dir=self.output_dir,
             show_options=show_options,
+            interactive_moves=interactive_moves,
             renderer=renderer
         )
 

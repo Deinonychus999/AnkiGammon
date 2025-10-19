@@ -157,6 +157,13 @@ CARD_CSS = """
     margin-bottom: 10px;
 }
 
+.click-hint {
+    font-size: 12px;
+    color: #999;
+    font-weight: normal;
+    font-style: italic;
+}
+
 .moves-table {
     width: auto;
     border-collapse: collapse;
@@ -186,6 +193,25 @@ CARD_CSS = """
     color: #66bb6a;
 }
 
+.move-row {
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.move-row:hover {
+    background-color: rgba(100, 150, 255, 0.1) !important;
+}
+
+.move-row.selected {
+    background-color: rgba(100, 150, 255, 0.2) !important;
+    border-left: 3px solid #4da6ff;
+}
+
+.move-row.best-move.selected {
+    background-color: rgba(76, 175, 80, 0.25) !important;
+    border-left: 3px solid #66bb6a;
+}
+
 .source-info {
     margin-top: 20px;
     padding: 10px;
@@ -203,5 +229,52 @@ CARD_CSS = """
     border-radius: 3px;
     font-family: monospace;
     font-size: 11px;
+}
+
+/* Position viewer controls */
+.position-viewer {
+    position: relative;
+}
+
+.position-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 10px 0;
+    padding: 8px 12px;
+    background-color: var(--canvas-elevated);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+}
+
+#position-status {
+    font-size: 14px;
+    font-weight: bold;
+    color: var(--text-fg);
+}
+
+button.toggle-btn,
+button.toggle-btn:link,
+button.toggle-btn:visited {
+    padding: 6px 12px;
+    background-color: #4da6ff;
+    color: #ffffff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: bold;
+    transition: background-color 0.2s ease;
+    text-decoration: none;
+}
+
+button.toggle-btn:hover {
+    background-color: #3d8fcc;
+    color: #ffffff;
+}
+
+button.toggle-btn:active {
+    background-color: #2d7fbc;
+    color: #ffffff;
 }
 """

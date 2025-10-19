@@ -24,6 +24,7 @@ class CardGenerator:
         self,
         output_dir: Path,
         show_options: bool = False,
+        interactive_moves: bool = False,
         renderer: Optional[BoardRenderer] = None
     ):
         """
@@ -32,12 +33,14 @@ class CardGenerator:
         Args:
             output_dir: Directory to save generated images
             show_options: If True, show multiple choice options (text only)
+            interactive_moves: If True, render positions for all moves (clickable analysis)
             renderer: Board renderer instance (creates default if None)
         """
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
         self.show_options = show_options
+        self.interactive_moves = interactive_moves
         self.renderer = renderer or BoardRenderer()
 
         # Create media directory
@@ -92,17 +95,37 @@ class CardGenerator:
                 decision, position_image
             )
 
-        # Generate resulting position image (after best move)
+        # Generate resulting position images
+        move_result_images = {}
         best_move = decision.get_best_move()
-        result_image = self._render_resulting_position(decision, best_move, f"{card_id}_result")
+
+        if self.interactive_moves:
+            # Render all candidate move positions for interactive visualization
+            for i, candidate in enumerate(candidates):
+                if candidate:
+                    result_img = self._render_resulting_position(
+                        decision, candidate, f"{card_id}_move_{i}"
+                    )
+                    move_result_images[candidate.notation] = result_img
+            result_image = move_result_images.get(best_move.notation) if best_move else None
+        else:
+            # Only render the best move's resulting position
+            if best_move:
+                result_image = self._render_resulting_position(
+                    decision, best_move, f"{card_id}_result"
+                )
+                move_result_images[best_move.notation] = result_image
+            else:
+                result_image = None
 
         # Generate card back
         back_html = self._generate_back(
-            decision, result_image, candidates, answer_index, self.show_options
+            decision, position_image, result_image, candidates, answer_index,
+            self.show_options, move_result_images
         )
 
         # Collect media files
-        media_files = [position_image, result_image]
+        media_files = [position_image] + list(move_result_images.values())
 
         # Generate tags
         tags = self._generate_tags(decision)
@@ -199,10 +222,12 @@ class CardGenerator:
     def _generate_back(
         self,
         decision: Decision,
-        position_image: str,
+        original_position_image: str,
+        result_position_image: str,
         candidates: List[Optional[Move]],
         answer_index: int,
-        show_options: bool
+        show_options: bool,
+        move_result_images: Dict[str, str]
     ) -> str:
         """Generate HTML for card back."""
         metadata = self._get_metadata_html(decision)
@@ -231,8 +256,18 @@ class CardGenerator:
             # Format error with explicit + sign (matching XG's format)
             error_str = f"{display_error:+.3f}" if display_error != 0 else "0.000"
 
+            # Add interactive attributes if enabled
+            if self.interactive_moves:
+                result_img = move_result_images.get(move.notation, "")
+                result_img_name = Path(result_img).name if result_img else ""
+                row_class = f"{rank_class} move-row"
+                row_attrs = f'data-move-notation="{move.notation}" data-result-image="{result_img_name}"'
+            else:
+                row_class = rank_class
+                row_attrs = ""
+
             table_rows.append(f"""
-<tr class="{rank_class}">
+<tr class="{row_class}" {row_attrs}>
     <td>{display_rank}</td>
     <td>{display_notation}</td>
     <td>{move.equity:.3f}</td>
@@ -262,15 +297,40 @@ class CardGenerator:
     </div>
 """
 
+        # Prepare image paths for JavaScript
+        original_img_name = Path(original_position_image).name
+        result_img_name = Path(result_position_image).name if result_position_image else original_img_name
+
+        # Generate position viewer HTML based on interactive_moves setting
+        if self.interactive_moves:
+            position_viewer_html = f"""
+    <div class="position-viewer">
+        <div class="position-image">
+            <img id="position-display" src="{result_img_name}" alt="Position" data-original="{original_img_name}" data-current="{result_img_name}" />
+        </div>
+        <div class="position-label">
+            <span id="position-status">After best move</span>
+            <button id="toggle-position" class="toggle-btn">Show original position</button>
+        </div>
+    </div>"""
+            analysis_title = '<h4>Top Moves Analysis: <span class="click-hint">(click a move to see the resulting position)</span></h4>'
+            table_body_id = 'id="moves-tbody"'
+        else:
+            # Non-interactive mode: just show the resulting position
+            position_viewer_html = f"""
+    <div class="position-image">
+        <img src="{result_img_name}" alt="Position" />
+    </div>"""
+            analysis_title = '<h4>Top Moves Analysis:</h4>'
+            table_body_id = ''
+
         html = f"""
 <div class="card-back">
-    <div class="position-image">
-        <img src="{Path(position_image).name}" alt="Position" />
-    </div>
+{position_viewer_html}
     <div class="metadata">{metadata}</div>
 {answer_html}
     <div class="analysis">
-        <h4>Top Moves Analysis:</h4>
+        {analysis_title}
         <table class="moves-table">
             <thead>
                 <tr>
@@ -280,7 +340,7 @@ class CardGenerator:
                     <th>Error</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody {table_body_id}>
                 {''.join(table_rows)}
             </tbody>
         </table>
@@ -288,6 +348,91 @@ class CardGenerator:
     {self._generate_source_info(decision)}
 </div>
 """
+
+        # Add JavaScript for interactive mode
+        if self.interactive_moves:
+            html += """
+<script>
+(function() {
+    // Get elements
+    const positionImg = document.getElementById('position-display');
+    const statusLabel = document.getElementById('position-status');
+    const toggleBtn = document.getElementById('toggle-position');
+    const moveRows = document.querySelectorAll('.move-row');
+
+    // Track state
+    let showingOriginal = false;
+    const originalImg = positionImg.dataset.original;
+    const bestMoveImg = positionImg.dataset.current;
+    let currentSelectedRow = null;
+
+    // Initialize - highlight best move row
+    const bestMoveRow = document.querySelector('.move-row.best-move');
+    if (bestMoveRow) {
+        bestMoveRow.classList.add('selected');
+        currentSelectedRow = bestMoveRow;
+    }
+
+    // Toggle button handler
+    toggleBtn.addEventListener('click', function() {
+        showingOriginal = !showingOriginal;
+
+        if (showingOriginal) {
+            positionImg.src = originalImg;
+            statusLabel.textContent = 'Original position';
+            toggleBtn.textContent = 'Show resulting position';
+
+            // Deselect all rows
+            moveRows.forEach(row => row.classList.remove('selected'));
+            currentSelectedRow = null;
+        } else {
+            positionImg.src = bestMoveImg;
+            statusLabel.textContent = 'After best move';
+            toggleBtn.textContent = 'Show original position';
+
+            // Re-select best move row
+            if (bestMoveRow) {
+                bestMoveRow.classList.add('selected');
+                currentSelectedRow = bestMoveRow;
+            }
+        }
+    });
+
+    // Click handler for move rows
+    moveRows.forEach(row => {
+        row.addEventListener('click', function() {
+            const resultImage = this.dataset.resultImage;
+            const moveNotation = this.dataset.moveNotation;
+
+            if (!resultImage) return;
+
+            // If clicking the same row, toggle to original
+            if (currentSelectedRow === this && !showingOriginal) {
+                showingOriginal = true;
+                positionImg.src = originalImg;
+                statusLabel.textContent = 'Original position';
+                toggleBtn.textContent = 'Show resulting position';
+                this.classList.remove('selected');
+                currentSelectedRow = null;
+                return;
+            }
+
+            // Show this move's resulting position
+            showingOriginal = false;
+            positionImg.src = resultImage;
+            statusLabel.textContent = 'After: ' + moveNotation;
+            toggleBtn.textContent = 'Show original position';
+
+            // Update selection
+            moveRows.forEach(r => r.classList.remove('selected'));
+            this.classList.add('selected');
+            currentSelectedRow = this;
+        });
+    });
+})();
+</script>
+"""
+
         return html
 
     def _generate_source_info(self, decision: Decision) -> str:
