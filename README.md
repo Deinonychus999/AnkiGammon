@@ -16,8 +16,14 @@ Convert eXtreme Gammon (XG) backgammon analysis into Anki flashcards for effecti
 
 ### Option 1: Standalone Executable (Recommended)
 
+**Windows:**
 1. Run `build_executable.bat` to create `xg2anki.exe`
 2. Double-click to run - no Python installation needed!
+
+**macOS/Linux:**
+1. Run `./build_executable.sh` to create `xg2anki`
+2. Run from terminal: `./dist/xg2anki` - no Python installation needed!
+3. macOS first run: Right-click → Open (or allow in System Settings → Privacy & Security)
 
 ### Option 2: Development Install
 
@@ -160,28 +166,66 @@ python -m xg2anki positions.txt --show-options
 
 **Quick Build:**
 
+Windows:
 ```bash
 build_executable.bat
+```
+
+macOS/Linux:
+```bash
+chmod +x build_executable.sh
+./build_executable.sh
 ```
 
 The executable will be in the `dist/` folder.
 
 **Manual Build (if script doesn't work):**
+
+Windows:
 ```bash
 # Install PyInstaller
 pip install pyinstaller
 
 # Clean previous builds
-rm -rf build dist
+rmdir /s /q build dist
 
 # Build
 pyinstaller xg2anki.spec
+```
+
+macOS/Linux:
+```bash
+# Install PyInstaller
+pip3 install pyinstaller
+
+# Clean previous builds
+rm -rf build dist
+
+# Build
+pyinstaller xg2anki-mac.spec
+
+# Remove quarantine attribute (macOS only)
+xattr -cr dist/xg2anki
 ```
 
 ### Testing Builds
 
 Before distributing:
 
+Windows:
+```bash
+# Test the executable works
+cd dist
+xg2anki.exe --help
+
+# Test interactive mode
+xg2anki.exe
+
+# Test with a sample file
+xg2anki.exe ..\examples\example_xg_export.txt
+```
+
+macOS/Linux:
 ```bash
 # Test the executable works
 cd dist
@@ -208,7 +252,9 @@ cd dist
 ### Settings Storage
 
 User preferences (color scheme, deck name, etc.) are stored in:
-- `C:\Users\YourName\.xg2anki\config.json`
+- Windows: `C:\Users\YourName\.xg2anki\config.json`
+- macOS: `~/.xg2anki/config.json`
+- Linux: `~/.xg2anki/config.json`
 
 This ensures settings persist even when using the standalone executable.
 
@@ -230,14 +276,23 @@ This ensures settings persist even when using the standalone executable.
 - Check Windows Defender / antivirus isn't blocking it
 - Look at build warnings: `pyinstaller xg2anki.spec > build.log 2>&1`
 
-**Security Note:**
+**Platform-Specific Issues:**
+
+Windows:
 - Some antivirus software may flag PyInstaller executables as suspicious (false positive)
-- This is common with PyInstaller - nothing to worry about
 - Users may need to add an exception in their antivirus
-- To reduce false positives:
-  1. Sign your executable (Windows: with a code signing certificate)
-  2. Build on clean systems
-  3. Upload to VirusTotal to show it's clean
+- To reduce false positives: Sign executable with code signing certificate
+
+macOS:
+- First run may show "cannot be opened because it is from an unidentified developer"
+- Solution 1: Right-click executable → Open → Open anyway
+- Solution 2: System Settings → Privacy & Security → Allow anyway
+- Solution 3: Remove quarantine: `xattr -cr dist/xg2anki`
+- For distribution: Sign with Apple Developer certificate and notarize
+
+Linux:
+- Ensure executable has execute permissions: `chmod +x xg2anki`
+- May need to install dependencies on minimal systems: `sudo apt install libxcb1`
 
 ## Requirements
 

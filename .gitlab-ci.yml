@@ -1,0 +1,53 @@
+# GitLab CI/CD Pipeline for XG2Anki
+# Automatically builds Windows executable
+#
+# ℹ️ INFO:
+# - Windows builds use GitLab's free SaaS runners (beta)
+# - macOS builds not included (requires Premium plan)
+# - For macOS: Users build from source (see README.md)
+
+stages:
+  - build
+  - release
+
+# Windows Build
+build:windows:
+  stage: build
+  tags:
+    - saas-windows-medium-amd64
+  before_script:
+    - python --version
+    - pip install -r requirements.txt
+    - pip install pyinstaller
+  script:
+    - pyinstaller xg2anki.spec
+    - cd dist
+    - Compress-Archive -Path xg2anki.exe -DestinationPath xg2anki-windows.zip
+  artifacts:
+    name: "xg2anki-windows-${CI_COMMIT_SHORT_SHA}"
+    paths:
+      - dist/xg2anki-windows.zip
+    expire_in: 1 week
+  only:
+    - main
+    - tags
+
+# Create Release (only on tags)
+release:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  needs:
+    - job: build:windows
+      artifacts: true
+  script:
+    - echo "Creating release for $CI_COMMIT_TAG"
+  release:
+    name: 'Release $CI_COMMIT_TAG'
+    description: 'XG2Anki release $CI_COMMIT_TAG - Download Windows executable below. For macOS/Linux, build from source (see README.md).'
+    tag_name: '$CI_COMMIT_TAG'
+    assets:
+      links:
+        - name: 'Windows Executable (ZIP)'
+          url: '${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/raw/dist/xg2anki-windows.zip?job=build:windows'
+  only:
+    - tags

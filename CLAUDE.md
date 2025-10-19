@@ -24,6 +24,21 @@ python -m xg2anki analysis.txt
 python -m unittest tests/test_basic.py
 ```
 
+### Building Executables
+
+**Windows:**
+```bash
+build_executable.bat
+# Creates dist/xg2anki.exe
+```
+
+**macOS/Linux:**
+```bash
+chmod +x build_executable.sh
+./build_executable.sh
+# Creates dist/xg2anki
+```
+
 ### Testing
 
 ```bash
