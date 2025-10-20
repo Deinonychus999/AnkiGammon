@@ -667,7 +667,7 @@ class CardGenerator:
                 const textX = parseFloat(text.getAttribute('x'));
                 const textY = parseFloat(text.getAttribute('y'));
 
-                if (Math.abs(checkerCx - textX) < 5 && Math.abs(checkerCy - textY) < 5) {{
+                if (5 > Math.abs(checkerCx - textX) && 5 > Math.abs(checkerCy - textY)) {{
                     return text;
                 }}
             }}
@@ -696,7 +696,7 @@ class CardGenerator:
         const isBar = (pointNum === 0 || pointNum === 25);
         const threshold = isBar ? 3 : 5;
 
-        if (newCount <= threshold) {{
+        if (threshold >= newCount) {{
             // No count needed, remove if exists
             if (countText) {{
                 countText.remove();
@@ -758,7 +758,7 @@ class CardGenerator:
                 const progress = Math.min(elapsed / duration, 1);
 
                 // Easing function (ease-in-out)
-                const eased = progress < 0.5
+                const eased = 0.5 > progress
                     ? 2 * progress * progress
                     : 1 - Math.pow(-2 * progress + 2, 2) / 2;
 
@@ -770,7 +770,7 @@ class CardGenerator:
                 checker.setAttribute('cx', currentX);
                 checker.setAttribute('cy', currentY);
 
-                if (progress < 1) {{
+                if (1 > progress) {{
                     requestAnimationFrame(animate);
                 }} else {{
                     resolve('completed');
