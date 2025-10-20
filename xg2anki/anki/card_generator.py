@@ -997,6 +997,15 @@ class CardGenerator:
         if (bestMoveRow) {{
             bestMoveRow.classList.add('selected');
             currentSelectedRow = bestMoveRow;
+
+            // Automatically trigger animation for best move
+            const bestMoveNotation = bestMoveRow.dataset.moveNotation;
+            if (bestMoveNotation) {{
+                // Small delay to ensure DOM is fully ready
+                setTimeout(() => {{
+                    animateMove(bestMoveNotation);
+                }}, 100);
+            }}
         }}
 
         moveRows.forEach(row => {{
