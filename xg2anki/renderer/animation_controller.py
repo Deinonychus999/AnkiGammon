@@ -61,13 +61,14 @@ class AnimationController:
         self.board_x = self.margin + self.cube_area_width
         self.board_y = self.margin
 
-    def get_point_coordinates(self, point_num: int, checker_index: int = 0) -> Tuple[float, float]:
+    def get_point_coordinates(self, point_num: int, checker_index: int = 0, player: Optional[Player] = None) -> Tuple[float, float]:
         """
         Calculate SVG coordinates for a checker on a specific point.
 
         Args:
             point_num: Point number (0=X bar, 1-24=board points, 25=O bar, -1=bear off)
             checker_index: Index of checker in stack (0=bottom, 1=next up, etc.)
+            player: Player bearing off (required when point_num == -1)
 
         Returns:
             (x, y) coordinates in SVG space
@@ -89,8 +90,22 @@ class AnimationController:
         # Handle bear-off (special marker -1)
         if point_num == -1:
             # Return off-board position (will be animated to bear-off tray)
+            # X-coordinate: center of bearoff area
             bearoff_x = self.board_x + self.playing_width + 50
-            bearoff_y = self.board_y + self.board_height_inner / 2
+
+            # Y-coordinate: bottom of appropriate tray where thin rectangles are drawn
+            # (matches SVGBoardRenderer._draw_bearoff checker placement)
+            checker_height = 50  # Must match SVGBoardRenderer
+
+            if player == Player.X:
+                # X uses top tray (not flipped)
+                tray_bottom = self.board_y + self.board_height_inner / 2 - 10
+                bearoff_y = tray_bottom - 10 - checker_height
+            else:
+                # O uses bottom tray (not flipped)
+                tray_bottom = self.board_y + self.board_height_inner - 10
+                bearoff_y = tray_bottom - 10 - checker_height
+
             return (bearoff_x, bearoff_y)
 
         # Handle regular board points (1-24)
@@ -239,7 +254,8 @@ function animatePositionTransition() {{
 
             # Get start and end coordinates
             start_x, start_y = self.get_point_coordinates(from_point, checker_index)
-            end_x, end_y = self.get_point_coordinates(to_point, checker_index)
+            # For bearoff moves (to_point == -1), pass the player information
+            end_x, end_y = self.get_point_coordinates(to_point, checker_index, player=on_roll if to_point == -1 else None)
 
             # Calculate control point for arc (parabolic curve)
             mid_x = (start_x + end_x) / 2
