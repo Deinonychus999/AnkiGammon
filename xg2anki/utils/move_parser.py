@@ -112,7 +112,11 @@ class MoveParser:
             # The only special handling needed is for bar points:
             # - X's bar is at position[0]
             # - O's bar is at position[25]
-            # These are already correctly set in parse_move_notation()
+            # parse_move_notation() returns 0 for "bar", so correct it for O
+            if from_point == 0 and player == Player.O:
+                from_point = 25
+            if to_point == 0 and player == Player.X:
+                to_point = 25  # When X hits, opponent goes to bar 25
 
             # Move checker
             if from_point == 26:  # Bearing off (from)
