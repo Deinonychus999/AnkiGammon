@@ -616,6 +616,13 @@ class CardGenerator:
         move_data_json = json.dumps(move_data)
         move_result_svgs_json = json.dumps(move_result_svgs)
 
+        # Get player on roll and checker colors
+        on_roll_player = 'X' if decision.on_roll == Player.X else 'O'
+        checker_x_color = self.renderer.color_scheme.checker_x
+        checker_o_color = self.renderer.color_scheme.checker_o
+        checker_border_color = self.renderer.color_scheme.checker_border
+        checker_radius = self.renderer.checker_radius
+
         # Generate animation JavaScript
         script = f"""
 <script>
@@ -624,6 +631,11 @@ class CardGenerator:
     const ANIMATION_DURATION = 200; // milliseconds
     const moveData = {move_data_json};
     const moveResultSVGs = {move_result_svgs_json};
+    const onRollPlayer = '{on_roll_player}';
+    const checkerXColor = '{checker_x_color}';
+    const checkerOColor = '{checker_o_color}';
+    const checkerBorderColor = '{checker_border_color}';
+    const checkerRadius = {checker_radius};
     let isAnimating = false;
     let cancelCurrentAnimation = false;
     let currentSelectedRow = null;
@@ -742,6 +754,111 @@ class CardGenerator:
         }}
     }}
 
+    // Create SVG arrow element from start to end coordinates
+    function createArrow(svg, startX, startY, endX, endY) {{
+        const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        g.setAttribute('class', 'move-arrow');
+
+        // Calculate arrow direction
+        const dx = endX - startX;
+        const dy = endY - startY;
+        const length = Math.sqrt(dx * dx + dy * dy);
+        const angle = Math.atan2(dy, dx);
+
+        // Arrow parameters
+        const arrowheadSize = 15;
+        const strokeWidth = 3;
+        const arrowAngle = Math.PI / 6; // 30 degrees
+
+        // Calculate arrowhead points
+        const arrowTipX = endX;
+        const arrowTipY = endY;
+        const arrowBase1X = endX - arrowheadSize * Math.cos(angle - arrowAngle);
+        const arrowBase1Y = endY - arrowheadSize * Math.sin(angle - arrowAngle);
+        const arrowBase2X = endX - arrowheadSize * Math.cos(angle + arrowAngle);
+        const arrowBase2Y = endY - arrowheadSize * Math.sin(angle + arrowAngle);
+
+        // Calculate where line should end (at the center of the arrowhead base)
+        const arrowBaseLength = arrowheadSize * Math.cos(arrowAngle);
+        const lineEndX = endX - arrowBaseLength * Math.cos(angle);
+        const lineEndY = endY - arrowBaseLength * Math.sin(angle);
+
+        // Create line
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', startX);
+        line.setAttribute('y1', startY);
+        line.setAttribute('x2', lineEndX);
+        line.setAttribute('y2', lineEndY);
+        line.setAttribute('stroke', '#FF6B35');
+        line.setAttribute('stroke-width', strokeWidth);
+        line.setAttribute('stroke-linecap', 'round');
+        line.setAttribute('opacity', '0.8');
+
+        // Create arrowhead
+        const arrowhead = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+        arrowhead.setAttribute('points',
+            `${{arrowTipX}},${{arrowTipY}} ${{arrowBase1X}},${{arrowBase1Y}} ${{arrowBase2X}},${{arrowBase2Y}}`);
+        arrowhead.setAttribute('fill', '#FF6B35');
+        arrowhead.setAttribute('opacity', '0.8');
+
+        g.appendChild(line);
+        g.appendChild(arrowhead);
+
+        return g;
+    }}
+
+    // Remove all arrows from SVG
+    function removeArrows(svg) {{
+        const arrows = svg.querySelectorAll('.move-arrow');
+        arrows.forEach(arrow => arrow.remove());
+    }}
+
+    // Remove all ghost checkers from SVG
+    function removeGhostCheckers(svg) {{
+        const ghosts = svg.querySelectorAll('.ghost-checker');
+        ghosts.forEach(ghost => ghost.remove());
+    }}
+
+    // Create a transparent checker at the original position
+    function createGhostChecker(svg, x, y) {{
+        const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        g.setAttribute('class', 'ghost-checker');
+
+        // Determine checker color based on which player is moving
+        const checkerColor = onRollPlayer === 'X' ? checkerXColor : checkerOColor;
+
+        // Create the checker circle
+        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circle.setAttribute('cx', x);
+        circle.setAttribute('cy', y);
+        circle.setAttribute('r', checkerRadius);
+        circle.setAttribute('fill', checkerColor);
+        circle.setAttribute('stroke', checkerBorderColor);
+        circle.setAttribute('stroke-width', '2');
+        circle.setAttribute('opacity', '0.3');
+
+        g.appendChild(circle);
+        return g;
+    }}
+
+    // Add arrows and ghost checkers for all movements in a move
+    function addMoveArrows(svg, animations) {{
+        // Remove any existing arrows and ghost checkers first
+        removeArrows(svg);
+        removeGhostCheckers(svg);
+
+        // Add arrow and ghost checker for each movement
+        animations.forEach(anim => {{
+            // Add ghost checker at start position
+            const ghost = createGhostChecker(svg, anim.start_x, anim.start_y);
+            svg.appendChild(ghost);
+
+            // Add arrow showing the move path
+            const arrow = createArrow(svg, anim.start_x, anim.start_y, anim.end_x, anim.end_y);
+            svg.appendChild(arrow);
+        }});
+    }}
+
     // Animate a single checker from start to end coordinates
     function animateChecker(checker, startX, startY, endX, endY, duration) {{
         return new Promise((resolve) => {{
@@ -855,6 +972,12 @@ class CardGenerator:
             const board = document.getElementById('animated-board');
             if (board) {{
                 board.innerHTML = resultSVG;
+
+                // Add arrows to the final result SVG showing the move paths
+                const finalSvg = board.querySelector('svg');
+                if (finalSvg) {{
+                    addMoveArrows(finalSvg, animations);
+                }}
             }}
         }}
 
