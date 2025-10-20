@@ -70,13 +70,15 @@ class InteractiveSession:
             click.echo(f"  1. Color scheme (current: {self.color_scheme})")
             click.echo(f"  2. Show move options (current: {'Yes' if self.settings.show_options else 'No'})")
             click.echo(f"  3. Interactive moves (current: {'Yes' if self.settings.interactive_moves else 'No'})")
-            click.echo("  4. Back to main menu")
+            export_display = "AnkiConnect" if self.settings.export_method == "ankiconnect" else "APKG"
+            click.echo(f"  4. Export method (current: {export_display})")
+            click.echo("  5. Back to main menu")
             click.echo()
 
             choice = click.prompt(
                 click.style("Choose an option", fg='green'),
                 type=str,
-                default='4'
+                default='5'
             )
 
             if choice == '1':
@@ -86,6 +88,8 @@ class InteractiveSession:
             elif choice == '3':
                 self.toggle_interactive_moves()
             elif choice == '4':
+                self.change_export_method()
+            elif choice == '5':
                 break
             else:
                 click.echo(click.style("\n  Invalid choice. Please try again.\n", fg='red'))
@@ -174,6 +178,41 @@ class InteractiveSession:
         click.echo(click.style(f"  (Saved as default)", fg='cyan'))
         click.echo()
 
+    def change_export_method(self):
+        """Allow user to change the export method."""
+        click.echo()
+        click.echo(click.style("=" * 60, fg='cyan'))
+        click.echo(click.style("  Export Method", fg='cyan', bold=True))
+        click.echo(click.style("=" * 60, fg='cyan'))
+        click.echo()
+        click.echo("Choose how cards are exported to Anki:")
+        click.echo()
+        click.echo("  1. AnkiConnect - Push directly to Anki (recommended)")
+        click.echo("     Requires AnkiConnect add-on (code: 2055492159)")
+        click.echo("     Cards appear immediately in the running Anki application")
+        click.echo()
+        click.echo("  2. APKG - Generate .apkg file for manual import")
+        click.echo("     Creates a file you can import into Anki later")
+        click.echo("     Useful when Anki is not running or AnkiConnect is unavailable")
+        click.echo()
+
+        current_choice = '1' if self.settings.export_method == 'ankiconnect' else '2'
+        choice = click.prompt(
+            click.style("Choose export method", fg='green'),
+            type=click.Choice(['1', '2']),
+            default=current_choice
+        )
+
+        format_map = {'1': 'ankiconnect', '2': 'apkg'}
+        new_method = format_map[choice]
+        self.settings.export_method = new_method
+
+        display_name = "AnkiConnect" if new_method == "ankiconnect" else "APKG"
+        click.echo()
+        click.echo(click.style(f"  Export method changed to: {display_name}", fg='green'))
+        click.echo(click.style(f"  (Saved as default)", fg='cyan'))
+        click.echo()
+
     def show_help(self):
         """Show help information."""
         click.echo()
@@ -216,19 +255,12 @@ class InteractiveSession:
             type=str
         )
 
-        # Get output format
+        # Use saved export method setting
+        output_format = self.settings.export_method
+        export_display = "AnkiConnect" if output_format == "ankiconnect" else "APKG"
         click.echo()
-        click.echo("Output format:")
-        click.echo("  1. AnkiConnect (Push directly to Anki - recommended)")
-        click.echo("  2. APKG (Import into Anki)")
-        format_choice = click.prompt(
-            click.style("Choose format", fg='green'),
-            type=click.Choice(['1', '2']),
-            default='1'
-        )
-
-        format_map = {'1': 'ankiconnect', '2': 'apkg'}
-        output_format = format_map[format_choice]
+        click.echo(click.style(f"Export method: {export_display}", fg='cyan'))
+        click.echo(click.style("(Change in Options menu if needed)", fg='cyan', dim=True))
 
         # Collect positions
         click.echo()

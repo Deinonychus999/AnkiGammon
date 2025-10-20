@@ -149,7 +149,7 @@ Each `ColorScheme` dataclass defines 10 colors:
 
 **Usage:**
 - In CLI: `python -m xg2anki --color-scheme ocean analysis.txt`
-- In interactive mode: Option 2 from main menu
+- In interactive mode: Options menu (option 2 from main menu)
 - User's selection is saved to `~/.xg2anki/config.json` and persisted across sessions
 
 #### Settings Persistence (settings.py)
