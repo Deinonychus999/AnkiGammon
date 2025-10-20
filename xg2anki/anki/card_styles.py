@@ -156,6 +156,76 @@ CARD_CSS = """
     margin: 10px 0;
 }
 
+/* Winning Chances Display */
+.winning-chances {
+    margin: 20px auto;
+    padding: 15px;
+    background-color: var(--canvas-elevated);
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    text-align: left;
+    width: auto;
+    display: inline-block;
+}
+
+.winning-chances h4 {
+    font-size: 18px;
+    color: var(--text-fg);
+    margin: 0 0 12px 0;
+    text-align: center;
+}
+
+.chances-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.chances-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background-color: var(--canvas);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+}
+
+.chances-label {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text-fg);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.chances-values {
+    font-size: 15px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.chances-values strong {
+    font-size: 16px;
+    color: #4da6ff;
+}
+
+.chances-detail {
+    font-size: 13px;
+    color: #999;
+}
+
+/* Analysis Container - for side-by-side layout */
+.analysis-container {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+    justify-content: center;
+    margin: 20px 0;
+}
+
 .analysis {
     margin: 20px 0;
     text-align: center;
@@ -165,6 +235,24 @@ CARD_CSS = """
     font-size: 18px;
     color: var(--text-fg);
     margin-bottom: 10px;
+    margin-top: 0;
+}
+
+/* Side-by-side sections for cube decisions */
+.analysis-section,
+.chances-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.analysis-section h4,
+.chances-section h4 {
+    font-size: 18px;
+    color: var(--text-fg);
+    margin: 0 0 10px 0;
+    text-align: center;
 }
 
 .click-hint {
@@ -220,6 +308,55 @@ CARD_CSS = """
 .move-row.best-move.selected {
     background-color: rgba(76, 175, 80, 0.25) !important;
     border-left: 3px solid #66bb6a;
+}
+
+/* Move W/G/B Side Panel */
+.move-wgb-panel {
+    position: fixed;
+    z-index: 1000;
+    background-color: var(--canvas-elevated);
+    border: 2px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    min-width: 200px;
+    pointer-events: auto;
+}
+
+.wgb-panel-content {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.wgb-panel-row {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.wgb-panel-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-fg);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.wgb-panel-value {
+    font-size: 13px;
+    color: var(--text-fg);
+    padding-left: 18px;
+}
+
+.wgb-panel-value strong {
+    font-size: 14px;
+    color: #4da6ff;
+}
+
+.wgb-highlighted {
+    background-color: rgba(100, 150, 255, 0.1) !important;
 }
 
 .source-info {

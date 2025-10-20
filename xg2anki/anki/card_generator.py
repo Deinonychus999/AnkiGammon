@@ -351,12 +351,24 @@ class CardGenerator:
 
             error_str = f"{display_error:+.3f}" if display_error != 0 else "0.000"
 
+            # Prepare W/G/B data attributes
+            wgb_attrs = ""
+            if move.player_win_pct is not None:
+                wgb_attrs = (
+                    f'data-player-win="{move.player_win_pct:.2f}" '
+                    f'data-player-gammon="{move.player_gammon_pct:.2f}" '
+                    f'data-player-backgammon="{move.player_backgammon_pct:.2f}" '
+                    f'data-opponent-win="{move.opponent_win_pct:.2f}" '
+                    f'data-opponent-gammon="{move.opponent_gammon_pct:.2f}" '
+                    f'data-opponent-backgammon="{move.opponent_backgammon_pct:.2f}"'
+                )
+
             if self.interactive_moves:
-                row_class = f"{rank_class} move-row"
-                row_attrs = f'data-move-notation="{move.notation}"'
+                row_class = f"{rank_class} move-row clickable-move-row"
+                row_attrs = f'data-move-notation="{move.notation}" {wgb_attrs}'
             else:
-                row_class = rank_class
-                row_attrs = ""
+                row_class = f"{rank_class} clickable-move-row"
+                row_attrs = wgb_attrs
 
             table_rows.append(f"""
 <tr class="{row_class}" {row_attrs}>
@@ -364,8 +376,7 @@ class CardGenerator:
     <td>{display_notation}</td>
     <td>{move.equity:.3f}</td>
     <td>{error_str}</td>
-</tr>
-""")
+</tr>""")
 
         # Generate answer section
         best_move = decision.get_best_move()
@@ -397,6 +408,9 @@ class CardGenerator:
 """
 
         # Generate position viewer HTML
+        from xg2anki.models import DecisionType
+        is_cube_decision = decision.decision_type == DecisionType.CUBE_ACTION
+
         if self.interactive_moves:
             # Interactive mode: single board with animated checkers
             position_viewer_html = f'''
@@ -405,21 +419,57 @@ class CardGenerator:
             {original_position_svg}
         </div>
     </div>'''
-            analysis_title = '<h4>Top Moves Analysis: <span class="click-hint">(click a move to see it animated)</span></h4>'
+            # Change title and hide animation tip for cube decisions
+            if is_cube_decision:
+                analysis_title = '<h4>Cube Actions Analysis:</h4>'
+            else:
+                analysis_title = '<h4>Top Moves Analysis: <span class="click-hint">(click a move to see it animated)</span></h4>'
             table_body_id = 'id="moves-tbody"'
         else:
             position_viewer_html = f'''
     <div class="position-svg">
         {result_position_svg or original_position_svg}
     </div>'''
-            analysis_title = '<h4>Top Moves Analysis:</h4>'
+            # Change title for cube decisions
+            if is_cube_decision:
+                analysis_title = '<h4>Cube Actions Analysis:</h4>'
+            else:
+                analysis_title = '<h4>Top Moves Analysis:</h4>'
             table_body_id = ''
 
-        html = f"""
-<div class="card-back">
-{position_viewer_html}
-    <div class="metadata">{metadata}</div>
-{answer_html}
+        # Generate winning chances HTML for cube decisions
+        winning_chances_html = ''
+        if is_cube_decision and decision.player_win_pct is not None:
+            winning_chances_html = self._generate_winning_chances_html(decision)
+
+        # For cube decisions with W/G/B, create side-by-side layout
+        if is_cube_decision and winning_chances_html:
+            analysis_and_chances = f"""
+    <div class="analysis-container">
+        <div class="analysis-section">
+            {analysis_title}
+            <table class="moves-table">
+                <thead>
+                    <tr>
+                        <th>Rank</th>
+                        <th>Move</th>
+                        <th>Equity</th>
+                        <th>Error</th>
+                    </tr>
+                </thead>
+                <tbody {table_body_id}>
+                    {''.join(table_rows)}
+                </tbody>
+            </table>
+        </div>
+        <div class="chances-section">
+            <h4>Winning Chances:</h4>
+{winning_chances_html}
+        </div>
+    </div>
+"""
+        else:
+            analysis_and_chances = f"""
     <div class="analysis">
         {analysis_title}
         <table class="moves-table">
@@ -436,6 +486,35 @@ class CardGenerator:
             </tbody>
         </table>
     </div>
+"""
+
+        # Add W/G/B side panel for checker play with moves that have W/G/B data
+        wgb_panel_html = ""
+        if not is_cube_decision and any(m.player_win_pct is not None for m in candidates if m):
+            player_color = self.renderer.color_scheme.checker_x if decision.on_roll == Player.X else self.renderer.color_scheme.checker_o
+            opponent_color = self.renderer.color_scheme.checker_o if decision.on_roll == Player.X else self.renderer.color_scheme.checker_x
+            wgb_panel_html = f"""
+    <div class="move-wgb-panel" id="wgb-panel" style="display: none;">
+        <div class="wgb-panel-content">
+            <div class="wgb-panel-row">
+                <span class="wgb-panel-label"><span style="color: {player_color};">●</span> Player:</span>
+                <span class="wgb-panel-value" id="wgb-player-value"></span>
+            </div>
+            <div class="wgb-panel-row">
+                <span class="wgb-panel-label"><span style="color: {opponent_color};">●</span> Opp.:</span>
+                <span class="wgb-panel-value" id="wgb-opponent-value"></span>
+            </div>
+        </div>
+    </div>
+"""
+
+        html = f"""
+<div class="card-back">
+{position_viewer_html}
+    <div class="metadata">{metadata}</div>
+{answer_html}
+{analysis_and_chances}
+{wgb_panel_html}
     {self._generate_source_info(decision)}
 </div>
 """
@@ -447,6 +526,9 @@ class CardGenerator:
             # Generate animation scripts
             animation_scripts = self._generate_checker_animation_scripts(decision, candidates, move_result_svgs or {})
             html += animation_scripts
+
+        # Add W/G/B toggle script for clickable rows
+        html += self._generate_wgb_toggle_script()
 
         return html
 
@@ -822,6 +904,122 @@ class CardGenerator:
 """
 
         return script
+
+    def _generate_wgb_toggle_script(self) -> str:
+        """Generate JavaScript for showing W/G/B details in side panel."""
+        return """
+<script>
+// Show W/G/B details in side panel when hovering/clicking on move rows
+(function() {
+    function initWGBPanel() {
+        const moveRows = document.querySelectorAll('.clickable-move-row');
+        const panel = document.getElementById('wgb-panel');
+
+        if (!panel) return; // No panel, skip
+
+        const playerValue = document.getElementById('wgb-player-value');
+        const opponentValue = document.getElementById('wgb-opponent-value');
+        let activeRow = null;
+
+        moveRows.forEach(row => {
+            // Only add handlers if this row has W/G/B data
+            if (row.hasAttribute('data-player-win')) {
+                row.style.cursor = 'pointer';
+
+                // Show panel on hover
+                row.addEventListener('mouseenter', function(e) {
+                    const playerWin = this.getAttribute('data-player-win');
+                    const playerGammon = this.getAttribute('data-player-gammon');
+                    const playerBackgammon = this.getAttribute('data-player-backgammon');
+                    const oppWin = this.getAttribute('data-opponent-win');
+                    const oppGammon = this.getAttribute('data-opponent-gammon');
+                    const oppBackgammon = this.getAttribute('data-opponent-backgammon');
+
+                    playerValue.innerHTML = '<strong>' + playerWin + '%</strong> <span style=\"font-size: 0.85em; color: #999;\">(G: ' + playerGammon + '% B: ' + playerBackgammon + '%)</span>';
+                    opponentValue.innerHTML = '<strong>' + oppWin + '%</strong> <span style=\"font-size: 0.85em; color: #999;\">(G: ' + oppGammon + '% B: ' + oppBackgammon + '%)</span>';
+
+                    // Position panel to the right of the table
+                    const rect = this.getBoundingClientRect();
+                    const tableRect = this.closest('table').getBoundingClientRect();
+
+                    panel.style.top = rect.top + 'px';
+                    panel.style.left = (tableRect.right + 10) + 'px';
+                    panel.style.display = 'block';
+
+                    activeRow = this;
+                    this.classList.add('wgb-highlighted');
+                });
+
+                row.addEventListener('mouseleave', function(e) {
+                    // Small delay to allow moving to the panel
+                    setTimeout(() => {
+                        if (!panel.matches(':hover') && activeRow === this) {
+                            panel.style.display = 'none';
+                            this.classList.remove('wgb-highlighted');
+                            activeRow = null;
+                        }
+                    }, 100);
+                });
+            }
+        });
+
+        // Keep panel visible when hovering over it
+        if (panel) {
+            panel.addEventListener('mouseenter', function() {
+                panel.style.display = 'block';
+            });
+
+            panel.addEventListener('mouseleave', function() {
+                panel.style.display = 'none';
+                if (activeRow) {
+                    activeRow.classList.remove('wgb-highlighted');
+                    activeRow = null;
+                }
+            });
+        }
+    }
+
+    // Initialize when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initWGBPanel);
+    } else {
+        initWGBPanel();
+    }
+})();
+</script>
+"""
+
+    def _generate_winning_chances_html(self, decision: Decision) -> str:
+        """
+        Generate HTML for winning chances display (W/G/B percentages).
+
+        Shows player and opponent winning chances with gammon and backgammon percentages.
+        Note: Title is added separately in side-by-side layout.
+        """
+        # Get checker colors from the renderer's color scheme
+        player_color = self.renderer.color_scheme.checker_x if decision.on_roll == Player.X else self.renderer.color_scheme.checker_o
+        opponent_color = self.renderer.color_scheme.checker_o if decision.on_roll == Player.X else self.renderer.color_scheme.checker_x
+
+        html = f'''            <div class="winning-chances">
+                <div class="chances-grid">
+                    <div class="chances-row">
+                        <span class="chances-label"><span style="color: {player_color}; font-size: 1.2em;">●</span> Player:</span>
+                        <span class="chances-values">
+                            <strong>{decision.player_win_pct:.2f}%</strong>
+                            <span class="chances-detail">(G: {decision.player_gammon_pct:.2f}% B: {decision.player_backgammon_pct:.2f}%)</span>
+                        </span>
+                    </div>
+                    <div class="chances-row">
+                        <span class="chances-label"><span style="color: {opponent_color}; font-size: 1.2em;">●</span> Opp.:</span>
+                        <span class="chances-values">
+                            <strong>{decision.opponent_win_pct:.2f}%</strong>
+                            <span class="chances-detail">(G: {decision.opponent_gammon_pct:.2f}% B: {decision.opponent_backgammon_pct:.2f}%)</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+'''
+        return html
 
     def _generate_source_info(self, decision: Decision) -> str:
         """Generate source information HTML."""

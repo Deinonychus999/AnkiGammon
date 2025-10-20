@@ -88,6 +88,9 @@ class XGTextParser:
         if not moves:
             return None
 
+        # Parse global winning chances (for cube decisions)
+        winning_chances = XGTextParser._parse_winning_chances(analysis_section)
+
         # Create decision
         decision = Decision(
             position=position,
@@ -100,10 +103,92 @@ class XGTextParser:
             cube_value=metadata.get('cube_value', 1),
             cube_owner=metadata.get('cube_owner', CubeState.CENTERED),
             decision_type=metadata.get('decision_type', DecisionType.CHECKER_PLAY),
-            candidate_moves=moves
+            candidate_moves=moves,
+            player_win_pct=winning_chances.get('player_win_pct'),
+            player_gammon_pct=winning_chances.get('player_gammon_pct'),
+            player_backgammon_pct=winning_chances.get('player_backgammon_pct'),
+            opponent_win_pct=winning_chances.get('opponent_win_pct'),
+            opponent_gammon_pct=winning_chances.get('opponent_gammon_pct'),
+            opponent_backgammon_pct=winning_chances.get('opponent_backgammon_pct'),
         )
 
         return decision
+
+    @staticmethod
+    def _parse_winning_chances(text: str) -> dict:
+        """
+        Parse global winning chances from text section.
+
+        Format:
+            Player Winning Chances:   52.68% (G:14.35% B:0.69%)
+            Opponent Winning Chances: 47.32% (G:12.42% B:0.55%)
+
+        Returns dict with keys: player_win_pct, player_gammon_pct, player_backgammon_pct,
+                                opponent_win_pct, opponent_gammon_pct, opponent_backgammon_pct
+        """
+        chances = {}
+
+        # Parse player winning chances
+        player_match = re.search(
+            r'Player Winning Chances:\s*(\d+\.?\d*)%\s*\(G:(\d+\.?\d*)%\s*B:(\d+\.?\d*)%\)',
+            text,
+            re.IGNORECASE
+        )
+        if player_match:
+            chances['player_win_pct'] = float(player_match.group(1))
+            chances['player_gammon_pct'] = float(player_match.group(2))
+            chances['player_backgammon_pct'] = float(player_match.group(3))
+
+        # Parse opponent winning chances
+        opponent_match = re.search(
+            r'Opponent Winning Chances:\s*(\d+\.?\d*)%\s*\(G:(\d+\.?\d*)%\s*B:(\d+\.?\d*)%\)',
+            text,
+            re.IGNORECASE
+        )
+        if opponent_match:
+            chances['opponent_win_pct'] = float(opponent_match.group(1))
+            chances['opponent_gammon_pct'] = float(opponent_match.group(2))
+            chances['opponent_backgammon_pct'] = float(opponent_match.group(3))
+
+        return chances
+
+    @staticmethod
+    def _parse_move_winning_chances(move_text: str) -> dict:
+        """
+        Parse winning chances from a move's analysis section.
+
+        Format:
+              Player:   53.81% (G:17.42% B:0.87%)
+              Opponent: 46.19% (G:12.99% B:0.64%)
+
+        Returns dict with keys: player_win_pct, player_gammon_pct, player_backgammon_pct,
+                                opponent_win_pct, opponent_gammon_pct, opponent_backgammon_pct
+        """
+        chances = {}
+
+        # Parse player chances
+        player_match = re.search(
+            r'Player:\s*(\d+\.?\d*)%\s*\(G:(\d+\.?\d*)%\s*B:(\d+\.?\d*)%\)',
+            move_text,
+            re.IGNORECASE
+        )
+        if player_match:
+            chances['player_win_pct'] = float(player_match.group(1))
+            chances['player_gammon_pct'] = float(player_match.group(2))
+            chances['player_backgammon_pct'] = float(player_match.group(3))
+
+        # Parse opponent chances
+        opponent_match = re.search(
+            r'Opponent:\s*(\d+\.?\d*)%\s*\(G:(\d+\.?\d*)%\s*B:(\d+\.?\d*)%\)',
+            move_text,
+            re.IGNORECASE
+        )
+        if opponent_match:
+            chances['opponent_win_pct'] = float(opponent_match.group(1))
+            chances['opponent_gammon_pct'] = float(opponent_match.group(2))
+            chances['opponent_backgammon_pct'] = float(opponent_match.group(3))
+
+        return chances
 
     @staticmethod
     def _parse_game_info(text: str) -> dict:
@@ -254,7 +339,11 @@ class XGTextParser:
             re.MULTILINE | re.IGNORECASE
         )
 
-        for match in move_pattern.finditer(text):
+        # Split text into lines to extract following lines after each move
+        lines = text.split('\n')
+        move_matches = list(move_pattern.finditer(text))
+
+        for i, match in enumerate(move_matches):
             rank = int(match.group(1))
             notation = match.group(2).strip()
             equity = float(match.group(3))
@@ -273,13 +362,30 @@ class XGTextParser:
             # Clean up notation
             notation = XGTextParser._clean_move_notation(notation)
 
+            # Extract winning chances from the lines following this move
+            # Get the text between this match and the next move (or end)
+            start_pos = match.end()
+            if i + 1 < len(move_matches):
+                end_pos = move_matches[i + 1].start()
+            else:
+                end_pos = len(text)
+
+            move_section = text[start_pos:end_pos]
+            winning_chances = XGTextParser._parse_move_winning_chances(move_section)
+
             moves.append(Move(
                 notation=notation,
                 equity=equity,
                 error=error,
                 rank=rank,
                 xg_error=xg_error,  # Store XG's error with sign
-                xg_notation=notation  # For checker play, XG notation same as regular notation
+                xg_notation=notation,  # For checker play, XG notation same as regular notation
+                player_win_pct=winning_chances.get('player_win_pct'),
+                player_gammon_pct=winning_chances.get('player_gammon_pct'),
+                player_backgammon_pct=winning_chances.get('player_backgammon_pct'),
+                opponent_win_pct=winning_chances.get('opponent_win_pct'),
+                opponent_gammon_pct=winning_chances.get('opponent_gammon_pct'),
+                opponent_backgammon_pct=winning_chances.get('opponent_backgammon_pct'),
             ))
 
         # If we didn't find moves with the standard pattern, try alternative patterns

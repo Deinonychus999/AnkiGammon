@@ -107,6 +107,13 @@ class Move:
     xg_notation: Optional[str] = None  # Original notation from XG (e.g., "No double" not "No double/Take")
     resulting_position: Optional[Position] = None  # Position after this move (if available)
     from_xg_analysis: bool = True  # True if from XG's analysis, False if synthetically generated
+    # Winning chances percentages
+    player_win_pct: Optional[float] = None  # Player winning percentage (e.g., 52.68)
+    player_gammon_pct: Optional[float] = None  # Player gammon percentage (e.g., 14.35)
+    player_backgammon_pct: Optional[float] = None  # Player backgammon percentage (e.g., 0.69)
+    opponent_win_pct: Optional[float] = None  # Opponent winning percentage (e.g., 47.32)
+    opponent_gammon_pct: Optional[float] = None  # Opponent gammon percentage (e.g., 12.42)
+    opponent_backgammon_pct: Optional[float] = None  # Opponent backgammon percentage (e.g., 0.55)
 
     def __str__(self) -> str:
         """Human-readable representation."""
@@ -138,6 +145,14 @@ class Decision:
     # Decision analysis
     decision_type: DecisionType = DecisionType.CHECKER_PLAY
     candidate_moves: List[Move] = field(default_factory=list)
+
+    # Winning chances percentages (for cube decisions)
+    player_win_pct: Optional[float] = None
+    player_gammon_pct: Optional[float] = None
+    player_backgammon_pct: Optional[float] = None
+    opponent_win_pct: Optional[float] = None
+    opponent_gammon_pct: Optional[float] = None
+    opponent_backgammon_pct: Optional[float] = None
 
     # Source metadata
     source_file: Optional[str] = None
