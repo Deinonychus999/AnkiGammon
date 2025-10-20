@@ -17,6 +17,7 @@ class Settings:
         "deck_name": "XG Backgammon",
         "show_options": True,
         "interactive_moves": False,
+        "export_method": "ankiconnect",
     }
 
     def __init__(self, config_path: Optional[Path] = None):
@@ -107,6 +108,16 @@ class Settings:
     def interactive_moves(self, value: bool) -> None:
         """Set whether to enable interactive move visualization."""
         self.set("interactive_moves", value)
+
+    @property
+    def export_method(self) -> str:
+        """Get the default export method."""
+        return self._settings.get("export_method", "ankiconnect")
+
+    @export_method.setter
+    def export_method(self, value: str) -> None:
+        """Set the default export method."""
+        self.set("export_method", value)
 
 
 # Global settings instance

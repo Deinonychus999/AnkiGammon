@@ -161,6 +161,7 @@ User preferences are automatically saved to `~/.xg2anki/config.json`:
 - `deck_name` - Default deck name (default: "XG Backgammon")
 - `show_options` - Whether to show options on cards (default: true)
 - `interactive_moves` - Whether to enable interactive move visualization (default: false)
+- `export_method` - Export method for cards: "ankiconnect" or "apkg" (default: "ankiconnect")
 
 **Settings API:**
 ```python
@@ -169,6 +170,7 @@ from xg2anki.settings import get_settings
 settings = get_settings()
 settings.color_scheme = "forest"  # Automatically saved
 settings.interactive_moves = True  # Enable interactive move visualization
+settings.export_method = "apkg"  # Choose export method: "ankiconnect" or "apkg"
 print(settings.color_scheme)  # Loads from config file
 ```
 
