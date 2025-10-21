@@ -2,16 +2,98 @@
 Settings configuration dialog.
 """
 
+import os
+import subprocess
+import tempfile
+from pathlib import Path
 from typing import Optional
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QFormLayout,
     QComboBox, QCheckBox, QLineEdit, QPushButton,
     QGroupBox, QFileDialog, QLabel, QDialogButtonBox
 )
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QThread
 
 from flashgammon.settings import Settings
 from flashgammon.renderer.color_schemes import list_schemes
+
+
+class GnuBGValidationWorker(QThread):
+    """Worker thread for validating GnuBG executable without blocking UI."""
+
+    # Signals to communicate with main thread
+    validation_complete = Signal(str, str)  # (status_text, style_sheet)
+
+    def __init__(self, gnubg_path: str):
+        super().__init__()
+        self.gnubg_path = gnubg_path
+
+    def run(self):
+        """Run validation in background thread."""
+        path_obj = Path(self.gnubg_path)
+
+        # Check if file exists
+        if not path_obj.exists():
+            self.validation_complete.emit("❌ File not found", "color: red;")
+            return
+
+        if not path_obj.is_file():
+            self.validation_complete.emit("❌ Not a file", "color: red;")
+            return
+
+        # Create a simple command file (same approach as gnubg_analyzer)
+        command_file = None
+        try:
+            # Create temp command file
+            fd, command_file = tempfile.mkstemp(suffix=".txt", prefix="gnubg_test_")
+            try:
+                with os.fdopen(fd, 'w') as f:
+                    # Simple command that should work on any gnubg
+                    f.write("quit\n")
+            except:
+                os.close(fd)
+                raise
+
+            # Try to run gnubg with -t (text mode) and -c (command file)
+            result = subprocess.run(
+                [str(self.gnubg_path), "-t", "-c", command_file],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+
+            # Check if it's actually GNU Backgammon
+            output = result.stdout + result.stderr
+            if "GNU Backgammon" in output or result.returncode == 0:
+                # Check if it's the GUI version (which may not work properly)
+                exe_name = path_obj.name.lower()
+                if "cli" not in exe_name and exe_name == "gnubg.exe":
+                    self.validation_complete.emit(
+                        "⚠ GUI version detected (use gnubg-cli.exe)",
+                        "color: orange;"
+                    )
+                else:
+                    self.validation_complete.emit(
+                        "✓ Valid GnuBG executable",
+                        "color: green;"
+                    )
+            else:
+                self.validation_complete.emit("⚠ Not GNU Backgammon", "color: orange;")
+
+        except subprocess.TimeoutExpired:
+            self.validation_complete.emit("⚠ Validation timeout", "color: orange;")
+        except Exception as e:
+            self.validation_complete.emit(
+                f"⚠ Cannot execute: {type(e).__name__}",
+                "color: orange;"
+            )
+        finally:
+            # Clean up temp file
+            if command_file:
+                try:
+                    os.unlink(command_file)
+                except OSError:
+                    pass
 
 
 class SettingsDialog(QDialog):
@@ -35,6 +117,9 @@ class SettingsDialog(QDialog):
         self.original_settings.export_method = settings.export_method
         self.original_settings.gnubg_path = settings.gnubg_path
         self.original_settings.gnubg_analysis_ply = settings.gnubg_analysis_ply
+
+        # Validation worker
+        self.validation_worker: Optional[GnuBGValidationWorker] = None
 
         self.setWindowTitle("Settings")
         self.setModal(True)
@@ -162,13 +247,31 @@ class SettingsDialog(QDialog):
             self._update_gnubg_status()
 
     def _update_gnubg_status(self):
-        """Update GnuBG status label."""
-        # TODO: Validate GnuBG path
+        """Update GnuBG status label asynchronously."""
+        # Cancel any running validation
+        if self.validation_worker and self.validation_worker.isRunning():
+            self.validation_worker.quit()
+            self.validation_worker.wait()
+
         path = self.txt_gnubg_path.text()
-        if path:
-            self.lbl_gnubg_status.setText("Not validated")
-        else:
+        if not path:
             self.lbl_gnubg_status.setText("Not configured")
+            self.lbl_gnubg_status.setStyleSheet("")
+            return
+
+        # Show loading state
+        self.lbl_gnubg_status.setText("⏳ Validating...")
+        self.lbl_gnubg_status.setStyleSheet("color: gray;")
+
+        # Start validation in background thread
+        self.validation_worker = GnuBGValidationWorker(path)
+        self.validation_worker.validation_complete.connect(self._on_validation_complete)
+        self.validation_worker.start()
+
+    def _on_validation_complete(self, status_text: str, style_sheet: str):
+        """Handle validation completion."""
+        self.lbl_gnubg_status.setText(status_text)
+        self.lbl_gnubg_status.setStyleSheet(style_sheet)
 
     def accept(self):
         """Save settings and close dialog."""
@@ -190,5 +293,17 @@ class SettingsDialog(QDialog):
 
     def reject(self):
         """Restore original settings and close dialog."""
+        # Clean up validation worker
+        if self.validation_worker and self.validation_worker.isRunning():
+            self.validation_worker.quit()
+            self.validation_worker.wait()
         # Don't modify settings object
         super().reject()
+
+    def closeEvent(self, event):
+        """Clean up when dialog is closed."""
+        # Clean up validation worker
+        if self.validation_worker and self.validation_worker.isRunning():
+            self.validation_worker.quit()
+            self.validation_worker.wait()
+        super().closeEvent(event)
