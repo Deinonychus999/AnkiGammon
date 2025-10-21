@@ -3,10 +3,12 @@ Settings configuration dialog.
 """
 
 import os
+import sys
 import subprocess
 import tempfile
 from pathlib import Path
 from typing import Optional
+import qtawesome as qta
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QFormLayout,
     QComboBox, QCheckBox, QLineEdit, QPushButton,
@@ -22,7 +24,7 @@ class GnuBGValidationWorker(QThread):
     """Worker thread for validating GnuBG executable without blocking UI."""
 
     # Signals to communicate with main thread
-    validation_complete = Signal(str, str)  # (status_text, style_sheet)
+    validation_complete = Signal(str, str)  # (status_text, status_type)
 
     def __init__(self, gnubg_path: str):
         super().__init__()
@@ -34,11 +36,11 @@ class GnuBGValidationWorker(QThread):
 
         # Check if file exists
         if not path_obj.exists():
-            self.validation_complete.emit("❌ File not found", "color: red;")
+            self.validation_complete.emit("File not found", "error")
             return
 
         if not path_obj.is_file():
-            self.validation_complete.emit("❌ Not a file", "color: red;")
+            self.validation_complete.emit("Not a file", "error")
             return
 
         # Create a simple command file (same approach as gnubg_analyzer)
@@ -65,27 +67,28 @@ class GnuBGValidationWorker(QThread):
             # Check if it's actually GNU Backgammon
             output = result.stdout + result.stderr
             if "GNU Backgammon" in output or result.returncode == 0:
-                # Check if it's the GUI version (which may not work properly)
-                exe_name = path_obj.name.lower()
-                if "cli" not in exe_name and exe_name == "gnubg.exe":
+                # Check if it's the GUI version (which may not work properly on Windows)
+                # Use stem to get filename without extension (works cross-platform)
+                exe_name = path_obj.stem.lower()
+                if sys.platform == 'win32' and "cli" not in exe_name and exe_name == "gnubg":
                     self.validation_complete.emit(
-                        "⚠ GUI version detected (use gnubg-cli.exe)",
-                        "color: orange;"
+                        "GUI version detected (use gnubg-cli.exe)",
+                        "warning"
                     )
                 else:
                     self.validation_complete.emit(
-                        "✓ Valid GnuBG executable",
-                        "color: green;"
+                        "Valid GnuBG executable",
+                        "valid"
                     )
             else:
-                self.validation_complete.emit("⚠ Not GNU Backgammon", "color: orange;")
+                self.validation_complete.emit("Not GNU Backgammon", "warning")
 
         except subprocess.TimeoutExpired:
-            self.validation_complete.emit("⚠ Validation timeout", "color: orange;")
+            self.validation_complete.emit("Validation timeout", "warning")
         except Exception as e:
             self.validation_complete.emit(
-                f"⚠ Cannot execute: {type(e).__name__}",
-                "color: orange;"
+                f"Cannot execute: {type(e).__name__}",
+                "warning"
             )
         finally:
             # Clean up temp file
@@ -236,11 +239,17 @@ class SettingsDialog(QDialog):
 
     def _browse_gnubg(self):
         """Browse for GnuBG executable."""
+        # Platform-specific file filter
+        if sys.platform == 'win32':
+            file_filter = "Executables (*.exe);;All Files (*)"
+        else:
+            file_filter = "All Files (*)"
+
         file_path, _ = QFileDialog.getOpenFileName(
             self,
             "Select GnuBG Executable",
             "",
-            "Executables (*.exe);;All Files (*)"
+            file_filter
         )
         if file_path:
             self.txt_gnubg_path.setText(file_path)
@@ -255,23 +264,38 @@ class SettingsDialog(QDialog):
 
         path = self.txt_gnubg_path.text()
         if not path:
-            self.lbl_gnubg_status.setText("Not configured")
+            self.lbl_gnubg_status.setText("  Not configured")
             self.lbl_gnubg_status.setStyleSheet("")
+            self.lbl_gnubg_status.setPixmap(qta.icon('fa6s.circle', color='#6c7086').pixmap(18, 18))
             return
 
         # Show loading state
-        self.lbl_gnubg_status.setText("⏳ Validating...")
+        self.lbl_gnubg_status.setText("    Validating...")
         self.lbl_gnubg_status.setStyleSheet("color: gray;")
+        self.lbl_gnubg_status.setPixmap(qta.icon('fa6s.spinner', color='#6c7086').pixmap(18, 18))
 
         # Start validation in background thread
         self.validation_worker = GnuBGValidationWorker(path)
         self.validation_worker.validation_complete.connect(self._on_validation_complete)
         self.validation_worker.start()
 
-    def _on_validation_complete(self, status_text: str, style_sheet: str):
+    def _on_validation_complete(self, status_text: str, status_type: str):
         """Handle validation completion."""
-        self.lbl_gnubg_status.setText(status_text)
-        self.lbl_gnubg_status.setStyleSheet(style_sheet)
+        # Determine icon based on status type
+        if status_type == "valid":
+            icon = qta.icon('fa6s.circle-check', color='#a6e3a1')
+        elif status_type == "warning":
+            icon = qta.icon('fa6s.triangle-exclamation', color='#fab387')
+        elif status_type == "error":
+            icon = qta.icon('fa6s.circle-xmark', color='#f38ba8')
+        else:
+            icon = None
+
+        # Set icon and text
+        if icon:
+            self.lbl_gnubg_status.setPixmap(icon.pixmap(18, 18))
+        self.lbl_gnubg_status.setText(f"    {status_text}")
+        self.lbl_gnubg_status.setStyleSheet("")
 
     def accept(self):
         """Save settings and close dialog."""

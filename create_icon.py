@@ -28,7 +28,7 @@ PNG_PATH = RESOURCES_DIR / "icon.png"
 # Colors (from the SVG)
 BG_COLOR = (30, 30, 46)  # #1e1e2e
 DIE_COLOR = (245, 224, 220)  # #f5e0dc
-BORDER_COLOR = (203, 166, 247)  # #cba6f7
+BORDER_COLOR = (69, 71, 90)  # #45475a - Subtle gray from design system
 PIP_COLOR = (30, 30, 46)  # #1e1e2e
 
 def draw_rotated_rect(draw, x, y, width, height, angle, fill, outline, outline_width, radius):

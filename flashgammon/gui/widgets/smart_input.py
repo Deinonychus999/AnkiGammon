@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal, QTimer
 from PySide6.QtGui import QFont
+import qtawesome as qta
 
 from flashgammon.settings import Settings
 from flashgammon.gui.format_detector import FormatDetector, DetectionResult, InputFormat
@@ -99,10 +100,12 @@ class SmartInputWidget(QWidget):
 
         feedback_layout = QHBoxLayout(self.feedback_panel)
         feedback_layout.setContentsMargins(12, 12, 12, 12)
+        feedback_layout.setSpacing(12)  # Add spacing between icon and text
 
         # Icon
-        self.feedback_icon = QLabel("ℹ️")
-        self.feedback_icon.setStyleSheet("font-size: 20px;")
+        self.feedback_icon = QLabel()
+        self.feedback_icon.setPixmap(qta.icon('fa6s.circle-info', color='#60a5fa').pixmap(20, 20))
+        self.feedback_icon.setFixedSize(20, 20)
         feedback_layout.addWidget(self.feedback_icon)
 
         # Text content
@@ -168,7 +171,7 @@ class SmartInputWidget(QWidget):
         if result.format == InputFormat.POSITION_IDS:
             if result.warnings:
                 # Warning state (GnuBG not configured)
-                self.feedback_icon.setText("⚠️")
+                self.feedback_icon.setPixmap(qta.icon('fa6s.triangle-exclamation', color='#fab387').pixmap(20, 20))
                 self.feedback_panel.setStyleSheet("""
                     QFrame {
                         background-color: #2e2416;
@@ -178,13 +181,13 @@ class SmartInputWidget(QWidget):
                     }
                 """)
                 self.feedback_title.setStyleSheet("font-weight: 600; font-size: 13px; color: #f9e2af;")
-                self.feedback_title.setText(f"⚠ {result.details}")
+                self.feedback_title.setText(f"{result.details}")
                 self.feedback_detail.setText(
                     result.warnings[0] + "\nConfigure GnuBG in Settings to analyze positions."
                 )
             else:
                 # Success state
-                self.feedback_icon.setText("✓")
+                self.feedback_icon.setPixmap(qta.icon('fa6s.circle-check', color='#a6e3a1').pixmap(20, 20))
                 self.feedback_panel.setStyleSheet("""
                     QFrame {
                         background-color: #1e2d1f;
@@ -194,7 +197,7 @@ class SmartInputWidget(QWidget):
                     }
                 """)
                 self.feedback_title.setStyleSheet("font-weight: 600; font-size: 13px; color: #a6e3a1;")
-                self.feedback_title.setText(f"✓ {result.details}")
+                self.feedback_title.setText(f"{result.details}")
 
                 # Calculate estimated time
                 est_seconds = result.count * 5  # ~5 seconds per position
@@ -205,7 +208,7 @@ class SmartInputWidget(QWidget):
 
         elif result.format == InputFormat.FULL_ANALYSIS:
             # Success state (blue)
-            self.feedback_icon.setText("✓")
+            self.feedback_icon.setPixmap(qta.icon('fa6s.circle-check', color='#89b4fa').pixmap(20, 20))
             self.feedback_panel.setStyleSheet("""
                 QFrame {
                     background-color: #1e2633;
@@ -215,7 +218,7 @@ class SmartInputWidget(QWidget):
                 }
             """)
             self.feedback_title.setStyleSheet("font-weight: 600; font-size: 13px; color: #89b4fa;")
-            self.feedback_title.setText(f"✓ {result.details}")
+            self.feedback_title.setText(f"{result.details}")
 
             # Show preview of first position if available
             preview_text = "Ready to add to export list"
@@ -229,7 +232,7 @@ class SmartInputWidget(QWidget):
 
         else:
             # Unknown/error state
-            self.feedback_icon.setText("⚠️")
+            self.feedback_icon.setPixmap(qta.icon('fa6s.triangle-exclamation', color='#fab387').pixmap(20, 20))
             self.feedback_panel.setStyleSheet("""
                 QFrame {
                     background-color: #2e2416;
@@ -239,7 +242,7 @@ class SmartInputWidget(QWidget):
                 }
             """)
             self.feedback_title.setStyleSheet("font-weight: 600; font-size: 13px; color: #fab387;")
-            self.feedback_title.setText(f"⚠ {result.details}")
+            self.feedback_title.setText(f"{result.details}")
 
             warning_text = "Paste XGID/GNUID or full XG analysis text"
             if result.warnings:

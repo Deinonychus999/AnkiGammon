@@ -7,9 +7,10 @@ from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QFileDialog, QMessageBox
 )
-from PySide6.QtCore import Qt, Signal, Slot, QUrl, QSettings
+from PySide6.QtCore import Qt, Signal, Slot, QUrl, QSettings, QSize
 from PySide6.QtGui import QAction, QKeySequence, QDesktopServices
 from PySide6.QtWebEngineWidgets import QWebEngineView
+import qtawesome as qta
 
 from flashgammon.settings import Settings
 from flashgammon.parsers.xg_text_parser import XGTextParser
@@ -103,7 +104,7 @@ class MainWindow(QMainWindow):
                         <!-- First die -->
                         <g transform="translate(0, 10)">
                             <rect x="2" y="2" width="32" height="32" rx="4"
-                                  fill="#f5e0dc" stroke="#cba6f7" stroke-width="1.5"
+                                  fill="#f5e0dc" stroke="#45475a" stroke-width="1.5"
                                   transform="rotate(-15 18 18)"/>
                             <!-- Pips for 5 -->
                             <circle cx="10" cy="10" r="2.5" fill="#1e1e2e" transform="rotate(-15 18 18)"/>
@@ -116,7 +117,7 @@ class MainWindow(QMainWindow):
                         <!-- Second die -->
                         <g transform="translate(36, 0)">
                             <rect x="2" y="2" width="32" height="32" rx="4"
-                                  fill="#f5e0dc" stroke="#cba6f7" stroke-width="1.5"
+                                  fill="#f5e0dc" stroke="#45475a" stroke-width="1.5"
                                   transform="rotate(12 18 18)"/>
                             <!-- Pips for 3 -->
                             <circle cx="10" cy="10" r="2.5" fill="#1e1e2e" transform="rotate(12 18 18)"/>
@@ -149,14 +150,18 @@ class MainWindow(QMainWindow):
         title.setAlignment(Qt.AlignCenter)
         layout.addWidget(title)
 
-        # Add Positions button (primary)
-        self.btn_add_positions = QPushButton("📋 Add Positions...")
+        # Add Positions button (primary) - blue background needs dark icons
+        self.btn_add_positions = QPushButton("  Add Positions...")
+        self.btn_add_positions.setIcon(qta.icon('fa6s.clipboard-list', color='#1e1e2e'))
+        self.btn_add_positions.setIconSize(QSize(18, 18))
         self.btn_add_positions.clicked.connect(self.on_add_positions_clicked)
         self.btn_add_positions.setToolTip("Paste position IDs or full XG analysis")
         layout.addWidget(self.btn_add_positions)
 
-        # Import file button (secondary)
-        self.btn_import = QPushButton("📁 Import XG File")
+        # Import file button (secondary) - blue background needs dark icons
+        self.btn_import = QPushButton("  Import XG File")
+        self.btn_import.setIcon(qta.icon('fa6s.folder-open', color='#1e1e2e'))
+        self.btn_import.setIconSize(QSize(18, 18))
         self.btn_import.clicked.connect(self.on_import_clicked)
         self.btn_import.setToolTip("Import positions from a text file")
         layout.addWidget(self.btn_import)
@@ -170,13 +175,17 @@ class MainWindow(QMainWindow):
         layout.addSpacing(8)
 
         # Settings button
-        self.btn_settings = QPushButton("⚙️ Settings")
+        self.btn_settings = QPushButton("  Settings")
+        self.btn_settings.setIcon(qta.icon('fa6s.gear', color='#cdd6f4'))
+        self.btn_settings.setIconSize(QSize(18, 18))
         self.btn_settings.setObjectName("btn_settings")
         self.btn_settings.clicked.connect(self.on_settings_clicked)
         layout.addWidget(self.btn_settings)
 
-        # Export button
-        self.btn_export = QPushButton("📤 Export to Anki")
+        # Export button - blue background needs dark icons
+        self.btn_export = QPushButton("  Export to Anki")
+        self.btn_export.setIcon(qta.icon('fa6s.file-export', color='#1e1e2e'))
+        self.btn_export.setIconSize(QSize(18, 18))
         self.btn_export.setEnabled(False)
         self.btn_export.clicked.connect(self.on_export_clicked)
         layout.addWidget(self.btn_export)

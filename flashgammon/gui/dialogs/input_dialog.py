@@ -9,6 +9,8 @@ Supports:
 from typing import List
 from pathlib import Path
 
+import qtawesome as qta
+
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
     QLabel, QListWidget, QListWidgetItem, QMessageBox,
@@ -52,10 +54,14 @@ class PendingPositionItem(QListWidgetItem):
         else:
             dice_str = "—"
 
-        # Icon based on status
-        icon = "🔍" if self.needs_analysis else "✓"
+        # Set text without emoji
+        self.setText(f"{decision_type} | {player} | {dice_str}")
 
-        self.setText(f"{icon} {decision_type} | {player} | {dice_str}")
+        # Icon based on status - use semantic colors
+        if self.needs_analysis:
+            self.setIcon(qta.icon('fa6s.magnifying-glass', color='#89b4fa'))  # Info blue
+        else:
+            self.setIcon(qta.icon('fa6s.circle-check', color='#a6e3a1'))  # Success green
 
         # Tooltip with more info
         tooltip = f"Decision Type: {decision_type}\n"
