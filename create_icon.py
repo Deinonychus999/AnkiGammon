@@ -21,7 +21,7 @@ except ImportError:
     exit(1)
 
 # Paths
-RESOURCES_DIR = Path(__file__).parent / "xg2anki" / "gui" / "resources"
+RESOURCES_DIR = Path(__file__).parent / "flashgammon" / "gui" / "resources"
 ICO_PATH = RESOURCES_DIR / "icon.ico"
 PNG_PATH = RESOURCES_DIR / "icon.png"
 

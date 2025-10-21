@@ -1,9 +1,11 @@
-"""Generate sample board SVGs for each color scheme."""
+"""Generate sample board PNGs for each color scheme."""
 
 from pathlib import Path
-from xg2anki.models import Position, Player, CubeState
-from xg2anki.renderer.svg_board_renderer import SVGBoardRenderer
-from xg2anki.renderer.color_schemes import SCHEMES
+from flashgammon.models import Position, Player, CubeState
+from flashgammon.renderer.svg_board_renderer import SVGBoardRenderer
+from flashgammon.renderer.color_schemes import SCHEMES
+from html2image import Html2Image
+import os
 
 
 def create_sample_position():
@@ -35,7 +37,7 @@ def create_sample_position():
 
 
 def main():
-    """Generate sample HTML files with SVG for all color schemes."""
+    """Generate sample PNG files for all color schemes."""
     # Create output directory
     output_dir = Path("color_scheme_samples")
     output_dir.mkdir(exist_ok=True)
@@ -43,7 +45,10 @@ def main():
     # Create sample position
     position = create_sample_position()
 
-    # Generate HTML file for each scheme
+    # Initialize html2image
+    hti = Html2Image(output_path=str(output_dir))
+
+    # Generate PNG file for each scheme
     for scheme_name, scheme in SCHEMES.items():
         print(f"Generating sample for {scheme_name}...")
 
@@ -60,49 +65,27 @@ def main():
             cube_owner=CubeState.CENTERED
         )
 
-        # Create HTML wrapper
-        html = f'''<!DOCTYPE html>
-<html>
-<head>
-    <title>{scheme.name} Color Scheme</title>
-    <style>
-        body {{
-            font-family: Arial, sans-serif;
-            text-align: center;
-            padding: 20px;
-            background: #f0f0f0;
-        }}
-        .container {{
-            max-width: 900px;
-            margin: 0 auto;
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }}
-        h1 {{
-            color: #333;
-            margin-bottom: 20px;
-        }}
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>{scheme.name} Color Scheme</h1>
-        {svg}
-    </div>
-</body>
-</html>'''
+        # Create HTML with embedded SVG
+        html = f"""
+        <!DOCTYPE html>
+        <html>
+        <body style="margin:0;padding:0;">
+            {svg}
+        </body>
+        </html>
+        """
 
-        # Save to file
-        output_path = output_dir / f"{scheme_name}.html"
-        with open(output_path, 'w', encoding='utf-8') as f:
-            f.write(html)
+        # Convert HTML to PNG
+        hti.screenshot(
+            html_str=html,
+            save_as=f"{scheme_name}.png",
+            size=(800, 500)
+        )
 
-        print(f"  Created: {output_path}")
+        print(f"  Created: {output_dir / f'{scheme_name}.png'}")
 
     print(f"\nAll samples generated in: {output_dir.absolute()}")
-    print("Open the HTML files in a browser to view the color schemes.")
+    print("PNG files ready for viewing.")
 
 
 if __name__ == "__main__":

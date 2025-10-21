@@ -10,8 +10,8 @@ Tests:
 
 import sys
 from PySide6.QtWidgets import QApplication
-from xg2anki.settings import get_settings
-from xg2anki.gui.dialogs import InputDialog
+from flashgammon.settings import get_settings
+from flashgammon.gui.dialogs import InputDialog
 
 # Sample XG analysis (full)
 SAMPLE_FULL_ANALYSIS = """XGID=--BBBBB-AB----a--cbdbBb-a-:1:1:1:65:0:0:2:0:10
@@ -68,7 +68,7 @@ def test_full_analysis_detection():
     """Test detection of full XG analysis."""
     print("Testing full XG analysis detection...")
 
-    from xg2anki.gui.format_detector import FormatDetector, InputFormat
+    from flashgammon.gui.format_detector import FormatDetector, InputFormat
 
     settings = get_settings()
     detector = FormatDetector(settings)
@@ -92,7 +92,7 @@ def test_position_ids_detection():
     """Test detection of position IDs only."""
     print("Testing position IDs detection...")
 
-    from xg2anki.gui.format_detector import FormatDetector, InputFormat
+    from flashgammon.gui.format_detector import FormatDetector, InputFormat
 
     settings = get_settings()
     detector = FormatDetector(settings)
@@ -116,7 +116,7 @@ def test_parsing():
     """Test parsing of XG analysis."""
     print("Testing XG analysis parsing...")
 
-    from xg2anki.parsers.xg_text_parser import XGTextParser
+    from flashgammon.parsers.xg_text_parser import XGTextParser
 
     decisions = XGTextParser.parse_string(SAMPLE_FULL_ANALYSIS)
 

@@ -1,4 +1,4 @@
-"""Basic tests for XG2Anki functionality."""
+"""Basic tests for FlashGammon functionality."""
 
 import unittest
 from pathlib import Path
@@ -8,12 +8,12 @@ import sys
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from xg2anki.models import Position, Player, CubeState, Decision, Move, DecisionType
-from xg2anki.utils.xgid import parse_xgid, encode_xgid
-from xg2anki.utils.move_parser import MoveParser
-from xg2anki.renderer.svg_board_renderer import SVGBoardRenderer
-from xg2anki.interactive import InteractiveSession
-from xg2anki.parsers.xg_text_parser import XGTextParser
+from flashgammon.models import Position, Player, CubeState, Decision, Move, DecisionType
+from flashgammon.utils.xgid import parse_xgid, encode_xgid
+from flashgammon.utils.move_parser import MoveParser
+from flashgammon.renderer.svg_board_renderer import SVGBoardRenderer
+from flashgammon.interactive import InteractiveSession
+from flashgammon.parsers.xg_text_parser import XGTextParser
 
 
 class TestXGIDParsing(unittest.TestCase):

@@ -4,13 +4,13 @@ with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 setup(
-    name="xg2anki",
+    name="flashgammon",
     version="0.1.0",
-    author="XG2Anki Contributors",
+    author="FlashGammon Contributors",
     description="Convert eXtreme Gammon analysis into Anki flashcards",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/yourusername/xg2anki",
+    url="https://github.com/yourusername/flashgammon",
     packages=find_packages(),
     classifiers=[
         "Development Status :: 3 - Alpha",
@@ -35,7 +35,7 @@ setup(
     ],
     entry_points={
         "console_scripts": [
-            "xg2anki=xg2anki.cli:main",
+            "flashgammon=flashgammon.cli:main",
         ],
     },
 )

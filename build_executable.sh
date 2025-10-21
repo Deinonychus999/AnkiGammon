@@ -1,11 +1,11 @@
 #!/bin/bash
-# Build script for creating XG2Anki macOS/Linux executable
+# Build script for creating FlashGammon macOS/Linux executable
 # Run this to create a standalone executable file
 
 set -e  # Exit on error
 
 echo "========================================"
-echo "XG2Anki Executable Builder (macOS/Linux)"
+echo "FlashGammon Executable Builder (macOS/Linux)"
 echo "========================================"
 echo ""
 
@@ -30,10 +30,10 @@ rm -rf build dist
 
 # Determine which spec file to use
 if [ "$PLATFORM" == "Darwin" ]; then
-    SPEC_FILE="xg2anki-mac.spec"
+    SPEC_FILE="flashgammon-mac.spec"
     echo "Using macOS spec file: $SPEC_FILE"
 else
-    SPEC_FILE="xg2anki.spec"
+    SPEC_FILE="flashgammon.spec"
     echo "Using Linux spec file: $SPEC_FILE"
 fi
 
@@ -54,11 +54,11 @@ echo "========================================"
 echo "Build completed successfully!"
 echo "========================================"
 echo ""
-echo "Executable location: dist/xg2anki"
+echo "Executable location: dist/flashgammon"
 echo ""
 
 # Make executable (just to be sure)
-chmod +x dist/xg2anki
+chmod +x dist/flashgammon
 
 # macOS-specific instructions
 if [ "$PLATFORM" == "Darwin" ]; then
@@ -67,7 +67,7 @@ if [ "$PLATFORM" == "Darwin" ]; then
     echo "  - Or: System Settings → Privacy & Security → Allow"
     echo ""
     echo "To allow running from anywhere:"
-    echo "  xattr -cr dist/xg2anki"
+    echo "  xattr -cr dist/flashgammon"
     echo ""
 fi
 
@@ -77,7 +77,7 @@ echo ""
 
 # Test the executable
 echo "Testing executable..."
-if ./dist/xg2anki --help > /dev/null 2>&1; then
+if ./dist/flashgammon --help > /dev/null 2>&1; then
     echo "✓ Executable test passed!"
 else
     echo "⚠ Warning: Executable test failed. Please check manually."

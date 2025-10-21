@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-XG2Anki converts eXtreme Gammon (XG) backgammon analysis into Anki flashcards. The application parses XG text exports containing position analysis, renders board positions as images, and creates flashcards with multiple-choice questions about the best move.
+FlashGammon converts eXtreme Gammon (XG) backgammon analysis into Anki flashcards. The application parses XG text exports containing position analysis, renders board positions as images, and creates flashcards with multiple-choice questions about the best move.
 
 ## Commands
 
@@ -15,10 +15,10 @@ XG2Anki converts eXtreme Gammon (XG) backgammon analysis into Anki flashcards. T
 pip install -r requirements.txt
 
 # Run the application (interactive mode)
-python -m xg2anki
+python -m flashgammon
 
 # Run with file input
-python -m xg2anki analysis.txt
+python -m flashgammon analysis.txt
 
 # Run tests
 python -m unittest tests/test_basic.py
@@ -35,8 +35,8 @@ pip install pyinstaller
 rm -rf build dist
 
 # Build executable
-pyinstaller xg2anki.spec
-# Creates dist/xg2anki.exe
+pyinstaller flashgammon.spec
+# Creates dist/flashgammon.exe
 ```
 
 **macOS/Linux:**
@@ -48,14 +48,14 @@ pip install pyinstaller
 rm -rf build dist
 
 # Build executable
-pyinstaller xg2anki-mac.spec
-# Creates dist/xg2anki
+pyinstaller flashgammon-mac.spec
+# Creates dist/flashgammon
 ```
 
 **Note:** The `build_executable.bat` and `build_executable.sh` scripts exist for end users, but Claude Code should use the PyInstaller commands above.
 
 **Build Output:**
-- Executable: `dist/xg2anki.exe` (Windows) or `dist/xg2anki` (macOS/Linux)
+- Executable: `dist/flashgammon.exe` (Windows) or `dist/flashgammon` (macOS/Linux)
 - Build artifacts: `build/` directory (can be deleted)
 - Size: ~16MB (includes Python runtime and all dependencies)
 - No Python installation required on target machine
@@ -144,7 +144,7 @@ The card back shows moves in **XG's original order** (not shuffled MCQ order):
 - **`anki/apkg_exporter.py`**: Generates .apkg files using genanki
 - **`cli.py`**: Command-line interface with `--color-scheme` option
 - **`interactive.py`**: Interactive mode for collecting positions with color scheme selection
-- **`settings.py`**: Settings persistence (saves user preferences like color scheme to `~/.xg2anki/config.json`)
+- **`settings.py`**: Settings persistence (saves user preferences like color scheme to `~/.flashgammon/config.json`)
 
 #### Color Schemes (renderer/color_schemes.py)
 
@@ -169,13 +169,13 @@ Each `ColorScheme` dataclass defines 10 colors:
 - `bearoff` - Bear-off tray background
 
 **Usage:**
-- In CLI: `python -m xg2anki --color-scheme ocean analysis.txt`
+- In CLI: `python -m flashgammon --color-scheme ocean analysis.txt`
 - In interactive mode: Options menu (option 2 from main menu)
-- User's selection is saved to `~/.xg2anki/config.json` and persisted across sessions
+- User's selection is saved to `~/.flashgammon/config.json` and persisted across sessions
 
 #### Settings Persistence (settings.py)
 
-User preferences are automatically saved to `~/.xg2anki/config.json`:
+User preferences are automatically saved to `~/.flashgammon/config.json`:
 
 **Saved Settings:**
 - `default_color_scheme` - Last selected color scheme (default: "classic")
@@ -186,7 +186,7 @@ User preferences are automatically saved to `~/.xg2anki/config.json`:
 
 **Settings API:**
 ```python
-from xg2anki.settings import get_settings
+from flashgammon.settings import get_settings
 
 settings = get_settings()
 settings.color_scheme = "forest"  # Automatically saved
@@ -231,7 +231,7 @@ Always use the internal Position model (points[0-25]). When reading/writing XGID
 ### Working with Settings
 
 Always use the global settings instance via `get_settings()`:
-- Automatically loads from `~/.xg2anki/config.json`
+- Automatically loads from `~/.flashgammon/config.json`
 - Changes are immediately persisted to disk
 - Thread-safe singleton pattern
 - Gracefully handles missing/corrupted config files
