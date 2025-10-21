@@ -28,16 +28,37 @@ python -m unittest tests/test_basic.py
 
 **Windows:**
 ```bash
-build_executable.bat
+# Install PyInstaller if needed
+pip install pyinstaller
+
+# Clean previous builds (optional)
+rm -rf build dist
+
+# Build executable
+pyinstaller xg2anki.spec
 # Creates dist/xg2anki.exe
 ```
 
 **macOS/Linux:**
 ```bash
-chmod +x build_executable.sh
-./build_executable.sh
+# Install PyInstaller if needed
+pip install pyinstaller
+
+# Clean previous builds (optional)
+rm -rf build dist
+
+# Build executable
+pyinstaller xg2anki-mac.spec
 # Creates dist/xg2anki
 ```
+
+**Note:** The `build_executable.bat` and `build_executable.sh` scripts exist for end users, but Claude Code should use the PyInstaller commands above.
+
+**Build Output:**
+- Executable: `dist/xg2anki.exe` (Windows) or `dist/xg2anki` (macOS/Linux)
+- Build artifacts: `build/` directory (can be deleted)
+- Size: ~16MB (includes Python runtime and all dependencies)
+- No Python installation required on target machine
 
 ### Testing
 
