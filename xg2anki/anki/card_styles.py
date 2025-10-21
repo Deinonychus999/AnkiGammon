@@ -310,53 +310,35 @@ CARD_CSS = """
     border-left: 3px solid #66bb6a;
 }
 
-/* Move W/G/B Side Panel */
-.move-wgb-panel {
-    position: fixed;
-    z-index: 1000;
-    background-color: var(--canvas-elevated);
-    border: 2px solid var(--border);
-    border-radius: 6px;
-    padding: 10px 12px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    min-width: 200px;
-    pointer-events: auto;
+/* Move Notation and Inline W/G/B Display */
+.move-notation {
+    font-weight: bold;
+    font-size: 15px;
+    margin-bottom: 4px;
 }
 
-.wgb-panel-content {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.wgb-panel-row {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-}
-
-.wgb-panel-label {
+.move-wgb-inline {
     font-size: 12px;
-    font-weight: 500;
-    color: var(--text-fg);
+    line-height: 1.5;
+    margin-top: 6px;
+}
+
+.wgb-line {
     display: flex;
     align-items: center;
     gap: 4px;
+    margin: 2px 0;
 }
 
-.wgb-panel-value {
-    font-size: 13px;
-    color: var(--text-fg);
-    padding-left: 18px;
-}
-
-.wgb-panel-value strong {
-    font-size: 14px;
+.wgb-line strong {
     color: #4da6ff;
+    font-size: 13px;
 }
 
-.wgb-highlighted {
-    background-color: rgba(100, 150, 255, 0.1) !important;
+.wgb-detail {
+    color: #999;
+    font-size: 11px;
+    margin-left: 2px;
 }
 
 .source-info {

@@ -370,10 +370,15 @@ class CardGenerator:
                 row_class = f"{rank_class} clickable-move-row"
                 row_attrs = wgb_attrs
 
+            # Generate inline W/G/B display
+            wgb_inline_html = self._format_wgb_inline(move, decision)
+
             table_rows.append(f"""
 <tr class="{row_class}" {row_attrs}>
     <td>{display_rank}</td>
-    <td>{display_notation}</td>
+    <td>
+        <div class="move-notation">{display_notation}</div>{wgb_inline_html}
+    </td>
     <td>{move.equity:.3f}</td>
     <td>{error_str}</td>
 </tr>""")
@@ -488,33 +493,12 @@ class CardGenerator:
     </div>
 """
 
-        # Add W/G/B side panel for checker play with moves that have W/G/B data
-        wgb_panel_html = ""
-        if not is_cube_decision and any(m.player_win_pct is not None for m in candidates if m):
-            player_color = self.renderer.color_scheme.checker_x if decision.on_roll == Player.X else self.renderer.color_scheme.checker_o
-            opponent_color = self.renderer.color_scheme.checker_o if decision.on_roll == Player.X else self.renderer.color_scheme.checker_x
-            wgb_panel_html = f"""
-    <div class="move-wgb-panel" id="wgb-panel" style="display: none;">
-        <div class="wgb-panel-content">
-            <div class="wgb-panel-row">
-                <span class="wgb-panel-label"><span style="color: {player_color};">●</span> Player:</span>
-                <span class="wgb-panel-value" id="wgb-player-value"></span>
-            </div>
-            <div class="wgb-panel-row">
-                <span class="wgb-panel-label"><span style="color: {opponent_color};">●</span> Opp.:</span>
-                <span class="wgb-panel-value" id="wgb-opponent-value"></span>
-            </div>
-        </div>
-    </div>
-"""
-
         html = f"""
 <div class="card-back">
 {position_viewer_html}
     <div class="metadata">{metadata}</div>
 {answer_html}
 {analysis_and_chances}
-{wgb_panel_html}
     {self._generate_source_info(decision)}
 </div>
 """
@@ -526,9 +510,6 @@ class CardGenerator:
             # Generate animation scripts
             animation_scripts = self._generate_checker_animation_scripts(decision, candidates, move_result_svgs or {})
             html += animation_scripts
-
-        # Add W/G/B toggle script for clickable rows
-        html += self._generate_wgb_toggle_script()
 
         return html
 
@@ -1037,89 +1018,31 @@ class CardGenerator:
 
         return script
 
-    def _generate_wgb_toggle_script(self) -> str:
-        """Generate JavaScript for showing W/G/B details in side panel."""
-        return """
-<script>
-// Show W/G/B details in side panel when hovering/clicking on move rows
-(function() {
-    function initWGBPanel() {
-        const moveRows = document.querySelectorAll('.clickable-move-row');
-        const panel = document.getElementById('wgb-panel');
+    def _format_wgb_inline(self, move: Move, decision: Decision) -> str:
+        """
+        Generate inline HTML for W/G/B percentages to display within move table cell.
 
-        if (!panel) return; // No panel, skip
+        Returns HTML with two lines showing player and opponent win/gammon/backgammon percentages.
+        Returns empty string if move has no W/G/B data.
+        """
+        if move.player_win_pct is None:
+            return ""
 
-        const playerValue = document.getElementById('wgb-player-value');
-        const opponentValue = document.getElementById('wgb-opponent-value');
-        let activeRow = null;
+        # Get checker colors from the renderer's color scheme
+        player_color = self.renderer.color_scheme.checker_x if decision.on_roll == Player.X else self.renderer.color_scheme.checker_o
+        opponent_color = self.renderer.color_scheme.checker_o if decision.on_roll == Player.X else self.renderer.color_scheme.checker_x
 
-        moveRows.forEach(row => {
-            // Only add handlers if this row has W/G/B data
-            if (row.hasAttribute('data-player-win')) {
-                row.style.cursor = 'pointer';
+        wgb_html = f'''
+        <div class="move-wgb-inline">
+            <div class="wgb-line">
+                <span style="color: {player_color};">●</span> P: <strong>{move.player_win_pct:.1f}%</strong> <span class="wgb-detail">(G:{move.player_gammon_pct:.1f}% B:{move.player_backgammon_pct:.1f}%)</span>
+            </div>
+            <div class="wgb-line">
+                <span style="color: {opponent_color};">○</span> O: <strong>{move.opponent_win_pct:.1f}%</strong> <span class="wgb-detail">(G:{move.opponent_gammon_pct:.1f}% B:{move.opponent_backgammon_pct:.1f}%)</span>
+            </div>
+        </div>'''
 
-                // Show panel on hover
-                row.addEventListener('mouseenter', function(e) {
-                    const playerWin = this.getAttribute('data-player-win');
-                    const playerGammon = this.getAttribute('data-player-gammon');
-                    const playerBackgammon = this.getAttribute('data-player-backgammon');
-                    const oppWin = this.getAttribute('data-opponent-win');
-                    const oppGammon = this.getAttribute('data-opponent-gammon');
-                    const oppBackgammon = this.getAttribute('data-opponent-backgammon');
-
-                    playerValue.innerHTML = '<strong>' + playerWin + '%</strong> <span style=\"font-size: 0.85em; color: #999;\">(G: ' + playerGammon + '% B: ' + playerBackgammon + '%)</span>';
-                    opponentValue.innerHTML = '<strong>' + oppWin + '%</strong> <span style=\"font-size: 0.85em; color: #999;\">(G: ' + oppGammon + '% B: ' + oppBackgammon + '%)</span>';
-
-                    // Position panel to the right of the table
-                    const rect = this.getBoundingClientRect();
-                    const tableRect = this.closest('table').getBoundingClientRect();
-
-                    panel.style.top = rect.top + 'px';
-                    panel.style.left = (tableRect.right + 10) + 'px';
-                    panel.style.display = 'block';
-
-                    activeRow = this;
-                    this.classList.add('wgb-highlighted');
-                });
-
-                row.addEventListener('mouseleave', function(e) {
-                    // Small delay to allow moving to the panel
-                    setTimeout(() => {
-                        if (!panel.matches(':hover') && activeRow === this) {
-                            panel.style.display = 'none';
-                            this.classList.remove('wgb-highlighted');
-                            activeRow = null;
-                        }
-                    }, 100);
-                });
-            }
-        });
-
-        // Keep panel visible when hovering over it
-        if (panel) {
-            panel.addEventListener('mouseenter', function() {
-                panel.style.display = 'block';
-            });
-
-            panel.addEventListener('mouseleave', function() {
-                panel.style.display = 'none';
-                if (activeRow) {
-                    activeRow.classList.remove('wgb-highlighted');
-                    activeRow = null;
-                }
-            });
-        }
-    }
-
-    // Initialize when DOM is ready
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initWGBPanel);
-    } else {
-        initWGBPanel();
-    }
-})();
-</script>
-"""
+        return wgb_html
 
     def _generate_winning_chances_html(self, decision: Decision) -> str:
         """
