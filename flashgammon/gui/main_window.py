@@ -2,10 +2,9 @@
 Main application window.
 """
 
-from pathlib import Path
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QPushButton, QLabel, QFileDialog, QMessageBox
+    QPushButton, QLabel, QMessageBox
 )
 from PySide6.QtCore import Qt, Signal, Slot, QUrl, QSettings, QSize
 from PySide6.QtGui import QAction, QKeySequence, QDesktopServices
@@ -25,7 +24,6 @@ class MainWindow(QMainWindow):
     """Main application window for FlashGammon."""
 
     # Signals
-    file_loaded = Signal(Path)
     decisions_parsed = Signal(list)  # List[Decision]
 
     def __init__(self, settings: Settings):
@@ -127,7 +125,7 @@ class MainWindow(QMainWindow):
                     </svg>
                 </div>
                 <h1>No Position Loaded</h1>
-                <p>Import an XG file to get started</p>
+                <p>Add positions to get started</p>
             </div>
         </body>
         </html>
@@ -157,14 +155,6 @@ class MainWindow(QMainWindow):
         self.btn_add_positions.clicked.connect(self.on_add_positions_clicked)
         self.btn_add_positions.setToolTip("Paste position IDs or full XG analysis")
         layout.addWidget(self.btn_add_positions)
-
-        # Import file button (secondary) - blue background needs dark icons
-        self.btn_import = QPushButton("  Import XG File")
-        self.btn_import.setIcon(qta.icon('fa6s.folder-open', color='#1e1e2e'))
-        self.btn_import.setIconSize(QSize(18, 18))
-        self.btn_import.clicked.connect(self.on_import_clicked)
-        self.btn_import.setToolTip("Import positions from a text file")
-        layout.addWidget(self.btn_import)
 
         # Position list widget
         self.position_list = PositionListWidget()
@@ -203,11 +193,6 @@ class MainWindow(QMainWindow):
         act_add_positions.setShortcut("Ctrl+N")
         act_add_positions.triggered.connect(self.on_add_positions_clicked)
         file_menu.addAction(act_add_positions)
-
-        act_open = QAction("&Open XG File...", self)
-        act_open.setShortcut(QKeySequence.Open)
-        act_open.triggered.connect(self.on_import_clicked)
-        file_menu.addAction(act_open)
 
         file_menu.addSeparator()
 
@@ -302,53 +287,6 @@ class MainWindow(QMainWindow):
         # Update position list
         self.position_list.set_decisions(self.current_decisions)
 
-    @Slot()
-    def on_import_clicked(self):
-        """Handle import button click."""
-        file_path, _ = QFileDialog.getOpenFileName(
-            self,
-            "Select XG Text File",
-            str(Path.home()),
-            "Text Files (*.txt);;All Files (*)"
-        )
-
-        if not file_path:
-            return
-
-        self.load_file(Path(file_path))
-
-    def load_file(self, path: Path):
-        """Load and parse an XG text file."""
-        try:
-            self.statusBar().showMessage(f"Parsing {path.name}...")
-
-            # Parse file (existing parser, zero changes!)
-            decisions = self.parser.parse_file(str(path))
-
-            if not decisions:
-                QMessageBox.warning(
-                    self,
-                    "No Positions Found",
-                    f"Could not find any valid positions in {path.name}"
-                )
-                return
-
-            # Emit signal to update UI
-            self.decisions_parsed.emit(decisions)
-
-            self.statusBar().showMessage(
-                f"Loaded {len(decisions)} position(s) from {path.name}",
-                5000
-            )
-
-        except Exception as e:
-            QMessageBox.critical(
-                self,
-                "Parse Error",
-                f"Failed to parse {path.name}:\n{str(e)}"
-            )
-            self.statusBar().showMessage("Error parsing file")
-
     @Slot(list)
     def on_decisions_loaded(self, decisions):
         """Handle newly loaded decisions."""
@@ -432,7 +370,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(
                 self,
                 "No Positions",
-                "Please import an XG file first"
+                "Please add positions first"
             )
             return
 
