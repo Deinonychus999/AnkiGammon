@@ -33,13 +33,20 @@ QPushButton:disabled {
 
 /* Settings and Secondary Buttons */
 QPushButton#btn_settings {
-    background-color: #313244;
+    background-color: transparent;
     color: #cdd6f4;
+    border: 2px solid #45475a;
 }
 
 QPushButton#btn_settings:hover {
-    background-color: #45475a;
-    color: #f5e0dc;
+    background-color: #89b4fa;
+    color: #1e1e2e;
+    border-color: #89b4fa;
+}
+
+QPushButton#btn_settings:pressed {
+    background-color: #74c7ec;
+    border-color: #74c7ec;
 }
 
 /* Position List Widget */

@@ -308,6 +308,7 @@ class InputDialog(QDialog):
         preview_layout.addWidget(preview_label)
 
         self.preview = QWebEngineView()
+        self.preview.setContextMenuPolicy(Qt.NoContextMenu)  # Disable browser context menu
         self.preview.setMinimumHeight(400)  # Increased for better board visibility
         self.preview.setHtml(self._get_empty_preview_html())
         preview_layout.addWidget(self.preview, stretch=1)  # Allow preview to expand

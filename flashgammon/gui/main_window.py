@@ -57,6 +57,7 @@ class MainWindow(QMainWindow):
 
         # Right panel: Preview
         self.preview = QWebEngineView()
+        self.preview.setContextMenuPolicy(Qt.NoContextMenu)  # Disable browser context menu
         welcome_html = """
         <!DOCTYPE html>
         <html>

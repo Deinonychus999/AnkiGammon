@@ -208,7 +208,7 @@ def _enrich_with_gnubg_analysis(decisions, settings):
         # Check if decision needs analysis
         if (not decision.candidate_moves or len(decision.candidate_moves) == 0) and decision.xgid:
             try:
-                click.echo(f"  Analyzing position with GnuBG (ply {settings.gnubg_analysis_ply})...")
+                click.echo(f"  Analyzing position with GnuBG ({settings.gnubg_analysis_ply}-ply)...")
 
                 # Create analyzer
                 analyzer = GNUBGAnalyzer(

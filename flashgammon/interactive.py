@@ -594,7 +594,7 @@ class InteractiveSession:
                 try:
                     if positions_analyzed == 0:
                         click.echo()
-                        click.echo(click.style(f"Analyzing positions with GnuBG (ply {self.settings.gnubg_analysis_ply})...", fg='cyan'))
+                        click.echo(click.style(f"Analyzing positions with GnuBG ({self.settings.gnubg_analysis_ply}-ply)...", fg='cyan'))
 
                     # Create analyzer
                     analyzer = GNUBGAnalyzer(
