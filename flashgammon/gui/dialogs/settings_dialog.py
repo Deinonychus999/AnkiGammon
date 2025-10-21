@@ -173,10 +173,10 @@ class SettingsDialog(QDialog):
         group = QGroupBox("Card Appearance")
         form = QFormLayout(group)
 
-        # Color scheme
+        # Board theme
         self.cmb_color_scheme = QComboBox()
         self.cmb_color_scheme.addItems(list_schemes())
-        form.addRow("Board Color Scheme:", self.cmb_color_scheme)
+        form.addRow("Board Theme:", self.cmb_color_scheme)
 
         # Show options
         self.chk_show_options = QCheckBox("Show multiple choice options on card front")

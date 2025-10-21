@@ -33,6 +33,7 @@ class MainWindow(QMainWindow):
         self.current_decisions = []
         self.parser = XGTextParser()
         self.renderer = SVGBoardRenderer(color_scheme=get_scheme(settings.color_scheme))
+        self.color_scheme_actions = {}  # Store references to color scheme menu actions
 
         self._setup_ui()
         self._setup_menu_bar()
@@ -221,12 +222,11 @@ class MainWindow(QMainWindow):
         act_settings.triggered.connect(self.on_settings_clicked)
         edit_menu.addAction(act_settings)
 
-        # Options menu
-        options_menu = menubar.addMenu("&Options")
+        # Board Theme menu
+        board_theme_menu = menubar.addMenu("&Board Theme")
 
-        # Color scheme submenu
+        # Add theme options directly (no submenu)
         from flashgammon.renderer.color_schemes import list_schemes
-        scheme_menu = options_menu.addMenu("&Color Scheme")
         for scheme in list_schemes():
             act_scheme = QAction(scheme.title(), self)
             act_scheme.setCheckable(True)
@@ -234,7 +234,8 @@ class MainWindow(QMainWindow):
             act_scheme.triggered.connect(
                 lambda checked, s=scheme: self.change_color_scheme(s)
             )
-            scheme_menu.addAction(act_scheme)
+            board_theme_menu.addAction(act_scheme)
+            self.color_scheme_actions[scheme] = act_scheme  # Store reference
 
         # Help menu
         help_menu = menubar.addMenu("&Help")
@@ -403,6 +404,10 @@ class MainWindow(QMainWindow):
         # Update renderer with new color scheme
         self.renderer = SVGBoardRenderer(color_scheme=get_scheme(settings.color_scheme))
 
+        # Update menu checkmarks if color scheme changed
+        for scheme_name, action in self.color_scheme_actions.items():
+            action.setChecked(scheme_name == settings.color_scheme)
+
         # Refresh current preview if a decision is displayed
         if self.current_decisions:
             selected = self.position_list.get_selected_decision()
@@ -429,6 +434,11 @@ class MainWindow(QMainWindow):
     def change_color_scheme(self, scheme: str):
         """Change the color scheme."""
         self.settings.color_scheme = scheme
+
+        # Update checkmarks: uncheck all, then check the selected one
+        for scheme_name, action in self.color_scheme_actions.items():
+            action.setChecked(scheme_name == scheme)
+
         self.on_settings_changed(self.settings)
 
     @Slot()
