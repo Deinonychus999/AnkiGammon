@@ -16,7 +16,7 @@ class Settings:
         "default_color_scheme": "classic",
         "deck_name": "XG Backgammon",
         "show_options": True,
-        "interactive_moves": False,
+        "interactive_moves": True,
         "export_method": "ankiconnect",
     }
 

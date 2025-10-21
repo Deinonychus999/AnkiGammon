@@ -160,7 +160,7 @@ User preferences are automatically saved to `~/.xg2anki/config.json`:
 - `default_color_scheme` - Last selected color scheme (default: "classic")
 - `deck_name` - Default deck name (default: "XG Backgammon")
 - `show_options` - Whether to show options on cards (default: true)
-- `interactive_moves` - Whether to enable interactive move visualization (default: false)
+- `interactive_moves` - Whether to enable interactive move visualization (default: true)
 - `export_method` - Export method for cards: "ankiconnect" or "apkg" (default: "ankiconnect")
 
 **Settings API:**
