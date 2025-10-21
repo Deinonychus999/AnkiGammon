@@ -229,25 +229,25 @@ class SVGBoardRenderer:
                 x = board_x + self.half_width + self.bar_width + (5 - i) * self.point_width
                 y_base = board_y + self.board_height
                 y_tip = y_base - self.point_height
-                color = self.color_scheme.point_dark if i % 2 == 0 else self.color_scheme.point_light
+                color = self.color_scheme.point_dark if point_num % 2 == 1 else self.color_scheme.point_light
                 label_y = y_base + 13
             elif i < 12:
                 x = board_x + (11 - i) * self.point_width
                 y_base = board_y + self.board_height
                 y_tip = y_base - self.point_height
-                color = self.color_scheme.point_light if i % 2 == 0 else self.color_scheme.point_dark
+                color = self.color_scheme.point_dark if point_num % 2 == 1 else self.color_scheme.point_light
                 label_y = y_base + 13
             elif i < 18:
                 x = board_x + (i - 12) * self.point_width
                 y_base = board_y
                 y_tip = y_base + self.point_height
-                color = self.color_scheme.point_dark if i % 2 == 0 else self.color_scheme.point_light
+                color = self.color_scheme.point_dark if point_num % 2 == 1 else self.color_scheme.point_light
                 label_y = y_base - 5
             else:
                 x = board_x + self.half_width + self.bar_width + (i - 18) * self.point_width
                 y_base = board_y
                 y_tip = y_base + self.point_height
-                color = self.color_scheme.point_light if i % 2 == 0 else self.color_scheme.point_dark
+                color = self.color_scheme.point_dark if point_num % 2 == 1 else self.color_scheme.point_light
                 label_y = y_base - 5
 
             # Draw triangle
