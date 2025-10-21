@@ -72,13 +72,15 @@ class InteractiveSession:
             click.echo(f"  3. Interactive moves (current: {'Yes' if self.settings.interactive_moves else 'No'})")
             export_display = "AnkiConnect" if self.settings.export_method == "ankiconnect" else "APKG"
             click.echo(f"  4. Export method (current: {export_display})")
-            click.echo("  5. Back to main menu")
+            gnubg_status = "Configured" if self.settings.gnubg_path else "Not configured"
+            click.echo(f"  5. Configure GnuBG path (current: {gnubg_status})")
+            click.echo("  6. Back to main menu")
             click.echo()
 
             choice = click.prompt(
                 click.style("Choose an option", fg='green'),
                 type=str,
-                default='5'
+                default='6'
             )
 
             if choice == '1':
@@ -90,6 +92,8 @@ class InteractiveSession:
             elif choice == '4':
                 self.change_export_method()
             elif choice == '5':
+                self.configure_gnubg_path()
+            elif choice == '6':
                 break
             else:
                 click.echo(click.style("\n  Invalid choice. Please try again.\n", fg='red'))
@@ -213,6 +217,59 @@ class InteractiveSession:
         click.echo(click.style(f"  (Saved as default)", fg='cyan'))
         click.echo()
 
+    def configure_gnubg_path(self):
+        """Allow user to configure GnuBG executable path."""
+        from pathlib import Path
+
+        click.echo()
+        click.echo(click.style("=" * 60, fg='cyan'))
+        click.echo(click.style("  GnuBG Configuration", fg='cyan', bold=True))
+        click.echo(click.style("=" * 60, fg='cyan'))
+        click.echo()
+        click.echo("GnuBG enables analysis of positions when you only have XGID/GNUID")
+        click.echo("(without full XG analysis text).")
+        click.echo()
+
+        if self.settings.gnubg_path:
+            click.echo(f"Current path: {self.settings.gnubg_path}")
+            if self.settings.is_gnubg_available():
+                click.echo(click.style("  Status: Available", fg='green'))
+            else:
+                click.echo(click.style("  Status: Path not found or not executable", fg='yellow'))
+        else:
+            click.echo("Not currently configured (optional)")
+
+        click.echo()
+        click.echo("Enter the path to gnubg-cli.exe (or gnubg on macOS/Linux)")
+        click.echo("Leave blank to clear/skip configuration")
+        click.echo()
+
+        path_input = click.prompt(
+            click.style("GnuBG path", fg='green'),
+            default=self.settings.gnubg_path or "",
+            type=str,
+            show_default=False
+        )
+
+        if path_input:
+            path_obj = Path(path_input)
+            if path_obj.exists():
+                self.settings.gnubg_path = str(path_obj.absolute())
+                click.echo()
+                click.echo(click.style("  GnuBG path saved!", fg='green'))
+                click.echo(click.style(f"  (Saved as default)", fg='cyan'))
+            else:
+                click.echo()
+                click.echo(click.style(f"  Warning: Path not found: {path_input}", fg='yellow'))
+                click.echo(click.style(f"  Path saved anyway (you can fix it later)", fg='cyan'))
+                self.settings.gnubg_path = path_input
+        else:
+            self.settings.gnubg_path = None
+            click.echo()
+            click.echo(click.style("  GnuBG path cleared", fg='cyan'))
+
+        click.echo()
+
     def show_help(self):
         """Show help information."""
         click.echo()
@@ -305,6 +362,10 @@ class InteractiveSession:
             click.echo(click.style(f"\nError parsing positions: {e}", fg='red'))
             return
 
+        # Enrich positions with GnuBG analysis if available and needed
+        if self.settings.is_gnubg_available():
+            decisions = self._enrich_with_gnubg(decisions)
+
         # Export
         # Note: show_options is passed as-is, where True means show text options (image_choices=False)
         # The export functions will handle this correctly
@@ -341,14 +402,28 @@ class InteractiveSession:
             if not lines:
                 return False
             text = "\n".join(trim_trailing_empty_lines(lines)).strip()
-            # Check for XGID and either:
-            # - Checker play: has 'eq:' in move lines
-            # - Cube decision: has 'Cubeful Equities:' or 'Best Cube action:' or both 'Double' and 'Take'/'Pass'
+
+            # Check for XGID
             has_xgid = 'XGID=' in text
-            has_checker_play = 'eq:' in text
+
+            # Check for GNUID format (base64 pattern with colon separator)
+            import re
+            has_gnuid = bool(re.match(r'^[A-Za-z0-9+/=]+:[A-Za-z0-9+/=]+$', text.strip()))
+
+            # Check for analysis text
+            has_checker_play = 'eq:' in text or 'Eq:' in text
             has_cube_decision = ('Cubeful Equities:' in text or
+                               'cubeful equities:' in text or
                                'Best Cube action:' in text or
+                               'Proper cube action:' in text or
                                ('Double' in text and ('Take' in text or 'Pass' in text or 'Drop' in text)))
+
+            # With gnubg configured, XGID-only or GNUID-only is complete
+            if self.settings.is_gnubg_available():
+                if has_xgid or has_gnuid:
+                    return True
+
+            # Standard: need XGID + analysis
             return has_xgid and (has_checker_play or has_cube_decision)
 
         def finalize_current_position(announce: bool = True) -> bool:
@@ -496,6 +571,63 @@ class InteractiveSession:
             click.echo()
             click.echo(click.style("Press Enter to continue...", fg='yellow'), nl=False)
             input()
+
+    def _enrich_with_gnubg(self, decisions: List[Decision]) -> List[Decision]:
+        """
+        Enrich decisions with GnuBG analysis if they lack candidate moves.
+
+        Args:
+            decisions: List of Decision objects to enrich
+
+        Returns:
+            List of Decision objects with GnuBG analysis added where needed
+        """
+        from xg2anki.utils.gnubg_analyzer import GNUBGAnalyzer
+        from xg2anki.parsers.gnubg_parser import GNUBGParser
+
+        enriched_decisions = []
+        positions_analyzed = 0
+
+        for decision in decisions:
+            # Check if decision needs analysis
+            if (not decision.candidate_moves or len(decision.candidate_moves) == 0) and decision.xgid:
+                try:
+                    if positions_analyzed == 0:
+                        click.echo()
+                        click.echo(click.style(f"Analyzing positions with GnuBG (ply {self.settings.gnubg_analysis_ply})...", fg='cyan'))
+
+                    # Create analyzer
+                    analyzer = GNUBGAnalyzer(
+                        gnubg_path=self.settings.gnubg_path,
+                        analysis_ply=self.settings.gnubg_analysis_ply
+                    )
+
+                    # Analyze position
+                    gnubg_output, decision_type = analyzer.analyze_position(decision.xgid)
+
+                    # Parse gnubg output
+                    enriched_decision = GNUBGParser.parse_analysis(
+                        gnubg_output,
+                        decision.xgid,
+                        decision_type
+                    )
+
+                    enriched_decisions.append(enriched_decision)
+                    positions_analyzed += 1
+                    click.echo(click.style(f"  Position {positions_analyzed} analyzed", fg='green'))
+
+                except Exception as e:
+                    click.echo(click.style(f"  Warning: Failed to analyze position: {e}", fg='yellow'))
+                    # Keep original decision without analysis
+                    enriched_decisions.append(decision)
+            else:
+                # Decision already has analysis
+                enriched_decisions.append(decision)
+
+        if positions_analyzed > 0:
+            click.echo(click.style(f"  Total analyzed: {positions_analyzed} position(s)", fg='green'))
+
+        return enriched_decisions
 
 
 def run_interactive():

@@ -5,6 +5,7 @@ Handles loading and saving user preferences such as color scheme selection.
 """
 
 import json
+import os
 from pathlib import Path
 from typing import Optional
 
@@ -18,6 +19,8 @@ class Settings:
         "show_options": True,
         "interactive_moves": True,
         "export_method": "ankiconnect",
+        "gnubg_path": None,
+        "gnubg_analysis_ply": 2,
     }
 
     def __init__(self, config_path: Optional[Path] = None):
@@ -118,6 +121,42 @@ class Settings:
     def export_method(self, value: str) -> None:
         """Set the default export method."""
         self.set("export_method", value)
+
+    @property
+    def gnubg_path(self) -> Optional[str]:
+        """Get the GnuBG executable path."""
+        return self._settings.get("gnubg_path", None)
+
+    @gnubg_path.setter
+    def gnubg_path(self, value: Optional[str]) -> None:
+        """Set the GnuBG executable path."""
+        self.set("gnubg_path", value)
+
+    @property
+    def gnubg_analysis_ply(self) -> int:
+        """Get the GnuBG analysis depth (ply)."""
+        return self._settings.get("gnubg_analysis_ply", 2)
+
+    @gnubg_analysis_ply.setter
+    def gnubg_analysis_ply(self, value: int) -> None:
+        """Set the GnuBG analysis depth (ply)."""
+        self.set("gnubg_analysis_ply", value)
+
+    def is_gnubg_available(self) -> bool:
+        """
+        Check if GnuBG is configured and accessible.
+
+        Returns:
+            True if gnubg_path is set and the file exists and is executable.
+        """
+        path = self.gnubg_path
+        if path is None:
+            return False
+        try:
+            path_obj = Path(path)
+            return path_obj.exists() and os.access(path, os.X_OK)
+        except (OSError, ValueError):
+            return False
 
 
 # Global settings instance

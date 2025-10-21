@@ -85,8 +85,9 @@ class XGTextParser:
 
         # Parse move analysis
         moves = XGTextParser._parse_moves(analysis_section)
-        if not moves:
-            return None
+        # Note: Allow empty moves for XGID-only positions (gnubg can analyze them later)
+        # if not moves:
+        #     return None
 
         # Parse global winning chances (for cube decisions)
         winning_chances = XGTextParser._parse_winning_chances(analysis_section)

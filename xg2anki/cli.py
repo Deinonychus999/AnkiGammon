@@ -52,12 +52,29 @@ from xg2anki.settings import get_settings
     help='Enable interactive move visualization (clickable moves in analysis table)'
 )
 @click.option(
+    '--gnubg-path',
+    type=click.Path(),
+    default=None,
+    help='Path to gnubg-cli.exe (overrides saved preference)'
+)
+@click.option(
+    '--gnubg-ply',
+    type=int,
+    default=None,
+    help='GnuBG analysis depth in plies (default: 2)'
+)
+@click.option(
+    '--use-gnubg',
+    is_flag=True,
+    help='Use GnuBG to analyze positions without XG analysis'
+)
+@click.option(
     '--interactive',
     '-i',
     is_flag=True,
     help='Run in interactive mode (default when no input file provided)'
 )
-def main(input_file, format, output, deck_name, show_options, input_format, color_scheme, interactive_moves, interactive):
+def main(input_file, format, output, deck_name, show_options, input_format, color_scheme, interactive_moves, gnubg_path, gnubg_ply, use_gnubg, interactive):
     """
     Convert eXtreme Gammon (XG) positions/analysis into Anki flashcards.
 
@@ -89,9 +106,16 @@ def main(input_file, format, output, deck_name, show_options, input_format, colo
     click.echo(f"XG2Anki - Converting backgammon analysis to Anki flashcards...")
     click.echo()
 
+    # Apply gnubg settings from CLI if provided
+    settings = get_settings()
+    if gnubg_path:
+        settings.gnubg_path = gnubg_path
+    if gnubg_ply:
+        settings.gnubg_analysis_ply = gnubg_ply
+
     # Parse input
     try:
-        decisions = parse_input(input_file, input_format)
+        decisions = parse_input(input_file, input_format, use_gnubg, settings)
         if not decisions:
             click.echo("Error: No decisions found in input file", err=True)
             sys.exit(1)
@@ -132,13 +156,80 @@ def main(input_file, format, output, deck_name, show_options, input_format, colo
     click.echo("Done!")
 
 
-def parse_input(input_file: str, input_format: str):
+def parse_input(input_file: str, input_format: str, use_gnubg: bool = False, settings=None):
     """Parse input file and return list of decisions."""
+    from xg2anki.settings import get_settings
+
+    if settings is None:
+        settings = get_settings()
+
     input_path = Path(input_file)
 
     # Always use XGTextParser (format detection happens within parser)
     click.echo(f"Reading input (XG text format)...")
-    return XGTextParser.parse_file(str(input_path))
+    decisions = XGTextParser.parse_file(str(input_path))
+
+    # If gnubg is enabled, enrich positions without analysis
+    if use_gnubg and settings.is_gnubg_available():
+        decisions = _enrich_with_gnubg_analysis(decisions, settings)
+    elif use_gnubg and not settings.is_gnubg_available():
+        click.echo(click.style("Warning: --use-gnubg specified but GnuBG not configured or not found", fg='yellow'))
+        click.echo(click.style("  Use --gnubg-path to specify path or configure in interactive mode", fg='yellow'))
+
+    return decisions
+
+
+def _enrich_with_gnubg_analysis(decisions, settings):
+    """
+    For decisions without moves, use gnubg to generate analysis.
+
+    Detects XGID-only positions by checking:
+    - decision.candidate_moves is empty or None
+    - decision.xgid is present
+    """
+    from xg2anki.utils.gnubg_analyzer import GNUBGAnalyzer
+    from xg2anki.parsers.gnubg_parser import GNUBGParser
+
+    enriched_decisions = []
+    positions_analyzed = 0
+
+    for decision in decisions:
+        # Check if decision needs analysis
+        if (not decision.candidate_moves or len(decision.candidate_moves) == 0) and decision.xgid:
+            try:
+                click.echo(f"  Analyzing position with GnuBG (ply {settings.gnubg_analysis_ply})...")
+
+                # Create analyzer
+                analyzer = GNUBGAnalyzer(
+                    gnubg_path=settings.gnubg_path,
+                    analysis_ply=settings.gnubg_analysis_ply
+                )
+
+                # Analyze position
+                gnubg_output, decision_type = analyzer.analyze_position(decision.xgid)
+
+                # Parse gnubg output
+                enriched_decision = GNUBGParser.parse_analysis(
+                    gnubg_output,
+                    decision.xgid,
+                    decision_type
+                )
+
+                enriched_decisions.append(enriched_decision)
+                positions_analyzed += 1
+
+            except Exception as e:
+                click.echo(click.style(f"  Warning: Failed to analyze position with GnuBG: {e}", fg='yellow'))
+                # Keep original decision without analysis
+                enriched_decisions.append(decision)
+        else:
+            # Decision already has analysis
+            enriched_decisions.append(decision)
+
+    if positions_analyzed > 0:
+        click.echo(click.style(f"  GnuBG analyzed {positions_analyzed} position(s)", fg='green'))
+
+    return enriched_decisions
 
 
 def export_apkg(decisions, output_dir, deck_name, show_options, color_scheme="classic", interactive_moves=False):
