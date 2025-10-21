@@ -74,7 +74,13 @@ from xg2anki.settings import get_settings
     is_flag=True,
     help='Run in interactive mode (default when no input file provided)'
 )
-def main(input_file, format, output, deck_name, show_options, input_format, color_scheme, interactive_moves, gnubg_path, gnubg_ply, use_gnubg, interactive):
+@click.option(
+    '--gui',
+    '-g',
+    is_flag=True,
+    help='Launch graphical user interface (GUI mode)'
+)
+def main(input_file, format, output, deck_name, show_options, input_format, color_scheme, interactive_moves, gnubg_path, gnubg_ply, use_gnubg, interactive, gui):
     """
     Convert eXtreme Gammon (XG) positions/analysis into Anki flashcards.
 
@@ -97,6 +103,11 @@ def main(input_file, format, output, deck_name, show_options, input_format, colo
         # Generate APKG file instead
         xg2anki analysis.json --format apkg
     """
+    # Launch GUI mode if requested
+    if gui:
+        from xg2anki.gui import run_gui
+        sys.exit(run_gui())
+
     # Launch interactive mode if no input file provided
     if not input_file or interactive:
         from xg2anki.interactive import run_interactive

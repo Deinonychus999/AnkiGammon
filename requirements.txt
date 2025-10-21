@@ -7,3 +7,7 @@ requests>=2.31.0
 # CLI
 click>=8.1.0
 colorama>=0.4.6
+
+# GUI dependencies
+PySide6>=6.6.0
+PySide6-Addons>=6.6.0
