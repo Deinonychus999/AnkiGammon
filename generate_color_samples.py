@@ -1,9 +1,9 @@
 """Generate sample board PNGs for each color scheme."""
 
 from pathlib import Path
-from flashgammon.models import Position, Player, CubeState
-from flashgammon.renderer.svg_board_renderer import SVGBoardRenderer
-from flashgammon.renderer.color_schemes import SCHEMES
+from ankigammon.models import Position, Player, CubeState
+from ankigammon.renderer.svg_board_renderer import SVGBoardRenderer
+from ankigammon.renderer.color_schemes import SCHEMES
 from html2image import Html2Image
 import os
 

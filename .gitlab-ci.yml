@@ -1,4 +1,4 @@
-# GitLab CI/CD Pipeline for FlashGammon
+# GitLab CI/CD Pipeline for AnkiGammon
 # Automatically builds Windows executable
 #
 # ℹ️ INFO:
@@ -20,13 +20,13 @@ build:windows:
     - pip install -r requirements.txt
     - pip install pyinstaller
   script:
-    - pyinstaller flashgammon.spec
+    - pyinstaller ankigammon.spec
     - cd dist
-    - Compress-Archive -Path flashgammon.exe -DestinationPath flashgammon-windows.zip
+    - Compress-Archive -Path ankigammon.exe -DestinationPath ankigammon-windows.zip
   artifacts:
-    name: "flashgammon-windows-${CI_COMMIT_SHORT_SHA}"
+    name: "ankigammon-windows-${CI_COMMIT_SHORT_SHA}"
     paths:
-      - dist/flashgammon-windows.zip
+      - dist/ankigammon-windows.zip
     expire_in: 1 week
   only:
     - main
@@ -43,11 +43,11 @@ release:
     - echo "Creating release for $CI_COMMIT_TAG"
   release:
     name: 'Release $CI_COMMIT_TAG'
-    description: 'FlashGammon release $CI_COMMIT_TAG - Download Windows executable below. For macOS/Linux, build from source (see README.md).'
+    description: 'AnkiGammon release $CI_COMMIT_TAG - Download Windows executable below. For macOS/Linux, build from source (see README.md).'
     tag_name: '$CI_COMMIT_TAG'
     assets:
       links:
         - name: 'Windows Executable (ZIP)'
-          url: '${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/raw/dist/flashgammon-windows.zip?job=build:windows'
+          url: '${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/raw/dist/ankigammon-windows.zip?job=build:windows'
   only:
     - tags

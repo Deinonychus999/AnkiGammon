@@ -21,7 +21,7 @@ wheels/
 *.egg
 MANIFEST
 *.manifest
-# Keep flashgammon.spec (PyInstaller config) - don't ignore it!
+# Keep ankigammon.spec (PyInstaller config) - don't ignore it!
 # *.spec
 
 # Virtual environments

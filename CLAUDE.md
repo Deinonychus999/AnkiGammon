@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-FlashGammon converts eXtreme Gammon (XG) backgammon analysis into Anki flashcards. The application parses XG text exports containing position analysis, renders board positions as images, and creates flashcards with multiple-choice questions about the best move.
+AnkiGammon converts eXtreme Gammon (XG) backgammon analysis into Anki flashcards. The application parses XG text exports containing position analysis, renders board positions as images, and creates flashcards with multiple-choice questions about the best move.
 
 ## Commands
 
@@ -15,10 +15,10 @@ FlashGammon converts eXtreme Gammon (XG) backgammon analysis into Anki flashcard
 pip install -r requirements.txt
 
 # Run the application (interactive mode)
-python -m flashgammon
+python -m ankigammon
 
 # Run with file input
-python -m flashgammon analysis.txt
+python -m ankigammon analysis.txt
 
 # Run tests
 python -m unittest tests/test_basic.py
@@ -35,8 +35,8 @@ pip install pyinstaller
 rm -rf build dist
 
 # Build executable
-pyinstaller flashgammon.spec
-# Creates dist/flashgammon.exe
+pyinstaller ankigammon.spec
+# Creates dist/ankigammon.exe
 ```
 
 **macOS/Linux:**
@@ -48,14 +48,14 @@ pip install pyinstaller
 rm -rf build dist
 
 # Build executable
-pyinstaller flashgammon-mac.spec
-# Creates dist/flashgammon
+pyinstaller ankigammon-mac.spec
+# Creates dist/ankigammon
 ```
 
 **Note:** The `build_executable.bat` and `build_executable.sh` scripts exist for end users, but Claude Code should use the PyInstaller commands above.
 
 **Build Output:**
-- Executable: `dist/flashgammon.exe` (Windows) or `dist/flashgammon` (macOS/Linux)
+- Executable: `dist/ankigammon.exe` (Windows) or `dist/ankigammon` (macOS/Linux)
 - Build artifacts: `build/` directory (can be deleted)
 - Size: ~16MB (includes Python runtime and all dependencies)
 - No Python installation required on target machine
@@ -224,7 +224,7 @@ The card back shows moves in **XG's original order** (not shuffled MCQ order):
 - **`anki/apkg_exporter.py`**: Generates .apkg files using genanki
 - **`cli.py`**: Command-line interface with `--color-scheme` option
 - **`interactive.py`**: Interactive mode for collecting positions with color scheme selection
-- **`settings.py`**: Settings persistence (saves user preferences like color scheme to `~/.flashgammon/config.json`)
+- **`settings.py`**: Settings persistence (saves user preferences like color scheme to `~/.ankigammon/config.json`)
 
 #### Color Schemes (renderer/color_schemes.py)
 
@@ -249,13 +249,13 @@ Each `ColorScheme` dataclass defines 10 colors:
 - `bearoff` - Bear-off tray background
 
 **Usage:**
-- In CLI: `python -m flashgammon --color-scheme ocean analysis.txt`
+- In CLI: `python -m ankigammon --color-scheme ocean analysis.txt`
 - In interactive mode: Options menu (option 2 from main menu)
-- User's selection is saved to `~/.flashgammon/config.json` and persisted across sessions
+- User's selection is saved to `~/.ankigammon/config.json` and persisted across sessions
 
 #### Settings Persistence (settings.py)
 
-User preferences are automatically saved to `~/.flashgammon/config.json`:
+User preferences are automatically saved to `~/.ankigammon/config.json`:
 
 **Saved Settings:**
 - `default_color_scheme` - Last selected color scheme (default: "classic")
@@ -266,7 +266,7 @@ User preferences are automatically saved to `~/.flashgammon/config.json`:
 
 **Settings API:**
 ```python
-from flashgammon.settings import get_settings
+from ankigammon.settings import get_settings
 
 settings = get_settings()
 settings.color_scheme = "forest"  # Automatically saved
@@ -328,14 +328,14 @@ ogid = position.to_ogid(...)
 gnuid = position.to_gnuid(...)
 
 # Auto-detect format in GUI
-from flashgammon.gui.format_detector import FormatDetector
+from ankigammon.gui.format_detector import FormatDetector
 result = FormatDetector.detect(user_input)
 ```
 
 ### Working with Settings
 
 Always use the global settings instance via `get_settings()`:
-- Automatically loads from `~/.flashgammon/config.json`
+- Automatically loads from `~/.ankigammon/config.json`
 - Changes are immediately persisted to disk
 - Thread-safe singleton pattern
 - Gracefully handles missing/corrupted config files

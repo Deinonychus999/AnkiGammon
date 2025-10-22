@@ -5,7 +5,7 @@ import tempfile
 import json
 from pathlib import Path
 
-from flashgammon.settings import Settings
+from ankigammon.settings import Settings
 
 
 class TestSettings(unittest.TestCase):

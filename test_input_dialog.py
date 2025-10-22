@@ -11,8 +11,8 @@ Tests:
 
 import sys
 from PySide6.QtWidgets import QApplication
-from flashgammon.settings import get_settings
-from flashgammon.gui.dialogs import InputDialog
+from ankigammon.settings import get_settings
+from ankigammon.gui.dialogs import InputDialog
 
 # Sample XG analysis (full)
 SAMPLE_FULL_ANALYSIS = """XGID=--BBBBB-AB----a--cbdbBb-a-:1:1:1:65:0:0:2:0:10
@@ -85,7 +85,7 @@ def test_full_analysis_detection():
     """Test detection of full XG analysis."""
     print("Testing full XG analysis detection...")
 
-    from flashgammon.gui.format_detector import FormatDetector, InputFormat
+    from ankigammon.gui.format_detector import FormatDetector, InputFormat
 
     settings = get_settings()
     detector = FormatDetector(settings)
@@ -107,7 +107,7 @@ def test_position_ids_detection():
     """Test detection of position IDs only (XGID format)."""
     print("Testing XGID position IDs detection...")
 
-    from flashgammon.gui.format_detector import FormatDetector, InputFormat
+    from ankigammon.gui.format_detector import FormatDetector, InputFormat
 
     settings = get_settings()
     detector = FormatDetector(settings)
@@ -129,7 +129,7 @@ def test_ogid_detection():
     """Test detection of OGID position IDs."""
     print("Testing OGID position IDs detection...")
 
-    from flashgammon.gui.format_detector import FormatDetector, InputFormat
+    from ankigammon.gui.format_detector import FormatDetector, InputFormat
 
     settings = get_settings()
     detector = FormatDetector(settings)
@@ -152,7 +152,7 @@ def test_gnuid_detection():
     """Test detection of GNUID position IDs."""
     print("Testing GNUID position IDs detection...")
 
-    from flashgammon.gui.format_detector import FormatDetector, InputFormat
+    from ankigammon.gui.format_detector import FormatDetector, InputFormat
 
     settings = get_settings()
     detector = FormatDetector(settings)
@@ -175,7 +175,7 @@ def test_mixed_formats_detection():
     """Test detection of mixed position formats (XGID, OGID, GNUID in one input)."""
     print("Testing mixed format detection...")
 
-    from flashgammon.gui.format_detector import FormatDetector, InputFormat
+    from ankigammon.gui.format_detector import FormatDetector, InputFormat
 
     settings = get_settings()
     detector = FormatDetector(settings)
@@ -198,7 +198,7 @@ def test_parsing():
     """Test parsing of XG analysis."""
     print("Testing XG analysis parsing...")
 
-    from flashgammon.parsers.xg_text_parser import XGTextParser
+    from ankigammon.parsers.xg_text_parser import XGTextParser
 
     decisions = XGTextParser.parse_string(SAMPLE_FULL_ANALYSIS)
 

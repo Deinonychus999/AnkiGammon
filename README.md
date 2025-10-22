@@ -1,4 +1,4 @@
-# FlashGammon
+# AnkiGammon
 
 Convert eXtreme Gammon (XG) backgammon analysis into Anki flashcards for effective study.
 
@@ -19,38 +19,38 @@ Convert eXtreme Gammon (XG) backgammon analysis into Anki flashcards for effecti
 ### Option 1: Standalone Executable (Recommended)
 
 **Windows:**
-1. Run `build_executable.bat` to create `flashgammon.exe`
+1. Run `build_executable.bat` to create `ankigammon.exe`
 2. Double-click to run - no Python installation needed!
 
 **macOS/Linux:**
-1. Run `./build_executable.sh` to create `flashgammon`
-2. Run from terminal: `./dist/flashgammon` - no Python installation needed!
+1. Run `./build_executable.sh` to create `ankigammon`
+2. Run from terminal: `./dist/ankigammon` - no Python installation needed!
 3. macOS first run: Right-click → Open (or allow in System Settings → Privacy & Security)
 
 ### Option 2: Development Install
 
 ```bash
-git clone https://github.com/yourusername/flashgammon.git
-cd flashgammon
+git clone https://github.com/yourusername/ankigammon.git
+cd ankigammon
 pip install -r requirements.txt
-python -m flashgammon
+python -m ankigammon
 ```
 
 ## Quick Start
 
 ### Interactive Mode (Easiest)
 ```bash
-flashgammon
+ankigammon
 ```
 Then paste XG positions when prompted.
 
 ### File-Based Mode
 ```bash
 # Push directly to Anki (requires AnkiConnect addon)
-flashgammon analysis.txt
+ankigammon analysis.txt
 
 # Or generate APKG file
-flashgammon analysis.txt --format apkg
+ankigammon analysis.txt --format apkg
 ```
 
 ## Getting Positions from XG
@@ -58,7 +58,7 @@ flashgammon analysis.txt --format apkg
 1. In eXtreme Gammon, analyze a position
 2. Press Ctrl+C to copy the analysis
 3. Paste into a text file or interactive mode
-4. Run flashgammon
+4. Run ankigammon
 
 **Example XG export format:**
 ```
@@ -77,7 +77,7 @@ Score is X:3 O:4 5 pt.(s) match.
 
 ## Supported Position Formats
 
-FlashGammon supports three backgammon position ID formats, with automatic detection:
+AnkiGammon supports three backgammon position ID formats, with automatic detection:
 
 ### XGID (eXtreme Gammon ID) - Primary Format
 **Format:** `XGID=PPPPPPPPPPPPPPPPPPPPPPPPPP:CV:CP:T:D:S1:S2:CJ:ML:MC`
@@ -113,7 +113,7 @@ Compact format used by GNU Backgammon. 14-character Position ID + 12-character M
 
 ### Format Detection
 
-The application **automatically detects** which format you're using. Just paste your position and FlashGammon will handle it:
+The application **automatically detects** which format you're using. Just paste your position and AnkiGammon will handle it:
 - XGID: Detected by `XGID=` prefix
 - OGID: Detected by base-26 pattern with colons
 - GNUID: Detected by base64 pattern
@@ -126,7 +126,7 @@ You can mix formats in the same input - each position can use a different format
 
 Push cards directly to running Anki:
 ```bash
-python -m flashgammon analysis.txt
+python -m ankigammon analysis.txt
 ```
 
 **Prerequisites:**
@@ -142,7 +142,7 @@ python -m flashgammon analysis.txt
 
 Generate a package file for manual import:
 ```bash
-python -m flashgammon analysis.txt --format apkg
+python -m ankigammon analysis.txt --format apkg
 ```
 
 Import into Anki: File → Import → Select the .apkg file
@@ -150,7 +150,7 @@ Import into Anki: File → Import → Select the .apkg file
 ## Command-Line Options
 
 ```
-Usage: flashgammon [OPTIONS] [INPUT_FILE]
+Usage: ankigammon [OPTIONS] [INPUT_FILE]
 
 Options:
   --format [ankiconnect|apkg]   Output format (default: ankiconnect)
@@ -180,19 +180,19 @@ Each XG position becomes one Anki card:
 
 ```bash
 # Interactive mode
-python -m flashgammon
+python -m ankigammon
 
 # Push to Anki (default)
-python -m flashgammon positions.txt
+python -m ankigammon positions.txt
 
 # Generate APKG file
-python -m flashgammon positions.txt --format apkg
+python -m ankigammon positions.txt --format apkg
 
 # Custom deck name
-python -m flashgammon positions.txt --deck-name "Opening Plays"
+python -m ankigammon positions.txt --deck-name "Opening Plays"
 
 # Show text options on front
-python -m flashgammon positions.txt --show-options
+python -m ankigammon positions.txt --show-options
 ```
 
 ## Troubleshooting
@@ -238,7 +238,7 @@ pip install pyinstaller
 rmdir /s /q build dist
 
 # Build
-pyinstaller flashgammon.spec
+pyinstaller ankigammon.spec
 ```
 
 macOS/Linux:
@@ -250,10 +250,10 @@ pip3 install pyinstaller
 rm -rf build dist
 
 # Build
-pyinstaller flashgammon-mac.spec
+pyinstaller ankigammon-mac.spec
 
 # Remove quarantine attribute (macOS only)
-xattr -cr dist/flashgammon
+xattr -cr dist/ankigammon
 ```
 
 ### Testing Builds
@@ -264,66 +264,66 @@ Windows:
 ```bash
 # Test the executable works
 cd dist
-flashgammon.exe --help
+ankigammon.exe --help
 
 # Test interactive mode
-flashgammon.exe
+ankigammon.exe
 
 # Test with a sample file
-flashgammon.exe ..\examples\example_xg_export.txt
+ankigammon.exe ..\examples\example_xg_export.txt
 ```
 
 macOS/Linux:
 ```bash
 # Test the executable works
 cd dist
-./flashgammon --help
+./ankigammon --help
 
 # Test interactive mode
-./flashgammon
+./ankigammon
 
 # Test with a sample file
-./flashgammon ../examples/example_xg_export.txt
+./ankigammon ../examples/example_xg_export.txt
 ```
 
 ### Project Structure
 
-- `flashgammon/` - Main package code
+- `ankigammon/` - Main package code
   - `parsers/` - XG text format parsers
   - `renderer/` - Board image generation
   - `anki/` - Anki card generation and export
   - `utils/` - Position format encoding/decoding (XGID, OGID, GNUID)
   - `gui/` - GUI components and format detection
 - `tests/` - Unit tests (includes tests for all three formats)
-- `flashgammon.spec` - PyInstaller configuration
+- `ankigammon.spec` - PyInstaller configuration
 - `build_executable.bat/.sh` - Build scripts
 
 ### Settings Storage
 
 User preferences (color scheme, deck name, etc.) are stored in:
-- Windows: `C:\Users\YourName\.flashgammon\config.json`
-- macOS: `~/.flashgammon/config.json`
-- Linux: `~/.flashgammon/config.json`
+- Windows: `C:\Users\YourName\.ankigammon\config.json`
+- macOS: `~/.ankigammon/config.json`
+- Linux: `~/.ankigammon/config.json`
 
 This ensures settings persist even when using the standalone executable.
 
 ### Troubleshooting Build Issues
 
 **ImportError during build:**
-- Add missing module to `hiddenimports` in `flashgammon.spec`
+- Add missing module to `hiddenimports` in `ankigammon.spec`
 
 **"Module not found" when running executable:**
 - Check the module is in `hiddenimports`
-- Try: `pyinstaller --collect-all flashgammon flashgammon.spec`
+- Try: `pyinstaller --collect-all ankigammon ankigammon.spec`
 
 **Executable too large:**
 - Remove unused dependencies from requirements.txt
-- Add more items to `excludes` in flashgammon.spec
+- Add more items to `excludes` in ankigammon.spec
 
 **Executable won't run:**
 - Test on clean machine without Python installed
 - Check Windows Defender / antivirus isn't blocking it
-- Look at build warnings: `pyinstaller flashgammon.spec > build.log 2>&1`
+- Look at build warnings: `pyinstaller ankigammon.spec > build.log 2>&1`
 
 **Platform-Specific Issues:**
 
@@ -336,11 +336,11 @@ macOS:
 - First run may show "cannot be opened because it is from an unidentified developer"
 - Solution 1: Right-click executable → Open → Open anyway
 - Solution 2: System Settings → Privacy & Security → Allow anyway
-- Solution 3: Remove quarantine: `xattr -cr dist/flashgammon`
+- Solution 3: Remove quarantine: `xattr -cr dist/ankigammon`
 - For distribution: Sign with Apple Developer certificate and notarize
 
 Linux:
-- Ensure executable has execute permissions: `chmod +x flashgammon`
+- Ensure executable has execute permissions: `chmod +x ankigammon`
 - May need to install dependencies on minimal systems: `sudo apt install libxcb1`
 
 ## Requirements

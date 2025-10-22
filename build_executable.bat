@@ -1,9 +1,9 @@
 @echo off
-REM Build script for creating FlashGammon Windows executable
+REM Build script for creating AnkiGammon Windows executable
 REM Run this to create a standalone .exe file
 
 echo ========================================
-echo FlashGammon Executable Builder
+echo AnkiGammon Executable Builder
 echo ========================================
 echo.
 
@@ -27,7 +27,7 @@ if exist dist rmdir /s /q dist
 REM Build the executable
 echo.
 echo Building executable...
-pyinstaller flashgammon.spec
+pyinstaller ankigammon.spec
 
 if errorlevel 1 (
     echo.
@@ -42,7 +42,7 @@ echo ========================================
 echo Build completed successfully!
 echo ========================================
 echo.
-echo Executable location: dist\flashgammon.exe
+echo Executable location: dist\ankigammon.exe
 echo.
 echo You can now distribute this file to users.
 echo Users do NOT need Python installed.
