@@ -14,7 +14,7 @@ import qtawesome as qta
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
     QLabel, QListWidget, QListWidgetItem, QMessageBox,
-    QFrame, QSplitter, QWidget
+    QFrame, QSplitter, QWidget, QProgressDialog
 )
 from PySide6.QtCore import Qt, Signal, Slot
 from PySide6.QtWebEngineWidgets import QWebEngineView

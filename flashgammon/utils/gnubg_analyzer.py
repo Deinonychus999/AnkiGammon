@@ -192,3 +192,145 @@ class GNUBGAnalyzer:
             output += "\n" + result.stderr
 
         return output
+
+    def analyze_cube_at_score(
+        self,
+        position_id: str,
+        match_length: int,
+        player_away: int,
+        opponent_away: int
+    ) -> dict:
+        """
+        Analyze cube decision at a specific match score.
+
+        Args:
+            position_id: XGID position string
+            match_length: Match length (e.g., 7 for 7-point match)
+            player_away: Points away from match for player on roll
+            opponent_away: Points away from match for opponent
+
+        Returns:
+            Dictionary with:
+                - best_action: Best cube action (e.g., "D/T", "N/T", "D/P")
+                - equity_no_double: Equity for no double
+                - equity_double_take: Equity for double/take
+                - equity_double_pass: Equity for double/pass
+                - error_no_double: Error if don't double (when D/T or D/P is best)
+                - error_double: Error if double (when N/T is best)
+                - error_pass: Error if pass (when D/T is best)
+
+        Raises:
+            ValueError: If position_id format is invalid or analysis fails
+        """
+        from flashgammon.utils.xgid import parse_xgid, encode_xgid
+
+        # Parse original XGID to get position and metadata
+        position, metadata = parse_xgid(position_id)
+
+        # Calculate actual scores from "away" values
+        # player_away=2 means player has (match_length - 2) points
+        score_on_roll = match_length - player_away
+        score_opponent = match_length - opponent_away
+
+        # Determine which player is on roll
+        from flashgammon.models import Player
+        on_roll = metadata.get('on_roll')
+
+        # Map scores to X and O based on who's on roll
+        if on_roll == Player.O:
+            score_o = score_on_roll
+            score_x = score_opponent
+        else:
+            score_x = score_on_roll
+            score_o = score_opponent
+
+        # Create new XGID with modified match score
+        modified_xgid = encode_xgid(
+            position=position,
+            cube_value=metadata.get('cube_value', 1),
+            cube_owner=metadata.get('cube_owner'),
+            dice=None,  # Cube decision has no dice
+            on_roll=on_roll,
+            score_x=score_x,
+            score_o=score_o,
+            match_length=match_length,
+            crawford_jacoby=metadata.get('crawford_jacoby', 0),
+            max_cube=metadata.get('max_cube', 256)
+        )
+
+        # Analyze the position
+        output, decision_type = self.analyze_position(modified_xgid)
+
+        # Parse cube decision
+        from flashgammon.parsers.gnubg_parser import GNUBGParser
+        moves = GNUBGParser._parse_cube_decision(output)
+
+        if not moves:
+            raise ValueError(f"Could not parse cube decision from GnuBG output")
+
+        # Build equity map
+        equity_map = {m.notation: m.equity for m in moves}
+
+        # Find best move
+        best_move = next((m for m in moves if m.rank == 1), None)
+        if not best_move:
+            raise ValueError("Could not determine best cube action")
+
+        # Get equities for the 3 main actions
+        no_double_eq = equity_map.get("No Double/Take", None)
+        double_take_eq = equity_map.get("Double/Take", equity_map.get("Redouble/Take", None))
+        double_pass_eq = equity_map.get("Double/Pass", equity_map.get("Redouble/Pass", None))
+
+        # Simplify best action notation for display
+        best_action_simplified = self._simplify_cube_notation(best_move.notation)
+
+        # Calculate errors for wrong decisions
+        best_equity = best_move.equity
+        error_no_double = None
+        error_double = None
+        error_pass = None
+
+        if no_double_eq is not None:
+            error_no_double = abs(best_equity - no_double_eq) if best_action_simplified != "N/T" else 0.0
+        if double_take_eq is not None:
+            error_double = abs(best_equity - double_take_eq) if best_action_simplified not in ["D/T", "TG/T"] else 0.0
+        if double_pass_eq is not None:
+            error_pass = abs(best_equity - double_pass_eq) if best_action_simplified != "D/P" else 0.0
+
+        return {
+            'best_action': best_action_simplified,
+            'equity_no_double': no_double_eq,
+            'equity_double_take': double_take_eq,
+            'equity_double_pass': double_pass_eq,
+            'error_no_double': error_no_double,
+            'error_double': error_double,
+            'error_pass': error_pass
+        }
+
+    @staticmethod
+    def _simplify_cube_notation(notation: str) -> str:
+        """
+        Simplify cube notation for display in score matrix.
+
+        Args:
+            notation: Full notation (e.g., "No Double/Take", "Double/Take")
+
+        Returns:
+            Simplified notation (e.g., "N/T", "D/T", "D/P", "TG/T", "TG/P")
+        """
+        notation_lower = notation.lower()
+
+        if "too good" in notation_lower:
+            if "take" in notation_lower:
+                return "TG/T"
+            elif "pass" in notation_lower:
+                return "TG/P"
+        elif "no double" in notation_lower or "no redouble" in notation_lower:
+            return "N/T"
+        elif "double" in notation_lower or "redouble" in notation_lower:
+            if "take" in notation_lower:
+                return "D/T"
+            elif "pass" in notation_lower or "drop" in notation_lower:
+                return "D/P"
+
+        return notation

@@ -28,7 +28,8 @@ class CardGenerator:
         show_options: bool = False,
         interactive_moves: bool = False,
         renderer: Optional[SVGBoardRenderer] = None,
-        animation_controller: Optional[AnimationController] = None
+        animation_controller: Optional[AnimationController] = None,
+        progress_callback: Optional[callable] = None
     ):
         """
         Initialize the card generator.
@@ -39,6 +40,7 @@ class CardGenerator:
             interactive_moves: If True, render positions for all moves (clickable analysis)
             renderer: SVG board renderer instance (creates default if None)
             animation_controller: Animation controller instance (creates default if None)
+            progress_callback: Optional callback(message: str) for progress updates
         """
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -48,6 +50,7 @@ class CardGenerator:
         self.renderer = renderer or SVGBoardRenderer()
         self.animation_controller = animation_controller or AnimationController()
         self.settings = get_settings()
+        self.progress_callback = progress_callback
 
     def generate_card(self, decision: Decision, card_id: Optional[str] = None) -> Dict[str, any]:
         """
@@ -67,6 +70,13 @@ class CardGenerator:
         """
         if card_id is None:
             card_id = self._generate_id()
+
+        # Validate that we have candidate moves to generate a card
+        if not decision.candidate_moves:
+            raise ValueError(
+                "Cannot generate card: decision has no candidate moves. "
+                "For XGID-only input, please use GnuBG analysis to populate moves."
+            )
 
         # Generate position SVG (before move)
         position_svg = self._render_position_svg(decision)
@@ -104,6 +114,8 @@ class CardGenerator:
                 result_svg = None
         else:
             # Interactive mode: generate result SVGs for all moves (for proper number display)
+            if self.progress_callback:
+                self.progress_callback(f"Rendering board positions...")
             for candidate in candidates:
                 if candidate:
                     result_svg_for_move = self._render_resulting_position_svg(decision, candidate)
@@ -111,6 +123,8 @@ class CardGenerator:
             result_svg = None
 
         # Generate card back
+        if self.progress_callback:
+            self.progress_callback("Generating card content...")
         back_html = self._generate_back(
             decision, position_svg, result_svg, candidates, shuffled_candidates,
             answer_index, self.show_options, move_result_svgs
@@ -493,12 +507,19 @@ class CardGenerator:
     </div>
 """
 
+        # Generate score matrix for cube decisions if enabled
+        score_matrix_html = ''
+        if is_cube_decision and decision.match_length > 0 and self.settings.get('generate_score_matrix', False):
+            score_matrix_html = self._generate_score_matrix_html(decision)
+            if score_matrix_html:
+                score_matrix_html = f"\n{score_matrix_html}"
+
         html = f"""
 <div class="card-back">
 {position_viewer_html}
     <div class="metadata">{metadata}</div>
 {answer_html}
-{analysis_and_chances}
+{analysis_and_chances}{score_matrix_html}
     {self._generate_source_info(decision)}
 </div>
 """
@@ -1075,6 +1096,55 @@ class CardGenerator:
             </div>
 '''
         return html
+
+    def _generate_score_matrix_html(self, decision: Decision) -> str:
+        """
+        Generate score matrix HTML for cube decisions.
+
+        Args:
+            decision: The cube decision
+
+        Returns:
+            HTML string with score matrix, or empty string if generation fails
+        """
+        # Only generate if GnuBG is available
+        if not self.settings.is_gnubg_available():
+            return ""
+
+        try:
+            from flashgammon.analysis.score_matrix import generate_score_matrix, format_matrix_as_html
+
+            # Calculate current score (away from match)
+            current_player_away = decision.match_length - (
+                decision.score_o if decision.on_roll == Player.O else decision.score_x
+            )
+            current_opponent_away = decision.match_length - (
+                decision.score_x if decision.on_roll == Player.O else decision.score_o
+            )
+
+            # Generate matrix with progress callback
+            matrix = generate_score_matrix(
+                xgid=decision.xgid,
+                match_length=decision.match_length,
+                gnubg_path=self.settings.gnubg_path,
+                ply_level=self.settings.gnubg_analysis_ply,
+                progress_callback=self.progress_callback
+            )
+
+            # Format as HTML
+            matrix_html = format_matrix_as_html(
+                matrix=matrix,
+                current_player_away=current_player_away,
+                current_opponent_away=current_opponent_away
+            )
+
+            return matrix_html
+
+        except Exception as e:
+            # Silently fail if matrix generation fails
+            # (e.g., GnuBG not available, analysis error)
+            print(f"Warning: Failed to generate score matrix: {e}")
+            return ""
 
     def _generate_source_info(self, decision: Decision) -> str:
         """Generate source information HTML."""

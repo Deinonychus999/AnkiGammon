@@ -178,7 +178,7 @@ QProgressBar {
     border-radius: 6px;
     text-align: center;
     background-color: #181825;
-    color: #cdd6f4;
+    color: #1e1e2e;
     font-weight: 600;
     height: 24px;
 }

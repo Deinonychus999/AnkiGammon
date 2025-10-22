@@ -120,6 +120,7 @@ class SettingsDialog(QDialog):
         self.original_settings.export_method = settings.export_method
         self.original_settings.gnubg_path = settings.gnubg_path
         self.original_settings.gnubg_analysis_ply = settings.gnubg_analysis_ply
+        self.original_settings.generate_score_matrix = settings.generate_score_matrix
 
         # Validation worker
         self.validation_worker: Optional[GnuBGValidationWorker] = None
@@ -210,6 +211,10 @@ class SettingsDialog(QDialog):
         self.cmb_gnubg_ply.addItems(["0", "1", "2", "3"])
         form.addRow("Analysis Depth (ply):", self.cmb_gnubg_ply)
 
+        # Score matrix generation
+        self.chk_generate_score_matrix = QCheckBox("Generate score matrix for cube decisions")
+        form.addRow(self.chk_generate_score_matrix)
+
         # Status label
         self.lbl_gnubg_status = QLabel()
         form.addRow("Status:", self.lbl_gnubg_status)
@@ -235,6 +240,7 @@ class SettingsDialog(QDialog):
         if self.settings.gnubg_path:
             self.txt_gnubg_path.setText(self.settings.gnubg_path)
         self.cmb_gnubg_ply.setCurrentIndex(self.settings.gnubg_analysis_ply)
+        self.chk_generate_score_matrix.setChecked(self.settings.generate_score_matrix)
         self._update_gnubg_status()
 
     def _browse_gnubg(self):
@@ -309,6 +315,7 @@ class SettingsDialog(QDialog):
         self.settings.interactive_moves = self.chk_interactive_moves.isChecked()
         self.settings.gnubg_path = self.txt_gnubg_path.text() or None
         self.settings.gnubg_analysis_ply = self.cmb_gnubg_ply.currentIndex()
+        self.settings.generate_score_matrix = self.chk_generate_score_matrix.isChecked()
 
         # Emit signal
         self.settings_changed.emit(self.settings)

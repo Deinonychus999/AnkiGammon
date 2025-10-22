@@ -62,7 +62,8 @@ class ApkgExporter:
         output_file: str = "xg_deck.apkg",
         show_options: bool = False,
         color_scheme: str = "classic",
-        interactive_moves: bool = False
+        interactive_moves: bool = False,
+        progress_callback: callable = None
     ) -> str:
         """
         Export decisions to an APKG file.
@@ -73,6 +74,7 @@ class ApkgExporter:
             show_options: Show multiple choice options (text-based)
             color_scheme: Board color scheme name
             interactive_moves: Enable interactive move visualization
+            progress_callback: Optional callback(message: str) for progress updates
 
         Returns:
             Path to generated APKG file
@@ -89,11 +91,14 @@ class ApkgExporter:
             output_dir=self.output_dir,
             show_options=show_options,
             interactive_moves=interactive_moves,
-            renderer=renderer
+            renderer=renderer,
+            progress_callback=progress_callback
         )
 
         # Generate cards
         for i, decision in enumerate(decisions):
+            if progress_callback:
+                progress_callback(f"Position {i+1}/{len(decisions)}: Starting...")
             card_data = card_gen.generate_card(decision, card_id=f"card_{i}")
 
             # Create note

@@ -17,6 +17,66 @@ from flashgammon.anki.card_generator import CardGenerator
 from flashgammon.renderer.svg_board_renderer import SVGBoardRenderer
 from flashgammon.renderer.color_schemes import SCHEMES
 from flashgammon.settings import Settings
+from flashgammon.utils.gnubg_analyzer import GNUBGAnalyzer
+from flashgammon.parsers.gnubg_parser import GNUBGParser
+
+
+class AnalysisWorker(QThread):
+    """
+    Background thread for GnuBG analysis of positions.
+
+    Signals:
+        progress(int, int): current, total
+        status_message(str): status update
+        finished(bool, str, List[Decision]): success, message, analyzed_decisions
+    """
+
+    progress = Signal(int, int)
+    status_message = Signal(str)
+    finished = Signal(bool, str, list)
+
+    def __init__(self, decisions: List[Decision], settings: Settings):
+        super().__init__()
+        self.decisions = decisions
+        self.settings = settings
+
+    def run(self):
+        """Analyze positions with GnuBG in background."""
+        try:
+            analyzer = GNUBGAnalyzer(
+                gnubg_path=self.settings.gnubg_path,
+                analysis_ply=self.settings.gnubg_analysis_ply
+            )
+
+            # Find positions that need analysis
+            positions_to_analyze = [(i, d) for i, d in enumerate(self.decisions) if not d.candidate_moves]
+            total = len(positions_to_analyze)
+
+            if total == 0:
+                self.finished.emit(True, "No analysis needed", self.decisions)
+                return
+
+            analyzed_decisions = list(self.decisions)  # Copy list
+
+            for idx, (pos_idx, decision) in enumerate(positions_to_analyze):
+                self.progress.emit(idx + 1, total)
+                self.status_message.emit(
+                    f"Analyzing position {idx + 1} of {total} with GnuBG ({self.settings.gnubg_analysis_ply}-ply)..."
+                )
+
+                # Analyze with GnuBG
+                gnubg_output, decision_type = analyzer.analyze_position(decision.xgid)
+                analyzed_decision = GNUBGParser.parse_analysis(
+                    gnubg_output,
+                    decision.xgid,
+                    decision_type
+                )
+                analyzed_decisions[pos_idx] = analyzed_decision
+
+            self.finished.emit(True, f"Analyzed {total} position(s)", analyzed_decisions)
+
+        except Exception as e:
+            self.finished.emit(False, f"Analysis failed: {str(e)}", self.decisions)
 
 
 class ExportWorker(QThread):
@@ -24,12 +84,12 @@ class ExportWorker(QThread):
     Background thread for export operations.
 
     Signals:
-        progress(int, int): current, total
+        progress(float): progress as percentage (0.0 to 1.0)
         status_message(str): status update
         finished(bool, str): success, message
     """
 
-    progress = Signal(int, int)
+    progress = Signal(float)
     status_message = Signal(str)
     finished = Signal(bool, str)
 
@@ -59,6 +119,7 @@ class ExportWorker(QThread):
     def _export_ankiconnect(self):
         """Export via AnkiConnect."""
         self.status_message.emit("Connecting to Anki...")
+        self.progress.emit(0.0)
 
         # Test connection
         client = AnkiConnect(deck_name=self.settings.deck_name)
@@ -82,25 +143,53 @@ class ExportWorker(QThread):
         color_scheme = SCHEMES.get(self.settings.color_scheme, SCHEMES['classic'])
         renderer = SVGBoardRenderer(color_scheme=color_scheme)
 
-        # Create card generator
-        output_dir = Path.home() / '.flashgammon' / 'cards'
-        card_gen = CardGenerator(
-            output_dir=output_dir,
-            show_options=self.settings.show_options,
-            interactive_moves=self.settings.interactive_moves,
-            renderer=renderer
-        )
-
         # Export decisions
         total = len(self.decisions)
         for i, decision in enumerate(self.decisions):
-            self.status_message.emit(f"Exporting position {i+1}/{total}...")
-            self.progress.emit(i + 1, total)
+            # Calculate base progress for this position
+            base_progress = i / total
+            position_progress_range = 1.0 / total  # How much progress this position represents
 
-            # Generate card
+            # Estimate sub-steps (used for progress bar calculation)
+            # Steps: render positions (1), score matrix (N cells), generate card (1)
+            has_score_matrix = (
+                decision.decision_type.name == 'CUBE_ACTION' and
+                decision.match_length > 0 and
+                self.settings.get('generate_score_matrix', False) and
+                self.settings.is_gnubg_available()
+            )
+            matrix_steps = (decision.match_length - 1) ** 2 if has_score_matrix else 0
+            total_substeps = 2 + matrix_steps  # render + matrix + generate card
+
+            current_substep = [0]  # Use list for mutable counter in nested function
+
+            # Progress callback for sub-steps
+            def progress_callback(message: str):
+                current_substep[0] += 1
+                # Calculate progress within this position
+                substep_progress = min(current_substep[0] / total_substeps, 0.95)  # Cap at 95% until Anki add
+                overall_progress = base_progress + (substep_progress * position_progress_range)
+                self.progress.emit(overall_progress)
+                self.status_message.emit(f"Position {i+1}/{total}: {message}")
+
+            # Create card generator with progress callback
+            output_dir = Path.home() / '.flashgammon' / 'cards'
+            card_gen = CardGenerator(
+                output_dir=output_dir,
+                show_options=self.settings.show_options,
+                interactive_moves=self.settings.interactive_moves,
+                renderer=renderer,
+                progress_callback=progress_callback
+            )
+
+            self.progress.emit(base_progress)
+
+            # Generate card (progress_callback will emit sub-steps and update progress)
             card_data = card_gen.generate_card(decision)
 
             # Add to Anki
+            self.status_message.emit(f"Position {i+1}/{total}: Adding to Anki...")
+            self.progress.emit(base_progress + (0.95 * position_progress_range))
             try:
                 client.add_note(
                     front=card_data['front'],
@@ -111,11 +200,15 @@ class ExportWorker(QThread):
                 self.finished.emit(False, f"Failed to add card {i+1}: {str(e)}")
                 return
 
+            # Update progress after card is successfully added
+            self.progress.emit((i + 1) / total)
+
         self.finished.emit(True, f"Successfully exported {total} card(s) to Anki")
 
     def _export_apkg(self):
         """Export to APKG file."""
         self.status_message.emit("Generating APKG file...")
+        self.progress.emit(0.0)
 
         if not self.output_path:
             self.finished.emit(False, "No output path specified for APKG export")
@@ -129,20 +222,75 @@ class ExportWorker(QThread):
                 deck_name=self.settings.deck_name
             )
 
+            # Custom export loop with progress tracking
+            from flashgammon.renderer.color_schemes import get_scheme
+            from flashgammon.renderer.svg_board_renderer import SVGBoardRenderer
+            from flashgammon.anki.card_generator import CardGenerator
+            import genanki
+
+            scheme = get_scheme(self.settings.color_scheme)
+            renderer = SVGBoardRenderer(color_scheme=scheme)
+
             # Generate cards
             total = len(self.decisions)
-            self.status_message.emit(f"Generating {total} card(s)...")
-            self.progress.emit(0, total)
+            for i, decision in enumerate(self.decisions):
+                # Calculate base progress for this position
+                base_progress = i / total
+                position_progress_range = 1.0 / total
 
-            exporter.export(
-                decisions=self.decisions,
-                output_file=self.output_path,
-                color_scheme=self.settings.color_scheme,
-                show_options=self.settings.show_options,
-                interactive_moves=self.settings.interactive_moves
-            )
+                # Estimate sub-steps (same logic as AnkiConnect)
+                has_score_matrix = (
+                    decision.decision_type.name == 'CUBE_ACTION' and
+                    decision.match_length > 0 and
+                    self.settings.get('generate_score_matrix', False) and
+                    self.settings.is_gnubg_available()
+                )
+                matrix_steps = (decision.match_length - 1) ** 2 if has_score_matrix else 0
+                total_substeps = 2 + matrix_steps  # render + matrix + generate card
 
-            self.progress.emit(total, total)
+                current_substep = [0]
+
+                # Progress callback for sub-steps
+                def apkg_progress_callback(message: str):
+                    current_substep[0] += 1
+                    substep_progress = min(current_substep[0] / total_substeps, 0.95)
+                    overall_progress = base_progress + (substep_progress * position_progress_range)
+                    self.progress.emit(overall_progress)
+                    self.status_message.emit(f"Position {i+1}/{total}: {message}")
+
+                # Create card generator with progress callback
+                card_gen = CardGenerator(
+                    output_dir=output_dir,
+                    show_options=self.settings.show_options,
+                    interactive_moves=self.settings.interactive_moves,
+                    renderer=renderer,
+                    progress_callback=apkg_progress_callback
+                )
+
+                self.progress.emit(base_progress)
+
+                # Generate card
+                card_data = card_gen.generate_card(decision, card_id=f"card_{i}")
+
+                # Create note
+                note = genanki.Note(
+                    model=exporter.model,
+                    fields=[card_data['front'], card_data['back']],
+                    tags=card_data['tags']
+                )
+
+                # Add to deck
+                exporter.deck.add_note(note)
+
+                # Update progress after card added
+                self.progress.emit((i + 1) / total)
+
+            # Write APKG file
+            self.status_message.emit("Writing APKG file...")
+            package = genanki.Package(exporter.deck)
+            package.write_to_file(str(self.output_path))
+
+            self.progress.emit(1.0)
             self.finished.emit(True, f"Successfully created {self.output_path}")
         except Exception as e:
             self.finished.emit(False, f"APKG export failed: {str(e)}")
@@ -161,6 +309,7 @@ class ExportDialog(QDialog):
         self.decisions = decisions
         self.settings = settings
         self.worker = None
+        self.analysis_worker = None
 
         self.setWindowTitle("Export to Anki")
         self.setModal(True)
@@ -176,9 +325,9 @@ class ExportDialog(QDialog):
         info = QLabel(f"Exporting {len(self.decisions)} position(s) to Anki")
         layout.addWidget(info)
 
-        # Progress bar
+        # Progress bar (use percentage-based progress)
         self.progress_bar = QProgressBar()
-        self.progress_bar.setRange(0, len(self.decisions))
+        self.progress_bar.setRange(0, 100)
         layout.addWidget(self.progress_bar)
 
         # Status label
@@ -210,24 +359,41 @@ class ExportDialog(QDialog):
         self.btn_export.setEnabled(False)
 
         # Get output path for APKG if needed
-        output_path = None
+        self.output_path = None
         if self.settings.export_method == "apkg":
-            output_path, _ = QFileDialog.getSaveFileName(
+            self.output_path, _ = QFileDialog.getSaveFileName(
                 self,
                 "Save APKG File",
                 str(Path.home() / f"{self.settings.deck_name}.apkg"),
                 "Anki Deck Package (*.apkg)"
             )
-            if not output_path:
+            if not self.output_path:
                 self.btn_export.setEnabled(True)
                 return
 
+        # Check if any positions need GnuBG analysis
+        needs_analysis = [d for d in self.decisions if not d.candidate_moves]
+
+        if needs_analysis:
+            # Run analysis first
+            self.status_label.setText(f"Analyzing {len(needs_analysis)} position(s) with GnuBG...")
+            self.analysis_worker = AnalysisWorker(self.decisions, self.settings)
+            self.analysis_worker.progress.connect(self.on_analysis_progress)
+            self.analysis_worker.status_message.connect(self.on_status_message)
+            self.analysis_worker.finished.connect(self.on_analysis_finished)
+            self.analysis_worker.start()
+        else:
+            # No analysis needed, proceed with export
+            self._start_export_worker()
+
+    def _start_export_worker(self):
+        """Start the actual export worker (after analysis if needed)."""
         # Create worker thread
         self.worker = ExportWorker(
             self.decisions,
             self.settings,
             self.settings.export_method,
-            output_path
+            self.output_path
         )
 
         # Connect signals
@@ -239,9 +405,34 @@ class ExportDialog(QDialog):
         self.worker.start()
 
     @Slot(int, int)
-    def on_progress(self, current, total):
-        """Update progress bar."""
-        self.progress_bar.setValue(current)
+    def on_analysis_progress(self, current, total):
+        """Update progress bar for analysis."""
+        self.progress_bar.setValue(int((current / total) * 100))
+
+    @Slot(bool, str, list)
+    def on_analysis_finished(self, success, message, analyzed_decisions):
+        """Handle analysis completion."""
+        if success:
+            # Update decisions with analyzed versions
+            self.decisions = analyzed_decisions
+            self.status_label.setText(f"{message} - Starting export...")
+            # Proceed with export
+            self._start_export_worker()
+        else:
+            # Analysis failed
+            self.status_label.setText(f"Analysis failed: {message}")
+            self.log_text.append(f"ERROR: {message}")
+            self.btn_export.setEnabled(True)
+            self.btn_close.setEnabled(True)
+
+    @Slot(float)
+    def on_progress(self, progress_fraction):
+        """Update progress bar.
+
+        Args:
+            progress_fraction: Progress as a fraction from 0.0 to 1.0
+        """
+        self.progress_bar.setValue(int(progress_fraction * 100))
 
     @Slot(str)
     def on_status_message(self, message):

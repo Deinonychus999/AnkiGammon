@@ -74,13 +74,15 @@ class InteractiveSession:
             click.echo(f"  4. Export method (current: {export_display})")
             gnubg_status = "Configured" if self.settings.gnubg_path else "Not configured"
             click.echo(f"  5. Configure GnuBG path (current: {gnubg_status})")
-            click.echo("  6. Back to main menu")
+            matrix_status = "Yes" if self.settings.generate_score_matrix else "No"
+            click.echo(f"  6. Generate score matrix (current: {matrix_status})")
+            click.echo("  7. Back to main menu")
             click.echo()
 
             choice = click.prompt(
                 click.style("Choose an option", fg='green'),
                 type=str,
-                default='6'
+                default='7'
             )
 
             if choice == '1':
@@ -94,6 +96,8 @@ class InteractiveSession:
             elif choice == '5':
                 self.configure_gnubg_path()
             elif choice == '6':
+                self.toggle_score_matrix()
+            elif choice == '7':
                 break
             else:
                 click.echo(click.style("\n  Invalid choice. Please try again.\n", fg='red'))
@@ -268,6 +272,45 @@ class InteractiveSession:
             click.echo()
             click.echo(click.style("  GnuBG path cleared", fg='cyan'))
 
+        click.echo()
+
+    def toggle_score_matrix(self):
+        """Toggle the 'generate score matrix' setting."""
+        click.echo()
+        click.echo(click.style("=" * 60, fg='cyan'))
+        click.echo(click.style("  Score Matrix Generation", fg='cyan', bold=True))
+        click.echo(click.style("=" * 60, fg='cyan'))
+        click.echo()
+        click.echo("When enabled, cube decision cards will include a score matrix showing")
+        click.echo("optimal cube actions at all possible match scores.")
+        click.echo()
+        click.echo("For example, in a 7-point match:")
+        click.echo("  - Matrix shows cube actions for 2a-2a through 7a-7a")
+        click.echo("  - Each cell shows best action (D/T, N/T, D/P) and error values")
+        click.echo("  - Current match score is highlighted")
+        click.echo()
+        click.echo(click.style("Note:", fg='yellow'), nl=False)
+        click.echo(" Requires GnuBG to be configured (Option 5).")
+        click.echo(click.style("Note:", fg='yellow'), nl=False)
+        click.echo(" Matrix generation uses GnuBG analysis for each score combination.")
+        click.echo("      This may increase card generation time significantly.")
+        click.echo()
+
+        if not self.settings.is_gnubg_available():
+            click.echo(click.style("  Warning: GnuBG is not configured!", fg='red'))
+            click.echo(click.style("  Please configure GnuBG path first (Option 5)", fg='yellow'))
+            click.echo()
+
+        new_value = click.confirm(
+            click.style("Generate score matrix for cube decisions?", fg='green'),
+            default=self.settings.generate_score_matrix
+        )
+
+        self.settings.generate_score_matrix = new_value
+
+        click.echo()
+        click.echo(click.style(f"  Setting saved: {'Matrix generation enabled' if new_value else 'Matrix generation disabled'}", fg='green'))
+        click.echo(click.style(f"  (Saved as default)", fg='cyan'))
         click.echo()
 
     def show_help(self):

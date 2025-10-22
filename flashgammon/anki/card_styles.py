@@ -626,4 +626,134 @@ button.animate-btn:disabled {
 .position-svg-container[style*="display: block"] {
     display: block !important;
 }
+
+/* ===================================================================
+   SCORE MATRIX STYLES
+   =================================================================== */
+
+.score-matrix {
+    margin: 30px auto 20px;
+    text-align: center;
+}
+
+.score-matrix h3 {
+    font-size: 18px;
+    color: var(--text-fg);
+    margin-bottom: 15px;
+}
+
+.score-matrix-table {
+    border-collapse: collapse;
+    margin: 0 auto;
+    font-size: 13px;
+    background-color: var(--canvas-elevated);
+    border: 2px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.score-matrix-table th {
+    background-color: var(--canvas-elevated);
+    color: var(--text-fg);
+    font-weight: bold;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+}
+
+.score-matrix-table td {
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    text-align: center;
+    min-width: 70px;
+}
+
+/* Cube action color coding */
+.score-matrix-table .action-double-take {
+    background-color: rgba(76, 175, 80, 0.3);
+}
+
+.score-matrix-table .action-double-pass {
+    background-color: rgba(255, 152, 0, 0.3);
+}
+
+.score-matrix-table .action-no-double {
+    background-color: rgba(33, 150, 243, 0.3);
+}
+
+.score-matrix-table .action-too-good {
+    background-color: rgba(156, 39, 176, 0.3);
+}
+
+/* Low error cells - more transparent to show it's a close decision */
+.score-matrix-table .action-double-take.low-error {
+    background-color: rgba(76, 175, 80, 0.12);
+}
+
+.score-matrix-table .action-double-pass.low-error {
+    background-color: rgba(255, 152, 0, 0.12);
+}
+
+.score-matrix-table .action-no-double.low-error {
+    background-color: rgba(33, 150, 243, 0.12);
+}
+
+.score-matrix-table .action-too-good.low-error {
+    background-color: rgba(156, 39, 176, 0.12);
+}
+
+/* Current score cell highlight */
+.score-matrix-table .current-score {
+    border: 3px solid #FFD700;
+    box-shadow: 0 0 8px rgba(255, 215, 0, 0.6);
+}
+
+/* Matrix cell content */
+.score-matrix-table .action {
+    font-weight: bold;
+    font-size: 14px;
+    margin-bottom: 4px;
+}
+
+.score-matrix-table .errors {
+    font-size: 11px;
+    color: #666;
+}
+
+.night_mode .score-matrix-table .errors {
+    color: #aaa;
+}
+
+/* Dark mode adjustments */
+.night_mode .score-matrix-table .action-double-take {
+    background-color: rgba(76, 175, 80, 0.4);
+}
+
+.night_mode .score-matrix-table .action-double-pass {
+    background-color: rgba(255, 152, 0, 0.4);
+}
+
+.night_mode .score-matrix-table .action-no-double {
+    background-color: rgba(33, 150, 243, 0.4);
+}
+
+.night_mode .score-matrix-table .action-too-good {
+    background-color: rgba(156, 39, 176, 0.4);
+}
+
+/* Dark mode low error cells */
+.night_mode .score-matrix-table .action-double-take.low-error {
+    background-color: rgba(76, 175, 80, 0.15);
+}
+
+.night_mode .score-matrix-table .action-double-pass.low-error {
+    background-color: rgba(255, 152, 0, 0.15);
+}
+
+.night_mode .score-matrix-table .action-no-double.low-error {
+    background-color: rgba(33, 150, 243, 0.15);
+}
+
+.night_mode .score-matrix-table .action-too-good.low-error {
+    background-color: rgba(156, 39, 176, 0.15);
+}
 """

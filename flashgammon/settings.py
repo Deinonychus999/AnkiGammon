@@ -21,6 +21,7 @@ class Settings:
         "export_method": "ankiconnect",
         "gnubg_path": None,
         "gnubg_analysis_ply": 2,
+        "generate_score_matrix": False,
     }
 
     def __init__(self, config_path: Optional[Path] = None):
@@ -141,6 +142,16 @@ class Settings:
     def gnubg_analysis_ply(self, value: int) -> None:
         """Set the GnuBG analysis depth (ply)."""
         self.set("gnubg_analysis_ply", value)
+
+    @property
+    def generate_score_matrix(self) -> bool:
+        """Get whether to generate score matrix for cube decisions."""
+        return self._settings.get("generate_score_matrix", False)
+
+    @generate_score_matrix.setter
+    def generate_score_matrix(self, value: bool) -> None:
+        """Set whether to generate score matrix for cube decisions."""
+        self.set("generate_score_matrix", value)
 
     def is_gnubg_available(self) -> bool:
         """
