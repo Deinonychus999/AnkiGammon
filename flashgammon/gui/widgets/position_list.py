@@ -44,6 +44,9 @@ class PositionListWidget(QListWidget):
         super().__init__(parent)
         self.decisions: List[Decision] = []
 
+        # Enable smooth scrolling
+        self.setVerticalScrollMode(QListWidget.ScrollPerPixel)
+
         # Enable context menu for delete
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         self.customContextMenuRequested.connect(self._show_context_menu)

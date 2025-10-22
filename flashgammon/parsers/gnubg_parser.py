@@ -101,7 +101,7 @@ class GNUBGParser:
         # Matches: "    1. Cubeful 4-ply    21/16 21/15                  Eq.:  -0.411"
         #          "    2. Cubeful 4-ply    9/4 9/3                      Eq.:  -0.437 ( -0.025)"
         move_pattern = re.compile(
-            r'^\s*(\d+)\.\s+(?:Cubeful\s+\d+-ply\s+)?(.*?)\s+Eq\.?:\s*([+-]?\d+\.\d+)(?:\s*\(([+-]?\d+\.\d+)\))?',
+            r'^\s*(\d+)\.\s+(?:Cubeful\s+\d+-ply\s+)?(.*?)\s+Eq\.?:\s*([+-]?\d+\.\d+)(?:\s*\(\s*([+-]?\d+\.\d+)\))?',
             re.IGNORECASE
         )
 

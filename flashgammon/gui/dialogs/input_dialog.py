@@ -72,6 +72,9 @@ class PendingListWidget(QListWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
 
+        # Enable smooth scrolling
+        self.setVerticalScrollMode(QListWidget.ScrollPerPixel)
+
         # Enable context menu
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         self.customContextMenuRequested.connect(self._show_context_menu)
@@ -428,7 +431,8 @@ class InputDialog(QDialog):
 
             # Add to pending list
             for decision in decisions:
-                needs_analysis = (result.format == InputFormat.POSITION_IDS)
+                # Check if decision actually has analysis (candidate_moves populated)
+                needs_analysis = not bool(decision.candidate_moves)
                 self.pending_decisions.append(decision)
 
                 item = PendingPositionItem(decision, needs_analysis)

@@ -341,6 +341,7 @@ class ExportDialog(QDialog):
         self.log_text = QTextEdit()
         self.log_text.setReadOnly(True)
         self.log_text.setMaximumHeight(150)
+        self.log_text.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self.log_text.hide()
         layout.addWidget(self.log_text)
 

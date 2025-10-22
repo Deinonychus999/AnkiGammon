@@ -284,9 +284,15 @@ class CardGenerator:
     const standardAnswer = document.getElementById('mcq-standard-answer');
 
     let moveMap = {{}};
+    let errorMap = {{}};
     if (standardAnswer && standardAnswer.dataset.moveMap) {{
         try {{
             moveMap = JSON.parse(standardAnswer.dataset.moveMap);
+        }} catch (e) {{}}
+    }}
+    if (standardAnswer && standardAnswer.dataset.errorMap) {{
+        try {{
+            errorMap = JSON.parse(standardAnswer.dataset.errorMap);
         }} catch (e) {{}}
     }}
 
@@ -296,6 +302,9 @@ class CardGenerator:
 
         const selectedMove = moveMap[selectedLetter] || '';
         const correctMove = moveMap[correctLetter] || '';
+        const selectedError = errorMap[selectedLetter] || 0.0;
+
+        const CLOSE_THRESHOLD = 0.020;
 
         if (selectedLetter === correctLetter) {{
             feedbackContainer.innerHTML = `
@@ -303,6 +312,15 @@ class CardGenerator:
                     <div class="feedback-icon">✓</div>
                     <div class="feedback-text">
                         <strong>${{selectedLetter}} is Correct!</strong>
+                    </div>
+                </div>
+            `;
+        }} else if (selectedError < CLOSE_THRESHOLD) {{
+            feedbackContainer.innerHTML = `
+                <div class="mcq-feedback-close">
+                    <div class="feedback-icon">≈</div>
+                    <div class="feedback-text">
+                        <strong>${{selectedLetter}} is Close!</strong> (${{selectedMove}}) <span class="feedback-separator">•</span> <strong>Best: ${{correctLetter}}</strong> (${{correctMove}})
                     </div>
                 </div>
             `;
@@ -323,7 +341,13 @@ class CardGenerator:
             if (moveCell) {{
                 const moveText = moveCell.textContent.trim();
                 if (moveText === selectedMove) {{
-                    row.classList.add(selectedLetter === correctLetter ? 'user-correct' : 'user-incorrect');
+                    if (selectedLetter === correctLetter) {{
+                        row.classList.add('user-correct');
+                    }} else if (selectedError < CLOSE_THRESHOLD) {{
+                        row.classList.add('user-close');
+                    }} else {{
+                        row.classList.add('user-incorrect');
+                    }}
                 }}
             }}
         }});
@@ -406,14 +430,16 @@ class CardGenerator:
 
             import json
             letter_to_move = {}
+            letter_to_error = {}
             for i, move in enumerate(shuffled_candidates):
                 if move and i < len(letters):
                     letter_to_move[letters[i]] = move.notation
+                    letter_to_error[letters[i]] = abs(move.error) if move.error is not None else 0.0
 
             answer_html = f"""
     <div class="mcq-feedback-container" id="mcq-feedback" style="display: none;">
     </div>
-    <div class="answer" id="mcq-standard-answer" data-correct-answer="{correct_letter}" data-move-map='{json.dumps(letter_to_move)}'>
+    <div class="answer" id="mcq-standard-answer" data-correct-answer="{correct_letter}" data-move-map='{json.dumps(letter_to_move)}' data-error-map='{json.dumps(letter_to_error)}'>
         <h3>Correct Answer: <span class="answer-letter">{correct_letter}</span></h3>
         <p class="best-move-notation">{best_notation}</p>
     </div>

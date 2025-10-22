@@ -450,6 +450,7 @@ button.toggle-btn:active {
 }
 
 .mcq-feedback-correct,
+.mcq-feedback-close,
 .mcq-feedback-incorrect,
 .mcq-feedback-neutral {
     display: flex;
@@ -480,6 +481,21 @@ button.toggle-btn:active {
 
 .mcq-feedback-correct .feedback-text {
     color: #2e7d32;
+}
+
+/* Close feedback (orange/yellow - nearly correct) */
+.mcq-feedback-close {
+    background-color: rgba(255, 152, 0, 0.15);
+    border: 2px solid #ff9800;
+    padding: 15px 20px;
+}
+
+.mcq-feedback-close .feedback-icon {
+    color: #ff9800;
+}
+
+.mcq-feedback-close .feedback-text {
+    color: #ef6c00;
 }
 
 /* Incorrect feedback (red) */
@@ -519,6 +535,10 @@ button.toggle-btn:active {
     background-color: rgba(76, 175, 80, 0.25);
 }
 
+.night_mode .mcq-feedback-close {
+    background-color: rgba(255, 152, 0, 0.25);
+}
+
 .night_mode .mcq-feedback-incorrect {
     background-color: rgba(244, 67, 54, 0.25);
 }
@@ -533,6 +553,11 @@ tr.user-correct {
     border-left: 3px solid #4caf50;
 }
 
+tr.user-close {
+    background-color: rgba(255, 152, 0, 0.15) !important;
+    border-left: 3px solid #ff9800;
+}
+
 tr.user-incorrect {
     background-color: rgba(244, 67, 54, 0.15) !important;
     border-left: 3px solid #f44336;
@@ -540,6 +565,10 @@ tr.user-incorrect {
 
 .night_mode tr.user-correct {
     background-color: rgba(76, 175, 80, 0.25) !important;
+}
+
+.night_mode tr.user-close {
+    background-color: rgba(255, 152, 0, 0.25) !important;
 }
 
 .night_mode tr.user-incorrect {
