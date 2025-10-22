@@ -10,6 +10,7 @@ from PySide6.QtCore import Qt, Signal, Slot, QUrl, QSettings, QSize
 from PySide6.QtGui import QAction, QKeySequence, QDesktopServices
 from PySide6.QtWebEngineWidgets import QWebEngineView
 import qtawesome as qta
+import base64
 
 from ankigammon.settings import Settings
 from ankigammon.parsers.xg_text_parser import XGTextParser
@@ -18,6 +19,7 @@ from ankigammon.renderer.color_schemes import get_scheme
 from ankigammon.models import Decision
 from ankigammon.gui.widgets import PositionListWidget
 from ankigammon.gui.dialogs import SettingsDialog, ExportDialog, InputDialog
+from ankigammon.gui.resources import get_resource_path
 
 
 class MainWindow(QMainWindow):
@@ -44,6 +46,9 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("AnkiGammon - Backgammon Analysis to Anki")
         self.setMinimumSize(1000, 700)
 
+        # Hide the status bar for a cleaner, modern look
+        self.statusBar().hide()
+
         # Central widget with horizontal layout
         central = QWidget()
         self.setCentralWidget(central)
@@ -58,12 +63,22 @@ class MainWindow(QMainWindow):
         # Right panel: Preview
         self.preview = QWebEngineView()
         self.preview.setContextMenuPolicy(Qt.NoContextMenu)  # Disable browser context menu
-        welcome_html = """
+
+        # Load icon and convert to base64 for embedding in HTML
+        icon_path = get_resource_path("ankigammon/gui/resources/icon.png")
+        icon_data_url = ""
+        if icon_path.exists():
+            with open(icon_path, "rb") as f:
+                icon_bytes = f.read()
+                icon_b64 = base64.b64encode(icon_bytes).decode('utf-8')
+                icon_data_url = f"data:image/png;base64,{icon_b64}"
+
+        welcome_html = f"""
         <!DOCTYPE html>
         <html>
         <head>
             <style>
-                body {
+                body {{
                     margin: 0;
                     padding: 0;
                     display: flex;
@@ -74,56 +89,36 @@ class MainWindow(QMainWindow):
                     background: linear-gradient(135deg, #1e1e2e 0%, #181825 100%);
                     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
                     color: #cdd6f4;
-                }
-                .welcome {
+                }}
+                .welcome {{
                     text-align: center;
                     padding: 40px;
-                }
-                h1 {
+                }}
+                h1 {{
                     color: #f5e0dc;
                     font-size: 32px;
                     margin-bottom: 16px;
                     font-weight: 700;
-                }
-                p {
+                }}
+                p {{
                     color: #a6adc8;
                     font-size: 16px;
                     margin: 8px 0;
-                }
-                .icon {
+                }}
+                .icon {{
                     margin-bottom: 24px;
                     opacity: 0.6;
-                }
+                }}
+                .icon img {{
+                    width: 140px;
+                    height: auto;
+                }}
             </style>
         </head>
         <body>
             <div class="welcome">
                 <div class="icon">
-                    <svg width="140" height="90" viewBox="-5 0 90 45" xmlns="http://www.w3.org/2000/svg">
-                        <!-- First die -->
-                        <g transform="translate(0, 10)">
-                            <rect x="2" y="2" width="32" height="32" rx="4"
-                                  fill="#f5e0dc" stroke="#45475a" stroke-width="1.5"
-                                  transform="rotate(-15 18 18)"/>
-                            <!-- Pips for 5 -->
-                            <circle cx="10" cy="10" r="2.5" fill="#1e1e2e" transform="rotate(-15 18 18)"/>
-                            <circle cx="26" cy="10" r="2.5" fill="#1e1e2e" transform="rotate(-15 18 18)"/>
-                            <circle cx="18" cy="18" r="2.5" fill="#1e1e2e" transform="rotate(-15 18 18)"/>
-                            <circle cx="10" cy="26" r="2.5" fill="#1e1e2e" transform="rotate(-15 18 18)"/>
-                            <circle cx="26" cy="26" r="2.5" fill="#1e1e2e" transform="rotate(-15 18 18)"/>
-                        </g>
-
-                        <!-- Second die -->
-                        <g transform="translate(36, 0)">
-                            <rect x="2" y="2" width="32" height="32" rx="4"
-                                  fill="#f5e0dc" stroke="#45475a" stroke-width="1.5"
-                                  transform="rotate(12 18 18)"/>
-                            <!-- Pips for 3 -->
-                            <circle cx="10" cy="10" r="2.5" fill="#1e1e2e" transform="rotate(12 18 18)"/>
-                            <circle cx="18" cy="18" r="2.5" fill="#1e1e2e" transform="rotate(12 18 18)"/>
-                            <circle cx="26" cy="26" r="2.5" fill="#1e1e2e" transform="rotate(12 18 18)"/>
-                        </g>
-                    </svg>
+                    <img src="{icon_data_url}" alt="AnkiGammon Icon" />
                 </div>
                 <h1>No Position Loaded</h1>
                 <p>Add positions to get started</p>
@@ -268,13 +263,7 @@ class MainWindow(QMainWindow):
         dialog = InputDialog(self.settings, self)
         dialog.positions_added.connect(self._on_positions_added)
 
-        if dialog.exec():
-            pending = dialog.get_pending_decisions()
-            if pending:
-                self.statusBar().showMessage(
-                    f"Added {len(pending)} position(s)",
-                    3000
-                )
+        dialog.exec()
 
     @Slot(list)
     def _on_positions_added(self, decisions):
@@ -378,9 +367,6 @@ class MainWindow(QMainWindow):
                 """
                 self.preview.setHtml(welcome_html)
 
-            # Update status bar
-            self.statusBar().showMessage(f"Deleted position #{index + 1}", 3000)
-
     @Slot(list)
     def on_decisions_loaded(self, decisions):
         """Handle newly loaded decisions."""
@@ -455,8 +441,6 @@ class MainWindow(QMainWindow):
             if selected:
                 self.show_decision(selected)
 
-        self.statusBar().showMessage("Settings saved", 3000)
-
     @Slot()
     def on_export_clicked(self):
         """Handle export button click."""
@@ -495,8 +479,12 @@ class MainWindow(QMainWindow):
             "About AnkiGammon",
             """<h2>AnkiGammon</h2>
             <p>Version 1.0.0</p>
-            <p>Convert eXtreme Gammon (XG) backgammon analysis into Anki flashcards.</p>
+            <p>Convert backgammon position analysis into interactive Anki flashcards.</p>
             <p>Built with PySide6 and Qt.</p>
+
+            <h3>Special Thanks</h3>
+            <p>OilSpillDuckling<br>Eran & OpenGammon</p>
+
             <p><a href="https://github.com/yourusername/ankigammon">GitHub Repository</a></p>
             """
         )

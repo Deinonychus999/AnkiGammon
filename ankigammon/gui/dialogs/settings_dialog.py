@@ -215,9 +215,14 @@ class SettingsDialog(QDialog):
         self.chk_generate_score_matrix = QCheckBox("Generate score matrix for cube decisions")
         form.addRow(self.chk_generate_score_matrix)
 
-        # Status label
-        self.lbl_gnubg_status = QLabel()
-        form.addRow("Status:", self.lbl_gnubg_status)
+        # Status display (icon + text in horizontal layout)
+        status_layout = QHBoxLayout()
+        self.lbl_gnubg_status_icon = QLabel()
+        self.lbl_gnubg_status_text = QLabel()
+        status_layout.addWidget(self.lbl_gnubg_status_icon)
+        status_layout.addWidget(self.lbl_gnubg_status_text)
+        status_layout.addStretch()
+        form.addRow("Status:", status_layout)
 
         return group
 
@@ -270,15 +275,15 @@ class SettingsDialog(QDialog):
 
         path = self.txt_gnubg_path.text()
         if not path:
-            self.lbl_gnubg_status.setText("  Not configured")
-            self.lbl_gnubg_status.setStyleSheet("")
-            self.lbl_gnubg_status.setPixmap(qta.icon('fa6s.circle', color='#6c7086').pixmap(18, 18))
+            self.lbl_gnubg_status_icon.setPixmap(qta.icon('fa6s.circle', color='#6c7086').pixmap(18, 18))
+            self.lbl_gnubg_status_text.setText("Not configured")
+            self.lbl_gnubg_status_text.setStyleSheet("")
             return
 
         # Show loading state
-        self.lbl_gnubg_status.setText("    Validating...")
-        self.lbl_gnubg_status.setStyleSheet("color: gray;")
-        self.lbl_gnubg_status.setPixmap(qta.icon('fa6s.spinner', color='#6c7086').pixmap(18, 18))
+        self.lbl_gnubg_status_icon.setPixmap(qta.icon('fa6s.spinner', color='#6c7086').pixmap(18, 18))
+        self.lbl_gnubg_status_text.setText("Validating...")
+        self.lbl_gnubg_status_text.setStyleSheet("color: gray;")
 
         # Start validation in background thread
         self.validation_worker = GnuBGValidationWorker(path)
@@ -297,11 +302,11 @@ class SettingsDialog(QDialog):
         else:
             icon = None
 
-        # Set icon and text
+        # Set icon and text separately
         if icon:
-            self.lbl_gnubg_status.setPixmap(icon.pixmap(18, 18))
-        self.lbl_gnubg_status.setText(f"    {status_text}")
-        self.lbl_gnubg_status.setStyleSheet("")
+            self.lbl_gnubg_status_icon.setPixmap(icon.pixmap(18, 18))
+        self.lbl_gnubg_status_text.setText(status_text)
+        self.lbl_gnubg_status_text.setStyleSheet("")
 
     def accept(self):
         """Save settings and close dialog."""
