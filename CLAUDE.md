@@ -75,7 +75,7 @@ python -m unittest tests.test_basic.TestXGIDParsing
 ### Core Data Flow
 
 1. **Input Parsing** (`parsers/xg_text_parser.py`) → Parses XG text export into `Decision` objects
-2. **Position Encoding** (`utils/xgid.py`) → Handles XGID format for position representation
+2. **Position Encoding** (`utils/xgid.py`, `utils/ogid.py`, `utils/gnuid.py`) → Handles three position formats: XGID (primary), OGID, and GNUID
 3. **Board Rendering** (`renderer/svg_board_renderer.py`) → Generates SVG markup of positions
 4. **Card Generation** (`anki/card_generator.py`) → Creates Anki card HTML with embedded SVG and MCQ format
 5. **Export** → Either AnkiConnect API (`anki/ankiconnect.py`) or APKG file (`anki/apkg_exporter.py`)
@@ -104,6 +104,83 @@ The XGID format is **perspective-dependent** for board points but **not for bar 
 - `points[1-24]` = board points (point 1 = O's home, point 24 = X's home)
 - `points[25]` = O's bar (BOTTOM player)
 - Positive values = X checkers, Negative values = O checkers
+
+#### OGID Position Encoding (utils/ogid.py)
+
+OGID (OpenGammon Position ID) is an alternative position format with **colon-separated fields** and **base-26 encoding**.
+
+**Format Structure:**
+```
+P1:P2:CUBE[:DICE[:TURN[:STATE[:S1[:S2[:ML[:MID[:NCHECKERS]]]]]]]]
+```
+
+**Position Encoding (P1 and P2):**
+- **Base-26 encoding** with repeated characters for multiple checkers
+- Characters '0'-'9' = points 0-9
+- Characters 'a'-'p' = points 10-25
+- Repeated characters indicate multiple checkers on the same point
+- Example: "aa" = 2 checkers on point 10, "000" = 3 checkers on point 0
+
+**Cube Field (3 characters):**
+- Char 1: Cube owner (W=White/X, B=Black/O, N=centered)
+- Char 2: Cube value (0-9 as log2: 0=1, 1=2, 2=4, etc.)
+- Char 3: Cube action (O=Offered, T=Taken, P=Passed, N=Normal)
+
+**Optional Metadata Fields:**
+- **DICE**: Two-digit dice roll (e.g., "63")
+- **TURN**: W=White on roll, B=Black on roll
+- **STATE**: Two-character game state (e.g., "IW", "FB")
+- **S1/S2**: Player scores
+- **ML**: Match length with modifiers (L=Lesotho, C=Crawford, G=Galaxie)
+  - Examples: "7" (7-point match), "5C" (Crawford game), "9G15" (Galaxie, max 15 games)
+- **MID**: Move ID sequence number
+- **NCHECKERS**: Number of checkers per side (default 15)
+
+**Key Characteristics:**
+- Not perspective-dependent (always absolute positions)
+- Supports position-only mode (first 3 fields: P1:P2:CUBE)
+- More verbose than XGID but more human-readable
+- Used by OpenGammon and compatible tools
+
+#### GNUID Position Encoding (utils/gnuid.py)
+
+GNUID (GNU Backgammon ID) is GnuBG's native position format with **Base64 encoding**.
+
+**Format Structure:**
+```
+PositionID:MatchID
+```
+
+**Position ID (14-character Base64 string):**
+- Encodes 10 bytes (80 bits) of position data
+- Variable-length bit encoding using run-length algorithm
+- Always encoded from Player X's perspective
+- Consecutive 1s represent checker counts at each point
+
+**Match ID (12-character Base64 string):**
+- Encodes 9 bytes (72 bits) of metadata
+- Bit-packed fields:
+  - Bits 0-3: Cube value (as log2)
+  - Bits 4-5: Cube owner (0=centered, 1=player, 2=opponent, 3=not available)
+  - Bit 7: Crawford rule flag
+  - Bits 8-10: Game state
+  - Bit 11: Turn (who's on roll)
+  - Bits 15-20: Dice values
+  - Bits 21-35: Match length
+  - Bits 36-50: Player X score
+  - Bits 51-65: Player O score
+
+**KNOWN LIMITATION:**
+⚠️ The current Position ID decoding implementation has issues with checker placement. Only one player's checkers decode correctly due to incomplete understanding of GNU Backgammon's legacy encoding algorithm. The Match ID parsing works correctly and extracts all game metadata.
+
+**Recommendation:** For full position analysis, prefer XGID or OGID formats. GNUID can be used when importing positions with full XG analysis text, or for match metadata extraction only.
+
+**Key Characteristics:**
+- Most compact format (26 characters total)
+- Base64 encoding for efficiency
+- Bit-level packing of all metadata
+- Native format for GNU Backgammon
+- Position ID encoding is complex and has legacy quirks
 
 #### Cube Decision Parsing (parsers/xg_text_parser.py)
 
@@ -135,8 +212,11 @@ The card back shows moves in **XG's original order** (not shuffled MCQ order):
 ## Key Files
 
 - **`models.py`**: Core data classes (Position, Decision, Move, Player, CubeState, DecisionType)
-- **`utils/xgid.py`**: XGID encoding/decoding with perspective handling
-- **`parsers/xg_text_parser.py`**: Parses XG text exports, handles cube decisions
+- **`utils/xgid.py`**: XGID encoding/decoding with perspective handling (primary format)
+- **`utils/ogid.py`**: OGID encoding/decoding with base-26 format (alternative format)
+- **`utils/gnuid.py`**: GNUID encoding/decoding for GNU Backgammon format (has known Position ID limitations)
+- **`parsers/xg_text_parser.py`**: Parses XG text exports (supports XGID and OGID), handles cube decisions
+- **`gui/format_detector.py`**: Auto-detects position format (XGID, OGID, or GNUID)
 - **`renderer/svg_board_renderer.py`**: Generates backgammon board SVG markup (replaces old PNG renderer)
 - **`renderer/color_schemes.py`**: Defines color schemes for board rendering (6 built-in schemes: classic, forest, ocean, desert, sunset, midnight)
 - **`anki/card_generator.py`**: Creates MCQ flashcard HTML with embedded SVG boards
@@ -223,10 +303,34 @@ print(settings.color_scheme)  # Loads from config file
 
 ### Working with Positions
 
-Always use the internal Position model (points[0-25]). When reading/writing XGID:
+Always use the internal Position model (points[0-25]). The application supports three position formats:
+
+**XGID (Primary format):**
 - Use `parse_xgid()` to convert XGID → (Position, metadata)
 - Use `encode_xgid()` or `Position.to_xgid()` to convert back
 - Never manually flip positions; XGID parsing handles perspective automatically
+
+**OGID (Alternative format):**
+- Use `parse_ogid()` to convert OGID → (Position, metadata)
+- Use `encode_ogid()` or `Position.to_ogid()` to convert back
+- More human-readable than XGID, supports position-only mode
+
+**GNUID (GNU Backgammon format):**
+- Use `parse_gnuid()` to convert GNUID → (Position, metadata)
+- Use `encode_gnuid()` or `Position.to_gnuid()` to convert back
+- ⚠️ Known limitation: Position ID decoding is incomplete, prefer XGID/OGID for accuracy
+
+**Format Conversion:**
+```python
+# Convert between formats using Position methods
+position = Position.from_xgid("XGID=...")
+ogid = position.to_ogid(...)
+gnuid = position.to_gnuid(...)
+
+# Auto-detect format in GUI
+from flashgammon.gui.format_detector import FormatDetector
+result = FormatDetector.detect(user_input)
+```
 
 ### Working with Settings
 

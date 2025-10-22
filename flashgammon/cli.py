@@ -38,7 +38,7 @@ from flashgammon.settings import get_settings
     '--input-format',
     type=click.Choice(['auto', 'xgtext'], case_sensitive=False),
     default='auto',
-    help='Input file format (default: auto-detect)'
+    help='Input file format (default: auto-detect). Supports XGID, OGID, and GNUID position formats.'
 )
 @click.option(
     '--color-scheme',
@@ -82,12 +82,14 @@ from flashgammon.settings import get_settings
 )
 def main(input_file, format, output, deck_name, show_options, input_format, color_scheme, interactive_moves, gnubg_path, gnubg_ply, use_gnubg, interactive, gui):
     """
-    Convert eXtreme Gammon (XG) positions/analysis into Anki flashcards.
+    Convert backgammon positions/analysis into Anki flashcards.
 
     Run without arguments for interactive mode, or provide an INPUT_FILE for batch processing.
 
-    INPUT_FILE should be:
+    INPUT_FILE can contain:
     - XG text export (with ASCII board and rollout data)
+    - Position IDs only: XGID, OGID, or GNUID formats (auto-detected)
+    - Mixed content (different formats in the same file)
 
     Examples:
 
@@ -97,11 +99,15 @@ def main(input_file, format, output, deck_name, show_options, input_format, colo
 
         \b
         # Push directly to Anki (default - requires Anki-Connect)
-        flashgammon analysis.json
+        flashgammon analysis.txt
 
         \b
         # Generate APKG file instead
-        flashgammon analysis.json --format apkg
+        flashgammon analysis.txt --format apkg
+
+        \b
+        # Use GnuBG to analyze position IDs without full analysis
+        flashgammon positions.txt --use-gnubg
     """
     # Launch GUI mode if requested
     if gui:

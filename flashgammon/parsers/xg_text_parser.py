@@ -11,6 +11,7 @@ from typing import List, Optional, Tuple
 
 from flashgammon.models import Decision, Move, Position, Player, CubeState, DecisionType
 from flashgammon.utils.xgid import parse_xgid
+from flashgammon.utils.ogid import parse_ogid
 
 
 class XGTextParser:
@@ -45,30 +46,40 @@ class XGTextParser:
         """
         decisions = []
 
-        # Split into sections by XGID
-        sections = re.split(r'(XGID=[^\n]+)', content)
+        # Split into sections by XGID or OGID patterns
+        # Pattern matches either XGID= or OGID (base-26 format)
+        sections = re.split(r'(XGID=[^\n]+|^[0-9a-p]+:[0-9a-p]+:[A-Z0-9]{3}[^\n]*)', content, flags=re.MULTILINE)
 
         for i in range(1, len(sections), 2):
             if i + 1 >= len(sections):
                 break
 
-            xgid_line = sections[i].strip()
+            position_id_line = sections[i].strip()
             analysis_section = sections[i + 1]
 
-            decision = XGTextParser._parse_decision_section(xgid_line, analysis_section)
+            decision = XGTextParser._parse_decision_section(position_id_line, analysis_section)
             if decision:
                 decisions.append(decision)
 
         return decisions
 
     @staticmethod
-    def _parse_decision_section(xgid_line: str, analysis_section: str) -> Optional[Decision]:
+    def _parse_decision_section(position_id_line: str, analysis_section: str) -> Optional[Decision]:
         """Parse a single decision section."""
-        # Parse XGID
+        # Detect and parse position ID (XGID or OGID)
         try:
-            position, metadata = parse_xgid(xgid_line)
+            # Check if it's XGID format
+            if position_id_line.startswith('XGID='):
+                position, metadata = parse_xgid(position_id_line)
+                position_id = position_id_line
+            # Check if it's OGID format (base-26 encoding)
+            elif re.match(r'^[0-9a-p]+:[0-9a-p]+:[A-Z0-9]{3}', position_id_line):
+                position, metadata = parse_ogid(position_id_line)
+                position_id = position_id_line
+            else:
+                raise ValueError(f"Unknown position ID format: {position_id_line}")
         except Exception as e:
-            print(f"Error parsing XGID '{xgid_line}': {e}")
+            print(f"Error parsing position ID '{position_id_line}': {e}")
             return None
 
         # Parse game info (players, score, cube, etc.)
@@ -106,7 +117,7 @@ class XGTextParser:
         # Create decision
         decision = Decision(
             position=position,
-            xgid=xgid_line,
+            xgid=position_id,  # Store original position ID (XGID or OGID)
             on_roll=metadata.get('on_roll', Player.O),
             dice=metadata.get('dice'),
             score_x=metadata.get('score_x', 0),

@@ -2,7 +2,7 @@
 Format detection for smart input handling.
 
 Detects whether pasted text contains:
-- Position IDs only (XGID/GNUID) - requires GnuBG analysis
+- Position IDs only (XGID/OGID/GNUID) - requires GnuBG analysis
 - Full XG analysis text - ready to parse
 """
 
@@ -25,7 +25,6 @@ class InputFormat(Enum):
 class DetectionResult:
     """Result of format detection."""
     format: InputFormat
-    confidence: float  # 0.0 to 1.0
     count: int  # Number of positions detected
     details: str  # Human-readable explanation
     warnings: List[str]  # Any warnings
@@ -57,7 +56,6 @@ class FormatDetector:
         if not text:
             return DetectionResult(
                 format=InputFormat.UNKNOWN,
-                confidence=0.0,
                 count=0,
                 details="No input",
                 warnings=[],
@@ -70,7 +68,6 @@ class FormatDetector:
         if not positions:
             return DetectionResult(
                 format=InputFormat.UNKNOWN,
-                confidence=0.0,
                 count=0,
                 details="No valid positions found",
                 warnings=["Could not parse input"],
@@ -94,7 +91,6 @@ class FormatDetector:
 
             return DetectionResult(
                 format=InputFormat.POSITION_IDS,
-                confidence=0.9,
                 count=len(positions),
                 details=f"{len(positions)} position ID(s) detected",
                 warnings=warnings,
@@ -104,7 +100,6 @@ class FormatDetector:
         elif all(pt == "full_analysis" for pt in position_types):
             return DetectionResult(
                 format=InputFormat.FULL_ANALYSIS,
-                confidence=0.95,
                 count=len(positions),
                 details=f"{len(positions)} full analysis position(s) detected",
                 warnings=[],
@@ -122,7 +117,6 @@ class FormatDetector:
 
             return DetectionResult(
                 format=InputFormat.FULL_ANALYSIS,  # Treat as full analysis, will handle IDs
-                confidence=0.7,
                 count=len(positions),
                 details=f"Mixed input: {full_count} with analysis, {id_count} ID(s) only",
                 warnings=warnings,
@@ -132,10 +126,9 @@ class FormatDetector:
         else:
             return DetectionResult(
                 format=InputFormat.UNKNOWN,
-                confidence=0.3,
                 count=len(positions),
                 details="Unable to determine format",
-                warnings=["Check input format - should be XGID/GNUID or full XG analysis"],
+                warnings=["Check input format - should be XGID/OGID/GNUID or full XG analysis"],
                 position_previews=previews
             )
 
@@ -176,12 +169,18 @@ class FormatDetector:
         return positions
 
     def _is_position_id_line(self, line: str) -> bool:
-        """Check if a single line is a position ID (XGID or GNUID)."""
+        """Check if a single line is a position ID (XGID, GNUID, or OGID)."""
         # XGID format
         if line.startswith('XGID='):
             return True
 
-        # GNUID format (base64 pattern)
+        # OGID format (base-26 encoding: 0-9a-p characters, at least 3 fields)
+        # Format: P1:P2:CUBE[:...] where P1 and P2 use only 0-9a-p
+        if re.match(r'^[0-9a-p]+:[0-9a-p]+:[A-Z0-9]{3}', line):
+            return True
+
+        # GNUID format (base64 pattern - has +, /, or = characters)
+        # Check for base64 chars after checking OGID to avoid confusion
         if re.match(r'^[A-Za-z0-9+/=]+:[A-Za-z0-9+/=]+$', line):
             return True
 
@@ -195,6 +194,7 @@ class FormatDetector:
             (type, preview) where type is "position_id", "full_analysis", or "unknown"
         """
         has_xgid = 'XGID=' in text
+        has_ogid = bool(re.match(r'^[0-9a-p]+:[0-9a-p]+:[A-Z0-9]{3}', text.strip()))
         has_gnuid = bool(re.match(r'^[A-Za-z0-9+/=]+:[A-Za-z0-9+/=]+$', text.strip()))
 
         # Check for analysis markers
@@ -203,10 +203,10 @@ class FormatDetector:
         has_board = bool(re.search(r'\+13-14-15-16-17-18', text))
 
         # Extract preview
-        preview = self._extract_preview(text, has_xgid, has_gnuid)
+        preview = self._extract_preview(text, has_xgid, has_ogid, has_gnuid)
 
         # Classification logic
-        if (has_xgid or has_gnuid):
+        if (has_xgid or has_ogid or has_gnuid):
             if has_checker_play or has_cube_decision or has_board:
                 return ("full_analysis", preview)
             else:
@@ -214,7 +214,7 @@ class FormatDetector:
 
         return ("unknown", preview)
 
-    def _extract_preview(self, text: str, has_xgid: bool, has_gnuid: bool) -> str:
+    def _extract_preview(self, text: str, has_xgid: bool, has_ogid: bool, has_gnuid: bool) -> str:
         """Extract a short preview of the position."""
         if has_xgid:
             match = re.search(r'XGID=([^\n]+)', text)
@@ -229,6 +229,18 @@ class FormatDetector:
                     return f"{player} to play {dice}"
 
                 return f"XGID={xgid}..."
+
+        elif has_ogid:
+            # Extract player/dice from OGID if possible
+            parts = text.strip().split(':')
+            if len(parts) >= 5:
+                dice = parts[3] if len(parts) > 3 and parts[3] else "to roll"
+                turn = parts[4] if len(parts) > 4 and parts[4] else ""
+                # OGID color is inverted: W sent → B on roll, B sent → W on roll
+                player = "Black" if turn == "W" else "White" if turn == "B" else "?"
+                if dice and dice != "to roll":
+                    return f"{player} to play {dice}"
+            return "OGID position"
 
         elif has_gnuid:
             return "GNUID position"

@@ -4,8 +4,10 @@ Convert eXtreme Gammon (XG) backgammon analysis into Anki flashcards for effecti
 
 ## Features
 
+- **Multiple position format support** - XGID (eXtreme Gammon), OGID (OpenGammon), and GNUID (GNU Backgammon)
 - **Direct XG export support** - Copy/paste positions from eXtreme Gammon
-- **Smart rendering** - Automatic board image generation from XGID
+- **Smart rendering** - Automatic board image generation from position IDs
+- **Automatic format detection** - Paste any supported format, the app detects it automatically
 - **Two output formats**:
   - AnkiConnect: Push directly to Anki (default, recommended)
   - APKG: Self-contained package for manual import
@@ -72,6 +74,51 @@ Score is X:3 O:4 5 pt.(s) match.
       Player:   79.46% (G:17.05% B:0.67%)
       Opponent: 20.54% (G:2.22% B:0.06%)
 ```
+
+## Supported Position Formats
+
+FlashGammon supports three backgammon position ID formats, with automatic detection:
+
+### XGID (eXtreme Gammon ID) - Primary Format
+**Format:** `XGID=PPPPPPPPPPPPPPPPPPPPPPPPPP:CV:CP:T:D:S1:S2:CJ:ML:MC`
+
+The standard XG format with 9 colon-separated fields including position, cube state, dice, and match info.
+
+**Example:**
+```
+XGID=---BBBBAAA---Ac-bbccbAA-A-:1:1:-1:63:4:3:0:5:8
+```
+
+### OGID (OpenGammon Position ID) - Alternative Format
+**Format:** `P1:P2:CUBE[:DICE[:TURN[:STATE[:S1[:S2[:ML[:MID[:NCHECKERS]]]]]]]]`
+
+Human-readable base-26 encoding with optional metadata fields. More verbose but easier to understand.
+
+**Example:**
+```
+cccccggggg:ddddiiiiii:N0N:63:W:IW:4:3:7:1:15
+```
+
+### GNUID (GNU Backgammon ID) - GnuBG Format
+**Format:** `PositionID:MatchID` (Base64 encoded)
+
+Compact format used by GNU Backgammon. 14-character Position ID + 12-character Match ID.
+
+**Example:**
+```
+4HPwATDgc/ABMA:8IhuACAACAAE
+```
+
+**⚠️ Known Limitation:** GNUID Position ID decoding is currently incomplete - only one player's checkers decode correctly. For full accuracy, prefer XGID or OGID formats. GNUID works best when combined with full analysis text or for match metadata extraction.
+
+### Format Detection
+
+The application **automatically detects** which format you're using. Just paste your position and FlashGammon will handle it:
+- XGID: Detected by `XGID=` prefix
+- OGID: Detected by base-26 pattern with colons
+- GNUID: Detected by base64 pattern
+
+You can mix formats in the same input - each position can use a different format!
 
 ## Output Formats
 
@@ -156,9 +203,10 @@ python -m flashgammon positions.txt --show-options
 - Check firewall isn't blocking localhost:8765
 
 **"No decisions found in input file"**
-- Ensure file includes XGID lines
+- Ensure file includes position ID lines (XGID, OGID, or GNUID format)
 - Make sure move analysis includes equity values (eq:)
 - Copy the full position from XG (press Ctrl+C)
+- For GNUID format: Consider using XGID or OGID instead due to known limitations
 
 ## For Developers
 
@@ -244,8 +292,9 @@ cd dist
   - `parsers/` - XG text format parsers
   - `renderer/` - Board image generation
   - `anki/` - Anki card generation and export
-  - `utils/` - XGID encoding/decoding
-- `tests/` - Unit tests
+  - `utils/` - Position format encoding/decoding (XGID, OGID, GNUID)
+  - `gui/` - GUI components and format detection
+- `tests/` - Unit tests (includes tests for all three formats)
 - `flashgammon.spec` - PyInstaller configuration
 - `build_executable.bat/.sh` - Build scripts
 

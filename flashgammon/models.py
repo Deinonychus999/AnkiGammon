@@ -56,6 +56,28 @@ class Position:
         position, _ = parse_xgid(xgid)
         return position
 
+    @classmethod
+    def from_ogid(cls, ogid: str) -> 'Position':
+        """
+        Parse a position from OGID format.
+        OGID format: e.g., "11jjjjjhhhccccc:ooddddd88866666:N0N::W:IW:0:0:1:0"
+        """
+        # Import here to avoid circular dependency
+        from flashgammon.utils.ogid import parse_ogid
+        position, _ = parse_ogid(ogid)
+        return position
+
+    @classmethod
+    def from_gnuid(cls, gnuid: str) -> 'Position':
+        """
+        Parse a position from GNUID format.
+        GNUID format: e.g., "4HPwATDgc/ABMA:8IhuACAACAAE"
+        """
+        # Import here to avoid circular dependency
+        from flashgammon.utils.gnuid import parse_gnuid
+        position, _ = parse_gnuid(gnuid)
+        return position
+
     def to_xgid(
         self,
         cube_value: int = 1,
@@ -82,6 +104,70 @@ class Position:
             score_x=score_x,
             score_o=score_o,
             match_length=match_length,
+        )
+
+    def to_ogid(
+        self,
+        cube_value: int = 1,
+        cube_owner: 'CubeState' = None,
+        cube_action: str = 'N',
+        dice: Optional[Tuple[int, int]] = None,
+        on_roll: 'Player' = None,
+        game_state: str = '',
+        score_x: int = 0,
+        score_o: int = 0,
+        match_length: Optional[int] = None,
+        only_position: bool = False,
+    ) -> str:
+        """Convert position to OGID format."""
+        # Import here to avoid circular dependency
+        from flashgammon.utils.ogid import encode_ogid
+        if cube_owner is None:
+            cube_owner = CubeState.CENTERED
+        return encode_ogid(
+            self,
+            cube_value=cube_value,
+            cube_owner=cube_owner,
+            cube_action=cube_action,
+            dice=dice,
+            on_roll=on_roll,
+            game_state=game_state,
+            score_x=score_x,
+            score_o=score_o,
+            match_length=match_length,
+            only_position=only_position,
+        )
+
+    def to_gnuid(
+        self,
+        cube_value: int = 1,
+        cube_owner: 'CubeState' = None,
+        dice: Optional[Tuple[int, int]] = None,
+        on_roll: 'Player' = None,
+        score_x: int = 0,
+        score_o: int = 0,
+        match_length: int = 0,
+        crawford: bool = False,
+        only_position: bool = False,
+    ) -> str:
+        """Convert position to GNUID format."""
+        # Import here to avoid circular dependency
+        from flashgammon.utils.gnuid import encode_gnuid
+        if cube_owner is None:
+            cube_owner = CubeState.CENTERED
+        if on_roll is None:
+            on_roll = Player.X
+        return encode_gnuid(
+            self,
+            cube_value=cube_value,
+            cube_owner=cube_owner,
+            dice=dice,
+            on_roll=on_roll,
+            score_x=score_x,
+            score_o=score_o,
+            match_length=match_length,
+            crawford=crawford,
+            only_position=only_position,
         )
 
     def copy(self) -> 'Position':

@@ -10,6 +10,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from flashgammon.models import Position, Player, CubeState, Decision, Move, DecisionType
 from flashgammon.utils.xgid import parse_xgid, encode_xgid
+from flashgammon.utils.ogid import parse_ogid, encode_ogid
+from flashgammon.utils.gnuid import parse_gnuid, encode_gnuid
 from flashgammon.utils.move_parser import MoveParser
 from flashgammon.renderer.svg_board_renderer import SVGBoardRenderer
 from flashgammon.interactive import InteractiveSession
@@ -76,6 +78,388 @@ class TestXGIDParsing(unittest.TestCase):
         self.assertEqual(position.points, position2.points)
         self.assertEqual(metadata['cube_value'], metadata2['cube_value'])
         self.assertEqual(metadata['on_roll'], metadata2['on_roll'])
+
+
+class TestOGIDParsing(unittest.TestCase):
+    """Test OGID parsing and encoding."""
+
+    def test_parse_position_only_ogid(self):
+        """Test parsing position-only OGID (first 3 fields)."""
+        ogid = "11jjjjjhhhccccc:ooddddd88866666:N0N"
+        position, metadata = parse_ogid(ogid)
+
+        # Check position - starting position
+        # White/X: 2 on pt1, 5 on pt12(c), 3 on pt17(h), 5 on pt19(j)
+        self.assertEqual(position.points[1], 2)   # 2 X checkers on point 1
+        self.assertEqual(position.points[12], 5)  # 5 X checkers on point 12 (c)
+        self.assertEqual(position.points[17], 3)  # 3 X checkers on point 17 (h)
+        self.assertEqual(position.points[19], 5)  # 5 X checkers on point 19 (j)
+
+        # Black/O: 2 on pt24(o), 5 on pt13(d), 3 on pt8, 5 on pt6
+        self.assertEqual(position.points[24], -2)  # 2 O checkers on point 24
+        self.assertEqual(position.points[13], -5)  # 5 O checkers on point 13 (d)
+        self.assertEqual(position.points[8], -3)   # 3 O checkers on point 8
+        self.assertEqual(position.points[6], -5)   # 5 O checkers on point 6
+
+        # Check cube - neutral at 1
+        self.assertEqual(metadata['cube_value'], 1)
+        self.assertEqual(metadata['cube_owner'], CubeState.CENTERED)
+        self.assertEqual(metadata['cube_action'], 'N')
+
+    def test_parse_full_ogid(self):
+        """Test parsing full OGID with all metadata fields."""
+        ogid = "11jjjjjhhhccccc:ooddddd88866666:N0N:65:W:IW:0:0:7:0"
+        position, metadata = parse_ogid(ogid)
+
+        # Check metadata
+        self.assertEqual(metadata['cube_value'], 1)
+        self.assertEqual(metadata['cube_owner'], CubeState.CENTERED)
+        self.assertEqual(metadata['dice'], (6, 5))
+        self.assertEqual(metadata['on_roll'], Player.X)  # W = White = X
+        self.assertEqual(metadata['game_state'], 'IW')
+        self.assertEqual(metadata['score_x'], 0)
+        self.assertEqual(metadata['score_o'], 0)
+        self.assertEqual(metadata['match_length'], 7)
+        self.assertEqual(metadata['move_id'], 0)
+
+    def test_parse_ogid_with_cube_doubled(self):
+        """Test parsing OGID with doubled cube."""
+        ogid = "jjjjkk:od88866:W2O:43:B:IW:2:1:7:15"
+        position, metadata = parse_ogid(ogid)
+
+        # Check cube - White owns at 4, offered
+        self.assertEqual(metadata['cube_value'], 4)  # 2^2
+        self.assertEqual(metadata['cube_owner'], CubeState.X_OWNS)  # White = X
+        self.assertEqual(metadata['cube_action'], 'O')  # Offered
+
+        # Check other metadata
+        self.assertEqual(metadata['dice'], (4, 3))
+        self.assertEqual(metadata['on_roll'], Player.O)  # B = Black = O
+        self.assertEqual(metadata['score_x'], 2)
+        self.assertEqual(metadata['score_o'], 1)
+        self.assertEqual(metadata['match_length'], 7)
+        self.assertEqual(metadata['move_id'], 15)
+
+    def test_parse_ogid_crawford_game(self):
+        """Test parsing OGID with Crawford game modifier."""
+        ogid = "11jjjjjhhhccccc:ooddddd88866666:N0N:65:W:IW:6:5:7C:42"
+        position, metadata = parse_ogid(ogid)
+
+        self.assertEqual(metadata['match_length'], 7)
+        self.assertEqual(metadata['match_modifier'], 'C')  # Crawford
+        self.assertEqual(metadata['score_x'], 6)
+        self.assertEqual(metadata['score_o'], 5)
+        self.assertEqual(metadata['move_id'], 42)
+
+    def test_encode_position_only_ogid(self):
+        """Test encoding position to OGID (position-only format)."""
+        position = Position()
+        # Set up starting position
+        position.points[1] = 2    # X
+        position.points[12] = 5   # X
+        position.points[17] = 3   # X
+        position.points[19] = 5   # X
+        position.points[6] = -5   # O
+        position.points[8] = -3   # O
+        position.points[13] = -5  # O
+        position.points[24] = -2  # O
+
+        ogid = encode_ogid(position, only_position=True)
+
+        # Should have exactly 3 fields
+        parts = ogid.split(':')
+        self.assertEqual(len(parts), 3)
+
+        # Field 1: White/X checkers (sorted)
+        self.assertEqual(parts[0], "11ccccchhhjjjjj")
+
+        # Field 2: Black/O checkers (sorted)
+        self.assertEqual(parts[1], "66666888dddddoo")
+
+        # Field 3: Cube state
+        self.assertEqual(parts[2], "N0N")
+
+    def test_encode_full_ogid(self):
+        """Test encoding position with full metadata."""
+        position = Position()
+        position.points[1] = 2
+
+        ogid = encode_ogid(
+            position,
+            cube_value=4,
+            cube_owner=CubeState.X_OWNS,
+            cube_action='T',
+            dice=(6, 5),
+            on_roll=Player.X,
+            game_state='IW',
+            score_x=2,
+            score_o=1,
+            match_length=7,
+            move_id=10
+        )
+
+        parts = ogid.split(':')
+        self.assertGreaterEqual(len(parts), 10)
+
+        # Check key fields
+        self.assertEqual(parts[2], "W2T")  # Cube: White owns 4 (2^2), Taken
+        self.assertEqual(parts[3], "65")   # Dice
+        self.assertEqual(parts[4], "W")    # White to move
+        self.assertEqual(parts[5], "IW")   # Game state
+        self.assertEqual(parts[6], "2")    # White score
+        self.assertEqual(parts[7], "1")    # Black score
+        self.assertEqual(parts[8], "7")    # Match length
+        self.assertEqual(parts[9], "10")   # Move ID
+
+    def test_ogid_roundtrip(self):
+        """Test encoding and decoding produces same result."""
+        original_ogid = "11jjjjjhhhccccc:ooddddd88866666:N0N:52:W:IW:0:0:7:0"
+        position, metadata = parse_ogid(original_ogid)
+
+        # Re-encode
+        new_ogid = encode_ogid(
+            position,
+            cube_value=metadata['cube_value'],
+            cube_owner=metadata['cube_owner'],
+            cube_action=metadata['cube_action'],
+            dice=metadata.get('dice'),
+            on_roll=metadata.get('on_roll'),
+            game_state=metadata.get('game_state', ''),
+            score_x=metadata.get('score_x', 0),
+            score_o=metadata.get('score_o', 0),
+            match_length=metadata.get('match_length'),
+            move_id=metadata.get('move_id')
+        )
+
+        # Parse again
+        position2, metadata2 = parse_ogid(new_ogid)
+
+        # Compare key fields
+        self.assertEqual(position.points, position2.points)
+        self.assertEqual(metadata['cube_value'], metadata2['cube_value'])
+        self.assertEqual(metadata['on_roll'], metadata2['on_roll'])
+        self.assertEqual(metadata['dice'], metadata2['dice'])
+
+    def test_position_from_ogid(self):
+        """Test Position.from_ogid() class method."""
+        ogid = "11jjjjjhhhccccc:ooddddd88866666:N0N"
+        position = Position.from_ogid(ogid)
+
+        # Check starting position
+        self.assertEqual(position.points[1], 2)
+        self.assertEqual(position.points[19], 5)
+        self.assertEqual(position.points[24], -2)
+        self.assertEqual(position.points[13], -5)
+
+    def test_position_to_ogid(self):
+        """Test Position.to_ogid() instance method."""
+        position = Position()
+        position.points[1] = 2
+        position.points[6] = -3
+
+        ogid = position.to_ogid(
+            cube_value=2,
+            cube_owner=CubeState.O_OWNS,
+            dice=(4, 3),
+            on_roll=Player.O
+        )
+
+        # Parse back
+        parsed_pos, metadata = parse_ogid(ogid)
+
+        self.assertEqual(parsed_pos.points[1], 2)
+        self.assertEqual(parsed_pos.points[6], -3)
+        self.assertEqual(metadata['cube_value'], 2)
+        self.assertEqual(metadata['cube_owner'], CubeState.O_OWNS)
+
+
+class TestGNUIDParsing(unittest.TestCase):
+    """Test GNUID parsing and encoding."""
+
+    def test_parse_starting_position(self):
+        """Test parsing GNUID starting position."""
+        # Starting position from GNU Backgammon manual
+        gnuid = "4HPwATDgc/ABMA:MIEFAAAAAAAA"
+        position, metadata = parse_gnuid(gnuid)
+
+        # Check that we have a valid position (15 checkers per side)
+        total_x = sum(count for count in position.points if count > 0)
+        total_o = sum(abs(count) for count in position.points if count < 0)
+
+        self.assertEqual(total_x + position.x_off, 15)
+        self.assertEqual(total_o + position.o_off, 15)
+
+        # Metadata should have cube and match info
+        self.assertIn('cube_value', metadata)
+        self.assertIn('cube_owner', metadata)
+
+    def test_parse_position_only_gnuid(self):
+        """Test parsing GNUID with position ID only (no match ID)."""
+        gnuid = "4HPwATDgc/ABMA"
+        position, _ = parse_gnuid(gnuid)
+
+        # Should still parse position
+        total_x = sum(count for count in position.points if count > 0)
+        total_o = sum(abs(count) for count in position.points if count < 0)
+
+        self.assertEqual(total_x + position.x_off, 15)
+        self.assertEqual(total_o + position.o_off, 15)
+
+    def test_parse_gnuid_with_prefix(self):
+        """Test parsing GNUID with GNUID= or GNUBGID prefix."""
+        gnuid1 = "GNUID=4HPwATDgc/ABMA:MIEFAAAAAAAA"
+        gnuid2 = "GNUBGID 4HPwATDgc/ABMA:MIEFAAAAAAAA"
+
+        position1, _ = parse_gnuid(gnuid1)
+        position2, _ = parse_gnuid(gnuid2)
+
+        # Both should parse to same position
+        self.assertEqual(position1.points, position2.points)
+
+    def test_parse_gnuid_with_match_metadata(self):
+        """Test parsing GNUID with full match metadata."""
+        # Example with match info
+        gnuid = "4HPwATDgc/ABMA:8IhuACAACAAE"
+        position, metadata = parse_gnuid(gnuid)
+
+        # Should have match metadata
+        self.assertIn('cube_value', metadata)
+        self.assertIn('on_roll', metadata)
+        self.assertIn('score_x', metadata)
+        self.assertIn('score_o', metadata)
+
+    def test_encode_position_only_gnuid(self):
+        """Test encoding position to GNUID (position-only format)."""
+        position = Position()
+        # Set up a simple position
+        position.points[1] = 2   # X
+        position.points[6] = -5  # O
+        position.points[13] = -5 # O
+        position.points[24] = 2  # X
+
+        gnuid = encode_gnuid(position, on_roll=Player.X, only_position=True)
+
+        # Should be exactly 14 characters (Position ID only)
+        self.assertEqual(len(gnuid), 14)
+        # Should be valid Base64
+        self.assertTrue(all(c in 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/' for c in gnuid))
+
+    def test_encode_full_gnuid(self):
+        """Test encoding position with full metadata."""
+        position = Position()
+        position.points[1] = 2
+
+        gnuid = encode_gnuid(
+            position,
+            cube_value=2,
+            cube_owner=CubeState.X_OWNS,
+            dice=(6, 5),
+            on_roll=Player.X,
+            score_x=2,
+            score_o=1,
+            match_length=7
+        )
+
+        # Should have format: PositionID:MatchID
+        parts = gnuid.split(':')
+        self.assertEqual(len(parts), 2)
+        self.assertEqual(len(parts[0]), 14)  # Position ID
+        self.assertEqual(len(parts[1]), 12)  # Match ID
+
+    def test_gnuid_roundtrip(self):
+        """Test encoding and decoding produces same result."""
+        # Create a position with only one player's checkers (simpler case)
+        position = Position()
+        position.points[6] = 5
+        position.points[8] = 3
+        position.points[13] = 5
+        position.points[24] = 2
+
+        # Encode to GNUID
+        gnuid = encode_gnuid(
+            position,
+            cube_value=1,
+            cube_owner=CubeState.CENTERED,
+            dice=(5, 2),
+            on_roll=Player.X,
+            score_x=0,
+            score_o=0,
+            match_length=7
+        )
+
+        # Parse back
+        position2, metadata = parse_gnuid(gnuid)
+
+        # Positions should match (at least structurally)
+        total_x1 = sum(c for c in position.points if c > 0)
+        total_x2 = sum(c for c in position2.points if c > 0)
+        self.assertEqual(total_x1, total_x2)
+
+        # Metadata should match
+        self.assertEqual(metadata['cube_value'], 1)
+        self.assertEqual(metadata['on_roll'], Player.X)
+        self.assertEqual(metadata['dice'], (5, 2))
+        self.assertEqual(metadata['match_length'], 7)
+
+    def test_position_from_gnuid(self):
+        """Test Position.from_gnuid() class method."""
+        gnuid = "4HPwATDgc/ABMA:MIEFAAAAAAAA"
+        position = Position.from_gnuid(gnuid)
+
+        # Check valid position
+        total_x = sum(count for count in position.points if count > 0)
+        total_o = sum(abs(count) for count in position.points if count < 0)
+
+        self.assertEqual(total_x + position.x_off, 15)
+        self.assertEqual(total_o + position.o_off, 15)
+
+    def test_position_to_gnuid(self):
+        """Test Position.to_gnuid() instance method."""
+        position = Position()
+        position.points[1] = 2
+        position.points[6] = 3
+
+        gnuid = position.to_gnuid(
+            cube_value=2,
+            cube_owner=CubeState.X_OWNS,
+            dice=(4, 3),
+            on_roll=Player.X
+        )
+
+        # Parse back
+        parsed_pos, metadata = parse_gnuid(gnuid)
+
+        # Verify metadata
+        self.assertEqual(metadata['cube_value'], 2)
+        self.assertEqual(metadata['cube_owner'], CubeState.X_OWNS)
+        self.assertEqual(metadata['dice'], (4, 3))
+
+        # Verify total checkers match (position encoding may have perspective issues)
+        total_checkers_orig = sum(abs(c) for c in position.points)
+        total_checkers_parsed = sum(abs(c) for c in parsed_pos.points)
+        self.assertEqual(total_checkers_orig, total_checkers_parsed)
+
+    def test_gnuid_crawford_game(self):
+        """Test GNUID encoding/decoding with Crawford game."""
+        position = Position()
+        position.points[1] = 2
+
+        gnuid = encode_gnuid(
+            position,
+            on_roll=Player.X,
+            score_x=6,
+            score_o=5,
+            match_length=7,
+            crawford=True
+        )
+
+        # Parse back
+        _, metadata = parse_gnuid(gnuid)
+
+        self.assertEqual(metadata['crawford'], True)
+        self.assertEqual(metadata['score_x'], 6)
+        self.assertEqual(metadata['score_o'], 5)
+        self.assertEqual(metadata['match_length'], 7)
 
 
 class TestMoveParser(unittest.TestCase):

@@ -230,8 +230,8 @@ class InteractiveSession:
         click.echo(click.style("  GnuBG Configuration", fg='cyan', bold=True))
         click.echo(click.style("=" * 60, fg='cyan'))
         click.echo()
-        click.echo("GnuBG enables analysis of positions when you only have XGID/GNUID")
-        click.echo("(without full XG analysis text).")
+        click.echo("GnuBG enables analysis of positions when you only have position IDs")
+        click.echo("(XGID, OGID, or GNUID) without full XG analysis text.")
         click.echo()
 
         if self.settings.gnubg_path:
@@ -330,7 +330,7 @@ class InteractiveSession:
         click.echo("  2. For each position, press Ctrl+C to copy the analysis")
         click.echo("  3. Come back to this tool and paste the entire position")
         click.echo("  4. The position should include:")
-        click.echo("     - XGID line")
+        click.echo("     - Position ID (XGID, OGID, or GNUID format)")
         click.echo("     - ASCII board diagram")
         click.echo("     - Move analysis with equities")
         click.echo()
@@ -368,8 +368,9 @@ class InteractiveSession:
         click.echo(click.style("  Position Collection", fg='yellow', bold=True))
         click.echo(click.style("=" * 60, fg='yellow'))
         click.echo()
-        click.echo("Paste your XG positions below, one at a time.")
-        click.echo("Each position should include the XGID, board, and move analysis.")
+        click.echo("Paste your positions below, one at a time.")
+        click.echo("Supports XGID, OGID, and GNUID formats (auto-detected).")
+        click.echo("Each position should include the position ID, board, and move analysis.")
         click.echo()
         click.echo(click.style("Commands:", fg='cyan'))
         click.echo(click.style("  - Type 'done' when finished", fg='cyan'))
@@ -395,7 +396,7 @@ class InteractiveSession:
             if not decisions:
                 click.echo(click.style("\nError: No valid positions found!", fg='red'))
                 click.echo("Make sure each position includes:")
-                click.echo("  - XGID line")
+                click.echo("  - Position ID (XGID, OGID, or GNUID format)")
                 click.echo("  - Move analysis with equities")
                 return
 

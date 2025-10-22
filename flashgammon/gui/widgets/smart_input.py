@@ -54,8 +54,8 @@ class SmartInputWidget(QWidget):
             "Paste XG analysis or position IDs here...\n\n"
             "Examples:\n"
             "• Full XG analysis (Ctrl+C from eXtreme Gammon)\n"
-            "• XGID lines (one per line)\n"
-            "• GNUID format"
+            "• XGID, OGID, or GNUID position IDs (one per line)\n"
+            "• Mixed formats supported - auto-detected"
         )
 
         # Use fixed-width font for better XGID readability
@@ -246,7 +246,7 @@ class SmartInputWidget(QWidget):
             self.feedback_title.setStyleSheet("font-weight: 600; font-size: 13px; color: #fab387;")
             self.feedback_title.setText(f"{result.details}")
 
-            warning_text = "Paste XGID/GNUID or full XG analysis text"
+            warning_text = "Paste XGID/OGID/GNUID or full XG analysis text"
             if result.warnings:
                 warning_text = "\n".join(result.warnings)
 

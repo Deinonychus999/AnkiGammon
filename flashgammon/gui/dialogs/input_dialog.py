@@ -2,7 +2,7 @@
 Smart input dialog for adding positions via paste.
 
 Supports:
-- Position IDs (XGID/GNUID) - analyzed with GnuBG
+- Position IDs (XGID/OGID/GNUID) - analyzed with GnuBG
 - Full XG analysis text - parsed directly
 """
 
@@ -21,8 +21,11 @@ from PySide6.QtGui import QAction, QKeyEvent
 from PySide6.QtWebEngineWidgets import QWebEngineView
 
 from flashgammon.settings import Settings
-from flashgammon.models import Decision
+from flashgammon.models import Decision, Position, Player, CubeState, DecisionType
 from flashgammon.parsers.xg_text_parser import XGTextParser
+from flashgammon.utils.gnuid import parse_gnuid
+from flashgammon.utils.ogid import parse_ogid
+from flashgammon.utils.xgid import parse_xgid
 from flashgammon.renderer.svg_board_renderer import SVGBoardRenderer
 from flashgammon.renderer.color_schemes import get_scheme
 from flashgammon.gui.widgets import SmartInputWidget
@@ -147,7 +150,7 @@ class InputDialog(QDialog):
 
     Allows users to paste:
     - Full XG analysis text (parsed directly)
-    - Position IDs (XGID/GNUID) - analyzed with GnuBG
+    - Position IDs (XGID/OGID/GNUID) - analyzed with GnuBG
 
     Signals:
         positions_added(List[Decision]): Emitted when positions are added
@@ -393,7 +396,7 @@ class InputDialog(QDialog):
                 self,
                 "Invalid Format",
                 "Could not detect valid position format.\n\n"
-                "Please paste XGID/GNUID or full XG analysis text."
+                "Please paste XGID/OGID/GNUID or full XG analysis text."
             )
             return
 
@@ -450,15 +453,94 @@ class InputDialog(QDialog):
 
     def _parse_input(self, text: str, format_type: InputFormat) -> List[Decision]:
         """Parse input text into Decision objects."""
-        if format_type == InputFormat.FULL_ANALYSIS or format_type == InputFormat.POSITION_IDS:
+        if format_type == InputFormat.FULL_ANALYSIS:
             # Use XGTextParser for full analysis
             decisions = XGTextParser.parse_string(text)
+            return decisions
 
-            # For position IDs, decisions will have empty candidate_moves
-            # We'll mark them for GnuBG analysis later
+        elif format_type == InputFormat.POSITION_IDS:
+            # Try parsing as position IDs (XGID, GNUID, or OGID)
+            decisions = []
+
+            # Split by lines
+            lines = [line.strip() for line in text.split('\n') if line.strip()]
+
+            for line in lines:
+                decision = self._parse_position_id(line)
+                if decision:
+                    decisions.append(decision)
+
             return decisions
 
         return []
+
+    def _parse_position_id(self, position_id: str) -> Decision:
+        """
+        Parse a single position ID (XGID, GNUID, or OGID) into a Decision.
+
+        Args:
+            position_id: Position ID string
+
+        Returns:
+            Decision object or None if parsing fails
+        """
+        # Try XGID first
+        if 'XGID=' in position_id or ':' in position_id:
+            try:
+                position, metadata = parse_xgid(position_id)
+                return self._create_decision_from_metadata(position, metadata)
+            except:
+                pass
+
+        # Try GNUID (14:12 Base64 format)
+        if ':' in position_id:
+            parts = position_id.split(':')
+            if len(parts) >= 2 and len(parts[0]) == 14 and len(parts[1]) == 12:
+                try:
+                    position, metadata = parse_gnuid(position_id)
+                    return self._create_decision_from_metadata(position, metadata)
+                except:
+                    pass
+
+        # Try OGID (base-26 format)
+        if ':' in position_id:
+            try:
+                position, metadata = parse_ogid(position_id)
+                return self._create_decision_from_metadata(position, metadata)
+            except:
+                pass
+
+        return None
+
+    def _create_decision_from_metadata(self, position: Position, metadata: dict) -> Decision:
+        """Create a Decision object from position and metadata."""
+        from flashgammon.utils.xgid import encode_xgid
+
+        # Generate XGID for GnuBG analysis
+        xgid = encode_xgid(
+            position=position,
+            cube_value=metadata.get('cube_value', 1),
+            cube_owner=metadata.get('cube_owner', CubeState.CENTERED),
+            dice=metadata.get('dice'),
+            on_roll=metadata.get('on_roll', Player.X),
+            score_x=metadata.get('score_x', 0),
+            score_o=metadata.get('score_o', 0),
+            match_length=metadata.get('match_length', 0)
+        )
+
+        return Decision(
+            position=position,
+            xgid=xgid,
+            on_roll=metadata.get('on_roll', Player.X),
+            dice=metadata.get('dice'),
+            score_x=metadata.get('score_x', 0),
+            score_o=metadata.get('score_o', 0),
+            match_length=metadata.get('match_length', 0),
+            cube_value=metadata.get('cube_value', 1),
+            cube_owner=metadata.get('cube_owner', CubeState.CENTERED),
+            decision_type=DecisionType.CUBE_ACTION if not metadata.get('dice') else DecisionType.CHECKER_PLAY,
+            candidate_moves=[]  # Empty moves list - will be filled by GnuBG analysis
+        )
 
     @Slot()
     def _on_clear_all_clicked(self):

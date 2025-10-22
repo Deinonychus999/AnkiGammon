@@ -46,6 +46,10 @@ class GNUBGAnalyzer:
             ValueError: If position_id format is invalid
             subprocess.CalledProcessError: If gnubg execution fails
         """
+        # Validate position_id
+        if position_id is None:
+            raise ValueError("position_id cannot be None. Decision object must have xgid field populated.")
+
         # Determine if it's XGID or GNUID and extract decision type
         decision_type = self._determine_decision_type(position_id)
 

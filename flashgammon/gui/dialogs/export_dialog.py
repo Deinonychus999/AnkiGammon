@@ -59,7 +59,7 @@ class AnalysisWorker(QThread):
             analyzed_decisions = list(self.decisions)  # Copy list
 
             for idx, (pos_idx, decision) in enumerate(positions_to_analyze):
-                self.progress.emit(idx + 1, total)
+                self.progress.emit(idx, total)  # Emit current progress before starting
                 self.status_message.emit(
                     f"Analyzing position {idx + 1} of {total} with GnuBG ({self.settings.gnubg_analysis_ply}-ply)..."
                 )
@@ -72,6 +72,9 @@ class AnalysisWorker(QThread):
                     decision_type
                 )
                 analyzed_decisions[pos_idx] = analyzed_decision
+
+                # Emit progress after completing this position
+                self.progress.emit(idx + 1, total)
 
             self.finished.emit(True, f"Analyzed {total} position(s)", analyzed_decisions)
 
@@ -406,8 +409,9 @@ class ExportDialog(QDialog):
 
     @Slot(int, int)
     def on_analysis_progress(self, current, total):
-        """Update progress bar for analysis."""
-        self.progress_bar.setValue(int((current / total) * 100))
+        """Update progress bar for analysis (0-50% of total progress)."""
+        # Analysis takes first half of progress bar (0-50%)
+        self.progress_bar.setValue(int((current / total) * 50))
 
     @Slot(bool, str, list)
     def on_analysis_finished(self, success, message, analyzed_decisions):
@@ -427,12 +431,20 @@ class ExportDialog(QDialog):
 
     @Slot(float)
     def on_progress(self, progress_fraction):
-        """Update progress bar.
+        """Update progress bar for export (50-100% of total progress).
 
         Args:
             progress_fraction: Progress as a fraction from 0.0 to 1.0
         """
-        self.progress_bar.setValue(int(progress_fraction * 100))
+        # Export takes second half of progress bar (50-100%)
+        # If no analysis was needed, this will go from 0-100% as expected
+        # If analysis was performed, this will go from 50-100%
+        if hasattr(self, 'analysis_worker') and self.analysis_worker is not None:
+            # Analysis was performed, map 0.0-1.0 to 50-100%
+            self.progress_bar.setValue(50 + int(progress_fraction * 50))
+        else:
+            # No analysis, map 0.0-1.0 to 0-100%
+            self.progress_bar.setValue(int(progress_fraction * 100))
 
     @Slot(str)
     def on_status_message(self, message):

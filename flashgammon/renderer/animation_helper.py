@@ -41,7 +41,11 @@ class AnimationHelper:
                 # Remove the repetition notation from the part
                 part = re.sub(r'\(\d+\)$', '', part)
 
-            from_str, to_str = part.split('/')
+            # Split on first '/' only to handle edge cases with multiple slashes
+            split_result = part.split('/', 1)
+            if len(split_result) != 2:
+                continue
+            from_str, to_str = split_result
 
             # Remove asterisk (hit indicator) from notation
             from_str = from_str.rstrip('*')
