@@ -160,6 +160,7 @@ class MainWindow(QMainWindow):
         # Position list widget
         self.position_list = PositionListWidget()
         self.position_list.position_selected.connect(self.show_decision)
+        self.position_list.position_deleted.connect(self.on_position_deleted)
         layout.addWidget(self.position_list, stretch=1)
 
         # Spacer
@@ -287,6 +288,98 @@ class MainWindow(QMainWindow):
 
         # Update position list
         self.position_list.set_decisions(self.current_decisions)
+
+    @Slot(int)
+    def on_position_deleted(self, index: int):
+        """Handle position deletion from list."""
+        if 0 <= index < len(self.current_decisions):
+            # Remove from decisions list
+            deleted = self.current_decisions.pop(index)
+
+            # Update position list with new indices
+            self.position_list.set_decisions(self.current_decisions)
+
+            # Disable export if no positions remain
+            if not self.current_decisions:
+                self.btn_export.setEnabled(False)
+                # Show welcome screen
+                welcome_html = """
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <style>
+                        body {
+                            margin: 0;
+                            padding: 0;
+                            display: flex;
+                            flex-direction: column;
+                            justify-content: center;
+                            align-items: center;
+                            min-height: 100vh;
+                            background: linear-gradient(135deg, #1e1e2e 0%, #181825 100%);
+                            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                            color: #cdd6f4;
+                        }
+                        .welcome {
+                            text-align: center;
+                            padding: 40px;
+                        }
+                        h1 {
+                            color: #f5e0dc;
+                            font-size: 32px;
+                            margin-bottom: 16px;
+                            font-weight: 700;
+                        }
+                        p {
+                            color: #a6adc8;
+                            font-size: 16px;
+                            margin: 8px 0;
+                        }
+                        .icon {
+                            margin-bottom: 24px;
+                            opacity: 0.6;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="welcome">
+                        <div class="icon">
+                            <svg width="140" height="90" viewBox="-5 0 90 45" xmlns="http://www.w3.org/2000/svg">
+                                <!-- First die -->
+                                <g transform="translate(0, 10)">
+                                    <rect x="2" y="2" width="32" height="32" rx="4"
+                                          fill="#f5e0dc" stroke="#45475a" stroke-width="1.5"
+                                          transform="rotate(-15 18 18)"/>
+                                    <!-- Pips for 5 -->
+                                    <circle cx="10" cy="10" r="2.5" fill="#1e1e2e" transform="rotate(-15 18 18)"/>
+                                    <circle cx="26" cy="10" r="2.5" fill="#1e1e2e" transform="rotate(-15 18 18)"/>
+                                    <circle cx="18" cy="18" r="2.5" fill="#1e1e2e" transform="rotate(-15 18 18)"/>
+                                    <circle cx="10" cy="26" r="2.5" fill="#1e1e2e" transform="rotate(-15 18 18)"/>
+                                    <circle cx="26" cy="26" r="2.5" fill="#1e1e2e" transform="rotate(-15 18 18)"/>
+                                </g>
+
+                                <!-- Second die -->
+                                <g transform="translate(36, 0)">
+                                    <rect x="2" y="2" width="32" height="32" rx="4"
+                                          fill="#f5e0dc" stroke="#45475a" stroke-width="1.5"
+                                          transform="rotate(12 18 18)"/>
+                                    <!-- Pips for 3 -->
+                                    <circle cx="10" cy="10" r="2.5" fill="#1e1e2e" transform="rotate(12 18 18)"/>
+                                    <circle cx="18" cy="18" r="2.5" fill="#1e1e2e" transform="rotate(12 18 18)"/>
+                                    <circle cx="26" cy="26" r="2.5" fill="#1e1e2e" transform="rotate(12 18 18)"/>
+                                </g>
+                            </svg>
+                        </div>
+                        <h1>No Position Loaded</h1>
+                        <p>Add positions to get started</p>
+                    </div>
+                </body>
+                </html>
+                """
+                self.preview.setHtml(welcome_html)
+
+            # Update status bar
+            self.statusBar().showMessage(f"Deleted position #{index + 1}", 3000)
 
     @Slot(list)
     def on_decisions_loaded(self, decisions):

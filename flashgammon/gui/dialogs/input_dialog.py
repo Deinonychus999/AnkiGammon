@@ -14,9 +14,10 @@ import qtawesome as qta
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
     QLabel, QListWidget, QListWidgetItem, QMessageBox,
-    QFrame, QSplitter, QWidget, QProgressDialog
+    QFrame, QSplitter, QWidget, QProgressDialog, QMenu
 )
 from PySide6.QtCore import Qt, Signal, Slot
+from PySide6.QtGui import QAction, QKeyEvent
 from PySide6.QtWebEngineWidgets import QWebEngineView
 
 from flashgammon.settings import Settings
@@ -58,6 +59,86 @@ class PendingPositionItem(QListWidgetItem):
             tooltip += f"\n\n{len(self.decision.candidate_moves)} moves analyzed"
 
         self.setToolTip(tooltip)
+
+
+class PendingListWidget(QListWidget):
+    """Custom list widget for pending positions with deletion support."""
+
+    item_deleted = Signal(int)  # Emits index of deleted item
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+        # Enable context menu
+        self.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.customContextMenuRequested.connect(self._show_context_menu)
+
+        # Set styling
+        self.setStyleSheet("""
+            QListWidget {
+                background-color: #1e1e2e;
+                border: 2px solid #313244;
+                border-radius: 8px;
+                padding: 8px;
+            }
+            QListWidget::item {
+                padding: 8px;
+                border-radius: 4px;
+                color: #cdd6f4;
+            }
+            QListWidget::item:selected {
+                background-color: #45475a;
+            }
+            QListWidget::item:hover {
+                background-color: #313244;
+            }
+        """)
+
+    @Slot()
+    def _show_context_menu(self, pos):
+        """Show context menu for delete action."""
+        item = self.itemAt(pos)
+        if not item or not isinstance(item, PendingPositionItem):
+            return
+
+        # Create context menu
+        menu = QMenu(self)
+
+        # Delete action with icon
+        delete_action = QAction(
+            qta.icon('fa6s.trash', color='#f38ba8'),  # Red delete icon
+            "Delete",
+            self
+        )
+        delete_action.triggered.connect(lambda: self._delete_item(item))
+        menu.addAction(delete_action)
+
+        # Show menu at cursor position
+        menu.exec(self.mapToGlobal(pos))
+
+    def _delete_item(self, item: PendingPositionItem):
+        """Delete an item from the list with confirmation."""
+        reply = QMessageBox.question(
+            self,
+            "Delete Position",
+            f"Delete pending position?\n\n{item.decision.get_short_display_text()}",
+            QMessageBox.Yes | QMessageBox.No
+        )
+
+        if reply == QMessageBox.Yes:
+            row = self.row(item)
+            self.takeItem(row)
+            # Emit signal with the row index
+            self.item_deleted.emit(row)
+
+    def keyPressEvent(self, event: QKeyEvent):
+        """Handle keyboard events for deletion."""
+        if event.key() in (Qt.Key_Delete, Qt.Key_Backspace):
+            item = self.currentItem()
+            if item and isinstance(item, PendingPositionItem):
+                self._delete_item(item)
+        else:
+            super().keyPressEvent(event)
 
 
 class InputDialog(QDialog):
@@ -258,27 +339,9 @@ class InputDialog(QDialog):
         splitter.setChildrenCollapsible(False)  # Prevent collapsing sections
 
         # Top section: Pending list
-        self.pending_list = QListWidget()
-        self.pending_list.setStyleSheet("""
-            QListWidget {
-                background-color: #1e1e2e;
-                border: 2px solid #313244;
-                border-radius: 8px;
-                padding: 8px;
-            }
-            QListWidget::item {
-                padding: 8px;
-                border-radius: 4px;
-                color: #cdd6f4;
-            }
-            QListWidget::item:selected {
-                background-color: #45475a;
-            }
-            QListWidget::item:hover {
-                background-color: #313244;
-            }
-        """)
+        self.pending_list = PendingListWidget()
         self.pending_list.currentItemChanged.connect(self._on_selection_changed)
+        self.pending_list.item_deleted.connect(self._on_item_deleted)
         splitter.addWidget(self.pending_list)
 
         # Bottom section: Preview pane
@@ -415,6 +478,20 @@ class InputDialog(QDialog):
             self.pending_list.clear()
             self._update_count_label()
             self.preview.setHtml(self._get_empty_preview_html())
+
+    @Slot(int)
+    def _on_item_deleted(self, index: int):
+        """Handle deletion of a pending item."""
+        if 0 <= index < len(self.pending_decisions):
+            # Remove from pending decisions list
+            self.pending_decisions.pop(index)
+
+            # Update count label
+            self._update_count_label()
+
+            # Clear preview if no items remain or no selection
+            if not self.pending_decisions:
+                self.preview.setHtml(self._get_empty_preview_html())
 
     @Slot(QListWidgetItem, QListWidgetItem)
     def _on_selection_changed(self, current, previous):
