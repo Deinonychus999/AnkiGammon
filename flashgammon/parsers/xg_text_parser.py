@@ -92,6 +92,17 @@ class XGTextParser:
         # Parse global winning chances (for cube decisions)
         winning_chances = XGTextParser._parse_winning_chances(analysis_section)
 
+        # Determine decision type
+        # If not explicitly set in metadata, infer from dice:
+        # - No dice (dice='00' in XGID) = CUBE_ACTION
+        # - Has dice = CHECKER_PLAY
+        if 'decision_type' in metadata:
+            decision_type = metadata['decision_type']
+        elif 'dice' not in metadata or metadata.get('dice') is None:
+            decision_type = DecisionType.CUBE_ACTION
+        else:
+            decision_type = DecisionType.CHECKER_PLAY
+
         # Create decision
         decision = Decision(
             position=position,
@@ -103,7 +114,7 @@ class XGTextParser:
             match_length=metadata.get('match_length', 0),
             cube_value=metadata.get('cube_value', 1),
             cube_owner=metadata.get('cube_owner', CubeState.CENTERED),
-            decision_type=metadata.get('decision_type', DecisionType.CHECKER_PLAY),
+            decision_type=decision_type,
             candidate_moves=moves,
             player_win_pct=winning_chances.get('player_win_pct'),
             player_gammon_pct=winning_chances.get('player_gammon_pct'),

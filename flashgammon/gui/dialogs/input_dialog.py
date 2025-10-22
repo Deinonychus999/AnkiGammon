@@ -41,21 +41,8 @@ class PendingPositionItem(QListWidgetItem):
 
     def _update_display(self):
         """Update display text based on decision."""
-        from flashgammon.models import DecisionType
-
-        decision_type = "Checker" if self.decision.decision_type == DecisionType.CHECKER_PLAY else "Cube"
-
-        # Get player name
-        player = "White" if self.decision.on_roll.value == 1 else "Black"
-
-        # Get dice display
-        if self.decision.dice:
-            dice_str = f"{self.decision.dice[0]}-{self.decision.dice[1]}"
-        else:
-            dice_str = "—"
-
-        # Set text without emoji
-        self.setText(f"{decision_type} | {player} | {dice_str}")
+        # Use consistent display format
+        self.setText(self.decision.get_short_display_text())
 
         # Icon based on status - use semantic colors
         if self.needs_analysis:
@@ -63,15 +50,12 @@ class PendingPositionItem(QListWidgetItem):
         else:
             self.setIcon(qta.icon('fa6s.circle-check', color='#a6e3a1'))  # Success green
 
-        # Tooltip with more info
-        tooltip = f"Decision Type: {decision_type}\n"
-        tooltip += f"On Roll: {player}\n"
-        if self.decision.dice:
-            tooltip += f"Dice: {dice_str}\n"
+        # Tooltip with metadata + analysis status
+        tooltip = self.decision.get_metadata_text()
         if self.needs_analysis:
-            tooltip += "\nNeeds GnuBG analysis"
+            tooltip += "\n\nNeeds GnuBG analysis"
         else:
-            tooltip += f"\n{len(self.decision.candidate_moves)} moves analyzed"
+            tooltip += f"\n\n{len(self.decision.candidate_moves)} moves analyzed"
 
         self.setToolTip(tooltip)
 

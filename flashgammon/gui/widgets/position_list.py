@@ -21,11 +21,7 @@ class PositionListItem(QListWidgetItem):
         self.index = index
 
         # Set display text
-        decision_type = "Checker" if decision.decision_type == DecisionType.CHECKER_PLAY else "Cube"
-        on_roll = "White" if decision.on_roll == Player.X else "Black"
-        dice_str = f"{decision.dice[0]}{decision.dice[1]}" if decision.dice else "—"
-
-        self.setText(f"#{index + 1}: {decision_type} | {on_roll} | {dice_str}")
+        self.setText(f"#{index + 1}: {decision.get_short_display_text()}")
 
         # Set tooltip with metadata
         self.setToolTip(decision.get_metadata_text())

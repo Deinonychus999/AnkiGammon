@@ -166,6 +166,17 @@ class Decision:
                 return move
         return self.candidate_moves[0] if self.candidate_moves else None
 
+    def get_short_display_text(self) -> str:
+        """Get short display text for list views."""
+        score = f"{self.score_x}-{self.score_o}"
+
+        if self.decision_type == DecisionType.CHECKER_PLAY:
+            dice_str = f"{self.dice[0]}{self.dice[1]}" if self.dice else "—"
+            return f"Checker | {dice_str} | {score}"
+        else:
+            # Cube decision - no dice to show
+            return f"Cube | {score}"
+
     def get_metadata_text(self) -> str:
         """Get formatted metadata for card display."""
         dice_str = f"{self.dice[0]}{self.dice[1]}" if self.dice else "N/A"
