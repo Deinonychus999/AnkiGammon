@@ -208,6 +208,7 @@ class SettingsDialog(QDialog):
         path_layout = QHBoxLayout()
         self.txt_gnubg_path = QLineEdit()
         btn_browse = QPushButton("Browse...")
+        btn_browse.setCursor(Qt.PointingHandCursor)
         btn_browse.clicked.connect(self._browse_gnubg)
         path_layout.addWidget(self.txt_gnubg_path)
         path_layout.addWidget(btn_browse)

@@ -330,9 +330,15 @@ class ExportDialog(QDialog):
         """Initialize the user interface."""
         layout = QVBoxLayout(self)
 
-        # Info label
-        info = QLabel(f"Exporting {len(self.decisions)} position(s) to Anki")
+        # Info label with deck name
+        info = QLabel(f"Exporting {len(self.decisions)} position(s)")
+        info.setStyleSheet("font-size: 13px; color: #a6adc8; margin-bottom: 4px;")
         layout.addWidget(info)
+
+        # Deck name label (modern styling)
+        deck_label = QLabel(f"<span style='font-size: 16px; font-weight: 600; color: #cdd6f4;'>{self.settings.deck_name}</span>")
+        deck_label.setStyleSheet("padding: 12px 16px; background-color: rgba(137, 180, 250, 0.08); border-radius: 8px;")
+        layout.addWidget(deck_label)
 
         # Progress bar (use percentage-based progress)
         self.progress_bar = QProgressBar()
@@ -354,8 +360,10 @@ class ExportDialog(QDialog):
         # Buttons
         self.button_box = QDialogButtonBox()
         self.btn_export = QPushButton("Export")
+        self.btn_export.setCursor(Qt.PointingHandCursor)
         self.btn_export.clicked.connect(self.start_export)
         self.btn_close = QPushButton("Close")
+        self.btn_close.setCursor(Qt.PointingHandCursor)
         self.btn_close.clicked.connect(self.reject)
         self.btn_close.setEnabled(False)
 

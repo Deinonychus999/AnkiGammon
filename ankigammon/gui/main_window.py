@@ -4,7 +4,7 @@ Main application window.
 
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QPushButton, QLabel, QMessageBox
+    QPushButton, QLabel, QMessageBox, QInputDialog
 )
 from PySide6.QtCore import Qt, Signal, Slot, QUrl, QSettings, QSize
 from PySide6.QtGui import QAction, QKeySequence, QDesktopServices
@@ -153,6 +153,7 @@ class MainWindow(QMainWindow):
         self.btn_add_positions.setIconSize(QSize(18, 18))
         self.btn_add_positions.clicked.connect(self.on_add_positions_clicked)
         self.btn_add_positions.setToolTip("Paste position IDs or full XG analysis")
+        self.btn_add_positions.setCursor(Qt.PointingHandCursor)
         layout.addWidget(self.btn_add_positions)
 
         # Position list widget
@@ -162,13 +163,68 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.position_list, stretch=1)
 
         # Spacer
-        layout.addSpacing(8)
+        layout.addSpacing(12)
+
+        # Deck name indicator with edit button
+        deck_container = QWidget()
+        deck_layout = QHBoxLayout(deck_container)
+        deck_layout.setContentsMargins(18, 16, 18, 16)
+        deck_layout.setSpacing(14)
+        deck_container.setStyleSheet("""
+            QWidget {
+                background-color: rgba(137, 180, 250, 0.08);
+                border-radius: 12px;
+            }
+        """)
+
+        self.lbl_deck_name = QLabel()
+        self.lbl_deck_name.setWordWrap(True)
+        self.lbl_deck_name.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        self.lbl_deck_name.setTextFormat(Qt.RichText)
+        self.lbl_deck_name.setStyleSheet("""
+            QLabel {
+                color: #cdd6f4;
+                padding: 2px 0px;
+                background: transparent;
+            }
+        """)
+        self._update_deck_label()
+        deck_layout.addWidget(self.lbl_deck_name, stretch=1)
+
+        # Edit button for deck name
+        self.btn_edit_deck = QPushButton()
+        self.btn_edit_deck.setIcon(qta.icon('fa6s.pencil', color='#a6adc8'))
+        self.btn_edit_deck.setIconSize(QSize(16, 16))
+        self.btn_edit_deck.setFixedSize(32, 32)
+        self.btn_edit_deck.setToolTip("Edit deck name")
+        self.btn_edit_deck.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(205, 214, 244, 0.05);
+                border: none;
+                border-radius: 8px;
+                padding: 0px;
+            }
+            QPushButton:hover {
+                background-color: rgba(205, 214, 244, 0.12);
+            }
+            QPushButton:pressed {
+                background-color: rgba(205, 214, 244, 0.18);
+            }
+        """)
+        self.btn_edit_deck.setCursor(Qt.PointingHandCursor)
+        self.btn_edit_deck.clicked.connect(self.on_edit_deck_name)
+        deck_layout.addWidget(self.btn_edit_deck, alignment=Qt.AlignVCenter)
+
+        layout.addWidget(deck_container)
+
+        layout.addSpacing(12)
 
         # Settings button
         self.btn_settings = QPushButton("  Settings")
         self.btn_settings.setIcon(qta.icon('fa6s.gear', color='#cdd6f4'))
         self.btn_settings.setIconSize(QSize(18, 18))
         self.btn_settings.setObjectName("btn_settings")
+        self.btn_settings.setCursor(Qt.PointingHandCursor)
         self.btn_settings.clicked.connect(self.on_settings_clicked)
         layout.addWidget(self.btn_settings)
 
@@ -177,6 +233,7 @@ class MainWindow(QMainWindow):
         self.btn_export.setIcon(qta.icon('fa6s.file-export', color='#1e1e2e'))
         self.btn_export.setIconSize(QSize(18, 18))
         self.btn_export.setEnabled(False)
+        self.btn_export.setCursor(Qt.PointingHandCursor)
         self.btn_export.clicked.connect(self.on_export_clicked)
         layout.addWidget(self.btn_export)
 
@@ -245,6 +302,16 @@ class MainWindow(QMainWindow):
     def _setup_connections(self):
         """Connect signals and slots."""
         self.decisions_parsed.connect(self.on_decisions_loaded)
+
+    def _update_deck_label(self):
+        """Update the deck name label with current settings."""
+        export_method = "AnkiConnect" if self.settings.export_method == "ankiconnect" else "APKG"
+        self.lbl_deck_name.setText(
+            f"<div style='line-height: 1.5;'>"
+            f"<div style='color: #a6adc8; font-size: 12px; font-weight: 500; margin-bottom: 6px;'>Exporting to</div>"
+            f"<div style='font-size: 18px; font-weight: 600; color: #cdd6f4;'>{self.settings.deck_name} <span style='color: #6c7086; font-size: 13px; font-weight: 400;'>· {export_method}</span></div>"
+            f"</div>"
+        )
 
     def _restore_window_state(self):
         """Restore window size and position from QSettings."""
@@ -422,6 +489,19 @@ class MainWindow(QMainWindow):
         self.preview.setHtml(html)
 
     @Slot()
+    def on_edit_deck_name(self):
+        """Handle deck name edit button click."""
+        new_name, ok = QInputDialog.getText(
+            self,
+            "Edit Deck Name",
+            "Enter deck name:",
+            text=self.settings.deck_name
+        )
+        if ok and new_name.strip():
+            self.settings.deck_name = new_name.strip()
+            self._update_deck_label()
+
+    @Slot()
     def on_settings_clicked(self):
         """Handle settings button click."""
         dialog = SettingsDialog(self.settings, self)
@@ -440,6 +520,9 @@ class MainWindow(QMainWindow):
         # Update menu checkmarks if color scheme changed
         for scheme_name, action in self.color_scheme_actions.items():
             action.setChecked(scheme_name == settings.color_scheme)
+
+        # Update deck name label
+        self._update_deck_label()
 
         # Refresh current preview if a decision is displayed
         if self.current_decisions:

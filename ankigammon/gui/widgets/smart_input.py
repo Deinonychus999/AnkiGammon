@@ -154,6 +154,7 @@ class SmartInputWidget(QWidget):
                 background-color: #585b70;
             }
         """)
+        self.override_btn.setCursor(Qt.PointingHandCursor)
         feedback_layout.addWidget(self.override_btn, alignment=Qt.AlignTop)
 
         layout.addWidget(self.feedback_container)

@@ -225,6 +225,7 @@ class InputDialog(QDialog):
                 background-color: #74c7ec;
             }
         """)
+        self.btn_done.setCursor(Qt.PointingHandCursor)
         self.btn_done.clicked.connect(self.accept)
         button_layout.addWidget(self.btn_done)
 
@@ -242,6 +243,7 @@ class InputDialog(QDialog):
                 background-color: #585b70;
             }
         """)
+        self.btn_cancel.setCursor(Qt.PointingHandCursor)
         self.btn_cancel.clicked.connect(self.reject)
         button_layout.addWidget(self.btn_cancel)
 
@@ -279,6 +281,7 @@ class InputDialog(QDialog):
                 color: #6c7086;
             }
         """)
+        self.btn_add.setCursor(Qt.PointingHandCursor)
         self.btn_add.clicked.connect(self._on_add_clicked)
         button_layout.addWidget(self.btn_add)
 
@@ -295,6 +298,7 @@ class InputDialog(QDialog):
                 background-color: #585b70;
             }
         """)
+        self.btn_clear.setCursor(Qt.PointingHandCursor)
         self.btn_clear.clicked.connect(self.input_widget.clear_text)
         button_layout.addWidget(self.btn_clear)
 
@@ -338,6 +342,7 @@ class InputDialog(QDialog):
                 color: #1e1e2e;
             }
         """)
+        self.btn_clear_all.setCursor(Qt.PointingHandCursor)
         self.btn_clear_all.clicked.connect(self._on_clear_all_clicked)
         header_layout.addWidget(self.btn_clear_all)
 
