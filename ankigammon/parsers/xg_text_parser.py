@@ -114,6 +114,23 @@ class XGTextParser:
         else:
             decision_type = DecisionType.CHECKER_PLAY
 
+        # Determine Crawford status from multiple sources
+        # Priority: 1) Text parsing, 2) XGID crawford_jacoby, 3) OGID match_modifier, 4) GNUID crawford
+        # Note: crawford_jacoby field means different things in different contexts:
+        #   - Match play (match_length > 0): crawford_jacoby = 1 means Crawford rule
+        #   - Money game (match_length = 0): crawford_jacoby = 1 means Jacoby rule
+        # The crawford boolean should ONLY be set for Crawford matches, not Jacoby money games
+        match_length = metadata.get('match_length', 0)
+        crawford = False
+
+        if match_length > 0:  # Only set crawford=True for match play
+            if 'crawford' in metadata and metadata['crawford']:
+                crawford = True
+            elif 'crawford_jacoby' in metadata and metadata['crawford_jacoby'] > 0:
+                crawford = True
+            elif 'match_modifier' in metadata and metadata['match_modifier'] == 'C':
+                crawford = True
+
         # Create decision
         decision = Decision(
             position=position,
@@ -123,6 +140,7 @@ class XGTextParser:
             score_x=metadata.get('score_x', 0),
             score_o=metadata.get('score_o', 0),
             match_length=metadata.get('match_length', 0),
+            crawford=crawford,
             cube_value=metadata.get('cube_value', 1),
             cube_owner=metadata.get('cube_owner', CubeState.CENTERED),
             decision_type=decision_type,
@@ -271,6 +289,16 @@ class XGTextParser:
             info['score_x'] = int(score_match.group(1))
             info['score_o'] = int(score_match.group(2))
             info['match_length'] = int(score_match.group(3))
+
+        # Check for Crawford game indicator in pip count line
+        # Format: "Pip count  X: 156  O: 167 X-O: 1-4/5 Crawford"
+        crawford_match = re.search(
+            r'Pip count.*Crawford',
+            text,
+            re.IGNORECASE
+        )
+        if crawford_match:
+            info['crawford'] = True
 
         # Check for money game
         if 'money game' in text.lower():

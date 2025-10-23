@@ -523,6 +523,22 @@ class InputDialog(QDialog):
         """Create a Decision object from position and metadata."""
         from ankigammon.utils.xgid import encode_xgid
 
+        # Determine Crawford status from metadata
+        # Note: crawford_jacoby field means different things in different contexts:
+        #   - Match play (match_length > 0): crawford_jacoby = 1 means Crawford rule
+        #   - Money game (match_length = 0): crawford_jacoby = 1 means Jacoby rule
+        # The crawford boolean should ONLY be set for Crawford matches, not Jacoby money games
+        match_length = metadata.get('match_length', 0)
+        crawford = False
+
+        if match_length > 0:  # Only set crawford=True for match play
+            if 'crawford' in metadata and metadata['crawford']:
+                crawford = True
+            elif 'crawford_jacoby' in metadata and metadata['crawford_jacoby'] > 0:
+                crawford = True
+            elif 'match_modifier' in metadata and metadata['match_modifier'] == 'C':
+                crawford = True
+
         # Generate XGID for GnuBG analysis
         xgid = encode_xgid(
             position=position,
@@ -532,7 +548,8 @@ class InputDialog(QDialog):
             on_roll=metadata.get('on_roll', Player.X),
             score_x=metadata.get('score_x', 0),
             score_o=metadata.get('score_o', 0),
-            match_length=metadata.get('match_length', 0)
+            match_length=metadata.get('match_length', 0),
+            crawford_jacoby=metadata.get('crawford_jacoby', 1 if crawford else 0)
         )
 
         return Decision(
@@ -543,6 +560,7 @@ class InputDialog(QDialog):
             score_x=metadata.get('score_x', 0),
             score_o=metadata.get('score_o', 0),
             match_length=metadata.get('match_length', 0),
+            crawford=crawford,
             cube_value=metadata.get('cube_value', 1),
             cube_owner=metadata.get('cube_owner', CubeState.CENTERED),
             decision_type=DecisionType.CUBE_ACTION if not metadata.get('dice') else DecisionType.CHECKER_PLAY,

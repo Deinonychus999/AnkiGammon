@@ -556,6 +556,59 @@ class TestDecision(unittest.TestCase):
         self.assertEqual(best.rank, 1)
         self.assertEqual(best.notation, "13/9 6/5")
 
+    def test_short_display_text(self):
+        """Test short display text for different game types."""
+        position = Position()
+
+        # Money game - no match length
+        decision = Decision(
+            position=position,
+            on_roll=Player.O,
+            dice=(6, 3),
+            score_x=0,
+            score_o=0,
+            match_length=0,
+            decision_type=DecisionType.CHECKER_PLAY
+        )
+        self.assertEqual(decision.get_short_display_text(), "Checker | 63 | Money")
+
+        # Match game - with match length
+        decision = Decision(
+            position=position,
+            on_roll=Player.O,
+            dice=(5, 2),
+            score_x=3,
+            score_o=4,
+            match_length=7,
+            decision_type=DecisionType.CHECKER_PLAY
+        )
+        self.assertEqual(decision.get_short_display_text(), "Checker | 52 | 3-4 of 7")
+
+        # Crawford game - with match length and Crawford flag
+        decision = Decision(
+            position=position,
+            on_roll=Player.X,
+            dice=(6, 6),
+            score_x=1,
+            score_o=4,
+            match_length=5,
+            crawford=True,
+            decision_type=DecisionType.CHECKER_PLAY
+        )
+        self.assertEqual(decision.get_short_display_text(), "Checker | 66 | 1-4 of 5 Crawford")
+
+        # Cube decision in Crawford game
+        decision = Decision(
+            position=position,
+            on_roll=Player.O,
+            score_x=6,
+            score_o=5,
+            match_length=7,
+            crawford=True,
+            decision_type=DecisionType.CUBE_ACTION
+        )
+        self.assertEqual(decision.get_short_display_text(), "Cube | 6-5 of 7 Crawford")
+
 
 class TestSVGBoardRenderer(unittest.TestCase):
     """Test SVG board renderer."""
@@ -707,6 +760,55 @@ eXtreme Gammon Version: 2.10"""
 
         self.assertEqual(decision.candidate_moves[1].notation, "13/9 6/1")
         self.assertAlmostEqual(decision.candidate_moves[1].error, 0.140, places=3)
+
+    def test_parse_crawford_game(self):
+        """Test parsing Crawford game match info."""
+        text = """XGID=-b---CC-C---eD---c-e---AA-:0:0:1:66:4:1:1:5:10
+
+X:Player 1   O:Player 2
+Score is X:1 O:4 5 pt.(s) match.
+ +13-14-15-16-17-18------19-20-21-22-23-24-+
+ | X           O    |   | O           X  X |
+ | X           O    |   | O                |
+ | X           O    |   | O                |
+ | X                |   | O                |
+ |                  |   | O                |
+ |                  |BAR|                  |
+ | O                |   |                  |
+ | O                |   |                  |
+ | O           X    |   | X  X             |
+ | O           X    |   | X  X           O |
+ | O           X    |   | X  X           O |
+ +12-11-10--9--8--7-------6--5--4--3--2--1-+
+Pip count  X: 156  O: 167 X-O: 1-4/5 Crawford
+Cube: 1
+X to play 66
+
+    1. 2-ply       13/7(4)                      eq:+0.590
+      Player:   67.47% (G:23.33% B:1.90%)
+      Opponent: 32.53% (G:6.44% B:0.15%)
+
+    2. 2-ply       13/7(2) 8/2(2)               eq:+0.578 (-0.012)
+      Player:   65.80% (G:25.43% B:1.84%)
+      Opponent: 34.20% (G:7.40% B:0.28%)
+
+eXtreme Gammon Version: 2.10, MET: Kazaross XG2"""
+
+        decisions = XGTextParser.parse_string(text)
+        self.assertEqual(len(decisions), 1)
+
+        decision = decisions[0]
+        # Check Crawford flag is set
+        self.assertTrue(decision.crawford)
+        # Check match length
+        self.assertEqual(decision.match_length, 5)
+        # Check scores
+        self.assertEqual(decision.score_x, 1)
+        self.assertEqual(decision.score_o, 4)
+        # Check metadata text includes Crawford indicator
+        metadata_text = decision.get_metadata_text()
+        self.assertIn("Crawford", metadata_text)
+        self.assertIn("5pt", metadata_text)
 
 
 class TestInteractiveSession(unittest.TestCase):

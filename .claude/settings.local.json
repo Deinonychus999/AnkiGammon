@@ -6,7 +6,8 @@
       "Bash(pip install:*)",
       "Bash(find:*)",
       "Bash(cat:*)",
-      "Bash(xargs ls:*)"
+      "Bash(xargs ls:*)",
+      "WebSearch"
     ],
     "deny": [],
     "ask": []

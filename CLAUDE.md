@@ -132,7 +132,7 @@ P1:P2:CUBE[:DICE[:TURN[:STATE[:S1[:S2[:ML[:MID[:NCHECKERS]]]]]]]]
 - **TURN**: W=White on roll, B=Black on roll
 - **STATE**: Two-character game state (e.g., "IW", "FB")
 - **S1/S2**: Player scores
-- **ML**: Match length with modifiers (L=Lesotho, C=Crawford, G=Galaxie)
+- **ML**: Match length with modifiers (L=Last game, C=Crawford, G=Galaxie)
   - Examples: "7" (7-point match), "5C" (Crawford game), "9G15" (Galaxie, max 15 games)
 - **MID**: Move ID sequence number
 - **NCHECKERS**: Number of checkers per side (default 15)
@@ -187,6 +187,28 @@ XG provides 3 equity values in "Cubeful Equities:" section, but the parser gener
 3. Determine best move from "Best Cube action:" text
 4. Rank all 5 options (rank 1 = best, ranks 2-5 based on equity)
 5. Track both `xg_rank` (order in XG's output) and `rank` (overall best-to-worst)
+
+#### Crawford Game Support
+
+The application fully supports Crawford games across all layers:
+
+**Data Model** (`models.py`):
+- `Decision` class has `crawford: bool` field to indicate Crawford game status
+- `get_metadata_text()` displays "7pt (Crawford)" for Crawford games vs. "7pt" for normal match games
+
+**Position Format Support:**
+- **XGID**: Field 8 (`crawford_jacoby`) indicates Crawford rule (value 1) or Jacoby rule (money games)
+- **OGID**: Match modifier 'C' in field 9 (e.g., "5C" = 5-point Crawford match)
+- **GNUID**: Bit 7 of Match ID is dedicated Crawford boolean flag
+
+**XG Text Parser** (`parsers/xg_text_parser.py`):
+- Detects Crawford games from pip count line: `Pip count  X: 156  O: 167 X-O: 1-4/5 Crawford`
+- Multi-source Crawford detection with priority: Text parsing → XGID → OGID → GNUID
+- Note: XG text format shows "5 pt.(s) match." in score line; Crawford appears only in pip count
+
+**Card Display:**
+- Flashcards show Crawford status in metadata line
+- Example: "White | Dice: 66 | Score: 1-4 | Cube: — | Match: 5pt (Crawford)"
 
 #### Card Back Analysis Table (anki/card_generator.py)
 

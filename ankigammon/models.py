@@ -87,6 +87,7 @@ class Position:
         score_x: int = 0,
         score_o: int = 0,
         match_length: int = 0,
+        crawford_jacoby: int = 0,
     ) -> str:
         """Convert position to XGID format."""
         # Import here to avoid circular dependency
@@ -104,6 +105,7 @@ class Position:
             score_x=score_x,
             score_o=score_o,
             match_length=match_length,
+            crawford_jacoby=crawford_jacoby,
         )
 
     def to_ogid(
@@ -117,6 +119,7 @@ class Position:
         score_x: int = 0,
         score_o: int = 0,
         match_length: Optional[int] = None,
+        match_modifier: str = '',
         only_position: bool = False,
     ) -> str:
         """Convert position to OGID format."""
@@ -135,6 +138,7 @@ class Position:
             score_x=score_x,
             score_o=score_o,
             match_length=match_length,
+            match_modifier=match_modifier,
             only_position=only_position,
         )
 
@@ -225,6 +229,7 @@ class Decision:
     score_x: int = 0
     score_o: int = 0
     match_length: int = 0  # 0 for money games
+    crawford: bool = False  # True if Crawford game (no doubling allowed)
     cube_value: int = 1
     cube_owner: CubeState = CubeState.CENTERED
 
@@ -254,7 +259,15 @@ class Decision:
 
     def get_short_display_text(self) -> str:
         """Get short display text for list views."""
-        score = f"{self.score_x}-{self.score_o}"
+        # Build score/game type string
+        if self.match_length > 0:
+            # Match play - show score and match info
+            score = f"{self.score_x}-{self.score_o} of {self.match_length}"
+            if self.crawford:
+                score += " Crawford"
+        else:
+            # Money game - just show "Money"
+            score = "Money"
 
         if self.decision_type == DecisionType.CHECKER_PLAY:
             dice_str = f"{self.dice[0]}{self.dice[1]}" if self.dice else "—"
@@ -266,7 +279,7 @@ class Decision:
     def get_metadata_text(self) -> str:
         """Get formatted metadata for card display."""
         dice_str = f"{self.dice[0]}{self.dice[1]}" if self.dice else "N/A"
-        match_str = f"{self.match_length}pt" if self.match_length > 0 else "Money"
+
         # Show em dash when cube is centered, otherwise just show value
         if self.cube_owner == CubeState.CENTERED:
             cube_str = "—"
@@ -278,13 +291,27 @@ class Decision:
         # Player.O = BOTTOM player (plays with black checkers from bottom)
         player_name = "White" if self.on_roll == Player.X else "Black"
 
-        return (
-            f"{player_name} | "
-            f"Dice: {dice_str} | "
-            f"Score: {self.score_x}-{self.score_o} | "
-            f"Cube: {cube_str} | "
-            f"Match: {match_str}"
-        )
+        # Build metadata string based on game type
+        if self.match_length > 0:
+            # Match play - show score and match info
+            match_str = f"{self.match_length}pt"
+            if self.crawford:
+                match_str += " (Crawford)"
+            return (
+                f"{player_name} | "
+                f"Dice: {dice_str} | "
+                f"Score: {self.score_x}-{self.score_o} | "
+                f"Cube: {cube_str} | "
+                f"Match: {match_str}"
+            )
+        else:
+            # Money game - don't show score, just "Money"
+            return (
+                f"{player_name} | "
+                f"Dice: {dice_str} | "
+                f"Cube: {cube_str} | "
+                f"Money"
+            )
 
     def __str__(self) -> str:
         """Human-readable representation."""
