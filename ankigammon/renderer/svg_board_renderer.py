@@ -435,11 +435,18 @@ class SVGBoardRenderer:
         # Bar point: 0 for X (top), 25 for O (bottom)
         bar_point = 0 if player == Player.X else 25
 
+        # Calculate starting Y position - start from center and go outward
+        board_center_y = board_y + self.board_height / 2
+        # Add extra spacing to separate the two players more
+        separation_offset = self.checker_radius * 2 + 10
+
         for i in range(max_visible):
             if top:
-                y = board_y + self.point_height + i * (self.checker_radius * 2 + 2)
+                # X checkers: start below center, stack toward bottom
+                y = board_center_y + separation_offset + i * (self.checker_radius * 2 + 2)
             else:
-                y = board_y + self.board_height - self.point_height - i * (self.checker_radius * 2 + 2)
+                # O checkers: start above center, stack toward top
+                y = board_center_y - separation_offset - i * (self.checker_radius * 2 + 2)
 
             # Add data attributes for animation
             checker_attrs = f'data-point="{bar_point}" data-checker-index="{i}"'
