@@ -215,7 +215,7 @@ class SettingsDialog(QDialog):
 
         # Analysis depth
         self.cmb_gnubg_ply = QComboBox()
-        self.cmb_gnubg_ply.addItems(["0", "1", "2", "3"])
+        self.cmb_gnubg_ply.addItems(["0", "1", "2", "3", "4"])
         form.addRow("Analysis Depth (ply):", self.cmb_gnubg_ply)
 
         # Score matrix generation

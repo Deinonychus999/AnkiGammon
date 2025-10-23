@@ -61,7 +61,7 @@ from ankigammon.settings import get_settings
     '--gnubg-ply',
     type=int,
     default=None,
-    help='GnuBG analysis depth in plies (default: 2)'
+    help='GnuBG analysis depth in plies (default: 3)'
 )
 @click.option(
     '--use-gnubg',

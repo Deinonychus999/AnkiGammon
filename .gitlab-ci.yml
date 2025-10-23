@@ -10,7 +10,7 @@ stages:
   - build
   - release
 
-# Windows Build
+# Windows Build (only on tagged releases)
 build:windows:
   stage: build
   tags:
@@ -29,7 +29,6 @@ build:windows:
       - dist/ankigammon-windows.zip
     expire_in: 1 week
   only:
-    - main
     - tags
 
 # Create Release (only on tags)

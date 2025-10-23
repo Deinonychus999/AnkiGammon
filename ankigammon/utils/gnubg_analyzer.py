@@ -17,13 +17,13 @@ from ankigammon.utils.xgid import parse_xgid
 class GNUBGAnalyzer:
     """Wrapper for gnubg-cli.exe command-line interface."""
 
-    def __init__(self, gnubg_path: str, analysis_ply: int = 2):
+    def __init__(self, gnubg_path: str, analysis_ply: int = 3):
         """
         Initialize GnuBG analyzer.
 
         Args:
             gnubg_path: Path to gnubg-cli.exe executable
-            analysis_ply: Analysis depth in plies (default: 2)
+            analysis_ply: Analysis depth in plies (default: 3)
         """
         self.gnubg_path = gnubg_path
         self.analysis_ply = analysis_ply

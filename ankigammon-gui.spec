@@ -88,7 +88,7 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [],
-    name='ankigammon-gui',
+    name='ankigammon',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

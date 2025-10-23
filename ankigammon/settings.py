@@ -20,7 +20,7 @@ class Settings:
         "interactive_moves": True,
         "export_method": "ankiconnect",
         "gnubg_path": None,
-        "gnubg_analysis_ply": 2,
+        "gnubg_analysis_ply": 3,
         "generate_score_matrix": False,
         "board_orientation": "counter-clockwise",
     }
@@ -137,7 +137,7 @@ class Settings:
     @property
     def gnubg_analysis_ply(self) -> int:
         """Get the GnuBG analysis depth (ply)."""
-        return self._settings.get("gnubg_analysis_ply", 2)
+        return self._settings.get("gnubg_analysis_ply", 3)
 
     @gnubg_analysis_ply.setter
     def gnubg_analysis_ply(self, value: int) -> None:

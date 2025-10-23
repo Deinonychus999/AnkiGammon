@@ -106,7 +106,7 @@ def generate_score_matrix(
     xgid: str,
     match_length: int,
     gnubg_path: str,
-    ply_level: int = 2,
+    ply_level: int = 3,
     progress_callback: Optional[callable] = None
 ) -> List[List[ScoreMatrixCell]]:
     """
