@@ -118,6 +118,7 @@ class SettingsDialog(QDialog):
         self.original_settings.show_options = settings.show_options
         self.original_settings.interactive_moves = settings.interactive_moves
         self.original_settings.export_method = settings.export_method
+        self.original_settings.board_orientation = settings.board_orientation
         self.original_settings.gnubg_path = settings.gnubg_path
         self.original_settings.gnubg_analysis_ply = settings.gnubg_analysis_ply
         self.original_settings.generate_score_matrix = settings.generate_score_matrix
@@ -182,6 +183,12 @@ class SettingsDialog(QDialog):
         self.cmb_color_scheme.addItems(list_schemes())
         form.addRow("Board Theme:", self.cmb_color_scheme)
 
+        # Board orientation
+        self.cmb_board_orientation = QComboBox()
+        self.cmb_board_orientation.addItem("Counter-clockwise (standard)", "counter-clockwise")
+        self.cmb_board_orientation.addItem("Clockwise", "clockwise")
+        form.addRow("Board Orientation:", self.cmb_board_orientation)
+
         # Show options
         self.chk_show_options = QCheckBox("Show multiple choice options on card front")
         form.addRow(self.chk_show_options)
@@ -237,6 +244,10 @@ class SettingsDialog(QDialog):
         # Color scheme
         scheme_index = list_schemes().index(self.settings.color_scheme)
         self.cmb_color_scheme.setCurrentIndex(scheme_index)
+
+        # Board orientation
+        orientation_index = 0 if self.settings.board_orientation == "counter-clockwise" else 1
+        self.cmb_board_orientation.setCurrentIndex(orientation_index)
 
         self.chk_show_options.setChecked(self.settings.show_options)
         self.chk_interactive_moves.setChecked(self.settings.interactive_moves)
@@ -316,6 +327,7 @@ class SettingsDialog(QDialog):
             "ankiconnect" if self.cmb_export_method.currentIndex() == 0 else "apkg"
         )
         self.settings.color_scheme = self.cmb_color_scheme.currentText()
+        self.settings.board_orientation = self.cmb_board_orientation.currentData()
         self.settings.show_options = self.chk_show_options.isChecked()
         self.settings.interactive_moves = self.chk_interactive_moves.isChecked()
         self.settings.gnubg_path = self.txt_gnubg_path.text() or None

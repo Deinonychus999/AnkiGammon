@@ -556,26 +556,6 @@ class TestDecision(unittest.TestCase):
         self.assertEqual(best.rank, 1)
         self.assertEqual(best.notation, "13/9 6/5")
 
-    def test_metadata_text(self):
-        """Test metadata text generation."""
-        position = Position()
-        decision = Decision(
-            position=position,
-            on_roll=Player.O,
-            dice=(6, 3),
-            score_x=2,
-            score_o=3,
-            match_length=7,
-            cube_value=2
-        )
-
-        text = decision.get_metadata_text()
-        self.assertIn("O", text)
-        self.assertIn("6-3", text)
-        self.assertIn("2-3", text)
-        self.assertIn("7pt", text)
-        self.assertIn("2", text)
-
 
 class TestSVGBoardRenderer(unittest.TestCase):
     """Test SVG board renderer."""

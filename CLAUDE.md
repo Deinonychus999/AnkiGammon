@@ -84,20 +84,21 @@ python -m unittest tests.test_basic.TestXGIDParsing
 
 #### XGID Position Encoding (utils/xgid.py)
 
-The XGID format is **perspective-dependent** for board points but **not for bar positions**. Understanding this is crucial when working with positions:
+The XGID format is **entirely perspective-dependent**. The ENTIRE 26-character position string (including bars) depends on whose turn it is:
 
-**Bar positions (ALWAYS the same regardless of turn):**
-- Char 0 = X's bar → maps to points[0]
-- Char 25 = O's bar → maps to points[25]
+**When turn=1 (O on roll - standard view):**
+- Char 0 = X's bar (top) → maps to points[0]
+- Chars 1-24 = points 1-24 in normal order
+- Char 25 = O's bar (bottom) → maps to points[25]
+- lowercase = X checkers (positive), uppercase = O checkers (negative)
 
-**Board points (perspective depends on turn):**
-- **When turn=1 (O on roll)**: Encoding is from O's perspective (standard)
-  - Chars 1-24 = points 1-24 in normal order
-  - lowercase = X checkers (positive), uppercase = O checkers (negative)
+**When turn=-1 (X on roll - flipped view):**
+- Char 0 = O's bar (top in X's view) → maps to points[25]
+- Chars 1-24 = points in REVERSED order (char 1 → point 24, char 24 → point 1)
+- Char 25 = X's bar (bottom in X's view) → maps to points[0]
+- **lowercase = O checkers (negative), uppercase = X checkers (positive) - MAPPING IS FLIPPED!**
 
-- **When turn=-1 (X on roll)**: Encoding is **FLIPPED** from X's perspective
-  - Point numbering is reversed (point 1 in encoding → point 24 in internal model)
-  - The uppercase/lowercase → player mapping stays the same
+**Key insight:** When X is on roll, the ENTIRE encoding is flipped: bars are swapped, points are reversed, AND uppercase/lowercase meanings are inverted.
 
 **Internal Position Model** (always consistent):
 - `points[0]` = X's bar (TOP player)
@@ -245,8 +246,38 @@ Each `ColorScheme` dataclass defines 10 colors:
 
 **Usage:**
 - In CLI: `python -m ankigammon --color-scheme ocean analysis.txt`
-- In interactive mode: Options menu (option 2 from main menu)
+- In interactive mode: Options menu (option 1 from main menu)
 - User's selection is saved to `~/.ankigammon/config.json` and persisted across sessions
+
+#### Board Orientation (renderer/svg_board_renderer.py)
+
+The application supports two board orientation modes that horizontally mirror the entire board layout:
+
+**Available Orientations:**
+- `counter-clockwise` (default) - Standard backgammon numbering
+  - Layout: Top (13-18 left, 19-24 right) | Bottom (12-7 left, 6-1 right)
+  - Point 1 = bottom right edge, Point 24 = top right edge
+  - Most common numbering system used in backgammon
+- `clockwise` - Horizontally mirrored layout
+  - Layout: Top (24-19 left, 18-13 right) | Bottom (1-6 left, 7-12 right)
+  - Point 1 = bottom left edge, Point 24 = top left edge
+  - Simple horizontal mirror of the standard layout
+
+**Implementation Details:**
+- The `SVGBoardRenderer` accepts an `orientation` parameter
+- Visual positions are mapped via `_get_visual_point_index()` method
+- The entire board layout is mirrored horizontally, including checker positions
+- A checker on point 24 will always be labeled "24" but appears on top-right (counter-clockwise) or top-left (clockwise)
+
+**Visual Mapping Formula (Clockwise):**
+- Points 1-12: `visual = 12 - point` (bottom row, flipped)
+- Points 13-24: `visual = 36 - point` (top row, both quadrants reversed)
+
+**Usage:**
+- In interactive mode: Options menu (option 5 from main menu)
+- In GUI: Settings dialog, Card Appearance section
+- User's selection is saved to `~/.ankigammon/config.json` and persisted across sessions
+- Setting is automatically applied to all generated cards
 
 #### Settings Persistence (settings.py)
 
@@ -258,6 +289,7 @@ User preferences are automatically saved to `~/.ankigammon/config.json`:
 - `show_options` - Whether to show options on cards (default: true)
 - `interactive_moves` - Whether to enable interactive move visualization (default: true)
 - `export_method` - Export method for cards: "ankiconnect" or "apkg" (default: "ankiconnect")
+- `board_orientation` - Board orientation: "clockwise" or "counter-clockwise" (default: "counter-clockwise")
 
 **Settings API:**
 ```python
@@ -267,6 +299,7 @@ settings = get_settings()
 settings.color_scheme = "forest"  # Automatically saved
 settings.interactive_moves = True  # Enable interactive move visualization
 settings.export_method = "apkg"  # Choose export method: "ankiconnect" or "apkg"
+settings.board_orientation = "clockwise"  # Set board orientation
 print(settings.color_scheme)  # Loads from config file
 ```
 

@@ -33,7 +33,10 @@ class MainWindow(QMainWindow):
         self.settings = settings
         self.current_decisions = []
         self.parser = XGTextParser()
-        self.renderer = SVGBoardRenderer(color_scheme=get_scheme(settings.color_scheme))
+        self.renderer = SVGBoardRenderer(
+            color_scheme=get_scheme(settings.color_scheme),
+            orientation=settings.board_orientation
+        )
         self.color_scheme_actions = {}  # Store references to color scheme menu actions
 
         self._setup_ui()
@@ -428,8 +431,11 @@ class MainWindow(QMainWindow):
     @Slot(Settings)
     def on_settings_changed(self, settings: Settings):
         """Handle settings changes."""
-        # Update renderer with new color scheme
-        self.renderer = SVGBoardRenderer(color_scheme=get_scheme(settings.color_scheme))
+        # Update renderer with new color scheme and orientation
+        self.renderer = SVGBoardRenderer(
+            color_scheme=get_scheme(settings.color_scheme),
+            orientation=settings.board_orientation
+        )
 
         # Update menu checkmarks if color scheme changed
         for scheme_name, action in self.color_scheme_actions.items():

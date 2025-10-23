@@ -153,7 +153,8 @@ class AnkiConnect:
         output_dir: Path,
         show_options: bool = False,
         color_scheme: str = "classic",
-        interactive_moves: bool = False
+        interactive_moves: bool = False,
+        orientation: str = "counter-clockwise"
     ) -> Dict[str, Any]:
         """
         Export decisions directly to Anki via Anki-Connect.
@@ -164,6 +165,7 @@ class AnkiConnect:
             show_options: Show multiple choice options (text-based)
             color_scheme: Board color scheme name
             interactive_moves: Enable interactive move visualization
+            orientation: Board orientation ("clockwise" or "counter-clockwise")
 
         Returns:
             Dictionary with export statistics
@@ -181,7 +183,7 @@ class AnkiConnect:
         from ankigammon.renderer.svg_board_renderer import SVGBoardRenderer
 
         scheme = get_scheme(color_scheme)
-        renderer = SVGBoardRenderer(color_scheme=scheme)
+        renderer = SVGBoardRenderer(color_scheme=scheme, orientation=orientation)
 
         # Create card generator
         card_gen = CardGenerator(

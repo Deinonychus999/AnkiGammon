@@ -72,17 +72,19 @@ class InteractiveSession:
             click.echo(f"  3. Interactive moves (current: {'Yes' if self.settings.interactive_moves else 'No'})")
             export_display = "AnkiConnect" if self.settings.export_method == "ankiconnect" else "APKG"
             click.echo(f"  4. Export method (current: {export_display})")
+            orientation_display = "Clockwise" if self.settings.board_orientation == "clockwise" else "Counter-clockwise"
+            click.echo(f"  5. Board orientation (current: {orientation_display})")
             gnubg_status = "Configured" if self.settings.gnubg_path else "Not configured"
-            click.echo(f"  5. Configure GnuBG path (current: {gnubg_status})")
+            click.echo(f"  6. Configure GnuBG path (current: {gnubg_status})")
             matrix_status = "Yes" if self.settings.generate_score_matrix else "No"
-            click.echo(f"  6. Generate score matrix (current: {matrix_status})")
-            click.echo("  7. Back to main menu")
+            click.echo(f"  7. Generate score matrix (current: {matrix_status})")
+            click.echo("  8. Back to main menu")
             click.echo()
 
             choice = click.prompt(
                 click.style("Choose an option", fg='green'),
                 type=str,
-                default='7'
+                default='8'
             )
 
             if choice == '1':
@@ -94,10 +96,12 @@ class InteractiveSession:
             elif choice == '4':
                 self.change_export_method()
             elif choice == '5':
-                self.configure_gnubg_path()
+                self.change_board_orientation()
             elif choice == '6':
-                self.toggle_score_matrix()
+                self.configure_gnubg_path()
             elif choice == '7':
+                self.toggle_score_matrix()
+            elif choice == '8':
                 break
             else:
                 click.echo(click.style("\n  Invalid choice. Please try again.\n", fg='red'))
@@ -218,6 +222,41 @@ class InteractiveSession:
         display_name = "AnkiConnect" if new_method == "ankiconnect" else "APKG"
         click.echo()
         click.echo(click.style(f"  Export method changed to: {display_name}", fg='green'))
+        click.echo(click.style(f"  (Saved as default)", fg='cyan'))
+        click.echo()
+
+    def change_board_orientation(self):
+        """Allow user to change the board orientation."""
+        click.echo()
+        click.echo(click.style("=" * 60, fg='cyan'))
+        click.echo(click.style("  Board Orientation", fg='cyan', bold=True))
+        click.echo(click.style("=" * 60, fg='cyan'))
+        click.echo()
+        click.echo("Choose how points are numbered on the board:")
+        click.echo()
+        click.echo("  1. Counter-clockwise (standard)")
+        click.echo("     Point 1 = bottom right, Point 24 = top right")
+        click.echo("     This is the most common numbering system")
+        click.echo()
+        click.echo("  2. Clockwise")
+        click.echo("     Point 1 = bottom left, Point 24 = top left")
+        click.echo("     Mirror image of counter-clockwise numbering")
+        click.echo()
+
+        current_choice = '2' if self.settings.board_orientation == 'clockwise' else '1'
+        choice = click.prompt(
+            click.style("Choose board orientation", fg='green'),
+            type=click.Choice(['1', '2']),
+            default=current_choice
+        )
+
+        orientation_map = {'1': 'counter-clockwise', '2': 'clockwise'}
+        new_orientation = orientation_map[choice]
+        self.settings.board_orientation = new_orientation
+
+        display_name = "Clockwise" if new_orientation == "clockwise" else "Counter-clockwise"
+        click.echo()
+        click.echo(click.style(f"  Board orientation changed to: {display_name}", fg='green'))
         click.echo(click.style(f"  (Saved as default)", fg='cyan'))
         click.echo()
 
@@ -591,13 +630,16 @@ class InteractiveSession:
         output_dir = Path.cwd() / "ankigammon_output"
         output_dir.mkdir(parents=True, exist_ok=True)
 
+        # Get board orientation from settings
+        orientation = self.settings.board_orientation
+
         try:
             click.echo(click.style("Generating deck...", fg='cyan'))
 
             if output_format == 'apkg':
-                export_apkg(decisions, output_dir, deck_name, show_options, color_scheme, interactive_moves)
+                export_apkg(decisions, output_dir, deck_name, show_options, color_scheme, interactive_moves, orientation)
             elif output_format == 'ankiconnect':
-                export_ankiconnect(decisions, output_dir, deck_name, show_options, color_scheme, interactive_moves)
+                export_ankiconnect(decisions, output_dir, deck_name, show_options, color_scheme, interactive_moves, orientation)
 
             click.echo()
             click.echo(click.style("=" * 60, fg='green'))

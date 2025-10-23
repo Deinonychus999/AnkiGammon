@@ -16,6 +16,7 @@ class SVGBoardRenderer:
         height: int = 600,
         point_height_ratio: float = 0.45,
         color_scheme: ColorScheme = CLASSIC,
+        orientation: str = "counter-clockwise",
     ):
         """
         Initialize the SVG board renderer.
@@ -25,11 +26,13 @@ class SVGBoardRenderer:
             height: SVG viewBox height
             point_height_ratio: Height of points as ratio of board height
             color_scheme: ColorScheme object defining board colors
+            orientation: Board orientation ("clockwise" or "counter-clockwise")
         """
         self.width = width
         self.height = height
         self.point_height_ratio = point_height_ratio
         self.color_scheme = color_scheme
+        self.orientation = orientation
 
         # Calculate dimensions (same logic as PNG renderer)
         self.margin = 20
@@ -217,34 +220,73 @@ class SVGBoardRenderer:
       stroke-width="2"/>
 '''
 
+    def _get_visual_point_index(self, point_num: int) -> int:
+        """
+        Map point number to visual position index based on orientation.
+
+        Counter-clockwise (standard):
+          Top: 13 14 15 16 17 18 | 19 20 21 22 23 24
+          Bottom: 12 11 10 9 8 7 | 6 5 4 3 2 1
+
+        Clockwise (horizontally mirrored):
+          Top: 24 23 22 21 20 19 | 18 17 16 15 14 13
+          Bottom: 1 2 3 4 5 6 | 7 8 9 10 11 12
+
+        Args:
+            point_num: Point number (1-24)
+
+        Returns:
+            Visual index for rendering (0-23)
+        """
+        if self.orientation == "clockwise":
+            # Simple horizontal mirror
+            if point_num <= 12:
+                # Points 1-12: bottom row, mirror horizontally
+                # Point 1 → visual 11, Point 12 → visual 0
+                return 12 - point_num
+            else:
+                # Points 13-24: top row, both quadrants need reversal
+                # Point 13 → visual 23, Point 18 → visual 18
+                # Point 19 → visual 17, Point 24 → visual 12
+                return 36 - point_num
+        else:
+            # Counter-clockwise: standard layout
+            return point_num - 1
+
     def _draw_points(self, board_x: float, board_y: float) -> str:
         """Draw the triangular points with numbers."""
         svg_parts = ['<g class="points">']
 
-        for i in range(24):
-            point_num = i + 1
+        # Iterate through all point numbers (1-24)
+        for point_num in range(1, 25):
+            # Get visual position for this point
+            visual_idx = self._get_visual_point_index(point_num)
 
-            # Determine point position (same logic as PNG renderer)
-            if i < 6:
-                x = board_x + self.half_width + self.bar_width + (5 - i) * self.point_width
+            # Determine point position based on visual index
+            if visual_idx < 6:
+                # Bottom right quadrant (visual positions 0-5)
+                x = board_x + self.half_width + self.bar_width + (5 - visual_idx) * self.point_width
                 y_base = board_y + self.board_height
                 y_tip = y_base - self.point_height
                 color = self.color_scheme.point_dark if point_num % 2 == 1 else self.color_scheme.point_light
                 label_y = y_base + 13
-            elif i < 12:
-                x = board_x + (11 - i) * self.point_width
+            elif visual_idx < 12:
+                # Bottom left quadrant (visual positions 6-11)
+                x = board_x + (11 - visual_idx) * self.point_width
                 y_base = board_y + self.board_height
                 y_tip = y_base - self.point_height
                 color = self.color_scheme.point_dark if point_num % 2 == 1 else self.color_scheme.point_light
                 label_y = y_base + 13
-            elif i < 18:
-                x = board_x + (i - 12) * self.point_width
+            elif visual_idx < 18:
+                # Top left quadrant (visual positions 12-17)
+                x = board_x + (visual_idx - 12) * self.point_width
                 y_base = board_y
                 y_tip = y_base + self.point_height
                 color = self.color_scheme.point_dark if point_num % 2 == 1 else self.color_scheme.point_light
                 label_y = y_base - 5
             else:
-                x = board_x + self.half_width + self.bar_width + (i - 18) * self.point_width
+                # Top right quadrant (visual positions 18-23)
+                x = board_x + self.half_width + self.bar_width + (visual_idx - 18) * self.point_width
                 y_base = board_y
                 y_tip = y_base + self.point_height
                 color = self.color_scheme.point_dark if point_num % 2 == 1 else self.color_scheme.point_light
@@ -649,20 +691,28 @@ class SVGBoardRenderer:
         if point_idx < 1 or point_idx > 24:
             raise ValueError(f"Invalid point index: {point_idx}")
 
-        if point_idx <= 6:
-            x = board_x + self.half_width + self.bar_width + (6 - point_idx) * self.point_width
+        # Get visual position based on orientation
+        visual_idx = self._get_visual_point_index(point_idx)
+
+        # Calculate position based on visual index
+        if visual_idx < 6:
+            # Bottom right quadrant (visual positions 0-5)
+            x = board_x + self.half_width + self.bar_width + (5 - visual_idx) * self.point_width
             y_base = board_y + self.board_height
             is_top = False
-        elif point_idx <= 12:
-            x = board_x + (12 - point_idx) * self.point_width
+        elif visual_idx < 12:
+            # Bottom left quadrant (visual positions 6-11)
+            x = board_x + (11 - visual_idx) * self.point_width
             y_base = board_y + self.board_height
             is_top = False
-        elif point_idx <= 18:
-            x = board_x + (point_idx - 13) * self.point_width
+        elif visual_idx < 18:
+            # Top left quadrant (visual positions 12-17)
+            x = board_x + (visual_idx - 12) * self.point_width
             y_base = board_y
             is_top = True
         else:
-            x = board_x + self.half_width + self.bar_width + (point_idx - 19) * self.point_width
+            # Top right quadrant (visual positions 18-23)
+            x = board_x + self.half_width + self.bar_width + (visual_idx - 18) * self.point_width
             y_base = board_y
             is_top = True
 

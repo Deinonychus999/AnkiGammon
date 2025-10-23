@@ -22,6 +22,7 @@ class Settings:
         "gnubg_path": None,
         "gnubg_analysis_ply": 2,
         "generate_score_matrix": False,
+        "board_orientation": "counter-clockwise",
     }
 
     def __init__(self, config_path: Optional[Path] = None):
@@ -152,6 +153,18 @@ class Settings:
     def generate_score_matrix(self, value: bool) -> None:
         """Set whether to generate score matrix for cube decisions."""
         self.set("generate_score_matrix", value)
+
+    @property
+    def board_orientation(self) -> str:
+        """Get the board orientation (clockwise or counter-clockwise)."""
+        return self._settings.get("board_orientation", "counter-clockwise")
+
+    @board_orientation.setter
+    def board_orientation(self, value: str) -> None:
+        """Set the board orientation (clockwise or counter-clockwise)."""
+        if value not in ["clockwise", "counter-clockwise"]:
+            raise ValueError("board_orientation must be 'clockwise' or 'counter-clockwise'")
+        self.set("board_orientation", value)
 
     def is_gnubg_available(self) -> bool:
         """

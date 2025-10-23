@@ -128,17 +128,13 @@ def parse_ogid(ogid: str) -> Tuple[Position, Dict]:
                 metadata['dice'] = (d1, d2)
 
     if len(parts) > 4 and parts[4]:
-        # Field 5: Color (W or B) - represents who SENT the position
-        # In OGID protocol, this is the player who supplied the position,
-        # which is the OPPOSITE of who's on roll (except for cube decisions)
-        # We invert the color to get the actual player on roll
+        # Field 5: Turn (W or B) - represents who is on roll
+        # W = White/X on roll, B = Black/O on roll
         turn_str = parts[4].upper()
         if turn_str == 'W':
-            # W sent position → B is on roll
-            metadata['on_roll'] = Player.O  # Black = O
-        elif turn_str == 'B':
-            # B sent position → W is on roll
             metadata['on_roll'] = Player.X  # White = X
+        elif turn_str == 'B':
+            metadata['on_roll'] = Player.O  # Black = O
 
     if len(parts) > 5 and parts[5]:
         # Field 6: Game state (e.g., IW, FB)

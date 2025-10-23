@@ -63,6 +63,7 @@ class ApkgExporter:
         show_options: bool = False,
         color_scheme: str = "classic",
         interactive_moves: bool = False,
+        orientation: str = "counter-clockwise",
         progress_callback: callable = None
     ) -> str:
         """
@@ -74,6 +75,7 @@ class ApkgExporter:
             show_options: Show multiple choice options (text-based)
             color_scheme: Board color scheme name
             interactive_moves: Enable interactive move visualization
+            orientation: Board orientation ("clockwise" or "counter-clockwise")
             progress_callback: Optional callback(message: str) for progress updates
 
         Returns:
@@ -84,7 +86,7 @@ class ApkgExporter:
         from ankigammon.renderer.svg_board_renderer import SVGBoardRenderer
 
         scheme = get_scheme(color_scheme)
-        renderer = SVGBoardRenderer(color_scheme=scheme)
+        renderer = SVGBoardRenderer(color_scheme=scheme, orientation=orientation)
 
         # Create card generator
         card_gen = CardGenerator(

@@ -157,13 +157,17 @@ def main(input_file, format, output, deck_name, show_options, input_format, colo
         settings = get_settings()
         color_scheme = settings.color_scheme
 
+    # Get orientation from settings
+    settings = get_settings()
+    orientation = settings.board_orientation
+
     # Export based on format
     try:
         if format == 'apkg':
-            export_apkg(decisions, output_dir, deck_name, show_options, color_scheme, interactive_moves)
+            export_apkg(decisions, output_dir, deck_name, show_options, color_scheme, interactive_moves, orientation)
 
         elif format == 'ankiconnect':
-            export_ankiconnect(decisions, output_dir, deck_name, show_options, color_scheme, interactive_moves)
+            export_ankiconnect(decisions, output_dir, deck_name, show_options, color_scheme, interactive_moves, orientation)
 
     except Exception as e:
         click.echo(f"Error during export: {e}", err=True)
@@ -249,13 +253,14 @@ def _enrich_with_gnubg_analysis(decisions, settings):
     return enriched_decisions
 
 
-def export_apkg(decisions, output_dir, deck_name, show_options, color_scheme="classic", interactive_moves=False):
+def export_apkg(decisions, output_dir, deck_name, show_options, color_scheme="classic", interactive_moves=False, orientation="counter-clockwise"):
     """Export to APKG format."""
     click.echo(f"Generating APKG file...")
     click.echo(f"  Deck name: {deck_name}")
     click.echo(f"  Show options: {'Yes' if show_options else 'No'}")
     click.echo(f"  Color scheme: {color_scheme}")
     click.echo(f"  Interactive moves: {'Yes' if interactive_moves else 'No'}")
+    click.echo(f"  Orientation: {orientation}")
 
     exporter = ApkgExporter(output_dir, deck_name)
     output_file = exporter.export(
@@ -263,7 +268,8 @@ def export_apkg(decisions, output_dir, deck_name, show_options, color_scheme="cl
         output_file="xg_deck.apkg",
         show_options=show_options,
         color_scheme=color_scheme,
-        interactive_moves=interactive_moves
+        interactive_moves=interactive_moves,
+        orientation=orientation
     )
 
     click.echo()
@@ -275,13 +281,14 @@ def export_apkg(decisions, output_dir, deck_name, show_options, color_scheme="cl
     click.echo(f"  3. Select: {output_file}")
 
 
-def export_ankiconnect(decisions, output_dir, deck_name, show_options, color_scheme="classic", interactive_moves=False):
+def export_ankiconnect(decisions, output_dir, deck_name, show_options, color_scheme="classic", interactive_moves=False, orientation="counter-clockwise"):
     """Export via Anki-Connect."""
     click.echo(f"Connecting to Anki...")
     click.echo(f"  Deck name: {deck_name}")
     click.echo(f"  Show options: {'Yes' if show_options else 'No'}")
     click.echo(f"  Color scheme: {color_scheme}")
     click.echo(f"  Interactive moves: {'Yes' if interactive_moves else 'No'}")
+    click.echo(f"  Orientation: {orientation}")
 
     client = AnkiConnect(deck_name=deck_name)
 
@@ -322,7 +329,8 @@ def export_ankiconnect(decisions, output_dir, deck_name, show_options, color_sch
         output_dir=output_dir,
         show_options=show_options,
         color_scheme=color_scheme,
-        interactive_moves=interactive_moves
+        interactive_moves=interactive_moves,
+        orientation=orientation
     )
 
     click.echo()

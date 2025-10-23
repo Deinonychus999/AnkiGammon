@@ -165,7 +165,10 @@ class InputDialog(QDialog):
         super().__init__(parent)
         self.settings = settings
         self.pending_decisions: List[Decision] = []
-        self.renderer = SVGBoardRenderer(color_scheme=get_scheme(settings.color_scheme))
+        self.renderer = SVGBoardRenderer(
+            color_scheme=get_scheme(settings.color_scheme),
+            orientation=settings.board_orientation
+        )
 
         self.setWindowTitle("Add Positions")
         self.setModal(True)

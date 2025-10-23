@@ -142,9 +142,12 @@ class ExportWorker(QThread):
         # Generate cards
         self.status_message.emit("Generating cards...")
 
-        # Create renderer with color scheme
+        # Create renderer with color scheme and orientation
         color_scheme = SCHEMES.get(self.settings.color_scheme, SCHEMES['classic'])
-        renderer = SVGBoardRenderer(color_scheme=color_scheme)
+        renderer = SVGBoardRenderer(
+            color_scheme=color_scheme,
+            orientation=self.settings.board_orientation
+        )
 
         # Export decisions
         total = len(self.decisions)
@@ -232,7 +235,10 @@ class ExportWorker(QThread):
             import genanki
 
             scheme = get_scheme(self.settings.color_scheme)
-            renderer = SVGBoardRenderer(color_scheme=scheme)
+            renderer = SVGBoardRenderer(
+                color_scheme=scheme,
+                orientation=self.settings.board_orientation
+            )
 
             # Generate cards
             total = len(self.decisions)
