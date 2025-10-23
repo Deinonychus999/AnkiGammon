@@ -48,6 +48,7 @@ class MainWindow(QMainWindow):
         """Initialize the user interface."""
         self.setWindowTitle("AnkiGammon - Backgammon Analysis to Anki")
         self.setMinimumSize(1000, 700)
+        self.resize(1300, 720)  # Optimal default size for board display
 
         # Hide the status bar for a cleaner, modern look
         self.statusBar().hide()
