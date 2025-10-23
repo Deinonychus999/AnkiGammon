@@ -170,17 +170,12 @@ PositionID:MatchID
   - Bits 36-50: Player X score
   - Bits 51-65: Player O score
 
-**KNOWN LIMITATION:**
-⚠️ The current Position ID decoding implementation has issues with checker placement. Only one player's checkers decode correctly due to incomplete understanding of GNU Backgammon's legacy encoding algorithm. The Match ID parsing works correctly and extracts all game metadata.
-
-**Recommendation:** For full position analysis, prefer XGID or OGID formats. GNUID can be used when importing positions with full XG analysis text, or for match metadata extraction only.
-
 **Key Characteristics:**
 - Most compact format (26 characters total)
 - Base64 encoding for efficiency
 - Bit-level packing of all metadata
 - Native format for GNU Backgammon
-- Position ID encoding is complex and has legacy quirks
+- Fully supports both position encoding and metadata extraction
 
 #### Cube Decision Parsing (parsers/xg_text_parser.py)
 

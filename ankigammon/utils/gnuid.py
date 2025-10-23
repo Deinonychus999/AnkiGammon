@@ -8,15 +8,7 @@ Position ID:
 - 14-character Base64 string
 - Encodes 10 bytes (80 bits)
 - Variable-length bit encoding of checker positions
-
-⚠️ KNOWN LIMITATION: The current implementation has issues with the Position ID encoding.
-   Only one player's checkers are being decoded correctly. This is likely due to
-   a misunderstanding of GNU Backgammon's legacy position encoding algorithm.
-
-   The Match ID parsing works correctly and extracts all game metadata.
-
-   For full position analysis, use XGID or OGID formats instead, or import
-   positions with full XG analysis text.
+- Format per point: [player 1-bits][0][opponent 1-bits][0]
 
 Match ID:
 - 12-character Base64 string
@@ -119,41 +111,121 @@ def _decode_position_id(position_id: str) -> Position:
         for i in range(8):
             bits.append((byte >> i) & 1)
 
-    # Decode bit string into position
-    # The encoding iterates through 26 points from player on roll's perspective
-    # Point order: 1-24 (board points) + bar (point 25 for player)
-
-    # We'll decode into arrays for each player from their perspective
-    player_checkers = [0] * 26  # Points 0-25 (0=bar for player on roll)
-    opponent_checkers = [0] * 26  # Points 0-25 (0=bar for opponent)
+    # Decode bit string into TanBoard structure
+    # Format: [player0-25points][player1-25points]
+    # Each point: [N consecutive 1s][separator 0]
+    # This matches GNU Backgammon's oldPositionFromKey() function
+    anBoard = [[0] * 25 for _ in range(2)]  # [2 players][25 points]
 
     bit_idx = 0
-    for point in range(26):
-        # Count player's checkers (consecutive 1s)
-        player_count = 0
+    player = 0  # Start with player 0 (X)
+    point = 0   # Start with point 0
+
+    while bit_idx < len(bits) and player < 2:
+        # Count consecutive 1s (checkers on this point)
+        checker_count = 0
         while bit_idx < len(bits) and bits[bit_idx] == 1:
-            player_count += 1
+            checker_count += 1
             bit_idx += 1
 
-        # Count opponent's checkers (consecutive 1s)
-        opponent_count = 0
-        while bit_idx < len(bits) and bits[bit_idx] == 1:
-            opponent_count += 1
-            bit_idx += 1
+        # Store checker count
+        if point < 25:
+            anBoard[player][point] = checker_count
 
-        # Skip separator 0
+        # Skip separator (0-bit)
         if bit_idx < len(bits) and bits[bit_idx] == 0:
             bit_idx += 1
 
-        player_checkers[point] = player_count
-        opponent_checkers[point] = opponent_count
+        # Move to next point
+        point += 1
+        if point >= 25:
+            # Move to next player
+            player += 1
+            point = 0
 
-    # Convert to our internal model
-    # GNUID always encodes from Player 1 (X/top player)'s perspective
-    # player_checkers = X's checkers, opponent_checkers = O's checkers
-    position = _convert_gnuid_to_position(player_checkers, opponent_checkers, Player.X)
+    # Convert TanBoard to our Position model
+    position = _convert_tanboard_to_position(anBoard)
 
     return position
+
+
+def _convert_tanboard_to_position(anBoard: list) -> Position:
+    """
+    Convert TanBoard structure to our internal Position model.
+
+    TanBoard structure (from GNU Backgammon):
+    - anBoard[0][0-23] = Player 0 (X/top) checkers on points 0-23
+    - anBoard[0][24] = Player 0 (X) bar
+    - anBoard[1][0-23] = Player 1 (O/bottom) checkers on points 0-23
+    - anBoard[1][24] = Player 1 (O) bar
+
+    Point numbering in TanBoard (player-relative):
+    - Player 0 (X): anBoard[0][0] = point 24, anBoard[0][23] = point 1 (reverse mapping)
+    - Player 1 (O): anBoard[1][0] = point 1, anBoard[1][23] = point 24 (direct mapping)
+
+    Our internal model:
+    - points[0] = X's bar
+    - points[1-24] = board points (1 = O's ace, 24 = X's ace)
+    - points[25] = O's bar
+    - Positive values = X checkers, Negative values = O checkers
+
+    Args:
+        anBoard: TanBoard structure [2 players][25 points]
+
+    Returns:
+        Position object
+    """
+    position = Position()
+
+    # Player 0 (X) - reverse numbering, positive values
+    for i in range(24):
+        our_point = 24 - i  # anBoard[0][0] → point 24, anBoard[0][23] → point 1
+        position.points[our_point] += anBoard[0][i]  # Positive for X
+    position.points[0] = anBoard[0][24]  # X's bar
+
+    # Player 1 (O) - direct numbering, negative values
+    for i in range(24):
+        our_point = i + 1  # anBoard[1][0] → point 1, anBoard[1][23] → point 24
+        position.points[our_point] -= anBoard[1][i]  # Negative for O
+    position.points[25] = -anBoard[1][24]  # O's bar
+
+    # Calculate borne-off checkers
+    total_x = sum(count for count in position.points if count > 0)
+    total_o = sum(abs(count) for count in position.points if count < 0)
+
+    position.x_off = 15 - total_x
+    position.o_off = 15 - total_o
+
+    return position
+
+
+def _convert_position_to_tanboard(position: Position) -> list:
+    """
+    Convert our internal Position model to TanBoard structure.
+
+    This is the inverse of _convert_tanboard_to_position.
+
+    Args:
+        position: Our internal position
+
+    Returns:
+        TanBoard structure [2 players][25 points]
+    """
+    anBoard = [[0] * 25 for _ in range(2)]
+
+    # Player 0 (X) - reverse mapping: point p → anBoard[0][24-p]
+    for our_point in range(1, 25):
+        if position.points[our_point] > 0:
+            anBoard[0][24 - our_point] = position.points[our_point]
+    anBoard[0][24] = position.points[0]  # X's bar
+
+    # Player 1 (O) - direct mapping: point p → anBoard[1][p-1]
+    for our_point in range(1, 25):
+        if position.points[our_point] < 0:
+            anBoard[1][our_point - 1] = -position.points[our_point]
+    anBoard[1][24] = -position.points[25] if position.points[25] < 0 else 0  # O's bar
+
+    return anBoard
 
 
 def _convert_gnuid_to_position(
@@ -181,22 +253,20 @@ def _convert_gnuid_to_position(
 
     if on_roll == Player.X:
         # X is on roll, so player = X, opponent = O
-        # GNUID uses GnuBG's point numbering (1-24 from bottom perspective)
-        # GNUID point 0-22 = our points 1-23
-        # GNUID point 23 = our point 24
+        # GNUID point 0 = X's point 24 (X's ace, looking from X's perspective)
+        # GNUID point 23 = X's point 1 (O's ace, looking from X's perspective)
         # GNUID point 24 = X's bar (our point 0)
         # GNUID point 25 = O's bar (our point 25)
 
-        # Map board points (direct mapping + 1)
+        # Map board points (reverse numbering for X's perspective)
         for gnuid_pt in range(24):
-            our_pt = gnuid_pt + 1
-            # Player checkers at these points are actually O's (from standard perspective)
-            position.points[our_pt] = -player_checkers[gnuid_pt]  # O checkers (negative)
-            position.points[our_pt] += opponent_checkers[gnuid_pt]  # X checkers (positive)
+            our_pt = 24 - gnuid_pt
+            position.points[our_pt] = player_checkers[gnuid_pt]  # X checkers (positive)
+            position.points[our_pt] -= opponent_checkers[gnuid_pt]  # O checkers (negative)
 
-        # Map bars (note: GnuBG might have different bar encoding)
-        position.points[25] = -player_checkers[24]  # O's bar
-        position.points[0] = opponent_checkers[25]  # X's bar
+        # Map bars
+        position.points[0] = player_checkers[24]  # X's bar
+        position.points[25] = -opponent_checkers[25]  # O's bar
 
     else:
         # O is on roll, so player = O, opponent = X
@@ -375,31 +445,25 @@ def _encode_position_id(position: Position) -> str:
     """
     Encode a Position into a 14-character Position ID.
 
-    GNUID Position IDs always encode from Player 1 (X/top player)'s perspective.
-
     Args:
         position: The position to encode
 
     Returns:
         14-character Base64 Position ID
     """
-    # Convert our position to GNUID perspective arrays (always from X's perspective)
-    player_checkers, opponent_checkers = _convert_position_to_gnuid(position, Player.X)
+    # Convert our position to TanBoard structure
+    anBoard = _convert_position_to_tanboard(position)
 
-    # Build bit string
+    # Build bit string - ALL player 0 points, then ALL player 1 points
     bits = []
 
-    for point in range(26):
-        # Add player's checkers as 1s
-        for _ in range(player_checkers[point]):
-            bits.append(1)
-
-        # Add opponent's checkers as 1s
-        for _ in range(opponent_checkers[point]):
-            bits.append(1)
-
-        # Add separator 0
-        bits.append(0)
+    for player in range(2):
+        for point in range(25):
+            # Add checkers as 1s
+            for _ in range(anBoard[player][point]):
+                bits.append(1)
+            # Add separator 0
+            bits.append(0)
 
     # Pad to 80 bits
     while len(bits) < 80:
