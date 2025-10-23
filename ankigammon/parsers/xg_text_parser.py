@@ -12,6 +12,7 @@ from typing import List, Optional, Tuple
 from ankigammon.models import Decision, Move, Position, Player, CubeState, DecisionType
 from ankigammon.utils.xgid import parse_xgid
 from ankigammon.utils.ogid import parse_ogid
+from ankigammon.utils.gnuid import parse_gnuid
 
 
 class XGTextParser:
@@ -46,9 +47,9 @@ class XGTextParser:
         """
         decisions = []
 
-        # Split into sections by XGID or OGID patterns
-        # Pattern matches either XGID= or OGID (base-26 format)
-        sections = re.split(r'(XGID=[^\n]+|^[0-9a-p]+:[0-9a-p]+:[A-Z0-9]{3}[^\n]*)', content, flags=re.MULTILINE)
+        # Split into sections by XGID, OGID, or GNUID patterns
+        # Pattern matches XGID=, OGID (base-26 format), or GNUID (base64 format)
+        sections = re.split(r'(XGID=[^\n]+|^[0-9a-p]+:[0-9a-p]+:[A-Z0-9]{3}[^\n]*|^[A-Za-z0-9+/]{14}:[A-Za-z0-9+/]{12})', content, flags=re.MULTILINE)
 
         for i in range(1, len(sections), 2):
             if i + 1 >= len(sections):
@@ -66,7 +67,7 @@ class XGTextParser:
     @staticmethod
     def _parse_decision_section(position_id_line: str, analysis_section: str) -> Optional[Decision]:
         """Parse a single decision section."""
-        # Detect and parse position ID (XGID or OGID)
+        # Detect and parse position ID (XGID, OGID, or GNUID)
         try:
             # Check if it's XGID format
             if position_id_line.startswith('XGID='):
@@ -75,6 +76,10 @@ class XGTextParser:
             # Check if it's OGID format (base-26 encoding)
             elif re.match(r'^[0-9a-p]+:[0-9a-p]+:[A-Z0-9]{3}', position_id_line):
                 position, metadata = parse_ogid(position_id_line)
+                position_id = position_id_line
+            # Check if it's GNUID format (base64 encoding)
+            elif re.match(r'^[A-Za-z0-9+/]{14}:[A-Za-z0-9+/]{12}$', position_id_line):
+                position, metadata = parse_gnuid(position_id_line)
                 position_id = position_id_line
             else:
                 raise ValueError(f"Unknown position ID format: {position_id_line}")

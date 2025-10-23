@@ -139,18 +139,22 @@ class FormatDetector:
         Positions are separated by:
         - Multiple blank lines (2+)
         - "eXtreme Gammon Version:" marker
-        - New XGID line after a complete position
+        - New XGID/OGID/GNUID line after a complete position
         """
         # First, try splitting by eXtreme Gammon version markers
         positions = []
 
-        # Split by XGID lines, keeping the XGID with its analysis
-        sections = re.split(r'(XGID=[^\n]+)', text)
+        # Split by XGID, OGID, or GNUID lines, keeping the position ID with its analysis
+        # Pattern matches XGID=, OGID (base-26), or GNUID (base64)
+        sections = re.split(r'(XGID=[^\n]+|^[0-9a-p]+:[0-9a-p]+:[A-Z0-9]{3}[^\n]*|^[A-Za-z0-9+/]{14}:[A-Za-z0-9+/]{12})', text, flags=re.MULTILINE)
 
-        # Recombine XGID with following content
+        # Recombine position ID with following content
         current_pos = ""
         for i, section in enumerate(sections):
-            if section.startswith('XGID='):
+            # Check if this section starts with a position ID
+            if (section.startswith('XGID=') or
+                re.match(r'^[0-9a-p]+:[0-9a-p]+:[A-Z0-9]{3}', section) or
+                re.match(r'^[A-Za-z0-9+/]{14}:[A-Za-z0-9+/]{12}$', section)):
                 if current_pos:
                     positions.append(current_pos.strip())
                 current_pos = section
@@ -179,9 +183,9 @@ class FormatDetector:
         if re.match(r'^[0-9a-p]+:[0-9a-p]+:[A-Z0-9]{3}', line):
             return True
 
-        # GNUID format (base64 pattern - has +, /, or = characters)
+        # GNUID format (base64: PositionID:MatchID = 14 chars:12 chars)
         # Check for base64 chars after checking OGID to avoid confusion
-        if re.match(r'^[A-Za-z0-9+/=]+:[A-Za-z0-9+/=]+$', line):
+        if re.match(r'^[A-Za-z0-9+/]{14}:[A-Za-z0-9+/]{12}$', line):
             return True
 
         return False
