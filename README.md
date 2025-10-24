@@ -1,22 +1,23 @@
 # AnkiGammon
 
-Paste any backgammon position. Get smart Anki study cards.
+A graphical application for converting backgammon positions into Anki flashcards. Analyze positions from eXtreme Gammon, OpenGammon, or GNU Backgammon and create smart study cards.
 
 ## Features
 
+- **Modern GUI interface** - Easy-to-use graphical application, no command-line needed
 - **Multiple position format support** - XGID (eXtreme Gammon), OGID (OpenGammon), and GNUID (GNU Backgammon)
 - **Direct XG export support** - Copy/paste positions from eXtreme Gammon
 - **Smart rendering** - Automatic board image generation from position IDs
 - **Automatic format detection** - Paste any supported format, the app detects it automatically
-- **Two output formats**:
-  - AnkiConnect: Push directly to Anki (default, recommended)
+- **Two export methods**:
+  - AnkiConnect: Push directly to Anki (recommended)
   - APKG: Self-contained package for manual import
-- **Interactive mode** - Paste positions directly, no file management needed
+- **Customizable appearance** - 6 color schemes and board orientation options
 - **Complete analysis** - Top 5 moves with equities and error calculations
 
 ## Installation
 
-### Option 1: Standalone Executable (Recommended)
+### Standalone Executable (Recommended)
 
 **Windows:**
 1. Run `build_executable.bat` to create `ankigammon.exe`
@@ -27,38 +28,30 @@ Paste any backgammon position. Get smart Anki study cards.
 2. Run from terminal: `./dist/ankigammon` - no Python installation needed!
 3. macOS first run: Right-click → Open (or allow in System Settings → Privacy & Security)
 
-### Option 2: Development Install
+### Development Install
+
+For developers who want to run from source:
 
 ```bash
 git clone https://github.com/yourusername/ankigammon.git
 cd ankigammon
 pip install -r requirements.txt
-python -m ankigammon
+python -m ankigammon  # Launches the GUI
 ```
 
-## Quick Start
+## Usage
 
-### Interactive Mode (Easiest)
-```bash
-ankigammon
-```
-Then paste XG positions when prompted.
+1. **Launch the application** - Double-click `ankigammon.exe` (Windows) or run `./ankigammon` (macOS/Linux)
+2. **Paste positions** - Copy analysis from eXtreme Gammon (Ctrl+C) and paste into the application
+3. **Configure settings** - Choose color scheme, board orientation, and export method in Settings
+4. **Generate cards** - Click "Generate Cards" to create Anki flashcards
 
-### File-Based Mode
-```bash
-# Push directly to Anki (requires AnkiConnect addon)
-ankigammon analysis.txt
-
-# Or generate APKG file
-ankigammon analysis.txt --format apkg
-```
-
-## Getting Positions from XG
+### Getting Positions from eXtreme Gammon
 
 1. In eXtreme Gammon, analyze a position
-2. Press Ctrl+C to copy the analysis
-3. Paste into a text file or interactive mode
-4. Run ankigammon
+2. Press Ctrl+C to copy the full analysis
+3. Paste into AnkiGammon's input area
+4. Click "Generate Cards"
 
 **Example XG export format:**
 ```
@@ -120,80 +113,48 @@ The application **automatically detects** which format you're using. Just paste 
 
 You can mix formats in the same input - each position can use a different format!
 
-## Output Formats
+## Export Methods
 
-### AnkiConnect (Default - Recommended)
+### AnkiConnect (Recommended)
 
-Push cards directly to running Anki:
-```bash
-python -m ankigammon analysis.txt
-```
-
-**Prerequisites:**
+Push cards directly to running Anki through the GUI:
 - Install [AnkiConnect addon](https://ankiweb.net/shared/info/2055492159)
-- Anki must be running
-
-**Advantages:**
-- No manual import
+- Keep Anki running while generating cards
+- Cards appear instantly in your deck
 - Automatic duplicate detection
-- Instant feedback
 
 ### APKG
 
 Generate a package file for manual import:
-```bash
-python -m ankigammon analysis.txt --format apkg
-```
-
-Import into Anki: File → Import → Select the .apkg file
-
-## Command-Line Options
-
-```
-Usage: ankigammon [OPTIONS] [INPUT_FILE]
-
-Options:
-  --format [ankiconnect|apkg]   Output format (default: ankiconnect)
-  -o, --output PATH             Output directory
-  --deck-name TEXT              Anki deck name (default: XG Backgammon)
-  --show-options                Show text move options on card front
-  -i, --interactive             Run in interactive mode
-  --help                        Show help message
-```
+- Select "APKG" in Settings
+- Import into Anki: File → Import → Select the .apkg file
+- Useful for offline card generation
 
 ## Card Format
 
-Each XG position becomes one Anki card:
+Each position becomes one Anki card:
 
 **Front:**
 - Board image showing the position
 - Metadata: player on roll, dice, score, cube, match length
 - Multiple choice: 5 candidate moves (labeled A-E, shuffled)
+- Optional text move descriptions
 
 **Back:**
 - Position image and metadata
 - Ranked table of top 5 moves with equity and error
 - Correct answer highlighted
-- Source XGID for reference
+- Source position ID for reference
 
-## Examples
+## Customization Options
 
-```bash
-# Interactive mode
-python -m ankigammon
-
-# Push to Anki (default)
-python -m ankigammon positions.txt
-
-# Generate APKG file
-python -m ankigammon positions.txt --format apkg
-
-# Custom deck name
-python -m ankigammon positions.txt --deck-name "Opening Plays"
-
-# Show text options on front
-python -m ankigammon positions.txt --show-options
-```
+The GUI Settings dialog provides:
+- **Color Schemes**: Choose from 6 built-in themes (Classic, Forest, Ocean, Desert, Sunset, Midnight)
+- **Board Orientation**: Counter-clockwise (standard) or Clockwise orientation
+- **Deck Name**: Customize your Anki deck name
+- **Show Move Options**: Toggle text move descriptions on card front
+- **Interactive Moves**: Enable/disable move visualization
+- **Export Method**: Choose between AnkiConnect or APKG output
 
 ## Troubleshooting
 
@@ -202,11 +163,16 @@ python -m ankigammon positions.txt --show-options
 - Make sure Anki is running
 - Check firewall isn't blocking localhost:8765
 
-**"No decisions found in input file"**
-- Ensure file includes position ID lines (XGID, OGID, or GNUID format)
+**"No decisions found in input"**
+- Ensure input includes position ID lines (XGID, OGID, or GNUID format)
 - Make sure move analysis includes equity values (eq:)
 - Copy the full position from XG (press Ctrl+C)
 - For GNUID format: Consider using XGID or OGID instead due to known limitations
+
+**Application won't start**
+- Windows: Check Windows Defender isn't blocking the executable
+- macOS: Right-click → Open, or remove quarantine with `xattr -cr ankigammon`
+- Linux: Ensure execute permissions with `chmod +x ankigammon`
 
 ## For Developers
 
@@ -250,62 +216,48 @@ pip3 install pyinstaller
 rm -rf build dist
 
 # Build
-pyinstaller ankigammon-mac.spec
+pyinstaller ankigammon.spec
 
 # Remove quarantine attribute (macOS only)
 xattr -cr dist/ankigammon
 ```
 
-### Testing Builds
-
-Before distributing:
+### Testing the Build
 
 Windows:
 ```bash
-# Test the executable works
+# Test the GUI launches
 cd dist
-ankigammon.exe --help
-
-# Test interactive mode
 ankigammon.exe
-
-# Test with a sample file
-ankigammon.exe ..\examples\example_xg_export.txt
 ```
 
 macOS/Linux:
 ```bash
-# Test the executable works
+# Test the GUI launches
 cd dist
-./ankigammon --help
-
-# Test interactive mode
 ./ankigammon
-
-# Test with a sample file
-./ankigammon ../examples/example_xg_export.txt
 ```
 
 ### Project Structure
 
 - `ankigammon/` - Main package code
   - `parsers/` - XG text format parsers
-  - `renderer/` - Board image generation
+  - `renderer/` - Board image generation (SVG-based)
   - `anki/` - Anki card generation and export
   - `utils/` - Position format encoding/decoding (XGID, OGID, GNUID)
   - `gui/` - GUI components and format detection
 - `tests/` - Unit tests (includes tests for all three formats)
-- `ankigammon.spec` - PyInstaller configuration
+- `ankigammon.spec` - PyInstaller configuration for GUI build
 - `build_executable.bat/.sh` - Build scripts
 
 ### Settings Storage
 
-User preferences (color scheme, deck name, etc.) are stored in:
+User preferences (color scheme, deck name, board orientation, etc.) are automatically saved to:
 - Windows: `C:\Users\YourName\.ankigammon\config.json`
 - macOS: `~/.ankigammon/config.json`
 - Linux: `~/.ankigammon/config.json`
 
-This ensures settings persist even when using the standalone executable.
+Settings persist across application restarts, even when using the standalone executable.
 
 ### Troubleshooting Build Issues
 
@@ -345,9 +297,9 @@ Linux:
 
 ## Requirements
 
-- Python 3.8+ (for development/pip install)
-- Dependencies: genanki, Pillow, click, requests, beautifulsoup4, lxml, numpy
-- For standalone executable: No requirements, Python is bundled
+- Python 3.8+ (for development install only)
+- Dependencies: genanki, requests, beautifulsoup4, lxml, numpy, tkinter
+- For standalone executable: No requirements - Python and all dependencies are bundled
 
 ## License
 

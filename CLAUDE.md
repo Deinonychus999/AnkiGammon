@@ -14,11 +14,8 @@ AnkiGammon converts eXtreme Gammon (XG) backgammon analysis into Anki flashcards
 # Install dependencies
 pip install -r requirements.txt
 
-# Run the application (interactive mode)
-python -m ankigammon
-
-# Run with file input
-python -m ankigammon analysis.txt
+# Run the GUI application
+python -m ankigammon.gui.main_window
 
 # Run tests
 python -m unittest tests/test_basic.py
@@ -28,34 +25,24 @@ python -m unittest tests/test_basic.py
 
 **Windows:**
 ```bash
-# Install PyInstaller if needed
-pip install pyinstaller
+# Build using the build script
+.\build_executable.bat
 
-# Clean previous builds (optional)
-rm -rf build dist
-
-# Build executable
+# Or use PyInstaller directly
 pyinstaller ankigammon.spec
-# Creates dist/ankigammon.exe
 ```
 
 **macOS/Linux:**
 ```bash
-# Install PyInstaller if needed
-pip install pyinstaller
+# Build using the build script
+./build_executable.sh
 
-# Clean previous builds (optional)
-rm -rf build dist
-
-# Build executable
-pyinstaller ankigammon-mac.spec
-# Creates dist/ankigammon
+# Or use PyInstaller directly
+pyinstaller ankigammon.spec
 ```
 
-**Note:** The `build_executable.bat` and `build_executable.sh` scripts exist for end users, but Claude Code should use the PyInstaller commands above.
-
 **Build Output:**
-- Executable: `dist/ankigammon.exe` (Windows) or `dist/ankigammon` (macOS/Linux)
+- Executable: `dist/AnkiGammon.exe` (Windows) or `dist/AnkiGammon.app` (macOS)
 - Build artifacts: `build/` directory (can be deleted)
 - Size: ~16MB (includes Python runtime and all dependencies)
 - No Python installation required on target machine
@@ -234,14 +221,14 @@ The card back shows moves in **XG's original order** (not shuffled MCQ order):
 - **`utils/ogid.py`**: OGID encoding/decoding with base-26 format (alternative format)
 - **`utils/gnuid.py`**: GNUID encoding/decoding for GNU Backgammon format (has known Position ID limitations)
 - **`parsers/xg_text_parser.py`**: Parses XG text exports (supports XGID and OGID), handles cube decisions
+- **`gui/main_window.py`**: Main GUI window for the application
 - **`gui/format_detector.py`**: Auto-detects position format (XGID, OGID, or GNUID)
-- **`renderer/svg_board_renderer.py`**: Generates backgammon board SVG markup (replaces old PNG renderer)
+- **`gui/dialogs/settings_dialog.py`**: Settings dialog for user preferences
+- **`renderer/svg_board_renderer.py`**: Generates backgammon board SVG markup
 - **`renderer/color_schemes.py`**: Defines color schemes for board rendering (6 built-in schemes: classic, forest, ocean, desert, sunset, midnight)
 - **`anki/card_generator.py`**: Creates MCQ flashcard HTML with embedded SVG boards
 - **`anki/ankiconnect.py`**: Sends cards to Anki via AnkiConnect API
 - **`anki/apkg_exporter.py`**: Generates .apkg files using genanki
-- **`cli.py`**: Command-line interface with `--color-scheme` option
-- **`interactive.py`**: Interactive mode for collecting positions with color scheme selection
 - **`settings.py`**: Settings persistence (saves user preferences like color scheme to `~/.ankigammon/config.json`)
 
 #### Color Schemes (renderer/color_schemes.py)
@@ -267,8 +254,7 @@ Each `ColorScheme` dataclass defines 10 colors:
 - `bearoff` - Bear-off tray background
 
 **Usage:**
-- In CLI: `python -m ankigammon --color-scheme ocean analysis.txt`
-- In interactive mode: Options menu (option 1 from main menu)
+- In GUI: Settings dialog, Card Appearance section
 - User's selection is saved to `~/.ankigammon/config.json` and persisted across sessions
 
 #### Board Orientation (renderer/svg_board_renderer.py)
@@ -296,7 +282,6 @@ The application supports two board orientation modes that horizontally mirror th
 - Points 13-24: `visual = 36 - point` (top row, both quadrants reversed)
 
 **Usage:**
-- In interactive mode: Options menu (option 5 from main menu)
 - In GUI: Settings dialog, Card Appearance section
 - User's selection is saved to `~/.ankigammon/config.json` and persisted across sessions
 - Setting is automatically applied to all generated cards
@@ -328,22 +313,20 @@ print(settings.color_scheme)  # Loads from config file
 **Fallback Behavior:**
 - Missing config file → uses defaults
 - Corrupted config file → silently falls back to defaults
-- CLI `--color-scheme` argument → overrides saved preference for that run only
 
 ## Common Patterns
 
 ### Adding a New Input Format
 
 1. Create parser in `parsers/` implementing `parse_file()` → `List[Decision]`
-2. Add format detection in `cli.py:parse_input()`
-3. Update `--input-format` option in CLI
+2. Add format detection in GUI file import logic
+3. Update GUI to handle the new format
 
 ### Adding a New Color Scheme
 
 1. Define new `ColorScheme` object in `renderer/color_schemes.py`
 2. Add to `SCHEMES` dictionary with a lowercase key name
-3. Update `--color-scheme` choices in `cli.py` (line 45)
-4. The scheme will automatically appear in interactive mode's color scheme menu
+3. The scheme will automatically appear in the GUI settings dialog
 
 ### Modifying Card Layout
 

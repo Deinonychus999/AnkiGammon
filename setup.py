@@ -29,11 +29,12 @@ setup(
         "lxml>=4.9.0",
         "genanki>=0.13.0",
         "requests>=2.31.0",
-        "click>=8.1.0",
+        "PySide6>=6.0.0",
+        "qtawesome>=1.0.0",
     ],
     entry_points={
-        "console_scripts": [
-            "ankigammon=ankigammon.cli:main",
+        "gui_scripts": [
+            "ankigammon=ankigammon.gui.app:run_gui",
         ],
     },
 )

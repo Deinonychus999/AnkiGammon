@@ -1,85 +1,45 @@
 #!/bin/bash
-# Build script for creating AnkiGammon macOS/Linux executable
-# Run this to create a standalone executable file
 
-set -e  # Exit on error
+# Build script for creating AnkiGammon GUI executable (macOS/Linux)
+# Usage: ./build_executable.sh
 
 echo "========================================"
-echo "AnkiGammon Executable Builder (macOS/Linux)"
+echo "Building AnkiGammon GUI Executable"
 echo "========================================"
-echo ""
-
-# Detect platform
-PLATFORM=$(uname)
-echo "Detected platform: $PLATFORM"
-echo ""
-
-# Check if PyInstaller is installed
-if ! python3 -c "import PyInstaller" 2>/dev/null; then
-    echo "PyInstaller not found. Installing..."
-    pip3 install pyinstaller
-    if [ $? -ne 0 ]; then
-        echo "ERROR: Failed to install PyInstaller"
-        exit 1
-    fi
-fi
+echo
 
 # Clean previous builds
-echo "Cleaning previous builds..."
-rm -rf build dist
-
-# Determine which spec file to use
-if [ "$PLATFORM" == "Darwin" ]; then
-    SPEC_FILE="ankigammon-mac.spec"
-    echo "Using macOS spec file: $SPEC_FILE"
-else
-    SPEC_FILE="ankigammon.spec"
-    echo "Using Linux spec file: $SPEC_FILE"
+if [ -d "build" ]; then
+    echo "Cleaning build directory..."
+    rm -rf build
+fi
+if [ -d "dist" ]; then
+    echo "Cleaning dist directory..."
+    rm -rf dist
 fi
 
-# Build the executable
-echo ""
-echo "Building executable..."
-pyinstaller "$SPEC_FILE"
+echo
+echo "Running PyInstaller..."
+pyinstaller ankigammon.spec
 
 if [ $? -ne 0 ]; then
-    echo ""
-    echo "ERROR: Build failed!"
+    echo
+    echo "========================================"
+    echo "Build FAILED"
+    echo "========================================"
     exit 1
 fi
 
-# Success message
-echo ""
+echo
 echo "========================================"
 echo "Build completed successfully!"
 echo "========================================"
-echo ""
-echo "Executable location: dist/ankigammon"
-echo ""
+echo
 
-# Make executable (just to be sure)
-chmod +x dist/ankigammon
-
-# macOS-specific instructions
-if [ "$PLATFORM" == "Darwin" ]; then
-    echo "macOS Users:"
-    echo "  - First run may require: Right-click → Open"
-    echo "  - Or: System Settings → Privacy & Security → Allow"
-    echo ""
-    echo "To allow running from anywhere:"
-    echo "  xattr -cr dist/ankigammon"
-    echo ""
-fi
-
-echo "You can now distribute this file to users."
-echo "Users do NOT need Python installed."
-echo ""
-
-# Test the executable
-echo "Testing executable..."
-if ./dist/ankigammon --help > /dev/null 2>&1; then
-    echo "✓ Executable test passed!"
+# Display executable location based on platform
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    echo "Application bundle: dist/AnkiGammon.app"
 else
-    echo "⚠ Warning: Executable test failed. Please check manually."
+    echo "Executable: dist/ankigammon"
 fi
-echo ""
+echo
