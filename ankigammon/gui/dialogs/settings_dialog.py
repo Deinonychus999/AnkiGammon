@@ -57,11 +57,18 @@ class GnuBGValidationWorker(QThread):
                 raise
 
             # Try to run gnubg with -t (text mode) and -c (command file)
+            # On Windows, prevent console window from appearing
+            kwargs = {
+                'capture_output': True,
+                'text': True,
+                'timeout': 5
+            }
+            if sys.platform == 'win32':
+                kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+
             result = subprocess.run(
                 [str(self.gnubg_path), "-t", "-c", command_file],
-                capture_output=True,
-                text=True,
-                timeout=5
+                **kwargs
             )
 
             # Check if it's actually GNU Backgammon

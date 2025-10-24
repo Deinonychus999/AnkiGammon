@@ -1,6 +1,6 @@
 # AnkiGammon
 
-Convert eXtreme Gammon (XG) backgammon analysis into Anki flashcards for effective study.
+Paste any backgammon position. Get smart Anki study cards.
 
 ## Features
 

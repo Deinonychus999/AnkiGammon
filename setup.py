@@ -28,10 +28,8 @@ setup(
         "beautifulsoup4>=4.12.0",
         "lxml>=4.9.0",
         "genanki>=0.13.0",
-        "Pillow>=10.0.0",
         "requests>=2.31.0",
         "click>=8.1.0",
-        "numpy>=1.24.0",
     ],
     entry_points={
         "console_scripts": [

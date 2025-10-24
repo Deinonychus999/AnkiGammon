@@ -5,6 +5,7 @@ Provides functionality to analyze backgammon positions using gnubg-cli.exe.
 """
 
 import os
+import sys
 import subprocess
 import tempfile
 from pathlib import Path
@@ -174,12 +175,16 @@ class GNUBGAnalyzer:
         cmd = [self.gnubg_path, "-t", "-c", command_file]
 
         # Execute gnubg
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=120,  # 120 second timeout
-        )
+        # On Windows, prevent console window from appearing
+        kwargs = {
+            'capture_output': True,
+            'text': True,
+            'timeout': 120,  # 120 second timeout
+        }
+        if sys.platform == 'win32':
+            kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+
+        result = subprocess.run(cmd, **kwargs)
 
         # Check for errors
         if result.returncode != 0:

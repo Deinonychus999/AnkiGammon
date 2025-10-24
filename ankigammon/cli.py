@@ -74,13 +74,7 @@ from ankigammon.settings import get_settings
     is_flag=True,
     help='Run in interactive mode (default when no input file provided)'
 )
-@click.option(
-    '--gui',
-    '-g',
-    is_flag=True,
-    help='Launch graphical user interface (GUI mode)'
-)
-def main(input_file, format, output, deck_name, show_options, input_format, color_scheme, interactive_moves, gnubg_path, gnubg_ply, use_gnubg, interactive, gui):
+def main(input_file, format, output, deck_name, show_options, input_format, color_scheme, interactive_moves, gnubg_path, gnubg_ply, use_gnubg, interactive):
     """
     Convert backgammon positions/analysis into Anki flashcards.
 
@@ -109,11 +103,6 @@ def main(input_file, format, output, deck_name, show_options, input_format, colo
         # Use GnuBG to analyze position IDs without full analysis
         ankigammon positions.txt --use-gnubg
     """
-    # Launch GUI mode if requested
-    if gui:
-        from ankigammon.gui import run_gui
-        sys.exit(run_gui())
-
     # Launch interactive mode if no input file provided
     if not input_file or interactive:
         from ankigammon.interactive import run_interactive
