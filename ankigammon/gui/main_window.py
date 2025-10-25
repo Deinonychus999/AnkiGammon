@@ -559,7 +559,7 @@ class MainWindow(QMainWindow):
     @Slot()
     def show_documentation(self):
         """Show online documentation."""
-        QDesktopServices.openUrl(QUrl("https://github.com/yourusername/ankigammon"))
+        QDesktopServices.openUrl(QUrl("https://github.com/Deinonychus999/AnkiGammon"))
 
     @Slot()
     def show_about_dialog(self):
@@ -575,7 +575,7 @@ class MainWindow(QMainWindow):
             <h3>Special Thanks</h3>
             <p>OilSpillDuckling<br>Eran & OpenGammon</p>
 
-            <p><a href="https://github.com/yourusername/ankigammon">GitHub Repository</a></p>
+            <p><a href="https://github.com/Deinonychus999/AnkiGammon">GitHub Repository</a></p>
             """
         )
 

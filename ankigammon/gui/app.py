@@ -149,7 +149,7 @@ def run_gui():
     app = QApplication(sys.argv)
     app.setApplicationName("AnkiGammon")
     app.setOrganizationName("AnkiGammon")
-    app.setOrganizationDomain("github.com/yourusername/ankigammon")
+    app.setOrganizationDomain("github.com/Deinonychus999/AnkiGammon")
 
     # Set application style (modern, consistent across platforms)
     app.setStyle('Fusion')

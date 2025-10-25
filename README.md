@@ -33,8 +33,8 @@ A graphical application for converting backgammon positions into Anki flashcards
 For developers who want to run from source:
 
 ```bash
-git clone https://github.com/yourusername/ankigammon.git
-cd ankigammon
+git clone https://github.com/Deinonychus999/AnkiGammon.git
+cd AnkiGammon
 pip install -e .  # Install in editable mode
 python -m ankigammon  # Launches the GUI
 ```
