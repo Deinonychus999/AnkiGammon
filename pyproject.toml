@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ankigammon"
+version = "1.0.0"
+description = "Convert eXtreme Gammon backgammon analysis into Anki flashcards"
+readme = "README.md"
+requires-python = ">=3.8"
+authors = [
+    {name = "AnkiGammon Contributors"},
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: End Users/Desktop",
+    "Topic :: Games/Entertainment :: Board Games",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+dependencies = [
+    # Core dependencies
+    "beautifulsoup4>=4.12.0",
+    "lxml>=4.9.0",
+    "genanki>=0.13.0",
+    "requests>=2.31.0",
+    # GUI dependencies
+    "PySide6>=6.6.0",
+    "PySide6-Addons>=6.6.0",
+    "qtawesome>=1.3.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pyinstaller>=6.0.0",
+    "pytest>=7.0.0",
+]
+
+[project.scripts]
+ankigammon = "ankigammon.gui.app:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["ankigammon*"]
+
+[tool.setuptools.package-data]
+ankigammon = [
+    "gui/resources/*",
+]

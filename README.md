@@ -35,7 +35,7 @@ For developers who want to run from source:
 ```bash
 git clone https://github.com/yourusername/ankigammon.git
 cd ankigammon
-pip install -r requirements.txt
+pip install -e .  # Install in editable mode
 python -m ankigammon  # Launches the GUI
 ```
 
@@ -298,7 +298,7 @@ Linux:
 ## Requirements
 
 - Python 3.8+ (for development install only)
-- Dependencies: genanki, requests, beautifulsoup4, lxml, numpy, tkinter
+- Dependencies automatically installed via `pip install .`: genanki, requests, beautifulsoup4, lxml, PySide6, qtawesome
 - For standalone executable: No requirements - Python and all dependencies are bundled
 
 ## License

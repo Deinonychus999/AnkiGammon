@@ -12,7 +12,13 @@ AnkiGammon converts eXtreme Gammon (XG) backgammon analysis into Anki flashcards
 
 ```bash
 # Install dependencies
-pip install -r requirements.txt
+pip install .
+
+# Install in editable mode (for development)
+pip install -e .
+
+# Install with dev dependencies (includes PyInstaller, pytest)
+pip install -e .[dev]
 
 # Run the GUI application
 python -m ankigammon.gui.main_window
