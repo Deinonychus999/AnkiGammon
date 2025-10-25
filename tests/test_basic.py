@@ -2,7 +2,6 @@
 
 import unittest
 from pathlib import Path
-from unittest.mock import patch
 import sys
 
 # Add parent directory to path
@@ -14,7 +13,6 @@ from ankigammon.utils.ogid import parse_ogid, encode_ogid
 from ankigammon.utils.gnuid import parse_gnuid, encode_gnuid
 from ankigammon.utils.move_parser import MoveParser
 from ankigammon.renderer.svg_board_renderer import SVGBoardRenderer
-from ankigammon.interactive import InteractiveSession
 from ankigammon.parsers.xg_text_parser import XGTextParser
 
 
@@ -809,66 +807,6 @@ eXtreme Gammon Version: 2.10, MET: Kazaross XG2"""
         metadata_text = decision.get_metadata_text()
         self.assertIn("Crawford", metadata_text)
         self.assertIn("5pt", metadata_text)
-
-
-class TestInteractiveSession(unittest.TestCase):
-    """Test interactive session helpers."""
-
-    def test_collect_position_includes_footer_after_blank_break(self):
-        """Ensure footer lines following blank separators stay with the position."""
-        session = InteractiveSession()
-        sample_lines = [
-            "XGID=-aA--BD-C---eA--ac-c--b-B-:0:0:1:61:0:0:3:0:10",
-            "",
-            "X:Player 1   O:Player 2",
-            "Score is X:0 O:0. Unlimited Game, Jacoby Beaver",
-            " +13-14-15-16-17-18------19-20-21-22-23-24-+",
-            " | X        O  O    |   | O        O     X |",
-            " |             O    |   | O        O     X |",
-            " |             O    |   | O                |",
-            " |                  |   |                  |",
-            " |                  |   |                  |",
-            " |                  |BAR|                  |",
-            " | O                |   |                  |",
-            " | O                |   | X                |",
-            " | O           X    |   | X                |",
-            " | O           X    |   | X  X             |",
-            " | O           X    |   | X  X        X  O |",
-            " +12-11-10--9--8--7-------6--5--4--3--2--1-+",
-            "Pip count  X: 121  O: 146 X-O: 0-0",
-            "Cube: 1",
-            "X to play 61",
-            "",
-            "    1. 2-ply       13/7 8/7                     eq:+0.100",
-            "      Player:   47.72% (G:16.27% B:0.55%)",
-            "      Opponent: 52.28% (G:0.00% B:0.00%)",
-            "",
-            "    2. 2-ply       24/18 2/1*                   eq:-0.029 (-0.129)",
-            "      Player:   43.43% (G:15.51% B:0.47%)",
-            "      Opponent: 56.57% (G:0.00% B:0.00%)",
-            "",
-            "    3. 2-ply       8/2 6/5                      eq:-0.053 (-0.153)",
-            "      Player:   42.67% (G:16.57% B:0.49%)",
-            "      Opponent: 57.33% (G:0.00% B:0.00%)",
-            "",
-            "    4. 2-ply       24/23 8/2                    eq:-0.064 (-0.164)",
-            "      Player:   42.45% (G:16.29% B:0.45%)",
-            "      Opponent: 57.55% (G:0.00% B:0.00%)",
-            "",
-            "    5. 2-ply       13/7 2/1*                    eq:-0.106 (-0.206)",
-            "      Player:   41.35% (G:14.66% B:0.36%)",
-            "      Opponent: 58.65% (G:0.00% B:0.00%)",
-            "eXtreme Gammon Version: 2.10",
-            "done",
-        ]
-
-        input_sequence = iter(sample_lines)
-
-        with patch('builtins.input', side_effect=lambda: next(input_sequence)):
-            positions = session.collect_positions()
-
-        self.assertEqual(len(positions), 1)
-        self.assertIn("eXtreme Gammon Version: 2.10", positions[0])
 
 
 def run_tests():

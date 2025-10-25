@@ -274,8 +274,11 @@ def encode_xgid(
     Returns:
         XGID string
     """
-    # Encode position
-    pos_str = _encode_position_string(position)
+    # Turn: 1 = BOTTOM (O), -1 = TOP (X)
+    turn = 1 if on_roll == Player.O else -1
+
+    # Encode position (turn-dependent)
+    pos_str = _encode_position_string(position, turn)
 
     # Cube value as log2
     cube_value_log = 0
@@ -291,9 +294,6 @@ def encode_xgid(
         cube_position = 1
     else:
         cube_position = 0
-
-    # Turn: 1 = BOTTOM (O), -1 = TOP (X)
-    turn = 1 if on_roll == Player.O else -1
 
     # Dice
     if dice:
@@ -319,48 +319,101 @@ def encode_xgid(
     return xgid
 
 
-def _encode_position_string(position: Position) -> str:
+def _encode_position_string(position: Position, turn: int) -> str:
     """
     Encode a position to the 26-character XGID format.
 
-    Format:
-    - Char 0: TOP player's bar (our points[0])
-    - Chars 1-24: board points
-    - Char 25: BOTTOM player's bar (our points[25])
+    CRITICAL: The ENTIRE position encoding depends on whose turn it is!
+
+    When turn=1 (O on roll - standard view):
+    - Char 0: X's bar (our points[0])
+    - Chars 1-24: points in standard order (our points[1-24])
+    - Char 25: O's bar (our points[25])
+
+    When turn=-1 (X on roll - flipped view):
+    - Char 0: O's bar (our points[25])
+    - Chars 1-24: points in REVERSED order (char 1 = points[24], char 24 = points[1])
+    - Char 25: X's bar (our points[0])
+
+    Args:
+        position: The position to encode
+        turn: 1 if O on roll, -1 if X on roll
+
+    Returns:
+        26-character position string
     """
-    chars = []
+    chars = [''] * 26
 
-    # Char 0: X's bar (TOP)
-    chars.append(_encode_checker_count(position.points[0]))
+    if turn == 1:
+        # O is on roll - encoding is from O's perspective (standard)
+        # Char 0: X's bar (top), Char 25: O's bar (bottom)
+        # Chars 1-24: points 1-24 in standard order
+        chars[0] = _encode_checker_count(position.points[0], turn)
+        chars[25] = _encode_checker_count(position.points[25], turn)
 
-    # Chars 1-24: board
-    for i in range(1, 25):
-        chars.append(_encode_checker_count(position.points[i]))
+        for i in range(1, 25):
+            chars[i] = _encode_checker_count(position.points[i], turn)
+    else:
+        # X is on roll - encoding is from X's perspective (FLIPPED!)
+        # The ENTIRE position is flipped, including bars:
+        # Char 0: O's bar (top in X's view), Char 25: X's bar (bottom in X's view)
+        # Chars 1-24: points from X's perspective -> need to reverse
 
-    # Char 25: O's bar (BOTTOM)
-    chars.append(_encode_checker_count(position.points[25]))
+        # Bars need to be swapped!
+        chars[0] = _encode_checker_count(position.points[25], turn)  # O's bar goes to char 0
+        chars[25] = _encode_checker_count(position.points[0], turn)  # X's bar goes to char 25
+
+        # Board points - reverse the numbering
+        for i in range(1, 25):
+            # Point i in our model goes to char (25-i) in the XGID
+            chars[25 - i] = _encode_checker_count(position.points[i], turn)
 
     return ''.join(chars)
 
 
-def _encode_checker_count(count: int) -> str:
+def _encode_checker_count(count: int, turn: int) -> str:
     """
     Encode checker count to a single character.
 
-    0 = '-'
-    1 to 16 (positive, X/TOP) = 'a' to 'p'
-    -1 to -16 (negative, O/BOTTOM) = 'A' to 'P'
+    CRITICAL: The uppercase/lowercase mapping CHANGES based on whose turn it is!
+
+    When turn=1 (O on roll - O's perspective):
+    - 0 = '-'
+    - positive (X) = lowercase 'a' to 'p'
+    - negative (O) = uppercase 'A' to 'P'
+
+    When turn=-1 (X on roll - X's perspective):
+    - 0 = '-'
+    - positive (X) = uppercase 'A' to 'P' - FLIPPED!
+    - negative (O) = lowercase 'a' to 'p' - FLIPPED!
+
+    Args:
+        count: Checker count (positive for X, negative for O, 0 for empty)
+        turn: 1 if O on roll, -1 if X on roll
+
+    Returns:
+        Single character encoding
     """
     if count == 0:
         return '-'
-    elif count > 0:
-        # TOP player (X) - positive -> 'a' to 'p'
-        if count > 16:
-            count = 16
-        return chr(ord('a') + count - 1)
+
+    abs_count = abs(count)
+    if abs_count > 16:
+        abs_count = 16
+
+    if turn == 1:
+        # O's perspective: lowercase=X (positive), uppercase=O (negative)
+        if count > 0:
+            # X checkers -> lowercase
+            return chr(ord('a') + abs_count - 1)
+        else:
+            # O checkers -> uppercase
+            return chr(ord('A') + abs_count - 1)
     else:
-        # BOTTOM player (O) - negative -> 'A' to 'P'
-        abs_count = abs(count)
-        if abs_count > 16:
-            abs_count = 16
-        return chr(ord('A') + abs_count - 1)
+        # X's perspective: uppercase=X (positive), lowercase=O (negative) - FLIPPED!
+        if count > 0:
+            # X checkers -> uppercase
+            return chr(ord('A') + abs_count - 1)
+        else:
+            # O checkers -> lowercase
+            return chr(ord('a') + abs_count - 1)
