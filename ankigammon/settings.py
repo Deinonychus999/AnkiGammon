@@ -15,7 +15,7 @@ class Settings:
 
     DEFAULT_SETTINGS = {
         "default_color_scheme": "classic",
-        "deck_name": "XG Backgammon",
+        "deck_name": "My AnkiGammon Deck",
         "show_options": True,
         "interactive_moves": True,
         "export_method": "ankiconnect",
@@ -87,7 +87,7 @@ class Settings:
     @property
     def deck_name(self) -> str:
         """Get the default deck name."""
-        return self._settings.get("deck_name", "XG Backgammon")
+        return self._settings.get("deck_name", "My AnkiGammon Deck")
 
     @deck_name.setter
     def deck_name(self, value: str) -> None:

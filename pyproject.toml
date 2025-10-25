@@ -42,7 +42,7 @@ dev = [
     "pytest>=7.0.0",
 ]
 
-[project.scripts]
+[project.gui-scripts]
 ankigammon = "ankigammon.gui.app:main"
 
 [tool.setuptools.packages.find]

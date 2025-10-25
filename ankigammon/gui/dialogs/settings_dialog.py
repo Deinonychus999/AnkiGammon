@@ -226,9 +226,15 @@ class SettingsDialog(QDialog):
         self.cmb_gnubg_ply.addItems(["0", "1", "2", "3", "4"])
         form.addRow("Analysis Depth (ply):", self.cmb_gnubg_ply)
 
-        # Score matrix generation
+        # Score matrix generation with inline warning
+        matrix_layout = QHBoxLayout()
         self.chk_generate_score_matrix = QCheckBox("Generate score matrix for cube decisions")
-        form.addRow(self.chk_generate_score_matrix)
+        matrix_layout.addWidget(self.chk_generate_score_matrix)
+        matrix_warning = QLabel("(slow)")
+        matrix_warning.setStyleSheet("font-size: 11px; color: #a6adc8; margin-left: 8px;")
+        matrix_layout.addWidget(matrix_warning)
+        matrix_layout.addStretch()
+        form.addRow(matrix_layout)
 
         # Status display (icon + text in horizontal layout)
         status_layout = QHBoxLayout()

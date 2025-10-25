@@ -121,7 +121,6 @@ Push cards directly to running Anki through the GUI:
 - Install [AnkiConnect addon](https://ankiweb.net/shared/info/2055492159)
 - Keep Anki running while generating cards
 - Cards appear instantly in your deck
-- Automatic duplicate detection
 
 ### APKG
 

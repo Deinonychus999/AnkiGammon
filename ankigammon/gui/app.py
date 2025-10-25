@@ -129,7 +129,7 @@ def create_splash_screen(icon_path: Path) -> QSplashScreen:
     return splash
 
 
-def run_gui():
+def main():
     """
     Launch the GUI application.
 
@@ -154,13 +154,22 @@ def run_gui():
     # Set application style (modern, consistent across platforms)
     app.setStyle('Fusion')
 
-    # Set application icon (use resource path helper for PyInstaller compatibility)
-    icon_path = get_resource_path("ankigammon/gui/resources/icon.png")
+    # Set application icon (use platform-specific format for best compatibility)
+    # macOS requires .icns, Windows prefers .ico, Linux uses .png
+    if sys.platform == 'darwin':
+        icon_file = "ankigammon/gui/resources/icon.icns"
+    elif sys.platform == 'win32':
+        icon_file = "ankigammon/gui/resources/icon.ico"
+    else:
+        icon_file = "ankigammon/gui/resources/icon.png"
+
+    icon_path = get_resource_path(icon_file)
     if icon_path.exists():
         app.setWindowIcon(QIcon(str(icon_path)))
 
-    # Show splash screen
-    splash = create_splash_screen(icon_path)
+    # Show splash screen (always use PNG for high-quality rendering at larger sizes)
+    splash_icon_path = get_resource_path("ankigammon/gui/resources/icon.png")
+    splash = create_splash_screen(splash_icon_path)
     splash.show()
     app.processEvents()  # Ensure splash screen is rendered
 
@@ -190,4 +199,4 @@ def run_gui():
 
 
 if __name__ == '__main__':
-    sys.exit(run_gui())
+    raise SystemExit(main())

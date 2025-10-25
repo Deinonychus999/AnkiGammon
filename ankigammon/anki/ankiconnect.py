@@ -18,7 +18,7 @@ class AnkiConnect:
     https://ankiweb.net/shared/info/2055492159
     """
 
-    def __init__(self, url: str = "http://localhost:8765", deck_name: str = "XG Backgammon"):
+    def __init__(self, url: str = "http://localhost:8765", deck_name: str = "My AnkiGammon Deck"):
         """
         Initialize Anki-Connect client.
 

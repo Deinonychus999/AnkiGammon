@@ -15,7 +15,7 @@ class ApkgExporter:
     Export XG decisions to Anki .apkg file.
     """
 
-    def __init__(self, output_dir: Path, deck_name: str = "XG Backgammon"):
+    def __init__(self, output_dir: Path, deck_name: str = "My AnkiGammon Deck"):
         """
         Initialize the APKG exporter.
 

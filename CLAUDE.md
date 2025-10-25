@@ -20,8 +20,14 @@ pip install -e .
 # Install with dev dependencies (includes PyInstaller, pytest)
 pip install -e .[dev]
 
-# Run the GUI application
-python -m ankigammon.gui.main_window
+# Run the GUI application (after installation)
+ankigammon
+
+# Or run as a module (works without installation if package is in PYTHONPATH)
+python -m ankigammon
+
+# Or run the app.py directly
+python ankigammon/gui/app.py
 
 # Run tests
 python -m unittest tests/test_basic.py
@@ -298,7 +304,7 @@ User preferences are automatically saved to `~/.ankigammon/config.json`:
 
 **Saved Settings:**
 - `default_color_scheme` - Last selected color scheme (default: "classic")
-- `deck_name` - Default deck name (default: "XG Backgammon")
+- `deck_name` - Default deck name (default: "My AnkiGammon Deck")
 - `show_options` - Whether to show options on cards (default: true)
 - `interactive_moves` - Whether to enable interactive move visualization (default: true)
 - `export_method` - Export method for cards: "ankiconnect" or "apkg" (default: "ankiconnect")

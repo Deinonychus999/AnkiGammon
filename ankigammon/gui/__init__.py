@@ -2,7 +2,7 @@
 GUI package for ankigammon desktop application.
 """
 
-__all__ = ['MainWindow', 'run_gui']
+__all__ = ['MainWindow', 'main']
 
 from .main_window import MainWindow
-from .app import run_gui
+from .app import main
