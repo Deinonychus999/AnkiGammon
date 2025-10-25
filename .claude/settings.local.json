@@ -10,7 +10,8 @@
       "WebSearch",
       "Bash(pyinstaller:*)",
       "Bash(dir:*)",
-      "Bash(findstr:*)"
+      "Bash(findstr:*)",
+      "Bash(git log:*)"
     ],
     "deny": [],
     "ask": []

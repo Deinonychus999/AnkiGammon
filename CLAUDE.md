@@ -54,7 +54,7 @@ pyinstaller ankigammon.spec
 ```
 
 **Build Output:**
-- Executable: `dist/AnkiGammon.exe` (Windows) or `dist/AnkiGammon.app` (macOS)
+- Executable: `dist/ankigammon.exe` (Windows), `dist/ankigammon` (Linux), or `dist/AnkiGammon.app` (macOS)
 - Build artifacts: `build/` directory (can be deleted)
 - Size: ~16MB (includes Python runtime and all dependencies)
 - No Python installation required on target machine
@@ -228,20 +228,42 @@ The card back shows moves in **XG's original order** (not shuffled MCQ order):
 
 ## Key Files
 
+### Core Data and Models
 - **`models.py`**: Core data classes (Position, Decision, Move, Player, CubeState, DecisionType)
+- **`settings.py`**: Settings persistence (saves user preferences to `~/.ankigammon/config.json`)
+
+### Application Entry Points
+- **`__main__.py`**: Entry point for running as a module (`python -m ankigammon`)
+- **`gui/app.py`**: Application entry point for GUI mode (sets up QApplication and launches MainWindow)
+
+### Position Format Utilities
 - **`utils/xgid.py`**: XGID encoding/decoding with perspective handling (primary format)
 - **`utils/ogid.py`**: OGID encoding/decoding with base-26 format (alternative format)
-- **`utils/gnuid.py`**: GNUID encoding/decoding for GNU Backgammon format (has known Position ID limitations)
+- **`utils/gnuid.py`**: GNUID encoding/decoding for GNU Backgammon format (fully functional)
+- **`utils/move_parser.py`**: Parses and applies backgammon move notation (e.g., "13/9 6/5", "bar/22")
+
+### Parsers and Analysis
 - **`parsers/xg_text_parser.py`**: Parses XG text exports (supports XGID and OGID), handles cube decisions
+- **`parsers/gnubg_parser.py`**: Parses GNU Backgammon CLI output into Decision objects
+- **`utils/gnubg_analyzer.py`**: Wrapper for gnubg-cli.exe command-line interface, enables position analysis
+
+### GUI Components
 - **`gui/main_window.py`**: Main GUI window for the application
 - **`gui/format_detector.py`**: Auto-detects position format (XGID, OGID, or GNUID)
 - **`gui/dialogs/settings_dialog.py`**: Settings dialog for user preferences
+- **`gui/dialogs/input_dialog.py`**: Smart input dialog for adding positions (supports position IDs and XG text)
+- **`gui/dialogs/export_dialog.py`**: Export progress dialog with AnkiConnect/APKG support
+
+### Board Rendering
 - **`renderer/svg_board_renderer.py`**: Generates backgammon board SVG markup
 - **`renderer/color_schemes.py`**: Defines color schemes for board rendering (6 built-in schemes: classic, forest, ocean, desert, sunset, midnight)
+- **`renderer/animation_controller.py`**: Generates JavaScript for animating checker movements
+
+### Anki Integration
 - **`anki/card_generator.py`**: Creates MCQ flashcard HTML with embedded SVG boards
+- **`anki/card_styles.py`**: Shared card styling constants (MODEL_NAME and CARD_CSS)
 - **`anki/ankiconnect.py`**: Sends cards to Anki via AnkiConnect API
 - **`anki/apkg_exporter.py`**: Generates .apkg files using genanki
-- **`settings.py`**: Settings persistence (saves user preferences like color scheme to `~/.ankigammon/config.json`)
 
 #### Color Schemes (renderer/color_schemes.py)
 
@@ -309,6 +331,9 @@ User preferences are automatically saved to `~/.ankigammon/config.json`:
 - `interactive_moves` - Whether to enable interactive move visualization (default: true)
 - `export_method` - Export method for cards: "ankiconnect" or "apkg" (default: "ankiconnect")
 - `board_orientation` - Board orientation: "clockwise" or "counter-clockwise" (default: "counter-clockwise")
+- `gnubg_path` - Path to GNU Backgammon executable for position analysis (default: None)
+- `gnubg_analysis_ply` - Analysis depth for GnuBG in ply (default: 3)
+- `generate_score_matrix` - Whether to generate score matrix for cube decisions (default: false)
 
 **Settings API:**
 ```python
@@ -363,7 +388,7 @@ Always use the internal Position model (points[0-25]). The application supports 
 **GNUID (GNU Backgammon format):**
 - Use `parse_gnuid()` to convert GNUID → (Position, metadata)
 - Use `encode_gnuid()` or `Position.to_gnuid()` to convert back
-- ⚠️ Known limitation: Position ID decoding is incomplete, prefer XGID/OGID for accuracy
+- Fully supports Position ID encoding and decoding for all position types
 
 **Format Conversion:**
 ```python

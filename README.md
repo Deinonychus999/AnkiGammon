@@ -102,7 +102,7 @@ Compact format used by GNU Backgammon. 14-character Position ID + 12-character M
 4HPwATDgc/ABMA:8IhuACAACAAE
 ```
 
-**⚠️ Known Limitation:** GNUID Position ID decoding is currently incomplete - only one player's checkers decode correctly. For full accuracy, prefer XGID or OGID formats. GNUID works best when combined with full analysis text or for match metadata extraction.
+GNUID fully supports position encoding and decoding, including all checker positions, bars, cube state, and match metadata.
 
 ### Format Detection
 
@@ -300,6 +300,28 @@ Linux:
 - Dependencies automatically installed via `pip install .`: genanki, requests, beautifulsoup4, lxml, PySide6, qtawesome
 - For standalone executable: No requirements - Python and all dependencies are bundled
 
+## Legal
+
+### Third-Party Software
+
+This application uses PySide6, which is licensed under the LGPL-3.0 license. See [THIRD-PARTY-LICENSES.md](THIRD-PARTY-LICENSES.md) for complete license information and attributions for all dependencies.
+
+### Trademarks
+
+- "eXtreme Gammon" and "XG" are registered trademarks of GameSite 2000 Ltd.
+- "Anki" is a trademark of Ankitects Pty Ltd
+- "Qt" is a trademark of The Qt Company Ltd.
+- GNU Backgammon is part of the GNU Project
+
+**This project is not affiliated with or endorsed by the creators of eXtreme Gammon, Anki, Qt, GNU Backgammon, or any other mentioned software.**
+
+### Position Format Specifications
+
+- **XGID format** specification is publicly documented by eXtreme Gammon (GameSite 2000 Ltd.) with explicit permission for redistribution: "This information can freely redistributed"
+- **GNUID format** is documented in the GNU Backgammon manual (GPL-3.0 project); our implementation is original code that reads/writes this format without incorporating GPL code
+
+All position encoding/decoding implementations in this project are original code.
+
 ## License
 
-MIT
+AnkiGammon is licensed under the MIT License. See [LICENSE](LICENSE) for details.

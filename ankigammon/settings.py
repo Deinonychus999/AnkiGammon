@@ -107,7 +107,7 @@ class Settings:
     @property
     def interactive_moves(self) -> bool:
         """Get whether to enable interactive move visualization."""
-        return self._settings.get("interactive_moves", False)
+        return self._settings.get("interactive_moves", True)
 
     @interactive_moves.setter
     def interactive_moves(self, value: bool) -> None:
