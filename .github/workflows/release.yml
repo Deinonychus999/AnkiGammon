@@ -1,0 +1,68 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  build-windows:
+    name: Build Windows Executable
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python --version
+          pip install .
+          pip install pyinstaller
+
+      - name: Build executable with PyInstaller
+        run: pyinstaller ankigammon.spec
+
+      - name: Create ZIP archive
+        run: |
+          cd dist
+          Compress-Archive -Path ankigammon.exe -DestinationPath ankigammon-windows.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ankigammon-windows
+          path: dist/ankigammon-windows.zip
+          retention-days: 7
+
+  create-release:
+    name: Create GitHub Release
+    needs: build-windows
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ankigammon-windows
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: Release ${{ github.ref_name }}
+          body: |
+            AnkiGammon release ${{ github.ref_name }}
+
+            Download Windows executable below. For macOS/Linux, build from source (see README.md).
+          files: ankigammon-windows.zip
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
