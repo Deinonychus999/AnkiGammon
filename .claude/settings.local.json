@@ -9,7 +9,8 @@
       "Bash(xargs ls:*)",
       "WebSearch",
       "Bash(pyinstaller:*)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(findstr:*)"
     ],
     "deny": [],
     "ask": []
