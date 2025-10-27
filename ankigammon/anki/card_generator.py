@@ -3,6 +3,7 @@
 import json
 import random
 import string
+import html
 from pathlib import Path
 from typing import List, Dict, Optional, Tuple
 
@@ -540,11 +541,15 @@ class CardGenerator:
             if score_matrix_html:
                 score_matrix_html = f"\n{score_matrix_html}"
 
+        # Generate note HTML if note exists
+        note_html = self._generate_note_html(decision)
+
         html = f"""
 <div class="card-back">
 {position_viewer_html}
     <div class="metadata">{metadata}</div>
 {answer_html}
+{note_html}
 {analysis_and_chances}{score_matrix_html}
     {self._generate_source_info(decision)}
 </div>
@@ -1171,6 +1176,21 @@ class CardGenerator:
             # (e.g., GnuBG not available, analysis error)
             print(f"Warning: Failed to generate score matrix: {e}")
             return ""
+
+    def _generate_note_html(self, decision: Decision) -> str:
+        """Generate note HTML if a note exists."""
+        if not decision.note:
+            return ""
+
+        # Escape HTML characters and preserve line breaks
+        escaped_note = html.escape(decision.note)
+
+        return f"""
+<div class="note-section">
+    <h4>Note:</h4>
+    <div class="note-content">{escaped_note}</div>
+</div>
+"""
 
     def _generate_source_info(self, decision: Decision) -> str:
         """Generate source information HTML."""

@@ -14,7 +14,8 @@ import qtawesome as qta
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
     QLabel, QListWidget, QListWidgetItem, QMessageBox,
-    QFrame, QSplitter, QWidget, QProgressDialog, QMenu
+    QFrame, QSplitter, QWidget, QProgressDialog, QMenu,
+    QInputDialog
 )
 from PySide6.QtCore import Qt, Signal, Slot
 from PySide6.QtGui import QAction, QKeyEvent
@@ -61,6 +62,10 @@ class PendingPositionItem(QListWidgetItem):
         else:
             tooltip += f"\n\n{len(self.decision.candidate_moves)} moves analyzed"
 
+        # Add note if present
+        if self.decision.note:
+            tooltip += f"\n\nNote: {self.decision.note}"
+
         self.setToolTip(tooltip)
 
 
@@ -102,13 +107,24 @@ class PendingListWidget(QListWidget):
 
     @Slot()
     def _show_context_menu(self, pos):
-        """Show context menu for delete action."""
+        """Show context menu for edit note and delete actions."""
         item = self.itemAt(pos)
         if not item or not isinstance(item, PendingPositionItem):
             return
 
         # Create context menu
         menu = QMenu(self)
+
+        # Edit Note action with icon
+        edit_note_action = QAction(
+            qta.icon('fa6s.note-sticky', color='#f9e2af'),  # Yellow note icon
+            "Edit Note...",
+            self
+        )
+        edit_note_action.triggered.connect(lambda: self._edit_note(item))
+        menu.addAction(edit_note_action)
+
+        menu.addSeparator()
 
         # Delete action with icon
         delete_action = QAction(
@@ -121,6 +137,30 @@ class PendingListWidget(QListWidget):
 
         # Show menu at cursor position
         menu.exec(self.mapToGlobal(pos))
+
+    def _edit_note(self, item: PendingPositionItem):
+        """Edit the note for a pending position."""
+        current_note = item.decision.note or ""
+        new_note, ok = QInputDialog.getMultiLineText(
+            self,
+            "Edit Note",
+            f"Note for pending position:",
+            current_note
+        )
+
+        if ok:
+            # Update the decision's note
+            item.decision.note = new_note.strip() if new_note.strip() else None
+
+            # Update tooltip to reflect the new note
+            tooltip = item.decision.get_short_display_text()
+            if item.needs_analysis:
+                tooltip += "\n\nNeeds GnuBG analysis"
+            else:
+                tooltip += f"\n\n{len(item.decision.candidate_moves)} moves analyzed"
+            if item.decision.note:
+                tooltip += f"\n\nNote: {item.decision.note}"
+            item.setToolTip(tooltip)
 
     def _delete_item(self, item: PendingPositionItem):
         """Delete an item from the list with confirmation."""

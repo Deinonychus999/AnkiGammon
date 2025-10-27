@@ -437,6 +437,7 @@ class MainWindow(QMainWindow):
                 </html>
                 """
                 self.preview.setHtml(welcome_html)
+                self.preview.update()  # Force repaint to avoid black screen issue
 
     @Slot(list)
     def on_decisions_loaded(self, decisions):
@@ -488,6 +489,7 @@ class MainWindow(QMainWindow):
         """
 
         self.preview.setHtml(html)
+        self.preview.update()  # Force repaint to avoid black screen issue
 
     @Slot()
     def on_edit_deck_name(self):

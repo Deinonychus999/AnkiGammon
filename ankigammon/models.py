@@ -250,6 +250,9 @@ class Decision:
     game_number: Optional[int] = None
     move_number: Optional[int] = None
 
+    # User annotations
+    note: Optional[str] = None  # User's note/comment/explanation for this position
+
     def get_best_move(self) -> Optional[Move]:
         """Get the best move (rank 1)."""
         for move in self.candidate_moves:

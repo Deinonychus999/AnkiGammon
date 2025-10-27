@@ -23,6 +23,7 @@ class Settings:
         "gnubg_analysis_ply": 3,
         "generate_score_matrix": False,
         "board_orientation": "counter-clockwise",
+        "last_apkg_directory": None,
     }
 
     def __init__(self, config_path: Optional[Path] = None):
@@ -165,6 +166,16 @@ class Settings:
         if value not in ["clockwise", "counter-clockwise"]:
             raise ValueError("board_orientation must be 'clockwise' or 'counter-clockwise'")
         self.set("board_orientation", value)
+
+    @property
+    def last_apkg_directory(self) -> Optional[str]:
+        """Get the last directory used for APKG export."""
+        return self._settings.get("last_apkg_directory", None)
+
+    @last_apkg_directory.setter
+    def last_apkg_directory(self, value: Optional[str]) -> None:
+        """Set the last directory used for APKG export."""
+        self.set("last_apkg_directory", value)
 
     def is_gnubg_available(self) -> bool:
         """

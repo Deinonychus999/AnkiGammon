@@ -71,6 +71,14 @@ class AnalysisWorker(QThread):
                     decision.xgid,
                     decision_type
                 )
+
+                # Preserve user-added metadata from original decision
+                analyzed_decision.note = decision.note
+                analyzed_decision.source_file = decision.source_file
+                analyzed_decision.game_number = decision.game_number
+                analyzed_decision.move_number = decision.move_number
+                analyzed_decision.position_image_path = decision.position_image_path
+
                 analyzed_decisions[pos_idx] = analyzed_decision
 
                 # Emit progress after completing this position
@@ -346,7 +354,7 @@ class ExportDialog(QDialog):
         layout.addWidget(self.progress_bar)
 
         # Status label
-        self.status_label = QLabel("Ready to export")
+        self.status_label = QLabel(f"Ready to export {len(self.decisions)} position(s) to deck {self.settings.deck_name}")
         layout.addWidget(self.status_label)
 
         # Log text (hidden initially)
@@ -379,15 +387,24 @@ class ExportDialog(QDialog):
         # Get output path for APKG if needed
         self.output_path = None
         if self.settings.export_method == "apkg":
+            # Use last directory if available, otherwise use home directory
+            if self.settings.last_apkg_directory:
+                default_path = Path(self.settings.last_apkg_directory) / f"{self.settings.deck_name}.apkg"
+            else:
+                default_path = Path.home() / f"{self.settings.deck_name}.apkg"
+
             self.output_path, _ = QFileDialog.getSaveFileName(
                 self,
                 "Save APKG File",
-                str(Path.home() / f"{self.settings.deck_name}.apkg"),
+                str(default_path),
                 "Anki Deck Package (*.apkg)"
             )
             if not self.output_path:
                 self.btn_export.setEnabled(True)
                 return
+
+            # Save the directory for next time
+            self.settings.last_apkg_directory = str(Path(self.output_path).parent)
 
         # Check if any positions need GnuBG analysis
         needs_analysis = [d for d in self.decisions if not d.candidate_moves]

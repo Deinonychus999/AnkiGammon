@@ -26,6 +26,148 @@ CARD_CSS = """
     display: block;
 }
 
+/* Landscape mode optimizations for mobile devices */
+@media screen and (orientation: landscape) and (max-height: 600px) {
+    .card {
+        padding: 5px 5px;
+        max-width: 100%;
+    }
+
+    /* Card front - maximize board size */
+    .card-front .position-svg svg {
+        max-height: 90vh;
+        width: auto;
+        margin: 2px auto;
+        border-width: 1px;
+    }
+
+    /* Card back - slightly smaller board to fit analysis */
+    .card-back .position-svg svg,
+    .card-back .position-svg-container svg,
+    .card-back #animated-board svg {
+        max-height: 85vh;
+        width: auto;
+        margin: 2px auto;
+        border-width: 1px;
+    }
+
+    .metadata {
+        margin: 3px 0;
+        padding: 5px;
+        font-size: 13px;
+    }
+
+    .question h3 {
+        font-size: 16px;
+        margin: 6px 0 5px;
+    }
+
+    .mcq-option {
+        padding: 8px 12px;
+        margin: 4px 0;
+        font-size: 14px;
+    }
+
+    .mcq-hint {
+        margin-top: 6px;
+        font-size: 12px;
+    }
+
+    .answer {
+        margin: 6px 0;
+        padding: 8px;
+    }
+
+    .answer h3 {
+        font-size: 15px;
+        margin: 0 0 5px;
+    }
+
+    .best-move-notation {
+        font-size: 15px;
+    }
+
+    .moves-table {
+        font-size: 13px;
+    }
+
+    .moves-table th,
+    .moves-table td {
+        padding: 5px 8px;
+    }
+
+    .analysis h4 {
+        font-size: 15px;
+        margin-bottom: 6px;
+    }
+
+    .winning-chances {
+        padding: 8px;
+        margin: 8px auto;
+    }
+
+    .winning-chances h4 {
+        font-size: 15px;
+        margin-bottom: 6px;
+    }
+}
+
+/* Very small landscape screens (phones in landscape) */
+@media screen and (orientation: landscape) and (max-height: 450px) {
+    .card {
+        padding: 5px 4px;
+    }
+
+    /* Card front - maximize board size even on small screens */
+    .card-front .position-svg svg {
+        max-height: 90vh;
+        width: auto;
+        margin: 2px auto;
+        border-width: 1px;
+    }
+
+    /* Card back - balance board with content */
+    .card-back .position-svg svg,
+    .card-back .position-svg-container svg,
+    .card-back #animated-board svg {
+        max-height: 80vh;
+        width: auto;
+        margin: 2px auto;
+        border-width: 1px;
+    }
+
+    .metadata {
+        margin: 2px 0;
+        padding: 4px;
+        font-size: 12px;
+    }
+
+    .question h3 {
+        font-size: 14px;
+        margin: 4px 0 3px;
+    }
+
+    .mcq-option {
+        padding: 6px 10px;
+        margin: 3px 0;
+        font-size: 13px;
+    }
+
+    .answer {
+        margin: 4px 0;
+        padding: 6px;
+    }
+
+    .moves-table {
+        font-size: 12px;
+    }
+
+    .moves-table th,
+    .moves-table td {
+        padding: 4px 6px;
+    }
+}
+
 .position-viewer {
     position: relative;
 }
@@ -156,6 +298,29 @@ CARD_CSS = """
     margin: 10px 0;
 }
 
+/* Note Section */
+.note-section {
+    margin: 20px 0;
+    padding: 15px;
+    background-color: rgba(249, 226, 175, 0.15);
+    border: 2px solid #f9e2af;
+    border-radius: 8px;
+    text-align: left;
+}
+
+.note-section h4 {
+    color: #f9e2af;
+    margin: 0 0 10px;
+    font-size: 16px;
+}
+
+.note-content {
+    color: var(--text-fg);
+    font-size: 14px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+}
+
 /* Winning Chances Display */
 .winning-chances {
     margin: 20px auto;
@@ -224,6 +389,45 @@ CARD_CSS = """
     align-items: flex-start;
     justify-content: center;
     margin: 20px 0;
+}
+
+/* Stack analysis sections vertically in landscape mode for better fit */
+@media screen and (orientation: landscape) and (max-height: 600px) {
+    .analysis-container {
+        flex-direction: column;
+        gap: 10px;
+        margin: 10px 0;
+    }
+
+    .note-section {
+        margin: 10px 0;
+        padding: 8px;
+    }
+
+    .note-section h4 {
+        font-size: 14px;
+        margin-bottom: 6px;
+    }
+
+    .note-content {
+        font-size: 12px;
+    }
+
+    .source-info {
+        margin-top: 10px;
+        padding: 6px;
+        font-size: 11px;
+    }
+
+    .mcq-feedback-container {
+        margin: 8px 0;
+        padding: 8px;
+        font-size: 14px;
+    }
+
+    .feedback-icon {
+        font-size: 28px;
+    }
 }
 
 .analysis {
@@ -784,5 +988,43 @@ button.animate-btn:disabled {
 
 .night_mode .score-matrix-table .action-too-good.low-error {
     background-color: rgba(156, 39, 176, 0.15);
+}
+
+/* Score matrix optimizations for landscape mode */
+@media screen and (orientation: landscape) and (max-height: 600px) {
+    .score-matrix {
+        margin: 15px auto 10px;
+    }
+
+    .score-matrix h3 {
+        font-size: 14px;
+        margin-bottom: 8px;
+    }
+
+    .score-matrix-table {
+        font-size: 11px;
+    }
+
+    .score-matrix-table th,
+    .score-matrix-table td {
+        padding: 4px 6px;
+        min-width: 50px;
+    }
+
+    .score-matrix-table .action {
+        font-size: 12px;
+        margin-bottom: 2px;
+    }
+
+    .score-matrix-table .errors {
+        font-size: 10px;
+    }
+}
+
+/* Hide score matrix on very small landscape screens to prevent scrolling */
+@media screen and (orientation: landscape) and (max-height: 450px) {
+    .score-matrix {
+        display: none;
+    }
 }
 """

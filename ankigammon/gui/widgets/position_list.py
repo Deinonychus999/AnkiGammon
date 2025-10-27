@@ -4,7 +4,8 @@ Widget for displaying list of parsed positions.
 
 from typing import List, Optional
 from PySide6.QtWidgets import (
-    QListWidget, QListWidgetItem, QWidget, QVBoxLayout, QLabel, QMenu, QMessageBox
+    QListWidget, QListWidgetItem, QWidget, QVBoxLayout, QLabel, QMenu, QMessageBox,
+    QInputDialog
 )
 from PySide6.QtCore import Qt, Signal, Slot
 from PySide6.QtGui import QIcon, QAction, QKeyEvent
@@ -24,8 +25,11 @@ class PositionListItem(QListWidgetItem):
         # Set display text
         self.setText(f"#{index + 1}: {decision.get_short_display_text()}")
 
-        # Set tooltip with metadata
-        self.setToolTip(decision.get_metadata_text())
+        # Set tooltip with metadata and note (if present)
+        tooltip = decision.get_metadata_text()
+        if decision.note:
+            tooltip += f"\n\nNote: {decision.note}"
+        self.setToolTip(tooltip)
 
 
 class PositionListWidget(QListWidget):
@@ -83,6 +87,17 @@ class PositionListWidget(QListWidget):
         # Create context menu
         menu = QMenu(self)
 
+        # Edit Note action with icon
+        edit_note_action = QAction(
+            qta.icon('fa6s.note-sticky', color='#f9e2af'),  # Yellow note icon
+            "Edit Note...",
+            self
+        )
+        edit_note_action.triggered.connect(lambda: self._edit_note(item))
+        menu.addAction(edit_note_action)
+
+        menu.addSeparator()
+
         # Delete action with icon
         delete_action = QAction(
             qta.icon('fa6s.trash', color='#f38ba8'),  # Red delete icon
@@ -94,6 +109,26 @@ class PositionListWidget(QListWidget):
 
         # Show menu at cursor position
         menu.exec(self.mapToGlobal(pos))
+
+    def _edit_note(self, item: PositionListItem):
+        """Edit the note for a position."""
+        current_note = item.decision.note or ""
+        new_note, ok = QInputDialog.getMultiLineText(
+            self,
+            "Edit Note",
+            f"Note for position #{item.index + 1}:",
+            current_note
+        )
+
+        if ok:
+            # Update the decision's note
+            item.decision.note = new_note.strip() if new_note.strip() else None
+
+            # Update tooltip to reflect the new note
+            tooltip = item.decision.get_metadata_text()
+            if item.decision.note:
+                tooltip += f"\n\nNote: {item.decision.note}"
+            item.setToolTip(tooltip)
 
     def _delete_item(self, item: PositionListItem):
         """Delete an item from the list with confirmation."""
