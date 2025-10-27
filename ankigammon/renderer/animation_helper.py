@@ -41,45 +41,82 @@ class AnimationHelper:
                 # Remove the repetition notation from the part
                 part = re.sub(r'\(\d+\)$', '', part)
 
-            # Split on first '/' only to handle edge cases with multiple slashes
-            split_result = part.split('/', 1)
-            if len(split_result) != 2:
-                continue
-            from_str, to_str = split_result
+            # Handle compound notation like "6/5*/3" or "24/23/22"
+            # Split by '/' and remove asterisks to get all points in the sequence
+            segments = part.split('/')
 
-            # Remove asterisk (hit indicator) from notation
-            from_str = from_str.rstrip('*')
-            to_str = to_str.rstrip('*')
+            # Remove asterisks from each segment
+            segments = [seg.rstrip('*') for seg in segments]
 
-            # Parse "from" point
-            if from_str.lower() == 'bar':
-                # Bar position depends on player
-                from_point = 0 if on_roll == Player.X else 25
-            elif from_str.lower() == 'off':
-                # Bearing off - skip (no visual animation needed)
-                continue
+            # If there are more than 2 segments, this is compound notation
+            # Convert it to consecutive moves: "6/5/3" -> [(6,5), (5,3)]
+            if len(segments) > 2:
+                for i in range(len(segments) - 1):
+                    from_str = segments[i]
+                    to_str = segments[i + 1]
+
+                    # Parse "from" point
+                    if from_str.lower() == 'bar':
+                        from_point = 0 if on_roll == Player.X else 25
+                    elif from_str.lower() == 'off':
+                        continue
+                    else:
+                        try:
+                            from_point = int(from_str)
+                        except ValueError:
+                            continue
+
+                    # Parse "to" point
+                    if to_str.lower() == 'bar':
+                        to_point = 25 if on_roll == Player.X else 0
+                    elif to_str.lower() == 'off':
+                        to_point = -1
+                    else:
+                        try:
+                            to_point = int(to_str)
+                        except ValueError:
+                            continue
+
+                    # Add the move repetition_count times
+                    for _ in range(repetition_count):
+                        moves.append((from_point, to_point))
             else:
-                try:
-                    from_point = int(from_str)
-                except ValueError:
+                # Simple notation like "6/5" or "bar/22"
+                from_str = segments[0]
+                to_str = segments[1] if len(segments) > 1 else ''
+
+                if not to_str:
                     continue
 
-            # Parse "to" point
-            if to_str.lower() == 'bar':
-                # Opponent bar
-                to_point = 25 if on_roll == Player.X else 0
-            elif to_str.lower() == 'off':
-                # Bearing off - use special marker (-1)
-                to_point = -1
-            else:
-                try:
-                    to_point = int(to_str)
-                except ValueError:
+                # Parse "from" point
+                if from_str.lower() == 'bar':
+                    # Bar position depends on player
+                    from_point = 0 if on_roll == Player.X else 25
+                elif from_str.lower() == 'off':
+                    # Bearing off - skip (no visual animation needed)
                     continue
+                else:
+                    try:
+                        from_point = int(from_str)
+                    except ValueError:
+                        continue
 
-            # Add the move repetition_count times (handles notation like "6/4(4)")
-            for _ in range(repetition_count):
-                moves.append((from_point, to_point))
+                # Parse "to" point
+                if to_str.lower() == 'bar':
+                    # Opponent bar
+                    to_point = 25 if on_roll == Player.X else 0
+                elif to_str.lower() == 'off':
+                    # Bearing off - use special marker (-1)
+                    to_point = -1
+                else:
+                    try:
+                        to_point = int(to_str)
+                    except ValueError:
+                        continue
+
+                # Add the move repetition_count times (handles notation like "6/4(4)")
+                for _ in range(repetition_count):
+                    moves.append((from_point, to_point))
 
         return moves
 

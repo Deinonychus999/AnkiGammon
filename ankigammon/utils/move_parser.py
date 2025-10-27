@@ -50,37 +50,75 @@ class MoveParser:
                 # Remove the repetition notation from the part
                 part = re.sub(r'\(\d+\)$', '', part)
 
-            # Parse from/to
-            from_str, to_str = part.split('/', 1)
+            # Handle compound notation like "6/5*/3" or "24/23/22"
+            # Split by '/' and remove asterisks to get all points in the sequence
+            segments = part.split('/')
 
-            # Remove asterisk (hit indicator) from notation
-            from_str = from_str.rstrip('*')
-            to_str = to_str.rstrip('*')
+            # Remove asterisks from each segment
+            segments = [seg.rstrip('*') for seg in segments]
 
-            # Parse 'from' point
-            if 'bar' in from_str:
-                from_point = 0  # X bar (we'll adjust for O later)
+            # If there are more than 2 segments, this is compound notation
+            # Convert it to consecutive moves: "6/5/3" -> [(6,5), (5,3)]
+            if len(segments) > 2:
+                for i in range(len(segments) - 1):
+                    from_str = segments[i]
+                    to_str = segments[i + 1]
+
+                    # Parse 'from' point
+                    if 'bar' in from_str:
+                        from_point = 0  # X bar (we'll adjust for O later)
+                    else:
+                        try:
+                            from_point = int(from_str)
+                        except ValueError:
+                            continue
+
+                    # Parse 'to' point
+                    if 'off' in to_str:
+                        to_point = 26  # Bearing off
+                    elif 'bar' in to_str:
+                        to_point = 0  # Will be adjusted based on context
+                    else:
+                        try:
+                            to_point = int(to_str)
+                        except ValueError:
+                            continue
+
+                    # Add the move repetition_count times
+                    for _ in range(repetition_count):
+                        moves.append((from_point, to_point))
             else:
-                try:
-                    from_point = int(from_str)
-                except ValueError:
+                # Simple notation like "6/5" or "bar/22"
+                from_str = segments[0]
+                to_str = segments[1] if len(segments) > 1 else ''
+
+                if not to_str:
                     continue
 
-            # Parse 'to' point
-            if 'off' in to_str:
-                to_point = 26  # Bearing off
-            elif 'bar' in to_str:
-                # Hit - destination is the bar (rare in notation)
-                to_point = 0  # Will be adjusted based on context
-            else:
-                try:
-                    to_point = int(to_str)
-                except ValueError:
-                    continue
+                # Parse 'from' point
+                if 'bar' in from_str:
+                    from_point = 0  # X bar (we'll adjust for O later)
+                else:
+                    try:
+                        from_point = int(from_str)
+                    except ValueError:
+                        continue
 
-            # Add the move repetition_count times (handles notation like "6/4(4)")
-            for _ in range(repetition_count):
-                moves.append((from_point, to_point))
+                # Parse 'to' point
+                if 'off' in to_str:
+                    to_point = 26  # Bearing off
+                elif 'bar' in to_str:
+                    # Hit - destination is the bar (rare in notation)
+                    to_point = 0  # Will be adjusted based on context
+                else:
+                    try:
+                        to_point = int(to_str)
+                    except ValueError:
+                        continue
+
+                # Add the move repetition_count times (handles notation like "6/4(4)")
+                for _ in range(repetition_count):
+                    moves.append((from_point, to_point))
 
         return moves
 
