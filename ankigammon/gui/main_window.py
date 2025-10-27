@@ -494,12 +494,28 @@ class MainWindow(QMainWindow):
     @Slot()
     def on_edit_deck_name(self):
         """Handle deck name edit button click."""
-        new_name, ok = QInputDialog.getText(
-            self,
-            "Edit Deck Name",
-            "Enter deck name:",
-            text=self.settings.deck_name
-        )
+        # Create input dialog
+        dialog = QInputDialog(self)
+        dialog.setWindowTitle("Edit Deck Name")
+        dialog.setLabelText("Enter deck name:")
+        dialog.setTextValue(self.settings.deck_name)
+
+        # Use a timer to set cursor pointers after dialog widgets are created
+        from PySide6.QtCore import QTimer
+        from PySide6.QtWidgets import QDialogButtonBox
+
+        def set_button_cursors():
+            button_box = dialog.findChild(QDialogButtonBox)
+            if button_box:
+                for button in button_box.buttons():
+                    button.setCursor(Qt.PointingHandCursor)
+
+        QTimer.singleShot(0, set_button_cursors)
+
+        # Show dialog and get result
+        ok = dialog.exec()
+        new_name = dialog.textValue()
+
         if ok and new_name.strip():
             self.settings.deck_name = new_name.strip()
             self._update_deck_label()

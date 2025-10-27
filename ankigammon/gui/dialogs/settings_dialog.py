@@ -162,6 +162,11 @@ class SettingsDialog(QDialog):
         )
         button_box.accepted.connect(self.accept)
         button_box.rejected.connect(self.reject)
+
+        # Add cursor pointers to OK and Cancel buttons
+        for button in button_box.buttons():
+            button.setCursor(Qt.PointingHandCursor)
+
         layout.addWidget(button_box)
 
     def _create_anki_group(self) -> QGroupBox:
@@ -176,6 +181,7 @@ class SettingsDialog(QDialog):
         # Export method
         self.cmb_export_method = QComboBox()
         self.cmb_export_method.addItems(["AnkiConnect", "APKG File"])
+        self.cmb_export_method.setCursor(Qt.PointingHandCursor)
         form.addRow("Default Export Method:", self.cmb_export_method)
 
         return group
@@ -188,20 +194,24 @@ class SettingsDialog(QDialog):
         # Board theme
         self.cmb_color_scheme = QComboBox()
         self.cmb_color_scheme.addItems(list_schemes())
+        self.cmb_color_scheme.setCursor(Qt.PointingHandCursor)
         form.addRow("Board Theme:", self.cmb_color_scheme)
 
         # Board orientation
         self.cmb_board_orientation = QComboBox()
         self.cmb_board_orientation.addItem("Counter-clockwise (standard)", "counter-clockwise")
         self.cmb_board_orientation.addItem("Clockwise", "clockwise")
+        self.cmb_board_orientation.setCursor(Qt.PointingHandCursor)
         form.addRow("Board Orientation:", self.cmb_board_orientation)
 
         # Show options
         self.chk_show_options = QCheckBox("Show multiple choice options on card front")
+        self.chk_show_options.setCursor(Qt.PointingHandCursor)
         form.addRow(self.chk_show_options)
 
         # Interactive moves
         self.chk_interactive_moves = QCheckBox("Enable interactive move visualization")
+        self.chk_interactive_moves.setCursor(Qt.PointingHandCursor)
         form.addRow(self.chk_interactive_moves)
 
         return group
@@ -224,11 +234,13 @@ class SettingsDialog(QDialog):
         # Analysis depth
         self.cmb_gnubg_ply = QComboBox()
         self.cmb_gnubg_ply.addItems(["0", "1", "2", "3", "4"])
+        self.cmb_gnubg_ply.setCursor(Qt.PointingHandCursor)
         form.addRow("Analysis Depth (ply):", self.cmb_gnubg_ply)
 
         # Score matrix generation with inline warning
         matrix_layout = QHBoxLayout()
         self.chk_generate_score_matrix = QCheckBox("Generate score matrix for cube decisions")
+        self.chk_generate_score_matrix.setCursor(Qt.PointingHandCursor)
         matrix_layout.addWidget(self.chk_generate_score_matrix)
         matrix_warning = QLabel("(slow)")
         matrix_warning.setStyleSheet("font-size: 11px; color: #a6adc8; margin-left: 8px;")

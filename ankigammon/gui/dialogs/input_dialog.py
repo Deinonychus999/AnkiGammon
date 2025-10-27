@@ -114,6 +114,8 @@ class PendingListWidget(QListWidget):
 
         # Create context menu
         menu = QMenu(self)
+        # Set cursor pointer for the menu
+        menu.setCursor(Qt.PointingHandCursor)
 
         # Edit Note action with icon
         edit_note_action = QAction(
@@ -141,12 +143,29 @@ class PendingListWidget(QListWidget):
     def _edit_note(self, item: PendingPositionItem):
         """Edit the note for a pending position."""
         current_note = item.decision.note or ""
-        new_note, ok = QInputDialog.getMultiLineText(
-            self,
-            "Edit Note",
-            f"Note for pending position:",
-            current_note
-        )
+
+        # Create input dialog
+        dialog = QInputDialog(self)
+        dialog.setWindowTitle("Edit Note")
+        dialog.setLabelText(f"Note for pending position:")
+        dialog.setTextValue(current_note)
+        dialog.setOption(QInputDialog.UsePlainTextEditForTextInput, True)
+
+        # Use a timer to set cursor pointers after dialog widgets are created
+        from PySide6.QtCore import QTimer
+        from PySide6.QtWidgets import QDialogButtonBox
+
+        def set_button_cursors():
+            button_box = dialog.findChild(QDialogButtonBox)
+            if button_box:
+                for button in button_box.buttons():
+                    button.setCursor(Qt.PointingHandCursor)
+
+        QTimer.singleShot(0, set_button_cursors)
+
+        # Show dialog and get result
+        ok = dialog.exec()
+        new_note = dialog.textValue()
 
         if ok:
             # Update the decision's note
@@ -262,6 +281,9 @@ class InputDialog(QDialog):
                 font-size: 13px;
             }
             QPushButton:hover {
+                background-color: #a0c8fc;
+            }
+            QPushButton:pressed {
                 background-color: #74c7ec;
             }
         """)
