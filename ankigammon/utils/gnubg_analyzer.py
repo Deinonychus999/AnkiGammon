@@ -8,8 +8,10 @@ import os
 import sys
 import subprocess
 import tempfile
+import multiprocessing
 from pathlib import Path
-from typing import Tuple
+from typing import Tuple, List, Callable, Optional
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 from ankigammon.models import DecisionType
 from ankigammon.utils.xgid import parse_xgid
@@ -67,6 +69,72 @@ class GNUBGAnalyzer:
                 os.unlink(command_file)
             except OSError:
                 pass
+
+    def analyze_positions_parallel(
+        self,
+        position_ids: List[str],
+        max_workers: Optional[int] = None,
+        progress_callback: Optional[Callable[[int, int], None]] = None
+    ) -> List[Tuple[str, DecisionType]]:
+        """
+        Analyze multiple positions in parallel.
+
+        Args:
+            position_ids: List of position identifiers (XGID or GNUID format)
+            max_workers: Maximum number of parallel workers (default: min(cpu_count, 8))
+            progress_callback: Optional callback function(completed, total) for progress updates
+
+        Returns:
+            List of tuples (gnubg_output_text, decision_type) in same order as position_ids
+
+        Raises:
+            ValueError: If any position_id format is invalid
+            subprocess.CalledProcessError: If any gnubg execution fails
+        """
+        if not position_ids:
+            return []
+
+        # Determine number of workers
+        if max_workers is None:
+            max_workers = min(multiprocessing.cpu_count(), 8)
+
+        # Use single-threaded for small batches (overhead not worth it)
+        if len(position_ids) <= 2:
+            results = []
+            for i, pos_id in enumerate(position_ids):
+                result = self.analyze_position(pos_id)
+                results.append(result)
+                if progress_callback:
+                    progress_callback(i + 1, len(position_ids))
+            return results
+
+        # Prepare arguments for parallel processing
+        args_list = [(self.gnubg_path, self.analysis_ply, pos_id) for pos_id in position_ids]
+
+        # Execute in parallel with progress tracking
+        results = [None] * len(position_ids)  # Pre-allocate results list
+        completed = 0
+
+        with ProcessPoolExecutor(max_workers=max_workers) as executor:
+            # Submit all tasks
+            future_to_idx = {
+                executor.submit(_analyze_position_worker, *args): idx
+                for idx, args in enumerate(args_list)
+            }
+
+            # Collect results as they complete
+            for future in as_completed(future_to_idx):
+                idx = future_to_idx[future]
+                try:
+                    results[idx] = future.result()
+                    completed += 1
+                    if progress_callback:
+                        progress_callback(completed, len(position_ids))
+                except Exception as e:
+                    # Re-raise with context about which position failed
+                    raise RuntimeError(f"Failed to analyze position {idx} ({position_ids[idx]}): {e}") from e
+
+        return results
 
     def _determine_decision_type(self, position_id: str) -> DecisionType:
         """
@@ -343,3 +411,21 @@ class GNUBGAnalyzer:
                 return "D/P"
 
         return notation
+
+
+def _analyze_position_worker(gnubg_path: str, analysis_ply: int, position_id: str) -> Tuple[str, DecisionType]:
+    """
+    Worker function for parallel position analysis.
+
+    This is a module-level function to support pickling for multiprocessing.
+
+    Args:
+        gnubg_path: Path to gnubg-cli.exe executable
+        analysis_ply: Analysis depth in plies
+        position_id: Position identifier (XGID or GNUID format)
+
+    Returns:
+        Tuple of (gnubg_output_text, decision_type)
+    """
+    analyzer = GNUBGAnalyzer(gnubg_path, analysis_ply)
+    return analyzer.analyze_position(position_id)

@@ -46,7 +46,7 @@ class AnalysisWorker(QThread):
         self._cancelled = True
 
     def run(self):
-        """Analyze positions with GnuBG in background."""
+        """Analyze positions with GnuBG in background (parallel processing)."""
         try:
             analyzer = GNUBGAnalyzer(
                 gnubg_path=self.settings.gnubg_path,
@@ -63,19 +63,38 @@ class AnalysisWorker(QThread):
 
             analyzed_decisions = list(self.decisions)  # Copy list
 
-            for idx, (pos_idx, decision) in enumerate(positions_to_analyze):
-                # Check for cancellation
-                if self._cancelled:
-                    self.finished.emit(False, "Analysis cancelled by user", self.decisions)
-                    return
+            # Prepare position IDs for batch analysis
+            position_ids = [d.xgid for _, d in positions_to_analyze]
 
-                self.progress.emit(idx, total)  # Emit current progress before starting
+            # Progress callback for parallel analysis
+            def progress_callback(completed: int, total_positions: int):
+                if self._cancelled:
+                    # Note: We can't easily cancel ProcessPoolExecutor mid-flight,
+                    # but we'll check after analysis completes
+                    return
+                self.progress.emit(completed, total_positions)
                 self.status_message.emit(
-                    f"Analyzing position {idx + 1} of {total} with GnuBG ({self.settings.gnubg_analysis_ply}-ply)..."
+                    f"Analyzing position {completed} of {total_positions} with GnuBG ({self.settings.gnubg_analysis_ply}-ply)..."
                 )
 
-                # Analyze with GnuBG
-                gnubg_output, decision_type = analyzer.analyze_position(decision.xgid)
+            # Analyze all positions in parallel
+            self.status_message.emit(
+                f"Starting analysis of {total} position(s) with GnuBG ({self.settings.gnubg_analysis_ply}-ply)..."
+            )
+            analysis_results = analyzer.analyze_positions_parallel(
+                position_ids,
+                progress_callback=progress_callback
+            )
+
+            # Check for cancellation after batch completes
+            if self._cancelled:
+                self.finished.emit(False, "Analysis cancelled by user", self.decisions)
+                return
+
+            # Parse results and update decisions
+            for idx, (pos_idx, decision) in enumerate(positions_to_analyze):
+                gnubg_output, decision_type = analysis_results[idx]
+
                 analyzed_decision = GNUBGParser.parse_analysis(
                     gnubg_output,
                     decision.xgid,
@@ -90,9 +109,6 @@ class AnalysisWorker(QThread):
                 analyzed_decision.position_image_path = decision.position_image_path
 
                 analyzed_decisions[pos_idx] = analyzed_decision
-
-                # Emit progress after completing this position
-                self.progress.emit(idx + 1, total)
 
             self.finished.emit(True, f"Analyzed {total} position(s)", analyzed_decisions)
 

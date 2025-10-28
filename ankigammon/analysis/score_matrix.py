@@ -107,7 +107,8 @@ def generate_score_matrix(
     match_length: int,
     gnubg_path: str,
     ply_level: int = 3,
-    progress_callback: Optional[callable] = None
+    progress_callback: Optional[callable] = None,
+    use_parallel: bool = True
 ) -> List[List[ScoreMatrixCell]]:
     """
     Generate a score matrix for all score combinations in a match.
@@ -118,6 +119,7 @@ def generate_score_matrix(
         gnubg_path: Path to gnubg-cli.exe
         ply_level: Analysis depth in plies
         progress_callback: Optional callback(message: str) for progress updates
+        use_parallel: Use parallel analysis (default: True, ~5-9x faster)
 
     Returns:
         2D list of ScoreMatrixCell objects, indexed as [row][col]
@@ -136,48 +138,144 @@ def generate_score_matrix(
         raise ValueError(f"Match length must be >= 2, got {match_length}")
 
     from ankigammon.utils.gnubg_analyzer import GNUBGAnalyzer
+    from ankigammon.utils.xgid import parse_xgid, encode_xgid
+    from ankigammon.models import Player
+    from ankigammon.parsers.gnubg_parser import GNUBGParser
 
     # Initialize analyzer
     analyzer = GNUBGAnalyzer(gnubg_path, ply_level)
 
+    # Parse original XGID to get position and metadata
+    position, metadata = parse_xgid(xgid)
+    on_roll = metadata.get('on_roll')
+
     # Matrix size is (match_length - 1) x (match_length - 1)
     # For 7-point match: 6x6 (scores from 2a to 7a)
     matrix_size = match_length - 1
-    matrix = []
 
     # Calculate total cells for progress
     total_cells = matrix_size * matrix_size
-    current_cell = 0
 
-    # Generate matrix row by row
+    # Prepare all position IDs and coordinate mappings
+    position_ids = []
+    coord_list = []  # [(player_away, opponent_away), ...]
+
+    for player_away in range(2, match_length + 1):
+        for opponent_away in range(2, match_length + 1):
+            # Calculate actual scores from "away" values
+            score_on_roll = match_length - player_away
+            score_opponent = match_length - opponent_away
+
+            # Map scores to X and O based on who's on roll
+            if on_roll == Player.O:
+                score_o = score_on_roll
+                score_x = score_opponent
+            else:
+                score_x = score_on_roll
+                score_o = score_opponent
+
+            # Create modified XGID with this score
+            modified_xgid = encode_xgid(
+                position=position,
+                cube_value=metadata.get('cube_value', 1),
+                cube_owner=metadata.get('cube_owner'),
+                dice=None,  # Cube decision has no dice
+                on_roll=on_roll,
+                score_x=score_x,
+                score_o=score_o,
+                match_length=match_length,
+                crawford_jacoby=metadata.get('crawford_jacoby', 0),
+                max_cube=metadata.get('max_cube', 256)
+            )
+
+            position_ids.append(modified_xgid)
+            coord_list.append((player_away, opponent_away))
+
+    # Analyze all positions (parallel or sequential)
+    if use_parallel and len(position_ids) > 2:
+        # Parallel analysis with progress tracking
+        def parallel_progress_callback(completed: int, total: int):
+            if progress_callback:
+                # Get current coordinates for display
+                if completed > 0 and completed <= len(coord_list):
+                    p_away, o_away = coord_list[completed - 1]
+                    progress_callback(
+                        f"Analyzing score {p_away}a-{o_away}a ({completed}/{total})..."
+                    )
+
+        analysis_results = analyzer.analyze_positions_parallel(
+            position_ids,
+            progress_callback=parallel_progress_callback
+        )
+    else:
+        # Sequential analysis (fallback for small matrices or if disabled)
+        analysis_results = []
+        for idx, pos_id in enumerate(position_ids):
+            if progress_callback:
+                p_away, o_away = coord_list[idx]
+                progress_callback(
+                    f"Analyzing score {p_away}a-{o_away}a ({idx + 1}/{total_cells})..."
+                )
+            analysis_results.append(analyzer.analyze_position(pos_id))
+
+    # Process results and build matrix
+    matrix = []
+    result_idx = 0
+
     for player_away in range(2, match_length + 1):
         row = []
         for opponent_away in range(2, match_length + 1):
-            current_cell += 1
+            # Get analysis result
+            output, decision_type = analysis_results[result_idx]
+            result_idx += 1
 
-            # Report progress
-            if progress_callback:
-                progress_callback(
-                    f"Analyzing score {player_away}a-{opponent_away}a "
-                    f"({current_cell}/{total_cells})..."
+            # Parse cube decision
+            moves = GNUBGParser._parse_cube_decision(output)
+
+            if not moves:
+                raise ValueError(
+                    f"Could not parse cube decision at score {player_away}a-{opponent_away}a"
                 )
 
-            # Analyze cube at this score
-            result = analyzer.analyze_cube_at_score(
-                position_id=xgid,
-                match_length=match_length,
-                player_away=player_away,
-                opponent_away=opponent_away
-            )
+            # Build equity map
+            equity_map = {m.notation: m.equity for m in moves}
+
+            # Find best move
+            best_move = next((m for m in moves if m.rank == 1), None)
+            if not best_move:
+                raise ValueError(
+                    f"Could not determine best cube action at score {player_away}a-{opponent_away}a"
+                )
+
+            # Get equities for the 3 main actions
+            no_double_eq = equity_map.get("No Double/Take", None)
+            double_take_eq = equity_map.get("Double/Take", equity_map.get("Redouble/Take", None))
+            double_pass_eq = equity_map.get("Double/Pass", equity_map.get("Redouble/Pass", None))
+
+            # Simplify best action notation
+            best_action_simplified = analyzer._simplify_cube_notation(best_move.notation)
+
+            # Calculate errors for wrong decisions
+            best_equity = best_move.equity
+            error_no_double = None
+            error_double = None
+            error_pass = None
+
+            if no_double_eq is not None:
+                error_no_double = abs(best_equity - no_double_eq) if best_action_simplified != "N/T" else 0.0
+            if double_take_eq is not None:
+                error_double = abs(best_equity - double_take_eq) if best_action_simplified not in ["D/T", "TG/T"] else 0.0
+            if double_pass_eq is not None:
+                error_pass = abs(best_equity - double_pass_eq) if best_action_simplified != "D/P" else 0.0
 
             # Create cell
             cell = ScoreMatrixCell(
                 player_away=player_away,
                 opponent_away=opponent_away,
-                best_action=result['best_action'],
-                error_no_double=result['error_no_double'],
-                error_double=result['error_double'],
-                error_pass=result['error_pass']
+                best_action=best_action_simplified,
+                error_no_double=error_no_double,
+                error_double=error_double,
+                error_pass=error_pass
             )
             row.append(cell)
 
