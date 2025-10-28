@@ -18,6 +18,7 @@ class InputFormat(Enum):
     """Detected input format type."""
     POSITION_IDS = "position_ids"
     FULL_ANALYSIS = "full_analysis"
+    XG_BINARY = "xg_binary"
     UNKNOWN = "unknown"
 
 
@@ -131,6 +132,45 @@ class FormatDetector:
                 warnings=["Check input format - should be XGID/OGID/GNUID or full XG analysis"],
                 position_previews=previews
             )
+
+    def detect_binary(self, data: bytes) -> DetectionResult:
+        """
+        Detect format from binary data (for file imports).
+
+        Args:
+            data: Raw binary data from file
+
+        Returns:
+            DetectionResult with format classification
+        """
+        # Check for XG binary format
+        if self._is_xg_binary(data):
+            return DetectionResult(
+                format=InputFormat.XG_BINARY,
+                count=1,  # Binary files typically contain 1 game (will be updated after parsing)
+                details="eXtreme Gammon binary file (.xg)",
+                warnings=[],
+                position_previews=["XG binary format"]
+            )
+
+        # Try decoding as text and use text detection
+        try:
+            text = data.decode('utf-8', errors='ignore')
+            return self.detect(text)
+        except:
+            return DetectionResult(
+                format=InputFormat.UNKNOWN,
+                count=0,
+                details="Unknown binary format",
+                warnings=["Could not parse binary data"],
+                position_previews=[]
+            )
+
+    def _is_xg_binary(self, data: bytes) -> bool:
+        """Check if data is XG binary format (.xg file)."""
+        if len(data) < 4:
+            return False
+        return data[0:4] == b'RGMH'
 
     def _split_positions(self, text: str) -> List[str]:
         """

@@ -41,6 +41,32 @@ For the full LGPL-3.0 license text, see: https://www.gnu.org/licenses/lgpl-3.0.h
 
 ---
 
+### xgdatatools (LGPL-2.1)
+
+**Copyright:** Copyright (c) 2013-2014 Michael Petch
+**License:** GNU Lesser General Public License v2.1
+**Website:** https://github.com/mpetch/xgdatatools (historical reference)
+
+xgdatatools is a collection of Python modules for reading and parsing eXtreme Gammon (XG) binary file formats. This project incorporates the following modules from xgdatatools:
+- `xgstruct.py` - Classes for reading XG file structures
+- `xgzarc.py` - XG archive compression/decompression utilities
+- `xgutils.py` - Utility functions for XG data handling
+- `xgimport.py` - High-level XG file import functionality
+
+**LGPL-2.1 Compliance Notice:**
+- xgdatatools modules are used as library code within AnkiGammon
+- Source code for the xgdatatools modules is included in this repository
+- The full LGPL-2.1 license text is provided in `xgdatatools_LICENSE.txt`
+- AnkiGammon source code is available at: https://github.com/Deinonychus999/AnkiGammon
+- These modules were originally developed by Michael Petch for GNU Backgammon integration
+
+For the full LGPL-2.1 license text, see: https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html
+
+**Attribution:**
+The xgdatatools code is based upon Delphi data structures provided by Xavier Dufaure de Citres (contact@extremegammon.com) for purposes of interacting with the eXtreme Gammon XG file formats. The file format specifications are published at http://www.extremegammon.com/xgformat.aspx
+
+---
+
 ### beautifulsoup4 (MIT License)
 
 **Copyright:** Copyright (c) 2004-present Leonard Richardson
@@ -124,6 +150,7 @@ All dependencies are compatible with MIT licensing:
 - MIT + MIT = ✓ Compatible
 - MIT + BSD-3-Clause = ✓ Compatible
 - MIT + Apache-2.0 = ✓ Compatible
+- MIT + LGPL-2.1 = ✓ Compatible (when used as library)
 - MIT + LGPL-3.0 = ✓ Compatible (when used as library)
 
-AnkiGammon remains licensed under the MIT License. The LGPL-3.0 license of PySide6 applies only to the PySide6 library itself, not to AnkiGammon.
+AnkiGammon remains licensed under the MIT License. The LGPL licenses (both LGPL-2.1 for xgdatatools and LGPL-3.0 for PySide6) apply only to those specific libraries, not to AnkiGammon itself.

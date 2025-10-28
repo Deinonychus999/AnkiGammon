@@ -24,6 +24,9 @@ class Settings:
         "generate_score_matrix": False,
         "board_orientation": "counter-clockwise",
         "last_apkg_directory": None,
+        "import_error_threshold": 0.080,
+        "import_include_player_x": True,
+        "import_include_player_o": True,
     }
 
     def __init__(self, config_path: Optional[Path] = None):
@@ -176,6 +179,36 @@ class Settings:
     def last_apkg_directory(self, value: Optional[str]) -> None:
         """Set the last directory used for APKG export."""
         self.set("last_apkg_directory", value)
+
+    @property
+    def import_error_threshold(self) -> float:
+        """Get the error threshold for XG file imports."""
+        return self._settings.get("import_error_threshold", 0.080)
+
+    @import_error_threshold.setter
+    def import_error_threshold(self, value: float) -> None:
+        """Set the error threshold for XG file imports."""
+        self.set("import_error_threshold", value)
+
+    @property
+    def import_include_player_x(self) -> bool:
+        """Get whether to include Player X mistakes in imports."""
+        return self._settings.get("import_include_player_x", True)
+
+    @import_include_player_x.setter
+    def import_include_player_x(self, value: bool) -> None:
+        """Set whether to include Player X mistakes in imports."""
+        self.set("import_include_player_x", value)
+
+    @property
+    def import_include_player_o(self) -> bool:
+        """Get whether to include Player O mistakes in imports."""
+        return self._settings.get("import_include_player_o", True)
+
+    @import_include_player_o.setter
+    def import_include_player_o(self, value: bool) -> None:
+        """Set whether to include Player O mistakes in imports."""
+        self.set("import_include_player_o", value)
 
     def is_gnubg_available(self) -> bool:
         """

@@ -197,6 +197,7 @@ class Move:
     xg_notation: Optional[str] = None  # Original notation from XG (e.g., "No double" not "No double/Take")
     resulting_position: Optional[Position] = None  # Position after this move (if available)
     from_xg_analysis: bool = True  # True if from XG's analysis, False if synthetically generated
+    was_played: bool = False  # True if this was the move actually played in the game
     # Winning chances percentages
     player_win_pct: Optional[float] = None  # Player winning percentage (e.g., 52.68)
     player_gammon_pct: Optional[float] = None  # Player gammon percentage (e.g., 14.35)

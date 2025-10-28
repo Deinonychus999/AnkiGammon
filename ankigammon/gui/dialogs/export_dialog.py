@@ -39,6 +39,11 @@ class AnalysisWorker(QThread):
         super().__init__()
         self.decisions = decisions
         self.settings = settings
+        self._cancelled = False
+
+    def cancel(self):
+        """Request cancellation of the analysis."""
+        self._cancelled = True
 
     def run(self):
         """Analyze positions with GnuBG in background."""
@@ -59,6 +64,11 @@ class AnalysisWorker(QThread):
             analyzed_decisions = list(self.decisions)  # Copy list
 
             for idx, (pos_idx, decision) in enumerate(positions_to_analyze):
+                # Check for cancellation
+                if self._cancelled:
+                    self.finished.emit(False, "Analysis cancelled by user", self.decisions)
+                    return
+
                 self.progress.emit(idx, total)  # Emit current progress before starting
                 self.status_message.emit(
                     f"Analyzing position {idx + 1} of {total} with GnuBG ({self.settings.gnubg_analysis_ply}-ply)..."
@@ -116,6 +126,11 @@ class ExportWorker(QThread):
         self.settings = settings
         self.export_method = export_method
         self.output_path = output_path
+        self._cancelled = False
+
+    def cancel(self):
+        """Request cancellation of the export."""
+        self._cancelled = True
 
     def run(self):
         """Execute export in background thread."""
@@ -160,6 +175,11 @@ class ExportWorker(QThread):
         # Export decisions
         total = len(self.decisions)
         for i, decision in enumerate(self.decisions):
+            # Check for cancellation
+            if self._cancelled:
+                self.finished.emit(False, "Export cancelled by user")
+                return
+
             # Calculate base progress for this position
             base_progress = i / total
             position_progress_range = 1.0 / total  # How much progress this position represents
@@ -251,6 +271,11 @@ class ExportWorker(QThread):
             # Generate cards
             total = len(self.decisions)
             for i, decision in enumerate(self.decisions):
+                # Check for cancellation
+                if self._cancelled:
+                    self.finished.emit(False, "Export cancelled by user")
+                    return
+
                 # Calculate base progress for this position
                 base_progress = i / total
                 position_progress_range = 1.0 / total
@@ -327,6 +352,7 @@ class ExportDialog(QDialog):
         self.settings = settings
         self.worker = None
         self.analysis_worker = None
+        self._closing = False  # Flag to track if user requested close
 
         self.setWindowTitle("Export to Anki")
         self.setModal(True)
@@ -372,12 +398,60 @@ class ExportDialog(QDialog):
         self.btn_export.clicked.connect(self.start_export)
         self.btn_close = QPushButton("Close")
         self.btn_close.setCursor(Qt.PointingHandCursor)
-        self.btn_close.clicked.connect(self.reject)
-        self.btn_close.setEnabled(False)
+        self.btn_close.clicked.connect(self.close_dialog)
 
         self.button_box.addButton(self.btn_export, QDialogButtonBox.AcceptRole)
         self.button_box.addButton(self.btn_close, QDialogButtonBox.RejectRole)
         layout.addWidget(self.button_box)
+
+    def closeEvent(self, event):
+        """Handle window close event (X button, ESC key, etc)."""
+        # Use the same close logic
+        analysis_running = self.analysis_worker and self.analysis_worker.isRunning()
+        export_running = self.worker and self.worker.isRunning()
+
+        if analysis_running or export_running:
+            # Request cancellation and ignore this close event
+            self._closing = True
+            self.btn_close.setEnabled(False)
+
+            if analysis_running:
+                self.analysis_worker.cancel()
+                self.status_label.setText("Cancelling analysis...")
+            elif export_running:
+                self.worker.cancel()
+                self.status_label.setText("Cancelling export...")
+
+            event.ignore()  # Don't close yet
+            return
+
+        # No workers running, allow close
+        event.accept()
+
+    @Slot()
+    def close_dialog(self):
+        """Handle close button click - cancel any running operations."""
+        # Check if any workers are running
+        analysis_running = self.analysis_worker and self.analysis_worker.isRunning()
+        export_running = self.worker and self.worker.isRunning()
+
+        if analysis_running or export_running:
+            # Set closing flag and request cancellation
+            self._closing = True
+            self.btn_close.setEnabled(False)
+
+            if analysis_running:
+                self.analysis_worker.cancel()
+                self.status_label.setText("Cancelling analysis...")
+            elif export_running:
+                self.worker.cancel()
+                self.status_label.setText("Cancelling export...")
+
+            # The finished signals will handle actually closing the dialog
+            return
+
+        # No workers running, close immediately
+        self.reject()
 
     @Slot()
     def start_export(self):
@@ -448,6 +522,11 @@ class ExportDialog(QDialog):
     @Slot(bool, str, list)
     def on_analysis_finished(self, success, message, analyzed_decisions):
         """Handle analysis completion."""
+        # Check if user requested to close
+        if self._closing:
+            self.reject()
+            return
+
         if success:
             # Update decisions with analyzed versions
             self.decisions = analyzed_decisions
@@ -459,7 +538,6 @@ class ExportDialog(QDialog):
             self.status_label.setText(f"Analysis failed: {message}")
             self.log_text.append(f"ERROR: {message}")
             self.btn_export.setEnabled(True)
-            self.btn_close.setEnabled(True)
 
     @Slot(float)
     def on_progress(self, progress_fraction):
@@ -489,10 +567,14 @@ class ExportDialog(QDialog):
     @Slot(bool, str)
     def on_finished(self, success, message):
         """Handle export completion."""
+        # Check if user requested to close
+        if self._closing:
+            self.reject()
+            return
+
         self.status_label.setText(message)
         self.log_text.append(f"\n{'SUCCESS' if success else 'FAILED'}: {message}")
 
-        self.btn_close.setEnabled(True)
         if success:
             self.btn_export.setEnabled(False)
         else:

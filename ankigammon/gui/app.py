@@ -136,6 +136,13 @@ def main():
     Returns:
         int: Application exit code
     """
+    # Configure logging
+    import logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+
     # Set Windows AppUserModelID for custom taskbar icon
     set_windows_app_id()
 

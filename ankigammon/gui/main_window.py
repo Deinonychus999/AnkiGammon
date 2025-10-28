@@ -13,12 +13,11 @@ import qtawesome as qta
 import base64
 
 from ankigammon.settings import Settings
-from ankigammon.parsers.xg_text_parser import XGTextParser
 from ankigammon.renderer.svg_board_renderer import SVGBoardRenderer
 from ankigammon.renderer.color_schemes import get_scheme
 from ankigammon.models import Decision
 from ankigammon.gui.widgets import PositionListWidget
-from ankigammon.gui.dialogs import SettingsDialog, ExportDialog, InputDialog
+from ankigammon.gui.dialogs import SettingsDialog, ExportDialog, InputDialog, ImportOptionsDialog
 from ankigammon.gui.resources import get_resource_path
 
 
@@ -32,17 +31,22 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.settings = settings
         self.current_decisions = []
-        self.parser = XGTextParser()
         self.renderer = SVGBoardRenderer(
             color_scheme=get_scheme(settings.color_scheme),
             orientation=settings.board_orientation
         )
         self.color_scheme_actions = {}  # Store references to color scheme menu actions
 
+        # Enable drag and drop
+        self.setAcceptDrops(True)
+
         self._setup_ui()
         self._setup_menu_bar()
         self._setup_connections()
         self._restore_window_state()
+
+        # Create drop overlay (will be shown during drag operations)
+        self._create_drop_overlay()
 
     def _setup_ui(self):
         """Initialize the user interface."""
@@ -55,6 +59,7 @@ class MainWindow(QMainWindow):
 
         # Central widget with horizontal layout
         central = QWidget()
+        central.setAcceptDrops(False)  # Let drag events propagate to main window
         self.setCentralWidget(central)
         layout = QHBoxLayout(central)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -62,11 +67,13 @@ class MainWindow(QMainWindow):
 
         # Left panel: Controls
         left_panel = self._create_left_panel()
+        left_panel.setAcceptDrops(False)  # Let drag events propagate to main window
         layout.addWidget(left_panel, stretch=1)
 
         # Right panel: Preview
         self.preview = QWebEngineView()
         self.preview.setContextMenuPolicy(Qt.NoContextMenu)  # Disable browser context menu
+        self.preview.setAcceptDrops(False)  # Let drag events propagate to main window
 
         # Load icon and convert to base64 for embedding in HTML
         icon_path = get_resource_path("ankigammon/gui/resources/icon.png")
@@ -252,6 +259,11 @@ class MainWindow(QMainWindow):
         act_add_positions.triggered.connect(self.on_add_positions_clicked)
         file_menu.addAction(act_add_positions)
 
+        act_import_file = QAction("&Import File...", self)
+        act_import_file.setShortcut("Ctrl+O")
+        act_import_file.triggered.connect(self.on_import_file_clicked)
+        file_menu.addAction(act_import_file)
+
         file_menu.addSeparator()
 
         act_export = QAction("&Export to Anki...", self)
@@ -327,6 +339,47 @@ class MainWindow(QMainWindow):
         state = settings.value("window/state")
         if state:
             self.restoreState(state)
+
+    def _create_drop_overlay(self):
+        """Create a visual overlay for drag-and-drop feedback."""
+        # Make overlay a child of central widget for proper positioning
+        self.drop_overlay = QWidget(self.centralWidget())
+        self.drop_overlay.setStyleSheet("""
+            QWidget {
+                background-color: rgba(137, 180, 250, 0.15);
+                border: 3px dashed #89b4fa;
+                border-radius: 12px;
+            }
+        """)
+
+        # Create layout for overlay content
+        overlay_layout = QVBoxLayout(self.drop_overlay)
+        overlay_layout.setAlignment(Qt.AlignCenter)
+
+        # Icon
+        icon_label = QLabel()
+        icon_label.setPixmap(qta.icon('fa6s.file-import', color='#89b4fa').pixmap(64, 64))
+        icon_label.setAlignment(Qt.AlignCenter)
+        overlay_layout.addWidget(icon_label)
+
+        # Text
+        text_label = QLabel("Drop .xg file to import")
+        text_label.setStyleSheet("""
+            QLabel {
+                color: #89b4fa;
+                font-size: 18px;
+                font-weight: 600;
+                background: transparent;
+                border: none;
+                padding: 12px;
+            }
+        """)
+        text_label.setAlignment(Qt.AlignCenter)
+        overlay_layout.addWidget(text_label)
+
+        # Initially hidden
+        self.drop_overlay.hide()
+        self.drop_overlay.setAttribute(Qt.WA_TransparentForMouseEvents)  # Don't block mouse events
 
     @Slot()
     def on_add_positions_clicked(self):
@@ -596,6 +649,244 @@ class MainWindow(QMainWindow):
             <p><a href="https://github.com/Deinonychus999/AnkiGammon">GitHub Repository</a></p>
             """
         )
+
+    def _filter_decisions_by_import_options(
+        self,
+        decisions: list[Decision],
+        threshold: float,
+        include_player_x: bool,
+        include_player_o: bool
+    ) -> list[Decision]:
+        """
+        Filter decisions based on import options.
+
+        Args:
+            decisions: All parsed decisions
+            threshold: Error threshold (positive value, e.g., 0.080)
+            include_player_x: Include Player.X mistakes
+            include_player_o: Include Player.O mistakes
+
+        Returns:
+            Filtered list of decisions
+        """
+        from ankigammon.models import Player
+
+        filtered = []
+
+        for decision in decisions:
+            # Check player filter
+            if decision.on_roll == Player.X and not include_player_x:
+                continue
+            if decision.on_roll == Player.O and not include_player_o:
+                continue
+
+            # Skip decisions with no moves
+            if not decision.candidate_moves:
+                continue
+
+            # Find the move that was actually played in the game
+            played_move = next((m for m in decision.candidate_moves if m.was_played), None)
+
+            # Fallback: if no move is marked as played, skip this decision
+            # (This should not happen with proper XG files, but handles edge cases)
+            if not played_move:
+                continue
+
+            # Use xg_error if available (convert to absolute value),
+            # otherwise use error (already positive)
+            error_magnitude = abs(played_move.xg_error) if played_move.xg_error is not None else played_move.error
+
+            # Only include if error is at or above threshold
+            if error_magnitude >= threshold:
+                filtered.append(decision)
+
+        return filtered
+
+    @Slot()
+    def on_import_file_clicked(self):
+        """Handle import file menu action."""
+        from PySide6.QtWidgets import QFileDialog
+
+        # Show file dialog
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Import Backgammon File",
+            "",
+            "XG Binary (*.xg);;All Files (*.*)"
+        )
+
+        if not file_path:
+            return
+
+        # Use the shared import logic
+        self._import_file(file_path)
+
+    def dragEnterEvent(self, event):
+        """Handle drag enter event - accept if it contains valid files."""
+        if event.mimeData().hasUrls():
+            # Check if any of the URLs are .xg files
+            urls = event.mimeData().urls()
+            for url in urls:
+                if url.isLocalFile():
+                    file_path = url.toLocalFile()
+                    if file_path.endswith('.xg'):
+                        # Show visual overlay
+                        self._show_drop_overlay()
+                        event.acceptProposedAction()
+                        return
+        event.ignore()
+
+    def dragLeaveEvent(self, event):
+        """Handle drag leave event - hide overlay when drag leaves the window."""
+        self._hide_drop_overlay()
+        event.accept()
+
+    def dropEvent(self, event):
+        """Handle drop event - import the dropped .xg files."""
+        # Hide overlay immediately
+        self._hide_drop_overlay()
+
+        if not event.mimeData().hasUrls():
+            event.ignore()
+            return
+
+        # Process each dropped file
+        urls = event.mimeData().urls()
+        for url in urls:
+            if url.isLocalFile():
+                file_path = url.toLocalFile()
+                if file_path.endswith('.xg'):
+                    # Import the file using the existing import logic
+                    self._import_file(file_path)
+
+        event.acceptProposedAction()
+
+    def _show_drop_overlay(self):
+        """Show the drop overlay with proper sizing."""
+        # Resize overlay to cover the entire parent (central widget)
+        self.drop_overlay.setGeometry(self.drop_overlay.parentWidget().rect())
+        self.drop_overlay.raise_()  # Bring to front
+        self.drop_overlay.show()
+
+    def _hide_drop_overlay(self):
+        """Hide the drop overlay."""
+        self.drop_overlay.hide()
+
+    def _import_file(self, file_path: str):
+        """
+        Import a file at the given path.
+        This is a helper method that can be called from both the menu action
+        and the drag-and-drop handler.
+        """
+        from ankigammon.gui.format_detector import FormatDetector, InputFormat
+        from ankigammon.parsers.xg_binary_parser import XGBinaryParser
+        import logging
+
+        logger = logging.getLogger(__name__)
+
+        try:
+            # Read file
+            with open(file_path, 'rb') as f:
+                data = f.read()
+
+            # Detect format
+            detector = FormatDetector(self.settings)
+            result = detector.detect_binary(data)
+
+            logger.info(f"Detected format: {result.format}, count: {result.count}")
+
+            # Parse based on format
+            decisions = []
+            total_count = 0  # Track total before filtering (for XG binary)
+
+            if result.format == InputFormat.XG_BINARY:
+                # Extract player names from XG file
+                player1_name, player2_name = XGBinaryParser.extract_player_names(file_path)
+
+                # Show import options dialog for XG binary files
+                import_dialog = ImportOptionsDialog(
+                    self.settings,
+                    player1_name=player1_name,
+                    player2_name=player2_name,
+                    parent=self
+                )
+                if import_dialog.exec():
+                    # User accepted - get options
+                    threshold, include_player_x, include_player_o = import_dialog.get_options()
+
+                    # Parse all decisions
+                    all_decisions = XGBinaryParser.parse_file(file_path)
+                    total_count = len(all_decisions)
+
+                    # Filter based on user options
+                    decisions = self._filter_decisions_by_import_options(
+                        all_decisions,
+                        threshold,
+                        include_player_x,
+                        include_player_o
+                    )
+
+                    logger.info(f"Filtered {len(decisions)} positions from {total_count} total")
+                else:
+                    # User cancelled
+                    return
+            else:
+                QMessageBox.warning(
+                    self,
+                    "Unknown Format",
+                    f"Could not detect file format.\n\nOnly XG binary files (.xg) are supported for file import.\n\n{result.details}"
+                )
+                return
+
+            # Add to current decisions
+            self.current_decisions.extend(decisions)
+            self.position_list.set_decisions(self.current_decisions)
+            self.btn_export.setEnabled(True)
+
+            # Show success message
+            from pathlib import Path
+            filename = Path(file_path).name
+
+            # Show filtering info
+            filtered_count = len(decisions)
+            message = f"Imported {filtered_count} position(s) from {filename}"
+            if total_count > filtered_count:
+                message += f"\n(filtered from {total_count} total positions)"
+
+            QMessageBox.information(
+                self,
+                "Import Successful",
+                message
+            )
+
+            logger.info(f"Successfully imported {len(decisions)} positions from {file_path}")
+
+        except FileNotFoundError:
+            QMessageBox.critical(
+                self,
+                "File Not Found",
+                f"Could not find file: {file_path}"
+            )
+        except ValueError as e:
+            QMessageBox.critical(
+                self,
+                "Invalid Format",
+                f"Invalid file format:\n{str(e)}"
+            )
+        except Exception as e:
+            logger.error(f"Failed to import file {file_path}: {e}", exc_info=True)
+            QMessageBox.critical(
+                self,
+                "Import Failed",
+                f"Failed to import file:\n{str(e)}"
+            )
+
+    def resizeEvent(self, event):
+        """Handle window resize - update overlay size."""
+        super().resizeEvent(event)
+        if hasattr(self, 'drop_overlay') and hasattr(self, 'centralWidget'):
+            # Update overlay to match central widget size
+            self.drop_overlay.setGeometry(self.drop_overlay.parentWidget().rect())
 
     def closeEvent(self, event):
         """Save window state on close."""

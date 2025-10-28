@@ -304,7 +304,11 @@ Linux:
 
 ### Third-Party Software
 
-This application uses PySide6, which is licensed under the LGPL-3.0 license. See [THIRD-PARTY-LICENSES.md](THIRD-PARTY-LICENSES.md) for complete license information and attributions for all dependencies.
+This application uses several LGPL-licensed components:
+- **PySide6** (LGPL-3.0) - Qt framework Python bindings for the GUI
+- **xgdatatools** (LGPL-2.1) - Modules for parsing eXtreme Gammon binary file formats
+
+See [THIRD-PARTY-LICENSES.md](THIRD-PARTY-LICENSES.md) for complete license information and attributions for all dependencies.
 
 ### Trademarks
 
@@ -318,9 +322,10 @@ This application uses PySide6, which is licensed under the LGPL-3.0 license. See
 ### Position Format Specifications
 
 - **XGID format** specification is publicly documented by eXtreme Gammon (GameSite 2000 Ltd.) with explicit permission for redistribution: "This information can freely redistributed"
+- **XG binary format** parsing is implemented using xgdatatools (LGPL-2.1) by Michael Petch, based on Delphi data structures provided by Xavier Dufaure de Citres
 - **GNUID format** is documented in the GNU Backgammon manual (GPL-3.0 project); our implementation is original code that reads/writes this format without incorporating GPL code
 
-All position encoding/decoding implementations in this project are original code.
+All position encoding/decoding implementations in this project are original code, except for the xgdatatools modules used for XG binary file parsing.
 
 ## License
 

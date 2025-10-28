@@ -532,6 +532,13 @@ class InputDialog(QDialog):
             decisions = XGTextParser.parse_string(text)
             return decisions
 
+        elif format_type == InputFormat.XG_BINARY:
+            # Binary format should use file import
+            raise ValueError(
+                "XG binary format (.xg files) must be imported via File → Import.\n"
+                "Binary data cannot be pasted as text."
+            )
+
         elif format_type == InputFormat.POSITION_IDS:
             # Try parsing as position IDs (XGID, GNUID, or OGID)
             decisions = []

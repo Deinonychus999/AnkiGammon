@@ -11,7 +11,11 @@
       "Bash(pyinstaller:*)",
       "Bash(dir:*)",
       "Bash(findstr:*)",
-      "Bash(git log:*)"
+      "Bash(git log:*)",
+      "Bash(curl:*)",
+      "WebFetch",
+      "Bash(more:*)",
+      "Bash(tree:*)"
     ],
     "deny": [],
     "ask": []

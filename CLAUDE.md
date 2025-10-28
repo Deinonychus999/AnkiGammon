@@ -409,3 +409,90 @@ Always use the global settings instance via `get_settings()`:
 - Changes are immediately persisted to disk
 - Thread-safe singleton pattern
 - Gracefully handles missing/corrupted config files
+
+## Licensing and Third-Party Code
+
+### LGPL-Licensed Components
+
+AnkiGammon incorporates code from two LGPL-licensed projects. Understanding the licensing separation is important for developers:
+
+#### xgdatatools (LGPL-2.1)
+
+**What it is:**
+- Python modules for parsing eXtreme Gammon binary file formats (.xg files)
+- Original author: Michael Petch (mpetch@gnubg.org)
+- Based on Delphi data structures provided by Xavier Dufaure de Citres (eXtreme Gammon author)
+
+**Files included:**
+- `xgstruct.py` - Classes for reading XG file structures
+- `xgzarc.py` - XG archive compression/decompression utilities
+- `xgutils.py` - Utility functions for XG data handling
+- `xgimport.py` - High-level XG file import functionality
+- `xgdatatools_LICENSE.txt` - Full LGPL-2.1 license text
+
+**LGPL Compliance:**
+- These modules are used as library code (not modified)
+- Source code is included in the repository
+- Can be replaced with alternative implementations
+- Do not affect the MIT license of the rest of AnkiGammon
+
+**Development Guidelines:**
+- DO NOT modify xgdatatools files unless absolutely necessary
+- If modifications are needed, clearly document them and maintain LGPL-2.1 compliance
+- Any code that uses xgdatatools is NOT covered by LGPL (it's just a library dependency)
+- The LGPL-2.1 allows use in MIT-licensed projects without viral licensing effects
+
+#### PySide6 (LGPL-3.0)
+
+**What it is:**
+- Qt framework Python bindings for the GUI
+- Used as a dynamically linked library dependency
+
+**Files:**
+- All GUI code in `ankigammon/gui/` uses PySide6
+- Installed via pip, not included in source repository
+
+**LGPL Compliance:**
+- PySide6 is used as an external library (dynamically linked)
+- Users can replace PySide6 with their own version
+- Source code available at: https://code.qt.io/cgit/pyside/pyside-setup.git/
+- GUI module is cleanly separated in `ankigammon/gui/` directory
+
+**Development Guidelines:**
+- PySide6 is used only in the GUI layer
+- No PySide6 code appears in core modules (parsers, renderers, utils)
+- This architectural separation keeps LGPL code isolated
+
+### Code Architecture and License Boundaries
+
+**MIT-Licensed Code (majority of AnkiGammon):**
+- Core data models: `models.py`
+- Position format utilities: `utils/xgid.py`, `utils/ogid.py`, `utils/gnuid.py`
+- Parsers: `parsers/xg_text_parser.py`, `parsers/gnubg_parser.py`
+- Rendering: `renderer/svg_board_renderer.py`, `renderer/color_schemes.py`
+- Anki integration: `anki/card_generator.py`, `anki/ankiconnect.py`, `anki/apkg_exporter.py`
+- Settings: `settings.py`
+
+**LGPL-2.1 Licensed Code (xgdatatools):**
+- `xgstruct.py`, `xgzarc.py`, `xgutils.py`, `xgimport.py`
+- Used for parsing XG binary file formats only
+- Currently not integrated into the main application (future feature)
+
+**LGPL-3.0 Licensed Code (PySide6):**
+- GUI layer: `gui/main_window.py`, `gui/dialogs/`, etc.
+- External dependency, not in repository
+
+### Important Notes for Contributors
+
+1. **Don't mix licenses unnecessarily** - Keep xgdatatools usage isolated to XG binary parsing
+2. **Document any modifications** - If you modify LGPL code, document changes clearly
+3. **Maintain architectural separation** - GUI code stays in `gui/`, core logic stays MIT
+4. **Source availability** - All LGPL source code must remain available (already satisfied)
+5. **License compatibility** - LGPL + MIT is compatible when LGPL code is used as a library
+
+### License File Locations
+
+- `LICENSE` - MIT License for AnkiGammon
+- `xgdatatools_LICENSE.txt` - LGPL-2.1 License for xgdatatools
+- `THIRD-PARTY-LICENSES.md` - Complete third-party attributions
+- Individual xgdatatools files contain LGPL headers
