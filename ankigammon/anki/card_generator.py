@@ -172,6 +172,13 @@ class CardGenerator:
         """Generate HTML for simple front (no options)."""
         metadata = self._get_metadata_html(decision)
 
+        # Determine question text based on decision type
+        from ankigammon.models import DecisionType
+        if decision.decision_type == DecisionType.CUBE_ACTION:
+            question_text = "What is the best cube action?"
+        else:
+            question_text = "What is the best move?"
+
         html = f"""
 <div class="card-front">
     <div class="position-svg">
@@ -179,7 +186,7 @@ class CardGenerator:
     </div>
     <div class="metadata">{metadata}</div>
     <div class="question">
-        <h3>What is the best move?</h3>
+        <h3>{question_text}</h3>
     </div>
 </div>
 """
@@ -194,6 +201,13 @@ class CardGenerator:
         """Generate interactive quiz MCQ front with clickable options."""
         metadata = self._get_metadata_html(decision)
         letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J']
+
+        # Determine question text based on decision type
+        from ankigammon.models import DecisionType
+        if decision.decision_type == DecisionType.CUBE_ACTION:
+            question_text = "What is the best cube action?"
+        else:
+            question_text = "What is the best move?"
 
         # Build clickable options
         options_html = []
@@ -212,7 +226,7 @@ class CardGenerator:
     </div>
     <div class="metadata">{metadata}</div>
     <div class="question">
-        <h3>What is the best move?</h3>
+        <h3>{question_text}</h3>
         <div class="mcq-options">
             {''.join(options_html)}
         </div>

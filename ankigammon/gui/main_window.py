@@ -155,6 +155,12 @@ class MainWindow(QMainWindow):
         title.setAlignment(Qt.AlignCenter)
         layout.addWidget(title)
 
+        # Button row: Add Positions and Import File
+        btn_row = QWidget()
+        btn_row_layout = QHBoxLayout(btn_row)
+        btn_row_layout.setContentsMargins(0, 0, 0, 0)
+        btn_row_layout.setSpacing(8)
+
         # Add Positions button (primary) - blue background needs dark icons
         self.btn_add_positions = QPushButton("  Add Positions...")
         self.btn_add_positions.setIcon(qta.icon('fa6s.clipboard-list', color='#1e1e2e'))
@@ -162,13 +168,68 @@ class MainWindow(QMainWindow):
         self.btn_add_positions.clicked.connect(self.on_add_positions_clicked)
         self.btn_add_positions.setToolTip("Paste position IDs or full XG analysis")
         self.btn_add_positions.setCursor(Qt.PointingHandCursor)
-        layout.addWidget(self.btn_add_positions)
+        btn_row_layout.addWidget(self.btn_add_positions, stretch=1)
+
+        # Import File button (equal primary) - full-sized with text + icon
+        self.btn_import_file = QPushButton("  Import File...")
+        self.btn_import_file.setIcon(qta.icon('fa6s.file-import', color='#1e1e2e'))
+        self.btn_import_file.setIconSize(QSize(18, 18))
+        self.btn_import_file.clicked.connect(self.on_import_file_clicked)
+        self.btn_import_file.setToolTip("Import .xg file")
+        self.btn_import_file.setCursor(Qt.PointingHandCursor)
+        btn_row_layout.addWidget(self.btn_import_file, stretch=1)
+
+        layout.addWidget(btn_row)
+
+        # Position list with integrated Clear All button
+        list_container = QWidget()
+        list_container_layout = QVBoxLayout(list_container)
+        list_container_layout.setContentsMargins(0, 0, 0, 0)
+        list_container_layout.setSpacing(0)
+
+        # Clear All button positioned at top-right
+        self.btn_clear_all = QPushButton("  Clear All")
+        self.btn_clear_all.setIcon(qta.icon('fa6s.trash-can', color='#a6adc8'))
+        self.btn_clear_all.setIconSize(QSize(11, 11))
+        self.btn_clear_all.setCursor(Qt.PointingHandCursor)
+        self.btn_clear_all.clicked.connect(self.on_clear_all_clicked)
+        self.btn_clear_all.setToolTip("Clear all positions")
+        self.btn_clear_all.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                color: #6c7086;
+                border: none;
+                padding: 6px 10px;
+                font-size: 11px;
+                font-weight: 500;
+                border-radius: 4px;
+            }
+            QPushButton:hover:enabled {
+                background-color: rgba(243, 139, 168, 0.15);
+                color: #f38ba8;
+            }
+            QPushButton:pressed:enabled {
+                background-color: rgba(243, 139, 168, 0.25);
+            }
+        """)
+
+        # Create header row with clear button aligned right (initially hidden)
+        self.list_header_row = QWidget()
+        header_layout = QHBoxLayout(self.list_header_row)
+        header_layout.setContentsMargins(0, 0, 0, 4)
+        header_layout.setSpacing(0)
+        header_layout.addStretch()
+        header_layout.addWidget(self.btn_clear_all)
+        self.list_header_row.hide()  # Hidden until positions are added
+        list_container_layout.addWidget(self.list_header_row)
 
         # Position list widget
         self.position_list = PositionListWidget()
         self.position_list.position_selected.connect(self.show_decision)
         self.position_list.positions_deleted.connect(self.on_positions_deleted)
-        layout.addWidget(self.position_list, stretch=1)
+        list_container_layout.addWidget(self.position_list, stretch=1)
+
+        layout.addWidget(list_container, stretch=1)
 
         # Spacer
         layout.addSpacing(12)
@@ -398,6 +459,7 @@ class MainWindow(QMainWindow):
         # Append to current decisions
         self.current_decisions.extend(decisions)
         self.btn_export.setEnabled(True)
+        self.list_header_row.show()
 
         # Update position list
         self.position_list.set_decisions(self.current_decisions)
@@ -413,9 +475,109 @@ class MainWindow(QMainWindow):
         # Refresh list ONCE (more efficient)
         self.position_list.set_decisions(self.current_decisions)
 
-        # Disable export if no positions remain
+        # Disable export and hide clear all if no positions remain
         if not self.current_decisions:
             self.btn_export.setEnabled(False)
+            self.list_header_row.hide()
+            # Show welcome screen
+            welcome_html = """
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <style>
+                        body {
+                            margin: 0;
+                            padding: 0;
+                            display: flex;
+                            flex-direction: column;
+                            justify-content: center;
+                            align-items: center;
+                            min-height: 100vh;
+                            background: linear-gradient(135deg, #1e1e2e 0%, #181825 100%);
+                            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                            color: #cdd6f4;
+                        }
+                        .welcome {
+                            text-align: center;
+                            padding: 40px;
+                        }
+                        h1 {
+                            color: #f5e0dc;
+                            font-size: 32px;
+                            margin-bottom: 16px;
+                            font-weight: 700;
+                        }
+                        p {
+                            color: #a6adc8;
+                            font-size: 16px;
+                            margin: 8px 0;
+                        }
+                        .icon {
+                            margin-bottom: 24px;
+                            opacity: 0.6;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="welcome">
+                        <div class="icon">
+                            <svg width="140" height="90" viewBox="-5 0 90 45" xmlns="http://www.w3.org/2000/svg">
+                                <!-- First die -->
+                                <g transform="translate(0, 10)">
+                                    <rect x="2" y="2" width="32" height="32" rx="4"
+                                          fill="#f5e0dc" stroke="#45475a" stroke-width="1.5"
+                                          transform="rotate(-15 18 18)"/>
+                                    <!-- Pips for 5 -->
+                                    <circle cx="10" cy="10" r="2.5" fill="#1e1e2e" transform="rotate(-15 18 18)"/>
+                                    <circle cx="26" cy="10" r="2.5" fill="#1e1e2e" transform="rotate(-15 18 18)"/>
+                                    <circle cx="18" cy="18" r="2.5" fill="#1e1e2e" transform="rotate(-15 18 18)"/>
+                                    <circle cx="10" cy="26" r="2.5" fill="#1e1e2e" transform="rotate(-15 18 18)"/>
+                                    <circle cx="26" cy="26" r="2.5" fill="#1e1e2e" transform="rotate(-15 18 18)"/>
+                                </g>
+
+                                <!-- Second die -->
+                                <g transform="translate(36, 0)">
+                                    <rect x="2" y="2" width="32" height="32" rx="4"
+                                          fill="#f5e0dc" stroke="#45475a" stroke-width="1.5"
+                                          transform="rotate(12 18 18)"/>
+                                    <!-- Pips for 3 -->
+                                    <circle cx="10" cy="10" r="2.5" fill="#1e1e2e" transform="rotate(12 18 18)"/>
+                                    <circle cx="18" cy="18" r="2.5" fill="#1e1e2e" transform="rotate(12 18 18)"/>
+                                    <circle cx="26" cy="26" r="2.5" fill="#1e1e2e" transform="rotate(12 18 18)"/>
+                                </g>
+                            </svg>
+                        </div>
+                        <h1>No Position Loaded</h1>
+                        <p>Add positions to get started</p>
+                    </div>
+                </body>
+                </html>
+                """
+            self.preview.setHtml(welcome_html)
+            self.preview.update()  # Force repaint to avoid black screen issue
+
+    @Slot()
+    def on_clear_all_clicked(self):
+        """Handle clear all button click."""
+        if not self.current_decisions:
+            return
+
+        # Show confirmation dialog
+        reply = QMessageBox.question(
+            self,
+            "Clear All Positions",
+            f"Are you sure you want to clear all {len(self.current_decisions)} position(s)?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+
+        if reply == QMessageBox.Yes:
+            # Clear all decisions
+            self.current_decisions.clear()
+            self.position_list.set_decisions(self.current_decisions)
+            self.btn_export.setEnabled(False)
+            self.list_header_row.hide()
+
             # Show welcome screen
             welcome_html = """
                 <!DOCTYPE html>
@@ -498,6 +660,7 @@ class MainWindow(QMainWindow):
         """Handle newly loaded decisions."""
         self.current_decisions = decisions
         self.btn_export.setEnabled(True)
+        self.list_header_row.show()
 
         # Update position list
         self.position_list.set_decisions(decisions)
@@ -843,6 +1006,7 @@ class MainWindow(QMainWindow):
             self.current_decisions.extend(decisions)
             self.position_list.set_decisions(self.current_decisions)
             self.btn_export.setEnabled(True)
+            self.list_header_row.show()
 
             # Show success message
             from pathlib import Path

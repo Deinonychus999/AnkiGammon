@@ -81,6 +81,41 @@ python -m unittest tests.test_basic.TestXGIDParsing
 
 ### Critical Architecture Details
 
+#### XG Binary Move Notation Indexing (parsers/xg_binary_parser.py)
+
+**CRITICAL BUG FIX:** XG binary files use **0-based indexing** for board points in move notation, while standard backgammon notation uses **1-based indexing**. This was causing all MCQ options to show illegal moves (off by 1).
+
+**Indexing Scheme:**
+- **XG binary move notation:** 0-23 for board points (0-based)
+- **Standard backgammon notation:** 1-24 for board points (1-based)
+- **Position array:** 0=X bar, 1-24=board points (1-based), 25=O bar
+
+**Example:**
+```
+XG binary raw: (12, 9, 12, 6)
+Before fix:    "12/9 12/6"  (WRONG - illegal moves)
+After fix:     "13/10 13/7" (CORRECT - add 1 to each point)
+```
+
+**Additional Processing:**
+The `_convert_move_notation()` method also handles:
+1. **Compound move combination**: XG stores multi-pip moves as separate sub-moves (e.g., `20/16 16/15` for a 4-1 roll), but standard notation combines them (`20/15`)
+2. **Hit detection**: Checks the position to detect opponent blots and adds `*` marker when a hit occurs
+
+**Example of compound move:**
+```
+XG binary raw: (19, 15, 15, 14)  # Two sub-moves
+Before fix:    "20/16 16/15"     # Shown as separate (confusing)
+After fix:     "20/15"            # Combined (or "20/15*" if hitting)
+```
+
+**Fix location:** `_convert_move_notation()` method (lines ~741-863)
+
+**Special values (no conversion needed):**
+- 0 = X's bar (stays "bar")
+- 25 = O's bar (stays "bar")
+- -1 = bearing off (stays "off")
+
 #### XGID Position Encoding (utils/xgid.py)
 
 The XGID format is **entirely perspective-dependent**. The ENTIRE 26-character position string (including bars) depends on whose turn it is:

@@ -296,9 +296,11 @@ class XGBinaryParser:
             n_moves = min(move_entry.NMoveEval, data_moves.NMoves)
 
             for i in range(n_moves):
-                # Parse move notation
+                # Parse move notation with compound move combination and hit detection
                 notation = XGBinaryParser._convert_move_notation(
-                    data_moves.Moves[i]
+                    data_moves.Moves[i],
+                    position,
+                    on_roll
                 )
 
                 # Get equity (7-element tuple from XG)
@@ -350,7 +352,11 @@ class XGBinaryParser:
 
         # Mark which move was actually played
         if hasattr(move_entry, 'Moves') and move_entry.Moves:
-            played_notation = XGBinaryParser._convert_move_notation(move_entry.Moves)
+            played_notation = XGBinaryParser._convert_move_notation(
+                move_entry.Moves,
+                position,
+                on_roll
+            )
             # Normalize by sorting sub-moves for comparison
             played_normalized = XGBinaryParser._normalize_move_notation(played_notation)
 
@@ -733,33 +739,50 @@ class XGBinaryParser:
         return " ".join(parts)
 
     @staticmethod
-    def _convert_move_notation(xg_moves: Tuple[int, ...]) -> str:
+    def _convert_move_notation(
+        xg_moves: Tuple[int, ...],
+        position: Optional[Position] = None,
+        on_roll: Optional[Player] = None
+    ) -> str:
         """
-        Convert XG move notation to readable format.
+        Convert XG move notation to readable format with compound move combination and hit detection.
+
+        IMPORTANT: XG binary uses 0-based indexing for board points in move notation.
+        - XG binary: 0-23 for board points
+        - Standard notation: 1-24 for board points
+        - Therefore, we add 1 to convert board point numbers to standard notation
+
+        XG binary stores compound moves as separate sub-moves (e.g., 20/16 16/15)
+        but standard notation combines them (e.g., 20/15*). This function:
+        1. Converts 0-based to 1-based point numbering
+        2. Combines consecutive sub-moves into compound moves
+        3. Detects and marks hits with *
 
         XG format: [from1, to1, from2, to2, from3, to3, from4, to4]
         Special values:
         - -1: End of move list OR bearing off (when used as destination)
         - 0: X's bar (white, top player) OR illegal/blocked move if all zeros
+        - 1-23: Board points (0-based, must add 1 for standard notation)
         - 25: O's bar (black, bottom player)
-        - 1-24: Normal points
 
         Args:
             xg_moves: Tuple of 8 integers
+            position: Position object for hit detection (optional)
+            on_roll: Player making the move (optional)
 
         Returns:
-            Move notation string (e.g., "24/20 13/9", "bar/22", "1/off 2/off")
+            Move notation string (e.g., "20/15*", "bar/22", "1/off 2/off")
             Returns "Cannot move" for illegal/blocked positions (all zeros)
         """
         if not xg_moves or len(xg_moves) < 2:
             return ""
 
         # Check for illegal/blocked move (all zeros)
-        # This occurs when a player cannot make any legal moves (e.g., on bar with all points blocked)
         if all(x == 0 for x in xg_moves):
             return "Cannot move"
 
-        parts = []
+        # First pass: Parse all sub-moves
+        sub_moves = []
         for i in range(0, len(xg_moves), 2):
             from_point = xg_moves[i]
 
@@ -771,7 +794,53 @@ class XGBinaryParser:
                 break
 
             to_point = xg_moves[i + 1]
+            sub_moves.append((from_point, to_point))
 
+        if not sub_moves:
+            return ""
+
+        # Sort sub-moves to enable better combination
+        # Sort by from_point descending (highest point first)
+        # This ensures that compound moves are combined optimally
+        # Example: [(7,5), (5,3), (3,1), (3,1)] combines to [(7,1), (3,1)] = "8/2* 4/2*"
+        # Without sorting: [(5,3), (3,1), (3,1), (7,5)] combines to [(5,1), (3,1), (7,5)] = "6/2* 4/2* 8/6"
+        sub_moves.sort(key=lambda m: m[0], reverse=True)
+
+        # Second pass: Combine compound moves
+        # Look for patterns where to_point of one move equals from_point of next
+        combined_moves = []
+        i = 0
+        while i < len(sub_moves):
+            from_point, to_point = sub_moves[i]
+
+            # Look ahead to see if we can combine with next move(s)
+            j = i + 1
+            while j < len(sub_moves):
+                next_from, next_to = sub_moves[j]
+                # Can combine if this move's destination is the next move's source
+                if to_point == next_from:
+                    to_point = next_to
+                    j += 1
+                else:
+                    break
+
+            # Check for hit if position is available
+            hit = False
+            if position and on_roll and 0 <= to_point <= 23:
+                # Convert 0-based to 1-based for position lookup
+                checker_count = position.points[to_point + 1]
+                # Hit occurs if opponent has exactly 1 checker at destination
+                if on_roll == Player.X and checker_count == -1:
+                    hit = True  # X hitting O
+                elif on_roll == Player.O and checker_count == 1:
+                    hit = True  # O hitting X
+
+            combined_moves.append((from_point, to_point, hit))
+            i = j
+
+        # Third pass: Format as notation strings
+        parts = []
+        for from_point, to_point, hit in combined_moves:
             # Convert special values to standard backgammon notation
             # Handle from_point
             if from_point == 0:
@@ -779,18 +848,23 @@ class XGBinaryParser:
             elif from_point == 25:
                 from_str = "bar"  # O's bar
             else:
-                from_str = str(from_point)
+                from_str = str(from_point + 1)  # Convert 0-based to 1-based
 
             # Handle to_point
             if to_point == -1:
                 to_str = "off"  # Bearing off
             elif to_point == 0:
-                to_str = "bar"  # X's bar (extremely rare edge case)
+                to_str = "bar"  # X's bar (opponent hit and sent to bar)
             elif to_point == 25:
-                to_str = "bar"  # O's bar (extremely rare edge case)
+                to_str = "bar"  # O's bar (opponent hit and sent to bar)
             else:
-                to_str = str(to_point)
+                to_str = str(to_point + 1)  # Convert 0-based to 1-based
 
-            parts.append(f"{from_str}/{to_str}")
+            # Add hit marker if applicable
+            notation = f"{from_str}/{to_str}"
+            if hit:
+                notation += "*"
+
+            parts.append(notation)
 
         return " ".join(parts) if parts else ""
