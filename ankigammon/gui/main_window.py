@@ -167,7 +167,7 @@ class MainWindow(QMainWindow):
         # Position list widget
         self.position_list = PositionListWidget()
         self.position_list.position_selected.connect(self.show_decision)
-        self.position_list.position_deleted.connect(self.on_position_deleted)
+        self.position_list.positions_deleted.connect(self.on_positions_deleted)
         layout.addWidget(self.position_list, stretch=1)
 
         # Spacer
@@ -402,21 +402,22 @@ class MainWindow(QMainWindow):
         # Update position list
         self.position_list.set_decisions(self.current_decisions)
 
-    @Slot(int)
-    def on_position_deleted(self, index: int):
-        """Handle position deletion from list."""
-        if 0 <= index < len(self.current_decisions):
-            # Remove from decisions list
-            deleted = self.current_decisions.pop(index)
+    @Slot(list)
+    def on_positions_deleted(self, indices: list):
+        """Handle deletion of multiple positions."""
+        # Sort indices in descending order and delete
+        for index in sorted(indices, reverse=True):
+            if 0 <= index < len(self.current_decisions):
+                self.current_decisions.pop(index)
 
-            # Update position list with new indices
-            self.position_list.set_decisions(self.current_decisions)
+        # Refresh list ONCE (more efficient)
+        self.position_list.set_decisions(self.current_decisions)
 
-            # Disable export if no positions remain
-            if not self.current_decisions:
-                self.btn_export.setEnabled(False)
-                # Show welcome screen
-                welcome_html = """
+        # Disable export if no positions remain
+        if not self.current_decisions:
+            self.btn_export.setEnabled(False)
+            # Show welcome screen
+            welcome_html = """
                 <!DOCTYPE html>
                 <html>
                 <head>
@@ -489,8 +490,8 @@ class MainWindow(QMainWindow):
                 </body>
                 </html>
                 """
-                self.preview.setHtml(welcome_html)
-                self.preview.update()  # Force repaint to avoid black screen issue
+            self.preview.setHtml(welcome_html)
+            self.preview.update()  # Force repaint to avoid black screen issue
 
     @Slot(list)
     def on_decisions_loaded(self, decisions):

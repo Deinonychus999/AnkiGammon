@@ -309,9 +309,13 @@ CARD_CSS = """
 }
 
 .note-section h4 {
-    color: #f9e2af;
+    color: #c9952a;
     margin: 0 0 10px;
     font-size: 16px;
+}
+
+.night_mode .note-section h4 {
+    color: #f9e2af;
 }
 
 .note-content {

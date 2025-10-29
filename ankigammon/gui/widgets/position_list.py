@@ -5,13 +5,14 @@ Widget for displaying list of parsed positions.
 from typing import List, Optional
 from PySide6.QtWidgets import (
     QListWidget, QListWidgetItem, QWidget, QVBoxLayout, QLabel, QMenu, QMessageBox,
-    QInputDialog
+    QDialog, QAbstractItemView
 )
 from PySide6.QtCore import Qt, Signal, Slot
 from PySide6.QtGui import QIcon, QAction, QKeyEvent
 import qtawesome as qta
 
 from ankigammon.models import Decision, DecisionType, Player
+from ankigammon.gui.dialogs.note_dialog import NoteEditDialog
 
 
 class PositionListItem(QListWidgetItem):
@@ -38,11 +39,11 @@ class PositionListWidget(QListWidget):
 
     Signals:
         position_selected(Decision): Emitted when user selects a position
-        position_deleted(int): Emitted when user deletes a position
+        positions_deleted(list): Emitted when user deletes position(s) - List[int] of indices
     """
 
     position_selected = Signal(Decision)
-    position_deleted = Signal(int)
+    positions_deleted = Signal(list)
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -50,6 +51,9 @@ class PositionListWidget(QListWidget):
 
         # Enable smooth scrolling
         self.setVerticalScrollMode(QListWidget.ScrollPerPixel)
+
+        # Enable multi-selection (Ctrl+Click, Shift+Click)
+        self.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
 
         # Enable context menu for delete
         self.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -80,8 +84,10 @@ class PositionListWidget(QListWidget):
     @Slot()
     def _show_context_menu(self, pos):
         """Show context menu for delete action."""
-        item = self.itemAt(pos)
-        if not item or not isinstance(item, PositionListItem):
+        # Get all selected items (not just the one at pos)
+        selected_items = self.selectedItems()
+
+        if not selected_items:
             return
 
         # Create context menu
@@ -89,24 +95,27 @@ class PositionListWidget(QListWidget):
         # Set cursor pointer for the menu
         menu.setCursor(Qt.PointingHandCursor)
 
-        # Edit Note action with icon
-        edit_note_action = QAction(
-            qta.icon('fa6s.note-sticky', color='#f9e2af'),  # Yellow note icon
-            "Edit Note...",
-            self
-        )
-        edit_note_action.triggered.connect(lambda: self._edit_note(item))
-        menu.addAction(edit_note_action)
+        # Edit Note action (only for single selection)
+        if len(selected_items) == 1:
+            item = selected_items[0]
+            edit_note_action = QAction(
+                qta.icon('fa6s.note-sticky', color='#f9e2af'),  # Yellow note icon
+                "Edit Note...",
+                self
+            )
+            edit_note_action.triggered.connect(lambda: self._edit_note(item))
+            menu.addAction(edit_note_action)
 
-        menu.addSeparator()
+            menu.addSeparator()
 
-        # Delete action with icon
+        # Delete action (works for single or multiple)
+        delete_text = "Delete" if len(selected_items) == 1 else f"Delete {len(selected_items)} Items"
         delete_action = QAction(
             qta.icon('fa6s.trash', color='#f38ba8'),  # Red delete icon
-            "Delete",
+            delete_text,
             self
         )
-        delete_action.triggered.connect(lambda: self._delete_item(item))
+        delete_action.triggered.connect(self._delete_selected_items)
         menu.addAction(delete_action)
 
         # Show menu at cursor position
@@ -116,30 +125,13 @@ class PositionListWidget(QListWidget):
         """Edit the note for a position."""
         current_note = item.decision.note or ""
 
-        # Create input dialog
-        dialog = QInputDialog(self)
-        dialog.setWindowTitle("Edit Note")
-        dialog.setLabelText(f"Note for position #{item.index + 1}:")
-        dialog.setTextValue(current_note)
-        dialog.setOption(QInputDialog.UsePlainTextEditForTextInput, True)
-
-        # Use a timer to set cursor pointers after dialog widgets are created
-        from PySide6.QtCore import QTimer
-        from PySide6.QtWidgets import QDialogButtonBox
-
-        def set_button_cursors():
-            button_box = dialog.findChild(QDialogButtonBox)
-            if button_box:
-                for button in button_box.buttons():
-                    button.setCursor(Qt.PointingHandCursor)
-
-        QTimer.singleShot(0, set_button_cursors)
+        # Create custom note edit dialog
+        dialog = NoteEditDialog(current_note, f"Note for position #{item.index + 1}:", self)
 
         # Show dialog and get result
-        ok = dialog.exec()
-        new_note = dialog.textValue()
+        if dialog.exec() == QDialog.Accepted:
+            new_note = dialog.get_text()
 
-        if ok:
             # Update the decision's note
             item.decision.note = new_note.strip() if new_note.strip() else None
 
@@ -149,27 +141,47 @@ class PositionListWidget(QListWidget):
                 tooltip += f"\n\nNote: {item.decision.note}"
             item.setToolTip(tooltip)
 
-    def _delete_item(self, item: PositionListItem):
-        """Delete an item from the list with confirmation."""
+    def _delete_selected_items(self):
+        """Delete all selected items from the list with confirmation."""
+        selected_items = self.selectedItems()
+
+        if not selected_items:
+            return
+
+        # Build confirmation message
+        if len(selected_items) == 1:
+            item = selected_items[0]
+            message = f"Delete position #{item.index + 1}?\n\n{item.decision.get_short_display_text()}"
+            title = "Delete Position"
+        else:
+            message = f"Delete {len(selected_items)} selected position(s)?"
+            title = "Delete Positions"
+
+        # Confirm deletion
         reply = QMessageBox.question(
             self,
-            "Delete Position",
-            f"Delete position #{item.index + 1}?\n\n{item.decision.get_short_display_text()}",
+            title,
+            message,
             QMessageBox.Yes | QMessageBox.No
         )
 
         if reply == QMessageBox.Yes:
-            row = self.row(item)
-            self.takeItem(row)
-            # Emit signal with the index to delete from parent's decision list
-            self.position_deleted.emit(item.index)
+            # Get indices and sort in descending order
+            indices_to_delete = sorted([item.index for item in selected_items], reverse=True)
+
+            # Delete from widget (highest to lowest to avoid index shifting)
+            rows_to_delete = sorted([self.row(item) for item in selected_items], reverse=True)
+            for row in rows_to_delete:
+                self.takeItem(row)
+
+            # Emit single signal with all deleted indices
+            self.positions_deleted.emit(indices_to_delete)
 
     def keyPressEvent(self, event: QKeyEvent):
         """Handle keyboard events for deletion."""
         if event.key() in (Qt.Key_Delete, Qt.Key_Backspace):
-            item = self.currentItem()
-            if item and isinstance(item, PositionListItem):
-                self._delete_item(item)
+            # Support multi-selection deletion via keyboard
+            self._delete_selected_items()
         else:
             super().keyPressEvent(event)
 
