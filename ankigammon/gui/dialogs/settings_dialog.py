@@ -58,10 +58,11 @@ class GnuBGValidationWorker(QThread):
 
             # Try to run gnubg with -t (text mode) and -c (command file)
             # On Windows, prevent console window from appearing
+            # Use longer timeout since first launch can be slow (loading neural networks)
             kwargs = {
                 'capture_output': True,
                 'text': True,
-                'timeout': 5
+                'timeout': 15
             }
             if sys.platform == 'win32':
                 kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
@@ -242,7 +243,7 @@ class SettingsDialog(QDialog):
         self.chk_generate_score_matrix = QCheckBox("Generate score matrix for cube decisions")
         self.chk_generate_score_matrix.setCursor(Qt.PointingHandCursor)
         matrix_layout.addWidget(self.chk_generate_score_matrix)
-        matrix_warning = QLabel("(slow)")
+        matrix_warning = QLabel("(time-consuming)")
         matrix_warning.setStyleSheet("font-size: 11px; color: #a6adc8; margin-left: 8px;")
         matrix_layout.addWidget(matrix_warning)
         matrix_layout.addStretch()

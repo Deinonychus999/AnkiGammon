@@ -370,6 +370,19 @@ class XGBinaryParser:
                 move.error = abs(best_equity - move.equity)
                 move.xg_error = move.equity - best_equity  # Negative for worse moves
 
+        # Generate XGID for the position
+        crawford_jacoby = 1 if crawford else 0
+        xgid = position.to_xgid(
+            cube_value=cube_value,
+            cube_owner=cube_owner,
+            dice=dice,
+            on_roll=on_roll,
+            score_x=score_x,
+            score_o=score_o,
+            match_length=match_length,
+            crawford_jacoby=crawford_jacoby
+        )
+
         # Create Decision
         decision = Decision(
             position=position,
@@ -383,6 +396,7 @@ class XGBinaryParser:
             cube_owner=cube_owner,
             decision_type=DecisionType.CHECKER_PLAY,
             candidate_moves=moves,
+            xgid=xgid
         )
 
         return decision
@@ -661,6 +675,19 @@ class XGBinaryParser:
                 if move.from_xg_analysis:
                     move.xg_error = move.equity - best_equity
 
+        # Generate XGID for the position
+        crawford_jacoby = 1 if crawford else 0
+        xgid = position.to_xgid(
+            cube_value=cube_value,
+            cube_owner=cube_owner,
+            dice=None,  # No dice for cube decisions
+            on_roll=on_roll,
+            score_x=score_x,
+            score_o=score_o,
+            match_length=match_length,
+            crawford_jacoby=crawford_jacoby
+        )
+
         # Create Decision
         decision = Decision(
             position=position,
@@ -674,6 +701,7 @@ class XGBinaryParser:
             cube_owner=cube_owner,
             decision_type=DecisionType.CUBE_ACTION,
             candidate_moves=moves,
+            xgid=xgid
         )
 
         return decision
