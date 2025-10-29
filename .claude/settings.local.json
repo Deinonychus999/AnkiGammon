@@ -15,7 +15,8 @@
       "Bash(curl:*)",
       "WebFetch",
       "Bash(more:*)",
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "Bash(awk:*)"
     ],
     "deny": [],
     "ask": []
