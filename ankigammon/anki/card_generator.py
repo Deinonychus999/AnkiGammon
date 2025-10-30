@@ -1250,6 +1250,9 @@ class CardGenerator:
             dice=decision.dice,
             cube_value=decision.cube_value,
             cube_owner=decision.cube_owner,
+            score_x=decision.score_x,
+            score_o=decision.score_o,
+            match_length=decision.match_length,
         )
 
     def _render_resulting_position_svg(self, decision: Decision, move: Move) -> str:
@@ -1270,6 +1273,9 @@ class CardGenerator:
             dice_opacity=0.3,
             cube_value=decision.cube_value,
             cube_owner=decision.cube_owner,
+            score_x=decision.score_x,
+            score_o=decision.score_o,
+            match_length=decision.match_length,
         )
 
     def _shuffle_candidates(

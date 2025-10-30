@@ -12,7 +12,7 @@ class SVGBoardRenderer:
 
     def __init__(
         self,
-        width: int = 900,
+        width: int = 880,
         height: int = 600,
         point_height_ratio: float = 0.45,
         color_scheme: ColorScheme = CLASSIC,
@@ -35,11 +35,13 @@ class SVGBoardRenderer:
         self.orientation = orientation
 
         # Calculate dimensions (same logic as PNG renderer)
+        # Use internal width of 900 for calculations, but viewBox can be cropped
+        self.internal_width = 900
         self.margin = 20
         self.cube_area_width = 70
         self.bearoff_area_width = 100
 
-        self.playing_width = self.width - 2 * self.margin - self.cube_area_width - self.bearoff_area_width
+        self.playing_width = self.internal_width - 2 * self.margin - self.cube_area_width - self.bearoff_area_width
         self.board_height = self.height - 2 * self.margin
 
         self.bar_width = self.playing_width * 0.08
@@ -58,6 +60,9 @@ class SVGBoardRenderer:
         cube_value: int = 1,
         cube_owner: CubeState = CubeState.CENTERED,
         move_data: Optional[Dict] = None,
+        score_x: int = 0,
+        score_o: int = 0,
+        match_length: int = 0,
     ) -> str:
         """
         Render a backgammon position as SVG.
@@ -70,6 +75,9 @@ class SVGBoardRenderer:
             cube_value: Doubling cube value
             cube_owner: Who owns the cube
             move_data: Optional move animation data (for animated cards)
+            score_x: X player's current score
+            score_o: O player's current score
+            match_length: Match length (0 = money game, > 0 = match play)
 
         Returns:
             SVG markup string
@@ -116,6 +124,10 @@ class SVGBoardRenderer:
 
         # Draw pip counts
         svg_parts.append(self._draw_pip_counts(position, board_x, board_y, flipped))
+
+        # Draw scores (for match play only)
+        if match_length > 0:
+            svg_parts.append(self._draw_scores(score_x, score_o, match_length, board_x, board_y, flipped))
 
         # Close SVG
         svg_parts.append('</svg>')
@@ -493,9 +505,9 @@ class SVGBoardRenderer:
         def get_color(player: Player) -> str:
             return self.color_scheme.checker_x if player == Player.X else self.color_scheme.checker_o
 
-        # Top tray
+        # Top tray (reduced height to make room for score display)
         tray_top = board_y + 10
-        tray_bottom = board_y + self.board_height / 2 - 10
+        tray_bottom = board_y + self.board_height / 2 - 70
 
         svg_parts.append(f'''
 <rect x="{bearoff_x}" y="{tray_top}"
@@ -526,8 +538,8 @@ class SVGBoardRenderer:
       stroke-width="1"/>
 ''')
 
-        # Bottom tray
-        tray_top = board_y + self.board_height / 2 + 10
+        # Bottom tray (reduced height to make room for score display)
+        tray_top = board_y + self.board_height / 2 + 70
         tray_bottom = board_y + self.board_height - 10
 
         svg_parts.append(f'''
@@ -633,8 +645,9 @@ class SVGBoardRenderer:
         """Draw the doubling cube."""
         cube_size = 50
 
-        cube_area_x = self.margin + 10
-        cube_area_center = cube_area_x + (self.cube_area_width - 20) / 2
+        # Center the cube in the area from left edge to board start
+        # board_x = margin + cube_area_width
+        cube_area_center = (self.margin + self.cube_area_width) / 2
 
         # Position cube based on owner
         if cube_owner == CubeState.CENTERED:
@@ -654,7 +667,7 @@ class SVGBoardRenderer:
 <g class="cube">
     <rect class="cube" x="{cube_x}" y="{cube_y}"
           width="{cube_size}" height="{cube_size}" rx="3"/>
-    <text class="cube-text" x="{cube_x + cube_size / 2}" y="{cube_y + cube_size / 2}">{text}</text>
+    <text class="cube-text" x="{cube_x + cube_size / 2}" y="{cube_y + cube_size / 2 + 2}">{text}</text>
 </g>
 '''
 
@@ -670,8 +683,8 @@ class SVGBoardRenderer:
         o_pips = self._calculate_pip_count(position, Player.O)
 
         bearoff_text_x = board_x + self.playing_width + 15
-        x_bearoff_top = board_y + 10 + 12
-        o_bearoff_top = board_y + self.board_height / 2 + 10 + 12
+        x_bearoff_top = board_y + 10 + 15
+        o_bearoff_top = board_y + self.board_height / 2 + 70 + 15
 
         if flipped:
             return f'''
@@ -685,6 +698,70 @@ class SVGBoardRenderer:
 <g class="pip-counts">
     <text class="pip-count" x="{bearoff_text_x}" y="{x_bearoff_top}">Pip: {x_pips}</text>
     <text class="pip-count" x="{bearoff_text_x}" y="{o_bearoff_top}">Pip: {o_pips}</text>
+</g>
+'''
+
+    def _draw_scores(
+        self,
+        score_x: int,
+        score_o: int,
+        match_length: int,
+        board_x: float,
+        board_y: float,
+        flipped: bool
+    ) -> str:
+        """Draw match scores on the board (only for match play)."""
+        if match_length == 0:
+            return ""
+
+        # Position scores in the middle area between bear-off trays
+        bearoff_x = board_x + self.playing_width + 10
+        bearoff_width = self.bearoff_area_width - 20
+        center_x = bearoff_x + bearoff_width / 2
+
+        # Center vertically in the board
+        center_y = board_y + self.board_height / 2
+
+        # Box dimensions
+        box_width = 60
+        box_height = 35
+        box_spacing = 5
+
+        # Calculate positions for 3 boxes stacked vertically
+        total_height = 3 * box_height + 2 * box_spacing
+        start_y = center_y - total_height / 2
+
+        return f'''
+<g class="match-scores">
+    <!-- Top box: X player score -->
+    <rect x="{center_x - box_width/2}" y="{start_y}"
+          width="{box_width}" height="{box_height}"
+          fill="{self.color_scheme.point_dark}"
+          stroke="{self.color_scheme.bearoff}"
+          stroke-width="2"/>
+    <text x="{center_x}" y="{start_y + box_height/2 + 8}"
+          text-anchor="middle" font-family="Arial, sans-serif"
+          font-size="22px" font-weight="bold" fill="{self.color_scheme.text}">{score_x}</text>
+
+    <!-- Middle box: Match length -->
+    <rect x="{center_x - box_width/2}" y="{start_y + box_height + box_spacing}"
+          width="{box_width}" height="{box_height}"
+          fill="{self.color_scheme.point_dark}"
+          stroke="{self.color_scheme.bearoff}"
+          stroke-width="2"/>
+    <text x="{center_x}" y="{start_y + box_height + box_spacing + box_height/2 + 7}"
+          text-anchor="middle" font-family="Arial, sans-serif"
+          font-size="16px" font-weight="bold" fill="{self.color_scheme.text}">{match_length}pt</text>
+
+    <!-- Bottom box: O player score -->
+    <rect x="{center_x - box_width/2}" y="{start_y + 2*box_height + 2*box_spacing}"
+          width="{box_width}" height="{box_height}"
+          fill="{self.color_scheme.point_dark}"
+          stroke="{self.color_scheme.bearoff}"
+          stroke-width="2"/>
+    <text x="{center_x}" y="{start_y + 2*box_height + 2*box_spacing + box_height/2 + 8}"
+          text-anchor="middle" font-family="Arial, sans-serif"
+          font-size="22px" font-weight="bold" fill="{self.color_scheme.text}">{score_o}</text>
 </g>
 '''
 

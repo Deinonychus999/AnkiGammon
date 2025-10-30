@@ -705,7 +705,10 @@ class InputDialog(QDialog):
             dice=decision.dice,
             on_roll=decision.on_roll,
             cube_value=decision.cube_value,
-            cube_owner=decision.cube_owner
+            cube_owner=decision.cube_owner,
+            score_x=decision.score_x,
+            score_o=decision.score_o,
+            match_length=decision.match_length,
         )
 
         html = f"""
