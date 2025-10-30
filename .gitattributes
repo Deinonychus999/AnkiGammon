@@ -1,0 +1,49 @@
+# Git Attributes for AnkiGammon
+# Ensures consistent handling of different file types
+
+# Auto-detect text files and normalize line endings
+* text=auto
+
+# Source code
+*.py text eol=lf
+*.js text eol=lf
+*.css text eol=lf
+*.html text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.sh text eol=lf
+*.bat text eol=crlf
+
+# Website assets - mark as binary to prevent text processing
+website/public/assets/** binary
+website/public/**/*.jpg binary
+website/public/**/*.jpeg binary
+website/public/**/*.png binary
+website/public/**/*.gif binary
+website/public/**/*.webp binary
+website/public/**/*.svg binary
+website/public/**/*.ico binary
+website/public/**/*.woff binary
+website/public/**/*.woff2 binary
+website/public/**/*.ttf binary
+website/public/**/*.eot binary
+website/public/**/*.mp4 binary
+website/public/**/*.webm binary
+
+# Documentation - exclude from language stats
+*.md linguist-documentation
+CLAUDE.md linguist-documentation
+website/** linguist-documentation
+
+# XG data files - binary format
+*.xg binary
+
+# Python bytecode - generated files
+*.pyc binary
+*.pyo binary
+*.pyd binary
+
+# Jupyter notebooks - treat as text but with special handling
+*.ipynb text eol=lf

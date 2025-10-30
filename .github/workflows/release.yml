@@ -1,9 +1,10 @@
 name: Build and Release
 
+# Only runs when you publish a GitHub Release (not on every commit)
+# To trigger: GitHub → Releases → Draft a new release → Publish
 on:
-  push:
-    tags:
-      - '*'
+  release:
+    types: [published]
 
 jobs:
   build-windows:
@@ -53,16 +54,9 @@ jobs:
         with:
           name: ankigammon-windows
 
-      - name: Create Release
+      - name: Upload Release Asset
         uses: softprops/action-gh-release@v1
         with:
-          name: Release ${{ github.ref_name }}
-          body: |
-            AnkiGammon release ${{ github.ref_name }}
-
-            Download Windows executable below. For macOS/Linux, build from source (see README.md).
           files: ankigammon-windows.zip
-          draft: false
-          prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
