@@ -200,7 +200,7 @@ class SettingsDialog(QDialog):
 
         # Board orientation
         self.cmb_board_orientation = QComboBox()
-        self.cmb_board_orientation.addItem("Counter-clockwise (standard)", "counter-clockwise")
+        self.cmb_board_orientation.addItem("Counter-clockwise", "counter-clockwise")
         self.cmb_board_orientation.addItem("Clockwise", "clockwise")
         self.cmb_board_orientation.setCursor(Qt.PointingHandCursor)
         form.addRow("Board Orientation:", self.cmb_board_orientation)

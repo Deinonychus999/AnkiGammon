@@ -149,7 +149,7 @@ Each position becomes one Anki card:
 
 The GUI Settings dialog provides:
 - **Color Schemes**: Choose from 6 built-in themes (Classic, Forest, Ocean, Desert, Sunset, Midnight)
-- **Board Orientation**: Counter-clockwise (standard) or Clockwise orientation
+- **Board Orientation**: Counter-clockwise or Clockwise orientation
 - **Deck Name**: Customize your Anki deck name
 - **Show Move Options**: Toggle text move descriptions on card front
 - **Interactive Moves**: Enable/disable move visualization

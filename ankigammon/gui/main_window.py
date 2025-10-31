@@ -685,17 +685,23 @@ class MainWindow(QMainWindow):
         <html>
         <head>
             <style>
-                body {{
+                html, body {{
                     margin: 0;
+                    padding: 0;
+                    height: 100%;
+                    overflow: hidden;
+                }}
+                body {{
                     padding: 20px;
                     display: flex;
                     justify-content: center;
                     align-items: center;
-                    min-height: 100vh;
                     background: linear-gradient(135deg, #1e1e2e 0%, #181825 100%);
+                    box-sizing: border-box;
                 }}
                 svg {{
                     max-width: 100%;
+                    max-height: 100%;
                     height: auto;
                     filter: drop-shadow(0 10px 30px rgba(0, 0, 0, 0.5));
                     border-radius: 12px;

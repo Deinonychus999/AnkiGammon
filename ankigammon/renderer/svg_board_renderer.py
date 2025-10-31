@@ -176,7 +176,7 @@ class SVGBoardRenderer:
             fill: {self.color_scheme.text};
         }}
         .die {{
-            fill: #FFFFFF;
+            fill: {self.color_scheme.dice_color};
             stroke: #000000;
             stroke-width: 2;
         }}
@@ -236,7 +236,7 @@ class SVGBoardRenderer:
         """
         Map point number to visual position index based on orientation.
 
-        Counter-clockwise (standard):
+        Counter-clockwise:
           Top: 13 14 15 16 17 18 | 19 20 21 22 23 24
           Bottom: 12 11 10 9 8 7 | 6 5 4 3 2 1
 
