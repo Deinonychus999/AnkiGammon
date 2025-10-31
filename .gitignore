@@ -54,3 +54,5 @@ media/
 *.tmp
 *.log
 temp/
+CLAUDE.md
+.claude/
