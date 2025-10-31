@@ -2,6 +2,8 @@
 
 A graphical application for converting backgammon positions into Anki flashcards. Analyze positions from eXtreme Gammon, OpenGammon, or GNU Backgammon and create smart study cards.
 
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/X8X31NIT0H)
+
 ## Features
 
 - **Modern GUI interface** - Easy-to-use graphical application, no command-line needed
