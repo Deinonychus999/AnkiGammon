@@ -19,16 +19,28 @@ A graphical application for converting backgammon positions into Anki flashcards
 
 ## Installation
 
-### Standalone Executable (Recommended)
+[![PyPI version](https://badge.fury.io/py/ankigammon.svg)](https://pypi.org/project/ankigammon/)
+
+### Quick Install (PyPI - Recommended for Python users)
+
+If you have Python 3.8+ installed:
+
+```bash
+pip install ankigammon
+ankigammon  # Launch the GUI
+```
+
+### Standalone Executable (No Python required)
+
+Download pre-built executables from [GitHub Releases](https://github.com/Deinonychus999/AnkiGammon/releases):
 
 **Windows:**
-1. Run `build_executable.bat` to create `ankigammon.exe`
-2. Double-click to run - no Python installation needed!
+1. Download `ankigammon-windows.zip` from the latest release
+2. Extract and double-click `ankigammon.exe`
 
 **macOS/Linux:**
-1. Run `./build_executable.sh` to create `ankigammon`
-2. Run from terminal: `./dist/ankigammon` - no Python installation needed!
-3. macOS first run: Right-click → Open (or allow in System Settings → Privacy & Security)
+1. Download the appropriate release for your platform
+2. macOS first run: Right-click → Open (or allow in System Settings → Privacy & Security)
 
 ### Development Install
 
@@ -38,7 +50,7 @@ For developers who want to run from source:
 git clone https://github.com/Deinonychus999/AnkiGammon.git
 cd AnkiGammon
 pip install -e .  # Install in editable mode
-python -m ankigammon  # Launches the GUI
+ankigammon  # Launches the GUI
 ```
 
 ## Usage
