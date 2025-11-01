@@ -733,7 +733,7 @@ class SVGBoardRenderer:
 
         return f'''
 <g class="match-scores">
-    <!-- Top box: X player score -->
+    <!-- Top box: O player score -->
     <rect x="{center_x - box_width/2}" y="{start_y}"
           width="{box_width}" height="{box_height}"
           fill="{self.color_scheme.point_dark}"
@@ -741,7 +741,7 @@ class SVGBoardRenderer:
           stroke-width="2"/>
     <text x="{center_x}" y="{start_y + box_height/2 + 8}"
           text-anchor="middle" font-family="Arial, sans-serif"
-          font-size="22px" font-weight="bold" fill="{self.color_scheme.text}">{score_x}</text>
+          font-size="22px" font-weight="bold" fill="{self.color_scheme.text}">{score_o}</text>
 
     <!-- Middle box: Match length -->
     <rect x="{center_x - box_width/2}" y="{start_y + box_height + box_spacing}"
@@ -753,7 +753,7 @@ class SVGBoardRenderer:
           text-anchor="middle" font-family="Arial, sans-serif"
           font-size="16px" font-weight="bold" fill="{self.color_scheme.text}">{match_length}pt</text>
 
-    <!-- Bottom box: O player score -->
+    <!-- Bottom box: X player score -->
     <rect x="{center_x - box_width/2}" y="{start_y + 2*box_height + 2*box_spacing}"
           width="{box_width}" height="{box_height}"
           fill="{self.color_scheme.point_dark}"
@@ -761,7 +761,7 @@ class SVGBoardRenderer:
           stroke-width="2"/>
     <text x="{center_x}" y="{start_y + 2*box_height + 2*box_spacing + box_height/2 + 8}"
           text-anchor="middle" font-family="Arial, sans-serif"
-          font-size="22px" font-weight="bold" fill="{self.color_scheme.text}">{score_o}</text>
+          font-size="22px" font-weight="bold" fill="{self.color_scheme.text}">{score_x}</text>
 </g>
 '''
 
