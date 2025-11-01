@@ -238,6 +238,11 @@ class Decision:
     decision_type: DecisionType = DecisionType.CHECKER_PLAY
     candidate_moves: List[Move] = field(default_factory=list)
 
+    # Cube decision errors (only for CUBE_ACTION decisions)
+    # These distinguish between the doubler's error and the responder's error
+    cube_error: Optional[float] = None  # Error made by doubler on double/no double decision (-1000 if not analyzed)
+    take_error: Optional[float] = None  # Error made by responder on take/pass decision (-1000 if not analyzed)
+
     # Winning chances percentages (for cube decisions)
     player_win_pct: Optional[float] = None
     player_gammon_pct: Optional[float] = None
@@ -260,6 +265,40 @@ class Decision:
             if move.rank == 1:
                 return move
         return self.candidate_moves[0] if self.candidate_moves else None
+
+    def get_cube_error_attribution(self) -> dict:
+        """
+        For cube decisions, identify which player(s) made errors.
+
+        Returns:
+            Dictionary with:
+            - 'doubler_error': float or None (error made by player on roll)
+            - 'responder_error': float or None (error made by opponent)
+            - 'doubler': Player or None (who doubled)
+            - 'responder': Player or None (who responded)
+        """
+        if self.decision_type != DecisionType.CUBE_ACTION:
+            return {
+                'doubler_error': None,
+                'responder_error': None,
+                'doubler': None,
+                'responder': None
+            }
+
+        # Determine who doubled and who responded
+        doubler = self.on_roll
+        responder = Player.X if self.on_roll == Player.O else Player.O
+
+        # Get errors (ignore -1000 which means not analyzed)
+        doubler_error = self.cube_error if self.cube_error and self.cube_error != -1000 else None
+        responder_error = self.take_error if self.take_error and self.take_error != -1000 else None
+
+        return {
+            'doubler_error': doubler_error,
+            'responder_error': responder_error,
+            'doubler': doubler,
+            'responder': responder
+        }
 
     def get_short_display_text(self) -> str:
         """Get short display text for list views."""

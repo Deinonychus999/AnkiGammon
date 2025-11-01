@@ -852,12 +852,6 @@ class MainWindow(QMainWindow):
         filtered = []
 
         for decision in decisions:
-            # Check player filter
-            if decision.on_roll == Player.X and not include_player_x:
-                continue
-            if decision.on_roll == Player.O and not include_player_o:
-                continue
-
             # Skip decisions with no moves
             if not decision.candidate_moves:
                 continue
@@ -875,7 +869,44 @@ class MainWindow(QMainWindow):
             error_magnitude = abs(played_move.xg_error) if played_move.xg_error is not None else played_move.error
 
             # Only include if error is at or above threshold
-            if error_magnitude >= threshold:
+            if error_magnitude < threshold:
+                continue
+
+            # For CUBE_ACTION decisions, check which player actually made the error
+            from ankigammon.models import DecisionType
+            if decision.decision_type == DecisionType.CUBE_ACTION:
+                attr = decision.get_cube_error_attribution()
+                doubler = attr['doubler']
+                responder = attr['responder']
+                doubler_error = attr['doubler_error']
+                responder_error = attr['responder_error']
+
+                # Determine which player(s) made errors
+                doubler_made_error = doubler_error is not None and abs(doubler_error) >= threshold
+                responder_made_error = responder_error is not None and abs(responder_error) >= threshold
+
+                # Check if we should include this decision based on player filter
+                include_decision = False
+
+                if doubler == Player.X and doubler_made_error and include_player_x:
+                    include_decision = True
+                if doubler == Player.O and doubler_made_error and include_player_o:
+                    include_decision = True
+                if responder == Player.X and responder_made_error and include_player_x:
+                    include_decision = True
+                if responder == Player.O and responder_made_error and include_player_o:
+                    include_decision = True
+
+                if include_decision:
+                    filtered.append(decision)
+            else:
+                # For CHECKER_PLAY decisions, use the simple logic
+                # Error belongs to the player on roll
+                if decision.on_roll == Player.X and not include_player_x:
+                    continue
+                if decision.on_roll == Player.O and not include_player_o:
+                    continue
+
                 filtered.append(decision)
 
         return filtered

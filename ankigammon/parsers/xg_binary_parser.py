@@ -681,6 +681,21 @@ class XGBinaryParser:
                 if move.from_xg_analysis:
                     move.xg_error = move.equity - best_equity
 
+        # Extract cube and take errors from XG binary data
+        # ErrCube: error made by doubler on double/no double decision
+        # ErrTake: error made by responder on take/pass decision
+        # Value of -1000 indicates not analyzed
+        cube_error = None
+        take_error = None
+        if hasattr(cube_entry, 'ErrCube'):
+            err_cube_raw = cube_entry.ErrCube
+            if err_cube_raw != -1000:
+                cube_error = err_cube_raw
+        if hasattr(cube_entry, 'ErrTake'):
+            err_take_raw = cube_entry.ErrTake
+            if err_take_raw != -1000:
+                take_error = err_take_raw
+
         # Generate XGID for the position
         crawford_jacoby = 1 if crawford else 0
         xgid = position.to_xgid(
@@ -707,6 +722,8 @@ class XGBinaryParser:
             cube_owner=cube_owner,
             decision_type=DecisionType.CUBE_ACTION,
             candidate_moves=moves,
+            cube_error=cube_error,
+            take_error=take_error,
             xgid=xgid
         )
 
