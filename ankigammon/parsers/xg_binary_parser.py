@@ -757,13 +757,13 @@ class XGBinaryParser:
         1. Converts 0-based to 1-based point numbering
         2. Combines consecutive sub-moves into compound moves
         3. Detects and marks hits with *
+        4. Detects duplicate moves and uses (2), (3), (4) notation for doublets
 
         XG format: [from1, to1, from2, to2, from3, to3, from4, to4]
         Special values:
         - -1: End of move list OR bearing off (when used as destination)
-        - 0: X's bar (white, top player) OR illegal/blocked move if all zeros
-        - 1-23: Board points (0-based, must add 1 for standard notation)
-        - 25: O's bar (black, bottom player)
+        - 24: Bar (both players when entering)
+        - 0-23: Board points (0-based, must add 1 for standard notation)
 
         Args:
             xg_moves: Tuple of 8 integers
@@ -771,7 +771,7 @@ class XGBinaryParser:
             on_roll: Player making the move (optional)
 
         Returns:
-            Move notation string (e.g., "20/15*", "bar/22", "1/off 2/off")
+            Move notation string (e.g., "20/15*", "bar/22", "15/9(2)")
             Returns "Cannot move" for illegal/blocked positions (all zeros)
         """
         if not xg_moves or len(xg_moves) < 2:
@@ -781,7 +781,7 @@ class XGBinaryParser:
         if all(x == 0 for x in xg_moves):
             return "Cannot move"
 
-        # First pass: Parse all sub-moves
+        # Pass 1: Parse all sub-moves
         sub_moves = []
         for i in range(0, len(xg_moves), 2):
             from_point = xg_moves[i]
@@ -799,29 +799,44 @@ class XGBinaryParser:
         if not sub_moves:
             return ""
 
-        # Sort sub-moves to enable better combination
-        # Sort by from_point descending (highest point first)
-        # This ensures that compound moves are combined optimally
-        # Example: [(7,5), (5,3), (3,1), (3,1)] combines to [(7,1), (3,1)] = "8/2* 4/2*"
-        # Without sorting: [(5,3), (3,1), (3,1), (7,5)] combines to [(5,1), (3,1), (7,5)] = "6/2* 4/2* 8/6"
-        sub_moves.sort(key=lambda m: m[0], reverse=True)
+        # Pass 2: Build adjacency map for chain detection
+        # Map from to_point -> list of indices that start from that point
+        from_point_map = {}
+        for idx, (from_point, to_point) in enumerate(sub_moves):
+            if from_point not in from_point_map:
+                from_point_map[from_point] = []
+            from_point_map[from_point].append(idx)
 
-        # Second pass: Combine compound moves
-        # Look for patterns where to_point of one move equals from_point of next
+        # Pass 3: Greedily build maximal chains
+        used = [False] * len(sub_moves)
         combined_moves = []
-        i = 0
-        while i < len(sub_moves):
-            from_point, to_point = sub_moves[i]
 
-            # Look ahead to see if we can combine with next move(s)
-            j = i + 1
-            while j < len(sub_moves):
-                next_from, next_to = sub_moves[j]
-                # Can combine if this move's destination is the next move's source
-                if to_point == next_from:
-                    to_point = next_to
-                    j += 1
-                else:
+        # Sort sub-moves by from_point descending to process in order
+        sorted_indices = sorted(range(len(sub_moves)),
+                               key=lambda i: sub_moves[i][0],
+                               reverse=True)
+
+        for start_idx in sorted_indices:
+            if used[start_idx]:
+                continue
+
+            # Start a new chain
+            from_point, to_point = sub_moves[start_idx]
+            used[start_idx] = True
+
+            # Extend the chain as far as possible
+            while to_point in from_point_map:
+                # Find an unused move that starts from current to_point
+                extended = False
+                for next_idx in from_point_map[to_point]:
+                    if not used[next_idx]:
+                        _, next_to = sub_moves[next_idx]
+                        to_point = next_to
+                        used[next_idx] = True
+                        extended = True
+                        break
+
+                if not extended:
                     break
 
             # Check for hit if position is available
@@ -836,34 +851,57 @@ class XGBinaryParser:
                     hit = True  # O hitting X
 
             combined_moves.append((from_point, to_point, hit))
-            i = j
 
-        # Third pass: Format as notation strings
+        # Pass 4: Count duplicates and format
+        from collections import Counter
+
+        # Count occurrences of each move (excluding hit marker for counting)
+        move_counts = Counter((from_point, to_point) for from_point, to_point, _ in combined_moves)
+
+        # Track how many of each move we've seen (for numbering)
+        move_seen = {}
+
+        # Sort combined moves for consistent output
+        combined_moves.sort(key=lambda m: m[0], reverse=True)
+
+        # Format as notation strings
         parts = []
         for from_point, to_point, hit in combined_moves:
+            move_key = (from_point, to_point)
+            count = move_counts[move_key]
+
+            # Track this occurrence
+            if move_key not in move_seen:
+                move_seen[move_key] = 0
+            move_seen[move_key] += 1
+            occurrence = move_seen[move_key]
+
             # Convert special values to standard backgammon notation
             # Handle from_point
-            if from_point == 0:
-                from_str = "bar"  # X's bar
-            elif from_point == 25:
-                from_str = "bar"  # O's bar
+            if from_point == 24:
+                from_str = "bar"  # Bar for both players
             else:
-                from_str = str(from_point + 1)  # Convert 0-based to 1-based
+                from_str = str(from_point + 1)  # Convert 0-based to 1-based (0→1, 23→24)
 
             # Handle to_point
             if to_point == -1:
                 to_str = "off"  # Bearing off
-            elif to_point == 0:
-                to_str = "bar"  # X's bar (opponent hit and sent to bar)
-            elif to_point == 25:
-                to_str = "bar"  # O's bar (opponent hit and sent to bar)
+            elif to_point == 24:
+                to_str = "bar"  # Opponent hit and sent to bar
             else:
-                to_str = str(to_point + 1)  # Convert 0-based to 1-based
+                to_str = str(to_point + 1)  # Convert 0-based to 1-based (0→1, 23→24)
 
-            # Add hit marker if applicable
+            # Build notation
             notation = f"{from_str}/{to_str}"
             if hit:
                 notation += "*"
+
+            # Add doublet notation if this is the first occurrence and count > 1
+            if occurrence == 1 and count > 1:
+                notation += f"({count})"
+            elif occurrence > 1:
+                # Skip duplicate occurrences (already counted in first one)
+                continue
 
             parts.append(notation)
 
