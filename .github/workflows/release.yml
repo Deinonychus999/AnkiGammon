@@ -41,9 +41,129 @@ jobs:
           path: dist/ankigammon-windows.zip
           retention-days: 7
 
+  build-macos:
+    name: Build macOS DMG
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python --version
+          pip install .
+          pip install pyinstaller
+          brew install create-dmg
+
+      - name: Build app bundle with PyInstaller
+        run: pyinstaller ankigammon.spec
+
+      - name: Ad-hoc sign app bundle (Apple Silicon compatibility)
+        run: |
+          codesign -s - --force --deep "dist/AnkiGammon.app"
+
+      - name: Create DMG
+        run: |
+          create-dmg \
+            --volname "AnkiGammon" \
+            --volicon "ankigammon/gui/resources/icon.icns" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --icon "AnkiGammon.app" 175 120 \
+            --hide-extension "AnkiGammon.app" \
+            --app-drop-link 425 120 \
+            "dist/AnkiGammon-macOS.dmg" \
+            "dist/AnkiGammon.app" || true
+
+      - name: Verify DMG was created
+        run: ls -lh dist/*.dmg
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ankigammon-macos
+          path: dist/AnkiGammon-macOS.dmg
+          retention-days: 7
+
+  build-linux:
+    name: Build Linux AppImage
+    runs-on: ubuntu-20.04  # Use older LTS for better compatibility
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxcb-xinerama0 libxcb-cursor0 libxkbcommon-x11-0
+
+      - name: Install dependencies
+        run: |
+          python --version
+          pip install .
+          pip install pyinstaller
+
+      - name: Build executable with PyInstaller
+        run: pyinstaller ankigammon.spec
+
+      - name: Download linuxdeploy and plugins
+        run: |
+          wget https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          wget https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
+          chmod +x linuxdeploy*.AppImage
+
+      - name: Create AppDir structure
+        run: |
+          mkdir -p AppDir/usr/bin
+          mkdir -p AppDir/usr/share/applications
+          mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
+          cp dist/ankigammon AppDir/usr/bin/
+          cp ankigammon/gui/resources/icon.png AppDir/usr/share/icons/hicolor/256x256/apps/ankigammon.png
+
+      - name: Create desktop entry
+        run: |
+          cat > AppDir/usr/share/applications/ankigammon.desktop << 'EOF'
+          [Desktop Entry]
+          Type=Application
+          Name=AnkiGammon
+          Exec=ankigammon
+          Icon=ankigammon
+          Categories=Education;
+          Comment=Convert eXtreme Gammon analysis to Anki flashcards
+          EOF
+
+      - name: Build AppImage
+        run: |
+          export QT_SELECT=qt6
+          ./linuxdeploy-x86_64.AppImage --appdir AppDir --plugin qt --output appimage
+
+      - name: Rename AppImage
+        run: |
+          mv AnkiGammon*.AppImage AnkiGammon-x86_64.AppImage || mv ankigammon*.AppImage AnkiGammon-x86_64.AppImage
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ankigammon-linux
+          path: AnkiGammon-x86_64.AppImage
+          retention-days: 7
+
   create-release:
     name: Create GitHub Release
-    needs: build-windows
+    needs: [build-windows, build-macos, build-linux]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -54,9 +174,22 @@ jobs:
         with:
           name: ankigammon-windows
 
-      - name: Upload Release Asset
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ankigammon-macos
+
+      - name: Download Linux artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ankigammon-linux
+
+      - name: Upload Release Assets
         uses: softprops/action-gh-release@v1
         with:
-          files: ankigammon-windows.zip
+          files: |
+            ankigammon-windows.zip
+            AnkiGammon-macOS.dmg
+            AnkiGammon-x86_64.AppImage
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

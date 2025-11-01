@@ -36,11 +36,35 @@ Download pre-built executables from [GitHub Releases](https://github.com/Deinony
 
 **Windows:**
 1. Download `ankigammon-windows.zip` from the latest release
-2. Extract and double-click `ankigammon.exe`
+2. Extract the ZIP file
+3. Double-click `ankigammon.exe`
+4. **Windows SmartScreen Warning:** Click "More info" → "Run anyway"
+   - This warning appears because the app is not code-signed
+   - The application is safe and open-source
 
-**macOS/Linux:**
-1. Download the appropriate release for your platform
-2. macOS first run: Right-click → Open (or allow in System Settings → Privacy & Security)
+**macOS:**
+1. Download `AnkiGammon-macOS.dmg` from the latest release
+2. Open the DMG file
+3. Drag AnkiGammon to your Applications folder
+4. **First time only:** Right-click AnkiGammon → Open
+   - If blocked, go to System Settings → Privacy & Security
+   - Scroll down and click "Open Anyway"
+   - Enter your password when prompted
+5. After first run, you can open AnkiGammon normally
+
+**Why do I see a security warning on macOS?**
+AnkiGammon is not code-signed because that requires a $99/year Apple Developer account. The app is open-source and safe to use.
+
+**Linux:**
+1. Download `AnkiGammon-x86_64.AppImage` from the latest release
+2. Make it executable:
+   - Right-click → Properties → Permissions → "Allow executing file as program"
+   - Or via terminal: `chmod +x AnkiGammon-x86_64.AppImage`
+3. Double-click to run!
+
+**Note for Ubuntu 22.04+ users:** If the AppImage doesn't run, install FUSE 2:
+- Ubuntu 22.04: `sudo apt install libfuse2`
+- Ubuntu 24.04: `sudo apt install libfuse2t64`
 
 ### Development Install
 
@@ -55,7 +79,11 @@ ankigammon  # Launches the GUI
 
 ## Usage
 
-1. **Launch the application** - Double-click `ankigammon.exe` (Windows) or run `./ankigammon` (macOS/Linux)
+1. **Launch the application**:
+   - Windows: Double-click `ankigammon.exe`
+   - macOS: Open AnkiGammon from Applications folder
+   - Linux: Double-click `AnkiGammon-x86_64.AppImage`
+   - From PyPI install: Run `ankigammon` in terminal
 2. **Paste positions** - Copy analysis from eXtreme Gammon (Ctrl+C) and paste into the application
 3. **Configure settings** - Choose color scheme, board orientation, and export method in Settings
 4. **Generate cards** - Click "Generate Cards" to create Anki flashcards
@@ -183,9 +211,10 @@ The GUI Settings dialog provides:
 - For GNUID format: Consider using XGID or OGID instead due to known limitations
 
 **Application won't start**
-- Windows: Check Windows Defender isn't blocking the executable
-- macOS: Right-click → Open, or remove quarantine with `xattr -cr ankigammon`
-- Linux: Ensure execute permissions with `chmod +x ankigammon`
+- Windows: Click "More info" → "Run anyway" if SmartScreen blocks the app
+- macOS: Right-click → Open on first run, or go to System Settings → Privacy & Security → "Open Anyway"
+- Linux: Make the AppImage executable with `chmod +x AnkiGammon-x86_64.AppImage`
+- Linux (Ubuntu 22.04+): Install FUSE 2 with `sudo apt install libfuse2` or `sudo apt install libfuse2t64` (Ubuntu 24.04)
 
 ## For Developers
 
