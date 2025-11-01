@@ -6,6 +6,7 @@ Provides functionality to analyze backgammon positions using gnubg-cli.exe.
 
 import os
 import sys
+import re
 import subprocess
 import tempfile
 import multiprocessing
@@ -135,6 +136,200 @@ class GNUBGAnalyzer:
                     raise RuntimeError(f"Failed to analyze position {idx} ({position_ids[idx]}): {e}") from e
 
         return results
+
+    def analyze_match_file(
+        self,
+        mat_file_path: str,
+        max_moves: int = 8,
+        progress_callback: Optional[Callable[[str], None]] = None
+    ) -> List[str]:
+        """
+        Analyze entire match file using gnubg and export to text files.
+
+        Args:
+            mat_file_path: Path to .mat match file
+            max_moves: Maximum number of candidate moves to show (default: 8)
+            progress_callback: Optional callback(status_message) for progress updates
+
+        Returns:
+            List of paths to exported text files (one per game)
+            Caller is responsible for cleaning up these temp files after parsing.
+
+        Raises:
+            FileNotFoundError: If mat_file not found
+            subprocess.CalledProcessError: If gnubg execution fails
+            RuntimeError: If export files were not created
+        """
+        # Validate input file
+        mat_path = Path(mat_file_path)
+        if not mat_path.exists():
+            raise FileNotFoundError(f"Match file not found: {mat_file_path}")
+
+        # Create temp directory for output
+        temp_dir = Path(tempfile.mkdtemp(prefix="gnubg_match_"))
+        output_base = temp_dir / "analyzed_match.txt"
+
+        if progress_callback:
+            progress_callback("Preparing analysis...")
+
+        # Create command file
+        # Note: Paths with spaces must be quoted for gnubg
+        mat_path_str = str(mat_path)
+        output_path_str = str(output_base)
+
+        # Quote paths if they contain spaces
+        if ' ' in mat_path_str:
+            mat_path_str = f'"{mat_path_str}"'
+        if ' ' in output_path_str:
+            output_path_str = f'"{output_path_str}"'
+
+        commands = [
+            "set automatic game off",
+            "set automatic roll off",
+            f"set analysis chequerplay evaluation plies {self.analysis_ply}",
+            f"set analysis cubedecision evaluation plies {self.analysis_ply}",
+            f"set export moves number {max_moves}",
+            f"import mat {mat_path_str}",
+            "analyse match",
+            f"export match text {output_path_str}",
+        ]
+
+        command_file = self._create_command_file_from_list(commands)
+
+        # Debug: Log command file contents
+        import logging
+        logger = logging.getLogger(__name__)
+        with open(command_file, 'r') as f:
+            logger.info(f"GnuBG command file:\n{f.read()}")
+
+        try:
+            if progress_callback:
+                progress_callback("Analyzing match... this may take several minutes")
+
+            # Execute gnubg (with longer timeout for match analysis)
+            kwargs = {
+                'capture_output': True,
+                'text': True,
+                'timeout': 600,  # 10 minute timeout for match analysis
+            }
+            if sys.platform == 'win32':
+                kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+
+            result = subprocess.run(
+                [self.gnubg_path, "-t", "-c", command_file],
+                **kwargs
+            )
+
+            # Log gnubg output for debugging
+            import logging
+            logger = logging.getLogger(__name__)
+            if result.stdout:
+                logger.info(f"GnuBG stdout (first 1000 chars):\n{result.stdout[:1000]}")
+            if result.stderr:
+                logger.warning(f"GnuBG stderr:\n{result.stderr}")
+
+            if result.returncode != 0:
+                raise subprocess.CalledProcessError(
+                    result.returncode,
+                    [self.gnubg_path, "-t", "-c", command_file],
+                    output=result.stdout,
+                    stderr=result.stderr
+                )
+
+            if progress_callback:
+                progress_callback("Finding exported files...")
+
+            # Debug: Log temp directory contents
+            temp_files = list(temp_dir.glob("*"))
+            logger.info(f"Files in temp dir {temp_dir}: {[f.name for f in temp_files]}")
+
+            # Find all exported text files (gnubg creates one per game)
+            # Pattern: analyzed_match.txt, analyzed_match_002.txt, analyzed_match_003.txt, etc.
+            exported_files = []
+
+            # First file (no suffix)
+            if output_base.exists():
+                exported_files.append(str(output_base))
+
+            # Additional files (with _NNN suffix)
+            game_num = 2
+            while True:
+                next_file = temp_dir / f"analyzed_match_{game_num:03d}.txt"
+                if next_file.exists():
+                    exported_files.append(str(next_file))
+                    game_num += 1
+                else:
+                    break
+
+            if not exported_files:
+                # Provide detailed error message with gnubg output
+                error_msg = (
+                    f"GnuBG did not create any export files.\n"
+                    f"Expected files in: {temp_dir}\n"
+                    f"Files found: {[f.name for f in temp_files]}\n\n"
+                )
+                if result.stdout:
+                    error_msg += f"GnuBG output:\n{result.stdout[:500]}\n"
+                if result.stderr:
+                    error_msg += f"GnuBG errors:\n{result.stderr[:500]}"
+
+                raise RuntimeError(error_msg)
+
+            # Verify that files were actually analyzed (not just exported without analysis)
+            # Quick check: look for analysis markers in first file
+            if exported_files:
+                with open(exported_files[0], 'r', encoding='utf-8') as f:
+                    content = f.read(5000)  # Read first 5KB
+                    # Check for analysis markers: "Rolled XX (±ERROR):"
+                    has_analysis = bool(re.search(r'Rolled \d\d \([+-]?\d+\.\d+\):', content))
+                    if not has_analysis:
+                        logger.warning("⚠️ GnuBG exported files but NO ANALYSIS FOUND!")
+                        logger.warning(f"Expected to find 'Rolled XX (±error):' pattern")
+                        logger.warning(f"First file preview:\n{content[:800]}")
+                        raise RuntimeError(
+                            "GnuBG exported the match but did not include analysis.\n"
+                            "The 'analyse match' command may have failed.\n\n"
+                            f"Check logs for GnuBG output."
+                        )
+
+            if progress_callback:
+                progress_callback(f"Analysis complete. {len(exported_files)} game(s) exported.")
+
+            # DEBUG: Copy first file to repo for inspection
+            if exported_files:
+                import shutil
+                debug_path = Path(__file__).parent.parent.parent / "debug_gnubg_output.txt"
+                shutil.copy2(exported_files[0], debug_path)
+                logger.info(f"DEBUG: Copied first export file to {debug_path}")
+
+            return exported_files
+
+        finally:
+            # Cleanup command file
+            try:
+                os.unlink(command_file)
+            except OSError:
+                pass
+
+    def _create_command_file_from_list(self, commands: List[str]) -> str:
+        """
+        Create temporary command file from list of commands.
+
+        Args:
+            commands: List of gnubg commands
+
+        Returns:
+            Path to temporary command file
+        """
+        fd, temp_path = tempfile.mkstemp(suffix=".txt", prefix="gnubg_commands_")
+        try:
+            with os.fdopen(fd, 'w') as f:
+                f.write('\n'.join(commands))
+                f.write('\n')
+        except:
+            os.close(fd)
+            raise
+        return temp_path
 
     def _determine_decision_type(self, position_id: str) -> DecisionType:
         """

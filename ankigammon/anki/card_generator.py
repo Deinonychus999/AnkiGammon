@@ -7,7 +7,7 @@ import html
 from pathlib import Path
 from typing import List, Dict, Optional, Tuple
 
-from ankigammon.models import Decision, Move, Player
+from ankigammon.models import Decision, Move, Player, DecisionType
 from ankigammon.renderer.svg_board_renderer import SVGBoardRenderer
 from ankigammon.renderer.animation_controller import AnimationController
 from ankigammon.utils.move_parser import MoveParser
@@ -83,8 +83,6 @@ class CardGenerator:
         position_svg = self._render_position_svg(decision)
 
         # Prepare candidate moves
-        from ankigammon.models import DecisionType
-
         max_options = self.settings.max_mcq_options
         if decision.decision_type == DecisionType.CUBE_ACTION:
             # Cube decisions always show all 5 actions
@@ -94,7 +92,8 @@ class CardGenerator:
 
         # Shuffle candidates for MCQ (but not for cube decisions - they have meaningful order)
         if decision.decision_type == DecisionType.CUBE_ACTION:
-            # Don't shuffle cube decisions - keep natural order
+            # Don't shuffle cube decisions - keep logical order:
+            # No Double/Take, Double/Take, Double/Pass, Too Good/Take, Too Good/Pass
             shuffled_candidates = candidates
             answer_index = next((i for i, c in enumerate(candidates) if c and c.rank == 1), 0)
         else:
@@ -181,7 +180,6 @@ class CardGenerator:
         metadata = self._get_metadata_html(decision)
 
         # Determine question text based on decision type
-        from ankigammon.models import DecisionType
         if decision.decision_type == DecisionType.CUBE_ACTION:
             question_text = "What is the best cube action?"
         else:
@@ -211,7 +209,6 @@ class CardGenerator:
         letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J']
 
         # Determine question text based on decision type
-        from ankigammon.models import DecisionType
         if decision.decision_type == DecisionType.CUBE_ACTION:
             question_text = "What is the best cube action?"
         else:
@@ -399,10 +396,28 @@ class CardGenerator:
         table_rows = []
         letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J']
 
-        sorted_candidates = sorted(
-            [m for m in candidates if m and m.from_xg_analysis],
-            key=lambda m: abs(m.error) if m.error is not None else 999.0
-        )
+        # Filter to only show moves from analysis (not synthetic)
+        analysis_moves = [m for m in candidates if m and m.from_xg_analysis]
+
+        # Sort cube decisions by logical order, checker plays by error
+        if decision.decision_type == DecisionType.CUBE_ACTION:
+            # Cube decisions: always show in logical order
+            # No double, Double/take, Double/pass
+            cube_order_map = {
+                "No double": 1,
+                "Double, take": 2,
+                "Double, pass": 3
+            }
+            sorted_candidates = sorted(
+                analysis_moves,
+                key=lambda m: cube_order_map.get(m.xg_notation if m.xg_notation else m.notation, 99)
+            )
+        else:
+            # Checker plays: sort by error (best first)
+            sorted_candidates = sorted(
+                analysis_moves,
+                key=lambda m: abs(m.error) if m.error is not None else 999.0
+            )
 
         for i, move in enumerate(sorted_candidates):
             rank_class = "best-move" if move.rank == 1 else ""
@@ -476,7 +491,6 @@ class CardGenerator:
 """
 
         # Generate position viewer HTML
-        from ankigammon.models import DecisionType
         is_cube_decision = decision.decision_type == DecisionType.CUBE_ACTION
 
         if self.interactive_moves:

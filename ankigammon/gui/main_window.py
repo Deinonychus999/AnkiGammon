@@ -4,13 +4,15 @@ Main application window.
 
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QPushButton, QLabel, QMessageBox, QInputDialog
+    QPushButton, QLabel, QMessageBox, QInputDialog, QApplication
 )
 from PySide6.QtCore import Qt, Signal, Slot, QUrl, QSettings, QSize
 from PySide6.QtGui import QAction, QKeySequence, QDesktopServices
 from PySide6.QtWebEngineWidgets import QWebEngineView
 import qtawesome as qta
 import base64
+import subprocess
+from typing import List, Tuple
 
 from ankigammon import __version__
 from ankigammon.settings import Settings
@@ -176,7 +178,7 @@ class MainWindow(QMainWindow):
         self.btn_import_file.setIcon(qta.icon('fa6s.file-import', color='#1e1e2e'))
         self.btn_import_file.setIconSize(QSize(18, 18))
         self.btn_import_file.clicked.connect(self.on_import_file_clicked)
-        self.btn_import_file.setToolTip("Import .xg file")
+        self.btn_import_file.setToolTip("Import .xg or .mat file")
         self.btn_import_file.setCursor(Qt.PointingHandCursor)
         btn_row_layout.addWidget(self.btn_import_file, stretch=1)
 
@@ -880,9 +882,14 @@ class MainWindow(QMainWindow):
         Returns:
             Filtered list of decisions
         """
-        from ankigammon.models import Player
+        from ankigammon.models import Player, DecisionType
+        import logging
+        logger = logging.getLogger(__name__)
 
         filtered = []
+
+        cube_decisions_found = sum(1 for d in decisions if d.decision_type == DecisionType.CUBE_ACTION)
+        logger.info(f"DEBUG: Filtering {len(decisions)} total decisions ({cube_decisions_found} cube decisions)")
 
         for decision in decisions:
             # Skip decisions with no moves
@@ -897,30 +904,30 @@ class MainWindow(QMainWindow):
             if not played_move:
                 continue
 
-            # Use xg_error if available (convert to absolute value),
-            # otherwise use error (already positive)
-            error_magnitude = abs(played_move.xg_error) if played_move.xg_error is not None else played_move.error
+            # Handle CUBE_ACTION and CHECKER_PLAY differently
+            # For cube decisions, errors are at Decision level (cube_error/take_error)
+            # For checker play, errors are at Move level (played_move.error)
 
-            # Only include if error is at or above threshold
-            if error_magnitude < threshold:
-                continue
-
-            # Ensure the played move is in the top 5 candidates for MCQ display
-            # This is critical for blunders - students need to see what mistake they made!
-            self._ensure_played_move_in_candidates(decision, played_move)
-
-            # For CUBE_ACTION decisions, check which player actually made the error
-            from ankigammon.models import DecisionType
             if decision.decision_type == DecisionType.CUBE_ACTION:
+                # For CUBE_ACTION decisions, check which player actually made the error
                 attr = decision.get_cube_error_attribution()
                 doubler = attr['doubler']
                 responder = attr['responder']
                 doubler_error = attr['doubler_error']
                 responder_error = attr['responder_error']
 
-                # Determine which player(s) made errors
+                logger.info(f"DEBUG: Cube decision - doubler={doubler}, doubler_error={doubler_error}, responder={responder}, responder_error={responder_error}, threshold={threshold}")
+
+                # Determine which player(s) made errors above threshold
                 doubler_made_error = doubler_error is not None and abs(doubler_error) >= threshold
                 responder_made_error = responder_error is not None and abs(responder_error) >= threshold
+
+                logger.info(f"DEBUG: doubler_made_error={doubler_made_error}, responder_made_error={responder_made_error}")
+
+                # Skip if no errors above threshold
+                if not doubler_made_error and not responder_made_error:
+                    logger.info(f"DEBUG: Skipping cube decision - no errors above threshold")
+                    continue
 
                 # Check if we should include this decision based on player filter
                 include_decision = False
@@ -934,19 +941,174 @@ class MainWindow(QMainWindow):
                 if responder == Player.O and responder_made_error and include_player_o:
                     include_decision = True
 
+                logger.info(f"DEBUG: include_decision={include_decision} (include_player_x={include_player_x}, include_player_o={include_player_o})")
+
                 if include_decision:
+                    # Ensure the played move is in the top candidates for MCQ display
+                    self._ensure_played_move_in_candidates(decision, played_move)
                     filtered.append(decision)
+                    logger.info(f"DEBUG: Added cube decision to filtered list")
             else:
-                # For CHECKER_PLAY decisions, use the simple logic
-                # Error belongs to the player on roll
+                # For CHECKER_PLAY decisions, error is at Move level
+                # Use xg_error if available (convert to absolute value),
+                # otherwise use error (already positive)
+                error_magnitude = abs(played_move.xg_error) if played_move.xg_error is not None else played_move.error
+
+                # Only include if error is at or above threshold
+                if error_magnitude < threshold:
+                    continue
+
+                # Check player filter - error belongs to the player on roll
                 if decision.on_roll == Player.X and not include_player_x:
                     continue
                 if decision.on_roll == Player.O and not include_player_o:
                     continue
 
+                # Ensure the played move is in the top 5 candidates for MCQ display
+                # This is critical for blunders - students need to see what mistake they made!
+                self._ensure_played_move_in_candidates(decision, played_move)
                 filtered.append(decision)
 
+        cube_decisions_filtered = sum(1 for d in filtered if d.decision_type == DecisionType.CUBE_ACTION)
+        logger.info(f"DEBUG: After filtering: {len(filtered)} decisions ({cube_decisions_filtered} cube decisions)")
+
         return filtered
+
+    def _import_match_file(self, file_path: str) -> Tuple[List[Decision], int]:
+        """
+        Import match file with analysis via GnuBG.
+
+        Args:
+            file_path: Path to .mat match file
+
+        Returns:
+            Tuple of (filtered_decisions, total_count) or (None, None) if cancelled/failed
+        """
+        from PySide6.QtWidgets import QMessageBox, QProgressDialog
+        from PySide6.QtCore import Qt
+        from ankigammon.utils.gnubg_analyzer import GNUBGAnalyzer
+        from ankigammon.parsers.gnubg_match_parser import parse_gnubg_match_files
+        from ankigammon.gui.dialogs.import_options_dialog import ImportOptionsDialog
+        import logging
+        import shutil
+        from pathlib import Path
+
+        logger = logging.getLogger(__name__)
+
+        # Check if GnuBG is configured
+        if not self.settings.is_gnubg_available():
+            result = QMessageBox.question(
+                self,
+                "GnuBG Required",
+                "Match file analysis requires GNU Backgammon.\n\n"
+                "Would you like to configure it in Settings?",
+                QMessageBox.Yes | QMessageBox.No
+            )
+            if result == QMessageBox.Yes:
+                self.on_settings_clicked()
+            return None, None
+
+        # Extract player names from .mat file
+        from ankigammon.parsers.gnubg_match_parser import GNUBGMatchParser
+        player1_name, player2_name = GNUBGMatchParser.extract_player_names_from_mat(file_path)
+
+        # Show import options dialog with actual player names
+        import_dialog = ImportOptionsDialog(
+            self.settings,
+            player1_name=player1_name,
+            player2_name=player2_name,
+            parent=self
+        )
+
+        if not import_dialog.exec():
+            # User cancelled
+            return None, None
+
+        # Get filter options
+        threshold, include_player_x, include_player_o = import_dialog.get_options()
+
+        # Create progress dialog
+        progress = QProgressDialog(self)
+        progress.setWindowTitle("Analyzing Match")
+        progress.setWindowModality(Qt.WindowModal)
+        progress.setMinimumDuration(0)  # Show immediately
+        progress.setRange(0, 0)  # Indeterminate
+        progress.setCancelButton(None)  # Can't cancel gnubg analysis
+        progress.setMinimumWidth(400)
+
+        def update_progress(status: str):
+            progress.setLabelText(status)
+            QApplication.processEvents()
+
+        try:
+            # Analyze match
+            update_progress("Analyzing match... this may take several minutes")
+
+            analyzer = GNUBGAnalyzer(
+                self.settings.gnubg_path,
+                self.settings.gnubg_analysis_ply
+            )
+
+            exported_files = analyzer.analyze_match_file(
+                file_path,
+                max_moves=self.settings.max_mcq_options,
+                progress_callback=update_progress
+            )
+
+            logger.info(f"GnuBG exported {len(exported_files)} file(s)")
+
+            # Parse exported files
+            update_progress(f"Parsing analysis from {len(exported_files)} game(s)...")
+
+            all_decisions = parse_gnubg_match_files(exported_files)
+            total_count = len(all_decisions)
+
+            logger.info(f"Parsed {total_count} positions from match")
+
+            # Filter based on user options
+            update_progress("Filtering positions by error threshold...")
+
+            decisions = self._filter_decisions_by_import_options(
+                all_decisions,
+                threshold,
+                include_player_x,
+                include_player_o
+            )
+
+            logger.info(f"Filtered to {len(decisions)} positions (threshold: {threshold})")
+
+            # Cleanup temp files
+            update_progress("Cleaning up temporary files...")
+            for temp_file in exported_files:
+                try:
+                    temp_dir = Path(temp_file).parent
+                    shutil.rmtree(temp_dir)
+                    break  # Only need to remove directory once
+                except Exception as e:
+                    logger.warning(f"Failed to cleanup temp files: {e}")
+
+            progress.close()
+            return decisions, total_count
+
+        except subprocess.CalledProcessError as e:
+            progress.close()
+            QMessageBox.critical(
+                self,
+                "Analysis Failed",
+                f"GnuBG analysis failed:\n\n{e.stderr if e.stderr else str(e)}"
+            )
+            logger.error(f"GnuBG analysis failed: {e}")
+            return None, None
+
+        except Exception as e:
+            progress.close()
+            QMessageBox.critical(
+                self,
+                "Import Failed",
+                f"Failed to import match file:\n\n{str(e)}"
+            )
+            logger.error(f"Match import failed: {e}", exc_info=True)
+            return None, None
 
     @Slot()
     def on_import_file_clicked(self):
@@ -958,7 +1120,7 @@ class MainWindow(QMainWindow):
             self,
             "Import Backgammon File",
             "",
-            "XG Binary (*.xg);;All Files (*.*)"
+            "All Supported Files (*.xg *.mat);;XG Binary (*.xg);;Match Files (*.mat);;All Files (*.*)"
         )
 
         if not file_path:
@@ -970,12 +1132,12 @@ class MainWindow(QMainWindow):
     def dragEnterEvent(self, event):
         """Handle drag enter event - accept if it contains valid files."""
         if event.mimeData().hasUrls():
-            # Check if any of the URLs are .xg files
+            # Check if any of the URLs are .xg or .mat files
             urls = event.mimeData().urls()
             for url in urls:
                 if url.isLocalFile():
                     file_path = url.toLocalFile()
-                    if file_path.endswith('.xg'):
+                    if file_path.endswith('.xg') or file_path.endswith('.mat'):
                         # Show visual overlay
                         self._show_drop_overlay()
                         event.acceptProposedAction()
@@ -1001,7 +1163,7 @@ class MainWindow(QMainWindow):
         for url in urls:
             if url.isLocalFile():
                 file_path = url.toLocalFile()
-                if file_path.endswith('.xg'):
+                if file_path.endswith('.xg') or file_path.endswith('.mat'):
                     # Import the file using the existing import logic
                     self._import_file(file_path)
 
@@ -1076,11 +1238,19 @@ class MainWindow(QMainWindow):
                 else:
                     # User cancelled
                     return
+
+            elif result.format == InputFormat.MATCH_FILE:
+                # Import match file with analysis
+                decisions, total_count = self._import_match_file(file_path)
+                if decisions is None:
+                    # User cancelled or error occurred
+                    return
+
             else:
                 QMessageBox.warning(
                     self,
                     "Unknown Format",
-                    f"Could not detect file format.\n\nOnly XG binary files (.xg) are supported for file import.\n\n{result.details}"
+                    f"Could not detect file format.\n\nSupported formats:\n- XG binary files (.xg)\n- Match files (.mat)\n\n{result.details}"
                 )
                 return
 

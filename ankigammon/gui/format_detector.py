@@ -19,6 +19,7 @@ class InputFormat(Enum):
     POSITION_IDS = "position_ids"
     FULL_ANALYSIS = "full_analysis"
     XG_BINARY = "xg_binary"
+    MATCH_FILE = "match_file"
     UNKNOWN = "unknown"
 
 
@@ -153,6 +154,20 @@ class FormatDetector:
                 position_previews=["XG binary format"]
             )
 
+        # Check for match file format
+        if FormatDetector.is_match_file(data):
+            warnings = []
+            if not self.settings.is_gnubg_available():
+                warnings.append("GnuBG required for match analysis (not configured)")
+
+            return DetectionResult(
+                format=InputFormat.MATCH_FILE,
+                count=1,  # Will be updated after analysis
+                details="Backgammon match file (.mat)",
+                warnings=warnings,
+                position_previews=["Match file - requires analysis"]
+            )
+
         # Try decoding as text and use text detection
         try:
             text = data.decode('utf-8', errors='ignore')
@@ -171,6 +186,59 @@ class FormatDetector:
         if len(data) < 4:
             return False
         return data[0:4] == b'RGMH'
+
+    @staticmethod
+    def is_match_file(data: bytes) -> bool:
+        """
+        Check if data is a backgammon match file (.mat format).
+
+        Match files can be in two formats:
+        1. With headers (OpenGammon, Backgammon Studio):
+           ; [Site "OpenGammon"]
+           ; [Player 1 "..."]
+        2. Plain text:
+           15 point match
+           Game 1
+
+        Args:
+            data: Raw file data
+
+        Returns:
+            True if this is a match file
+        """
+        try:
+            # Try UTF-8 decoding
+            text = data.decode('utf-8', errors='ignore')
+
+            # Check for .mat header format (semicolon comments)
+            if text.lstrip().startswith(';'):
+                return True
+
+            # Check for plain text match format
+            # Look for "N point match" in first few lines
+            first_lines = '\n'.join(text.split('\n')[:10])
+            if re.search(r'\d+\s+point\s+match', first_lines, re.IGNORECASE):
+                return True
+
+            # Check for match-specific keywords in first 500 chars
+            header = text[:500]
+            match_indicators = [
+                'point match',
+                'Game 1',
+                'Doubles =>',
+                'Takes',
+                'Drops',
+                'Wins.*point'
+            ]
+
+            matches = sum(1 for indicator in match_indicators
+                         if re.search(indicator, header, re.IGNORECASE))
+
+            # If we see 3+ match indicators, it's probably a match file
+            return matches >= 3
+
+        except:
+            return False
 
     def _split_positions(self, text: str) -> List[str]:
         """
