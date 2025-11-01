@@ -366,9 +366,9 @@ class MainWindow(QMainWindow):
         # Help menu
         help_menu = menubar.addMenu("&Help")
 
-        act_docs = QAction("&Documentation", self)
-        act_docs.triggered.connect(self.show_documentation)
-        help_menu.addAction(act_docs)
+        act_website = QAction("&Visit Website", self)
+        act_website.triggered.connect(self.show_website)
+        help_menu.addAction(act_website)
 
         act_about = QAction("&About AnkiGammon", self)
         act_about.triggered.connect(self.show_about_dialog)
@@ -802,9 +802,9 @@ class MainWindow(QMainWindow):
         self.on_settings_changed(self.settings)
 
     @Slot()
-    def show_documentation(self):
-        """Show online documentation."""
-        QDesktopServices.openUrl(QUrl("https://github.com/Deinonychus999/AnkiGammon"))
+    def show_website(self):
+        """Open the project website."""
+        QDesktopServices.openUrl(QUrl("https://ankigammon.com/"))
 
     @Slot()
     def show_about_dialog(self):
@@ -812,15 +812,19 @@ class MainWindow(QMainWindow):
         QMessageBox.about(
             self,
             "About AnkiGammon",
-            f"""<h2>AnkiGammon</h2>
+            f"""<style>
+            a {{ color: #3daee9; text-decoration: none; font-weight: bold; }}
+            a:hover {{ text-decoration: underline; }}
+            </style>
+            <h2>AnkiGammon</h2>
             <p>Version {__version__}</p>
             <p>Convert backgammon position analysis into interactive Anki flashcards.</p>
             <p>Built with PySide6 and Qt.</p>
 
             <h3>Special Thanks</h3>
-            <p>OilSpillDuckling<br>Eran & OpenGammon</p>
+            <p>OilSpillDuckling<br>Eran & OpenGammon<br>Orad & Backgammon101</p>
 
-            <p><a href="https://github.com/Deinonychus999/AnkiGammon">GitHub Repository</a></p>
+            <p><a href="https://github.com/Deinonychus999/AnkiGammon">GitHub Repository</a> | <a href="https://ko-fi.com/ankigammon">Donate</a></p>
             """
         )
 
