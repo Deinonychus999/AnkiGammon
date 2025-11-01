@@ -94,7 +94,7 @@ jobs:
 
   build-linux:
     name: Build Linux AppImage
-    runs-on: ubuntu-20.04  # Use older LTS for better compatibility
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
@@ -105,11 +105,6 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libxcb-xinerama0 libxcb-cursor0 libxkbcommon-x11-0
-
       - name: Install dependencies
         run: |
           python --version
@@ -119,11 +114,10 @@ jobs:
       - name: Build executable with PyInstaller
         run: pyinstaller ankigammon.spec
 
-      - name: Download linuxdeploy and plugins
+      - name: Download linuxdeploy
         run: |
           wget https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
-          wget https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
-          chmod +x linuxdeploy*.AppImage
+          chmod +x linuxdeploy-x86_64.AppImage
 
       - name: Create AppDir structure
         run: |
@@ -147,18 +141,17 @@ jobs:
 
       - name: Build AppImage
         run: |
-          export QT_SELECT=qt6
-          ./linuxdeploy-x86_64.AppImage --appdir AppDir --plugin qt --output appimage
+          ./linuxdeploy-x86_64.AppImage --appdir AppDir --output appimage
 
-      - name: Rename AppImage
+      - name: Verify AppImage
         run: |
-          mv AnkiGammon*.AppImage AnkiGammon-x86_64.AppImage || mv ankigammon*.AppImage AnkiGammon-x86_64.AppImage
+          ls -lh *.AppImage
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ankigammon-linux
-          path: AnkiGammon-x86_64.AppImage
+          path: "AnkiGammon-x86_64.AppImage"
           retention-days: 7
 
   create-release:
