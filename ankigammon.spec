@@ -117,7 +117,7 @@ if sys.platform == 'darwin':
     app = BUNDLE(
         exe,
         name='AnkiGammon.app',
-        icon='ankigammon/gui/resources/icon.png',  # Use PNG for now, convert to .icns on macOS
+        icon='ankigammon/gui/resources/icon.icns',
         bundle_identifier='com.ankigammon.app',
         info_plist={
             'NSHighResolutionCapable': 'True',
