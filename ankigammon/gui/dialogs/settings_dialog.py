@@ -250,7 +250,7 @@ class SettingsDialog(QDialog):
         btn_browse.clicked.connect(self._browse_gnubg)
         path_layout.addWidget(self.txt_gnubg_path)
         path_layout.addWidget(btn_browse)
-        form.addRow("GnuBG Path:", path_layout)
+        form.addRow("GnuBG CLI Path:", path_layout)
 
         # Analysis depth
         self.cmb_gnubg_ply = QComboBox()
