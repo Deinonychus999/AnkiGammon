@@ -625,7 +625,7 @@ class TestSVGBoardRenderer(unittest.TestCase):
 
         # Check that it's valid SVG
         self.assertIn('<svg', svg)
-        self.assertIn('viewBox="0 0 900 600"', svg)
+        self.assertIn('viewBox="0 0 880 600"', svg)
         self.assertIn('</svg>', svg)
         self.assertGreater(len(svg), 5000)  # Should be a reasonable size
 

@@ -393,7 +393,7 @@ class CardGenerator:
 
         sorted_candidates = sorted(
             [m for m in candidates if m and m.from_xg_analysis],
-            key=lambda m: m.xg_rank if m.xg_rank is not None else 999
+            key=lambda m: abs(m.error) if m.error is not None else 999.0
         )
 
         for i, move in enumerate(sorted_candidates):

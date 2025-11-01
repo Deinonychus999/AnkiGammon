@@ -16,7 +16,7 @@ from ankigammon import __version__
 from ankigammon.settings import Settings
 from ankigammon.renderer.svg_board_renderer import SVGBoardRenderer
 from ankigammon.renderer.color_schemes import get_scheme
-from ankigammon.models import Decision
+from ankigammon.models import Decision, Move
 from ankigammon.gui.widgets import PositionListWidget
 from ankigammon.gui.dialogs import SettingsDialog, ExportDialog, InputDialog, ImportOptionsDialog
 from ankigammon.gui.resources import get_resource_path
@@ -828,6 +828,39 @@ class MainWindow(QMainWindow):
             """
         )
 
+    def _ensure_played_move_in_candidates(self, decision: Decision, played_move: Move) -> None:
+        """
+        Ensure the played move is in the top 5 candidates for MCQ display.
+
+        When exporting blunders, the actual move played might not be in XG's top 5
+        analyzed moves. This method injects it into the candidate list so students
+        can see what mistake they made.
+
+        Args:
+            decision: The decision object to modify
+            played_move: The move that was actually played
+        """
+        # Check if played move is already in the top 5 candidates
+        top_5 = decision.candidate_moves[:5]
+
+        # If played move is already in top 5, nothing to do
+        if played_move in top_5:
+            return
+
+        # Played move is NOT in top 5 - we need to inject it
+        # At this point, we know there must be at least 5 other moves
+        # (otherwise played_move would be in top_5)
+        #
+        # Strategy: Remove played_move from its current position (6th or worse)
+        # and insert it at position 4 (5th slot, 0-indexed)
+
+        # Remove played_move from wherever it currently is
+        decision.candidate_moves.remove(played_move)
+
+        # Insert at position 4 (5th slot, 0-indexed)
+        # This replaces what was previously the 5th move
+        decision.candidate_moves.insert(4, played_move)
+
     def _filter_decisions_by_import_options(
         self,
         decisions: list[Decision],
@@ -871,6 +904,10 @@ class MainWindow(QMainWindow):
             # Only include if error is at or above threshold
             if error_magnitude < threshold:
                 continue
+
+            # Ensure the played move is in the top 5 candidates for MCQ display
+            # This is critical for blunders - students need to see what mistake they made!
+            self._ensure_played_move_in_candidates(decision, played_move)
 
             # For CUBE_ACTION decisions, check which player actually made the error
             from ankigammon.models import DecisionType
