@@ -12,6 +12,7 @@ from PySide6.QtWebEngineWidgets import QWebEngineView
 import qtawesome as qta
 import base64
 
+from ankigammon import __version__
 from ankigammon.settings import Settings
 from ankigammon.renderer.svg_board_renderer import SVGBoardRenderer
 from ankigammon.renderer.color_schemes import get_scheme
@@ -811,8 +812,8 @@ class MainWindow(QMainWindow):
         QMessageBox.about(
             self,
             "About AnkiGammon",
-            """<h2>AnkiGammon</h2>
-            <p>Version 1.0.0</p>
+            f"""<h2>AnkiGammon</h2>
+            <p>Version {__version__}</p>
             <p>Convert backgammon position analysis into interactive Anki flashcards.</p>
             <p>Built with PySide6 and Qt.</p>
 

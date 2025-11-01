@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ankigammon"
-version = "1.0.0"
+version = "1.1.0"
 description = "Convert eXtreme Gammon backgammon analysis into Anki flashcards"
 readme = "README.md"
 requires-python = ">=3.8"
