@@ -90,8 +90,14 @@ class CardGenerator:
         else:
             candidates = decision.candidate_moves[:5]
 
-        # Shuffle candidates for MCQ
-        shuffled_candidates, answer_index = self._shuffle_candidates(candidates)
+        # Shuffle candidates for MCQ (but not for cube decisions - they have meaningful order)
+        if decision.decision_type == DecisionType.CUBE_ACTION:
+            # Don't shuffle cube decisions - keep natural order
+            shuffled_candidates = candidates
+            answer_index = next((i for i, c in enumerate(candidates) if c and c.rank == 1), 0)
+        else:
+            # Shuffle checker play decisions for MCQ
+            shuffled_candidates, answer_index = self._shuffle_candidates(candidates)
 
         # Generate card front
         if self.show_options:
