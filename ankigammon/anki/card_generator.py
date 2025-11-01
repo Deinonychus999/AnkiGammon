@@ -85,10 +85,12 @@ class CardGenerator:
         # Prepare candidate moves
         from ankigammon.models import DecisionType
 
+        max_options = self.settings.max_mcq_options
         if decision.decision_type == DecisionType.CUBE_ACTION:
+            # Cube decisions always show all 5 actions
             candidates = decision.candidate_moves[:5]
         else:
-            candidates = decision.candidate_moves[:5]
+            candidates = decision.candidate_moves[:max_options]
 
         # Shuffle candidates for MCQ (but not for cube decisions - they have meaningful order)
         if decision.decision_type == DecisionType.CUBE_ACTION:
@@ -395,7 +397,7 @@ class CardGenerator:
 
         # Build move table
         table_rows = []
-        letters = ['A', 'B', 'C', 'D', 'E']
+        letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J']
 
         sorted_candidates = sorted(
             [m for m in candidates if m and m.from_xg_analysis],

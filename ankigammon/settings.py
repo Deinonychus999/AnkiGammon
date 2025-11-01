@@ -27,6 +27,7 @@ class Settings:
         "import_error_threshold": 0.080,
         "import_include_player_x": True,
         "import_include_player_o": True,
+        "max_mcq_options": 5,
     }
 
     def __init__(self, config_path: Optional[Path] = None):
@@ -209,6 +210,18 @@ class Settings:
     def import_include_player_o(self, value: bool) -> None:
         """Set whether to include Player O mistakes in imports."""
         self.set("import_include_player_o", value)
+
+    @property
+    def max_mcq_options(self) -> int:
+        """Get the maximum number of MCQ options to display."""
+        return self._settings.get("max_mcq_options", 5)
+
+    @max_mcq_options.setter
+    def max_mcq_options(self, value: int) -> None:
+        """Set the maximum number of MCQ options to display."""
+        if value < 2 or value > 10:
+            raise ValueError("max_mcq_options must be between 2 and 10")
+        self.set("max_mcq_options", value)
 
     def is_gnubg_available(self) -> bool:
         """

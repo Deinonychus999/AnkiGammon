@@ -131,17 +131,25 @@ QComboBox:hover {
     border-color: #6c7086;
 }
 
+QComboBox:disabled {
+    background-color: #313244;
+    color: #6c7086;
+    border-color: #313244;
+}
+
 QComboBox::drop-down {
     border: none;
     padding-right: 8px;
 }
 
 QComboBox::down-arrow {
-    image: none;
-    border-left: 4px solid transparent;
-    border-right: 4px solid transparent;
-    border-top: 6px solid #cdd6f4;
-    margin-right: 8px;
+    image: url(ankigammon/gui/resources/down-arrow.svg);
+    width: 12px;
+    height: 8px;
+}
+
+QComboBox:disabled::down-arrow {
+    opacity: 0.3;
 }
 
 QComboBox QAbstractItemView {

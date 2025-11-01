@@ -130,6 +130,7 @@ class SettingsDialog(QDialog):
         self.original_settings.gnubg_path = settings.gnubg_path
         self.original_settings.gnubg_analysis_ply = settings.gnubg_analysis_ply
         self.original_settings.generate_score_matrix = settings.generate_score_matrix
+        self.original_settings.max_mcq_options = settings.max_mcq_options
 
         # Validation worker
         self.validation_worker: Optional[GnuBGValidationWorker] = None
@@ -205,10 +206,29 @@ class SettingsDialog(QDialog):
         self.cmb_board_orientation.setCursor(Qt.PointingHandCursor)
         form.addRow("Board Orientation:", self.cmb_board_orientation)
 
-        # Show options
+        # Show options with max options dropdown on same line
+        show_options_layout = QHBoxLayout()
         self.chk_show_options = QCheckBox("Show multiple choice options on card front")
         self.chk_show_options.setCursor(Qt.PointingHandCursor)
-        form.addRow(self.chk_show_options)
+        show_options_layout.addWidget(self.chk_show_options)
+
+        # Push max options to the right
+        show_options_layout.addStretch()
+
+        # Max options dropdown (on same line, right-aligned)
+        self.lbl_max_options = QLabel("Max Options:")
+        show_options_layout.addWidget(self.lbl_max_options)
+
+        self.cmb_max_mcq_options = QComboBox()
+        self.cmb_max_mcq_options.addItems([str(i) for i in range(2, 11)])
+        self.cmb_max_mcq_options.setCursor(Qt.PointingHandCursor)
+        self.cmb_max_mcq_options.setMaximumWidth(80)
+        show_options_layout.addWidget(self.cmb_max_mcq_options)
+
+        form.addRow(show_options_layout)
+
+        # Connect checkbox to enable/disable dropdown
+        self.chk_show_options.toggled.connect(self._on_show_options_toggled)
 
         # Interactive moves
         self.chk_interactive_moves = QCheckBox("Enable interactive move visualization")
@@ -279,6 +299,12 @@ class SettingsDialog(QDialog):
         self.chk_show_options.setChecked(self.settings.show_options)
         self.chk_interactive_moves.setChecked(self.settings.interactive_moves)
 
+        # Max MCQ options (combobox has values 2-10, setting value is 2-10, so index is value-2)
+        self.cmb_max_mcq_options.setCurrentIndex(self.settings.max_mcq_options - 2)
+
+        # Initialize max options enabled state based on show options checkbox
+        self._on_show_options_toggled(self.settings.show_options)
+
         # GnuBG
         if self.settings.gnubg_path:
             self.txt_gnubg_path.setText(self.settings.gnubg_path)
@@ -346,6 +372,17 @@ class SettingsDialog(QDialog):
         self.lbl_gnubg_status_text.setText(status_text)
         self.lbl_gnubg_status_text.setStyleSheet("")
 
+    def _on_show_options_toggled(self, checked: bool):
+        """Enable/disable max options dropdown based on show options checkbox."""
+        self.lbl_max_options.setEnabled(checked)
+        self.cmb_max_mcq_options.setEnabled(checked)
+
+        # Add visual feedback for disabled state
+        if checked:
+            self.lbl_max_options.setStyleSheet("")
+        else:
+            self.lbl_max_options.setStyleSheet("color: #6c7086;")
+
     def accept(self):
         """Save settings and close dialog."""
         # Update settings object
@@ -357,6 +394,7 @@ class SettingsDialog(QDialog):
         self.settings.board_orientation = self.cmb_board_orientation.currentData()
         self.settings.show_options = self.chk_show_options.isChecked()
         self.settings.interactive_moves = self.chk_interactive_moves.isChecked()
+        self.settings.max_mcq_options = self.cmb_max_mcq_options.currentIndex() + 2
         self.settings.gnubg_path = self.txt_gnubg_path.text() or None
         self.settings.gnubg_analysis_ply = self.cmb_gnubg_ply.currentIndex()
         self.settings.generate_score_matrix = self.chk_generate_score_matrix.isChecked()
