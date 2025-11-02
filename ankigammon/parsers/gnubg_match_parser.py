@@ -281,6 +281,18 @@ class GNUBGMatchParser:
         except:
             return None
 
+        # Generate XGID for score matrix support
+        xgid = position.to_xgid(
+            cube_value=pos_metadata.get('cube_value', 1),
+            cube_owner=pos_metadata.get('cube_owner', CubeState.CENTERED),
+            dice=None,  # Cube decision happens before dice roll
+            on_roll=on_roll,
+            score_x=pos_metadata.get('score_x', 0),
+            score_o=pos_metadata.get('score_o', 0),
+            match_length=metadata.get('match_length', 0),
+            crawford_jacoby=1 if pos_metadata.get('crawford', False) else 0
+        )
+
         # Parse cube equities from "Cubeful equities:" section
         equities = {}
         proper_action = None
@@ -501,7 +513,7 @@ class GNUBGMatchParser:
             cube_value=pos_metadata.get('cube_value', 1),
             cube_owner=pos_metadata.get('cube_owner', CubeState.CENTERED),
             crawford=pos_metadata.get('crawford', False),
-            xgid=None,
+            xgid=xgid,
             move_number=move_number,
             cube_error=cube_error,  # Doubler's error
             take_error=take_error  # Responder's error
@@ -586,6 +598,18 @@ class GNUBGMatchParser:
             position, pos_metadata = parse_gnuid(position_id + ":" + match_id if match_id else position_id)
         except:
             return None
+
+        # Generate XGID for score matrix support
+        xgid = position.to_xgid(
+            cube_value=pos_metadata.get('cube_value', 1),
+            cube_owner=pos_metadata.get('cube_owner', CubeState.CENTERED),
+            dice=None,  # Cube decision happens before dice roll
+            on_roll=on_roll,
+            score_x=pos_metadata.get('score_x', 0),
+            score_o=pos_metadata.get('score_o', 0),
+            match_length=metadata.get('match_length', 0),
+            crawford_jacoby=1 if pos_metadata.get('crawford', False) else 0
+        )
 
         # Parse cube equities from "Cubeful equities:" section
         equities = {}
@@ -806,7 +830,7 @@ class GNUBGMatchParser:
             cube_value=pos_metadata.get('cube_value', 1),
             cube_owner=pos_metadata.get('cube_owner', CubeState.CENTERED),
             crawford=pos_metadata.get('crawford', False),
-            xgid=None,
+            xgid=xgid,
             move_number=move_number,
             cube_error=cube_error,  # Doubler's error
             take_error=take_error  # Responder's error
@@ -871,6 +895,18 @@ class GNUBGMatchParser:
             position, pos_metadata = parse_gnuid(position_id + ":" + match_id if match_id else position_id)
         except:
             return None
+
+        # Generate XGID for score matrix support
+        xgid = position.to_xgid(
+            cube_value=pos_metadata.get('cube_value', 1),
+            cube_owner=pos_metadata.get('cube_owner', CubeState.CENTERED),
+            dice=(dice1, dice2),
+            on_roll=on_roll,
+            score_x=pos_metadata.get('score_x', 0),
+            score_o=pos_metadata.get('score_o', 0),
+            match_length=metadata.get('match_length', 0),
+            crawford_jacoby=1 if pos_metadata.get('crawford', False) else 0
+        )
 
         # Find the move that was played (marked with *)
         # Format: "* Deinonychus moves 24/18 13/9"
@@ -979,7 +1015,7 @@ class GNUBGMatchParser:
             cube_value=pos_metadata.get('cube_value', 1),
             cube_owner=pos_metadata.get('cube_owner', CubeState.CENTERED),
             crawford=pos_metadata.get('crawford', False),
-            xgid=None,  # We have GNUID, not XGID
+            xgid=xgid,
             move_number=move_number
         )
 
