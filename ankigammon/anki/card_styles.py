@@ -879,6 +879,12 @@ button.animate-btn:disabled {
     margin-bottom: 15px;
 }
 
+.score-matrix h3 .ply-indicator {
+    font-size: 14px;
+    opacity: 0.6;
+    font-weight: normal;
+}
+
 .score-matrix-table {
     border-collapse: collapse;
     margin: 0 auto;
@@ -1003,6 +1009,10 @@ button.animate-btn:disabled {
     .score-matrix h3 {
         font-size: 14px;
         margin-bottom: 8px;
+    }
+
+    .score-matrix h3 .ply-indicator {
+        font-size: 11px;
     }
 
     .score-matrix-table {

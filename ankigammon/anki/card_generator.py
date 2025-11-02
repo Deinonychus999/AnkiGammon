@@ -446,8 +446,11 @@ class CardGenerator:
                 row_class = f"{rank_class} clickable-move-row"
                 row_attrs = wgb_attrs
 
-            # Generate inline W/G/B display
-            wgb_inline_html = self._format_wgb_inline(move, decision)
+            # Generate inline W/G/B display (only for checker play, not cube decisions)
+            if decision.decision_type == DecisionType.CHECKER_PLAY:
+                wgb_inline_html = self._format_wgb_inline(move, decision)
+            else:
+                wgb_inline_html = ""
 
             table_rows.append(f"""
 <tr class="{row_class}" {row_attrs}>
@@ -1202,7 +1205,8 @@ class CardGenerator:
             matrix_html = format_matrix_as_html(
                 matrix=matrix,
                 current_player_away=current_player_away,
-                current_opponent_away=current_opponent_away
+                current_opponent_away=current_opponent_away,
+                ply_level=self.settings.gnubg_analysis_ply
             )
 
             return matrix_html

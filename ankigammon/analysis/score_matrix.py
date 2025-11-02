@@ -287,7 +287,8 @@ def generate_score_matrix(
 def format_matrix_as_html(
     matrix: List[List[ScoreMatrixCell]],
     current_player_away: Optional[int] = None,
-    current_opponent_away: Optional[int] = None
+    current_opponent_away: Optional[int] = None,
+    ply_level: Optional[int] = None
 ) -> str:
     """
     Format score matrix as HTML table.
@@ -296,6 +297,7 @@ def format_matrix_as_html(
         matrix: Score matrix from generate_score_matrix()
         current_player_away: Highlight this cell (player's score away)
         current_opponent_away: Highlight this cell (opponent's score away)
+        ply_level: Analysis depth in plies (for display in title)
 
     Returns:
         HTML string with styled table
@@ -307,7 +309,13 @@ def format_matrix_as_html(
 
     # Start table
     html = '<div class="score-matrix">\n'
-    html += '<h3>Score Matrix for Initial Double</h3>\n'
+
+    # Build title with optional ply level indicator
+    title = 'Score Matrix for Initial Double'
+    if ply_level is not None:
+        title += f' <span class="ply-indicator">({ply_level}-ply)</span>'
+    html += f'<h3>{title}</h3>\n'
+
     html += '<table class="score-matrix-table">\n'
 
     # Header row

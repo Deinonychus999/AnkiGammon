@@ -178,12 +178,16 @@ class XGBinaryParser:
 
         Therefore, we need to invert all signs when copying the position.
 
+        IMPORTANT: This method only handles sign inversion. XG binary ALWAYS stores
+        positions from O's (Player 1's) perspective. The caller must flip the position
+        if it needs to be shown from X's perspective.
+
         Args:
             raw_points: Raw 26-element position array from XG binary
-            on_roll: Player who is on roll
+            on_roll: Player who is on roll (currently unused, kept for compatibility)
 
         Returns:
-            Position object with correct internal representation
+            Position object with signs inverted (still from O's perspective)
         """
         position = Position()
 
@@ -269,13 +273,24 @@ class XGBinaryParser:
         # Map to AnkiGammon: Player.O (bottom) or Player.X (top)
         on_roll = Player.O if move_entry.ActiveP == 1 else Player.X
 
-        # Create position from XG position array with perspective transformation
-        # XG binary format stores positions from the perspective of the player on roll,
-        # similar to XGID format. When X is on roll, the position needs to be flipped.
+        # Create position from XG position array
+        # XG binary format ALWAYS stores positions from O's (Player 1's) perspective
+        # We need to flip to X's perspective when X is on roll
         position = XGBinaryParser._transform_position(
             list(move_entry.PositionI),
             on_roll
         )
+
+        # Flip position if X is on roll (since XG stores from O's perspective)
+        if on_roll == Player.X:
+            # Flip the position by reversing points and swapping signs
+            flipped_points = [0] * 26
+            flipped_points[0] = -position.points[25]  # X's bar = O's bar (negated)
+            flipped_points[25] = -position.points[0]  # O's bar = X's bar (negated)
+            for i in range(1, 25):
+                flipped_points[i] = -position.points[25 - i]
+            position.points = flipped_points
+            position.x_off, position.o_off = position.o_off, position.x_off
 
         # Get dice
         dice = tuple(move_entry.Dice) if move_entry.Dice else None
@@ -433,6 +448,11 @@ class XGBinaryParser:
         - Eval: Win probabilities for "No Double" scenario
         - EvalDouble: Win probabilities for "Double/Take" scenario
 
+        IMPORTANT: For cube decisions, we always need to show the position from the
+        doubler's perspective (the player who has the cube decision), regardless of
+        whether the error was made by the doubler or the responder. This is critical
+        for score matrix generation and consistent position display.
+
         Args:
             cube_entry: CubeEntry from xgstruct
             match_length: Match length (0 for money game)
@@ -443,13 +463,15 @@ class XGBinaryParser:
         Returns:
             Decision object with 5 cube options, or None if unanalyzed
         """
-        # Determine player on roll
-        on_roll = Player.O if cube_entry.ActiveP == 1 else Player.X
+        # Determine player on roll from ActiveP
+        # IMPORTANT: ActiveP may represent the responder for take/pass errors,
+        # but we always need to show cube decisions from the doubler's perspective
+        active_player = Player.O if cube_entry.ActiveP == 1 else Player.X
 
-        # Create position with perspective transformation
+        # Create position with perspective transformation (using active_player)
         position = XGBinaryParser._transform_position(
             list(cube_entry.Position),
-            on_roll
+            active_player
         )
 
         # Parse cube state
@@ -681,6 +703,24 @@ class XGBinaryParser:
                 if move.from_xg_analysis:
                     move.xg_error = move.equity - best_equity
 
+        # Extract decision-level winning chances from "No Double" evaluation
+        # This represents the current position's winning chances
+        decision_player_win_pct = None
+        decision_player_gammon_pct = None
+        decision_player_backgammon_pct = None
+        decision_opponent_win_pct = None
+        decision_opponent_gammon_pct = None
+        decision_opponent_backgammon_pct = None
+
+        if eval_no_double and len(eval_no_double) >= 7:
+            # Same format as MoveEntry: [Lose_BG, Lose_G, Lose_S, Win_S, Win_G, Win_BG, Equity]
+            decision_opponent_win_pct = eval_no_double[2] * 100  # Total opponent wins
+            decision_opponent_gammon_pct = eval_no_double[1] * 100  # Opp gammon+BG
+            decision_opponent_backgammon_pct = eval_no_double[0] * 100  # Opp BG only
+            decision_player_win_pct = eval_no_double[3] * 100  # Total player wins
+            decision_player_gammon_pct = eval_no_double[4] * 100  # Player gammon+BG
+            decision_player_backgammon_pct = eval_no_double[5] * 100  # Player BG only
+
         # Extract cube and take errors from XG binary data
         # ErrCube: error made by doubler on double/no double decision
         # ErrTake: error made by responder on take/pass decision
@@ -695,6 +735,69 @@ class XGBinaryParser:
             err_take_raw = cube_entry.ErrTake
             if err_take_raw != -1000:
                 take_error = err_take_raw
+
+        # Determine who the doubler is (the player making the cube decision)
+        # For cube decisions, we ALWAYS want to show the position from the doubler's perspective,
+        # even if the error was made by the responder on the take/pass decision.
+        #
+        # CRITICAL UNDERSTANDING:
+        # - ActiveP = the player who had the cube decision (on roll)
+        # - cube_error = error made by ActiveP on the double/no double decision
+        # - take_error = error made by the OPPONENT of ActiveP on the take/pass decision
+        #
+        # Therefore, ActiveP is ALWAYS the potential doubler (the player who had access to the cube).
+        # The doubler is determined by:
+        # 1. If cube is owned by X: only X can redouble (X is the doubler)
+        # 2. If cube is owned by O: only O can redouble (O is the doubler)
+        # 3. If cube is centered: ActiveP is the doubler (had the cube decision)
+
+        # Check the actual cube action taken in the game
+        doubled_in_game = hasattr(cube_entry, 'Double') and cube_entry.Double == 1
+
+        if doubled_in_game:
+            # A double occurred in the game - determine who doubled
+            if cube_owner == CubeState.X_OWNS:
+                # X owns cube and redoubled
+                doubler = Player.X
+            elif cube_owner == CubeState.O_OWNS:
+                # O owns cube and redoubled
+                doubler = Player.O
+            else:
+                # Cube is centered - ActiveP is the doubler
+                doubler = active_player
+        else:
+            # No double occurred - determine who had the cube decision
+            if cube_owner == CubeState.X_OWNS:
+                # X owns cube - X had the decision (chose not to redouble)
+                doubler = Player.X
+            elif cube_owner == CubeState.O_OWNS:
+                # O owns cube - O had the decision (chose not to redouble)
+                doubler = Player.O
+            else:
+                # Cube is centered - ActiveP had the cube decision (chose not to double)
+                doubler = active_player
+
+        # Always use doubler as on_roll for cube decisions
+        on_roll = doubler
+
+        # CRITICAL: XG binary ALWAYS stores positions from O's (Player 1's) perspective
+        # If the doubler is X, we need to flip the position to show it from X's perspective
+        if doubler == Player.X:
+            logger.debug(
+                f"Flipping position from O's perspective to X's perspective (doubler is X)"
+            )
+            # Flip the position by reversing points and swapping signs
+            flipped_points = [0] * 26
+            # Swap the bars
+            flipped_points[0] = -position.points[25]  # X's bar = O's bar (negated)
+            flipped_points[25] = -position.points[0]  # O's bar = X's bar (negated)
+            # Reverse and negate board points
+            for i in range(1, 25):
+                flipped_points[i] = -position.points[25 - i]
+
+            position.points = flipped_points
+            # Swap borne-off counts
+            position.x_off, position.o_off = position.o_off, position.x_off
 
         # Generate XGID for the position
         crawford_jacoby = 1 if crawford else 0
@@ -724,7 +827,13 @@ class XGBinaryParser:
             candidate_moves=moves,
             cube_error=cube_error,
             take_error=take_error,
-            xgid=xgid
+            xgid=xgid,
+            player_win_pct=decision_player_win_pct,
+            player_gammon_pct=decision_player_gammon_pct,
+            player_backgammon_pct=decision_player_backgammon_pct,
+            opponent_win_pct=decision_opponent_win_pct,
+            opponent_gammon_pct=decision_opponent_gammon_pct,
+            opponent_backgammon_pct=decision_opponent_backgammon_pct
         )
 
         return decision
