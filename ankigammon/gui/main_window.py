@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QMessageBox, QInputDialog, QApplication
 )
-from PySide6.QtCore import Qt, Signal, Slot, QUrl, QSettings, QSize, QThread
+from PySide6.QtCore import Qt, Signal, Slot, QUrl, QSettings, QSize, QThread, QTimer
 from PySide6.QtGui import QAction, QKeySequence, QDesktopServices
 from PySide6.QtWebEngineWidgets import QWebEngineView
 import qtawesome as qta
@@ -1309,15 +1309,21 @@ class MainWindow(QMainWindow):
             event.ignore()
             return
 
-        # Process each dropped file
+        # Collect file paths to import
+        file_paths = []
         urls = event.mimeData().urls()
         for url in urls:
             if url.isLocalFile():
-                file_path = url.toLocalFile()
-                # Import any file - format detector will validate
-                self._import_file(file_path)
+                file_paths.append(url.toLocalFile())
 
+        # Accept the drop event IMMEDIATELY to unblock Windows Explorer
         event.acceptProposedAction()
+
+        # Defer the actual import processing to the next event loop iteration
+        # This ensures the drop event completes and Windows Explorer is released
+        # before we do any heavy processing or show dialogs
+        for file_path in file_paths:
+            QTimer.singleShot(0, lambda fp=file_path: self._import_file(fp))
 
     def _show_drop_overlay(self):
         """Show the drop overlay with proper sizing."""
