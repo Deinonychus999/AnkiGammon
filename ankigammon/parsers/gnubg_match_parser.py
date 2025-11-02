@@ -293,9 +293,36 @@ class GNUBGMatchParser:
             crawford_jacoby=1 if pos_metadata.get('crawford', False) else 0
         )
 
+        # Extract winning chances from "Cube analysis" section
+        # Format (cube_section_idx points to "Cube analysis" line):
+        #   Cube analysis                                <-- cube_section_idx
+        #   1-ply cubeless equity  -0.009 (Money:  -0.009)  <-- +1 line
+        #     0.493 0.138 0.006 - 0.507 0.132 0.006   <-- +2 lines (probabilities)
+        #   Cubeful equities:
+        no_double_probs = None
+        for offset in range(1, 10):  # Search forward from cube_section_idx
+            if cube_section_idx + offset >= len(lines):
+                break
+            line = lines[cube_section_idx + offset]
+
+            # Look for "1-ply cubeless equity" line
+            if '1-ply cubeless equity' in line:
+                # Probabilities are on the next line
+                if cube_section_idx + offset + 1 < len(lines):
+                    prob_line = lines[cube_section_idx + offset + 1]
+                    # Format: "  0.493 0.138 0.006 - 0.507 0.132 0.006"
+                    prob_match = re.match(
+                        r'\s*(0\.\d+)\s+(0\.\d+)\s+(0\.\d+)\s+-\s+(0\.\d+)\s+(0\.\d+)\s+(0\.\d+)',
+                        prob_line
+                    )
+                    if prob_match:
+                        no_double_probs = tuple(float(p) for p in prob_match.groups())
+                break
+
         # Parse cube equities from "Cubeful equities:" section
         equities = {}
         proper_action = None
+
         for offset in range(cube_section_idx - start_idx, cube_section_idx - start_idx + 20):
             if start_idx + offset >= len(lines):
                 break
@@ -516,7 +543,14 @@ class GNUBGMatchParser:
             xgid=xgid,
             move_number=move_number,
             cube_error=cube_error,  # Doubler's error
-            take_error=take_error  # Responder's error
+            take_error=take_error,  # Responder's error
+            # Add decision-level winning chances from "No double" evaluation
+            player_win_pct=no_double_probs[0] * 100 if no_double_probs else None,
+            player_gammon_pct=no_double_probs[1] * 100 if no_double_probs else None,
+            player_backgammon_pct=no_double_probs[2] * 100 if no_double_probs else None,
+            opponent_win_pct=no_double_probs[3] * 100 if no_double_probs else None,
+            opponent_gammon_pct=no_double_probs[4] * 100 if no_double_probs else None,
+            opponent_backgammon_pct=no_double_probs[5] * 100 if no_double_probs else None
         )
 
         return decision
@@ -611,9 +645,36 @@ class GNUBGMatchParser:
             crawford_jacoby=1 if pos_metadata.get('crawford', False) else 0
         )
 
+        # Extract winning chances from "Cube analysis" section
+        # Format (cube_section_idx points to "Cube analysis" line):
+        #   Cube analysis                                <-- cube_section_idx
+        #   1-ply cubeless equity  -0.009 (Money:  -0.009)  <-- +1 line
+        #     0.493 0.138 0.006 - 0.507 0.132 0.006   <-- +2 lines (probabilities)
+        #   Cubeful equities:
+        no_double_probs = None
+        for offset in range(1, 10):  # Search forward from cube_section_idx
+            if cube_section_idx + offset >= len(lines):
+                break
+            line = lines[cube_section_idx + offset]
+
+            # Look for "1-ply cubeless equity" line
+            if '1-ply cubeless equity' in line:
+                # Probabilities are on the next line
+                if cube_section_idx + offset + 1 < len(lines):
+                    prob_line = lines[cube_section_idx + offset + 1]
+                    # Format: "  0.493 0.138 0.006 - 0.507 0.132 0.006"
+                    prob_match = re.match(
+                        r'\s*(0\.\d+)\s+(0\.\d+)\s+(0\.\d+)\s+-\s+(0\.\d+)\s+(0\.\d+)\s+(0\.\d+)',
+                        prob_line
+                    )
+                    if prob_match:
+                        no_double_probs = tuple(float(p) for p in prob_match.groups())
+                break
+
         # Parse cube equities from "Cubeful equities:" section
         equities = {}
         proper_action = None
+
         for offset in range(cube_section_idx - start_idx, cube_section_idx - start_idx + 20):
             if start_idx + offset >= len(lines):
                 break
@@ -833,7 +894,14 @@ class GNUBGMatchParser:
             xgid=xgid,
             move_number=move_number,
             cube_error=cube_error,  # Doubler's error
-            take_error=take_error  # Responder's error
+            take_error=take_error,  # Responder's error
+            # Add decision-level winning chances from "No double" evaluation
+            player_win_pct=no_double_probs[0] * 100 if no_double_probs else None,
+            player_gammon_pct=no_double_probs[1] * 100 if no_double_probs else None,
+            player_backgammon_pct=no_double_probs[2] * 100 if no_double_probs else None,
+            opponent_win_pct=no_double_probs[3] * 100 if no_double_probs else None,
+            opponent_gammon_pct=no_double_probs[4] * 100 if no_double_probs else None,
+            opponent_backgammon_pct=no_double_probs[5] * 100 if no_double_probs else None
         )
 
         return decision
