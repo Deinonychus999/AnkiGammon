@@ -31,10 +31,20 @@ class GNUBGAnalyzer:
         """
         self.gnubg_path = gnubg_path
         self.analysis_ply = analysis_ply
+        self._current_process = None  # Store reference to running process
 
         # Validate gnubg path
         if not Path(gnubg_path).exists():
             raise FileNotFoundError(f"GnuBG executable not found: {gnubg_path}")
+
+    def terminate(self):
+        """Terminate any running GnuBG process."""
+        if self._current_process is not None:
+            try:
+                self._current_process.kill()
+                self._current_process = None
+            except:
+                pass
 
     def analyze_position(self, position_id: str) -> Tuple[str, DecisionType]:
         """
@@ -204,36 +214,55 @@ class GNUBGAnalyzer:
 
         try:
             if progress_callback:
-                progress_callback("Analyzing match... this may take several minutes")
+                progress_callback(f"Analyzing match with GnuBG ({self.analysis_ply}-ply)...")
 
             # Execute gnubg (with longer timeout for match analysis)
+            # Use Popen instead of run so we can kill the process if needed
             kwargs = {
-                'capture_output': True,
+                'stdout': subprocess.PIPE,
+                'stderr': subprocess.PIPE,
                 'text': True,
-                'timeout': 600,  # 10 minute timeout for match analysis
             }
             if sys.platform == 'win32':
                 kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
 
-            result = subprocess.run(
+            # Start process and store reference
+            self._current_process = subprocess.Popen(
                 [self.gnubg_path, "-t", "-c", command_file],
                 **kwargs
             )
 
+            # Wait for completion (with timeout)
+            try:
+                stdout, stderr = self._current_process.communicate(timeout=600)
+                returncode = self._current_process.returncode
+            except subprocess.TimeoutExpired:
+                self._current_process.kill()
+                stdout, stderr = self._current_process.communicate()
+                self._current_process = None
+                raise subprocess.CalledProcessError(
+                    -1,
+                    [self.gnubg_path, "-t", "-c", command_file],
+                    output="Process timed out after 10 minutes",
+                    stderr=""
+                )
+            finally:
+                self._current_process = None
+
             # Log gnubg output for debugging
             import logging
             logger = logging.getLogger(__name__)
-            if result.stdout:
-                logger.info(f"GnuBG stdout (first 1000 chars):\n{result.stdout[:1000]}")
-            if result.stderr:
-                logger.warning(f"GnuBG stderr:\n{result.stderr}")
+            if stdout:
+                logger.info(f"GnuBG stdout (first 1000 chars):\n{stdout[:1000]}")
+            if stderr:
+                logger.warning(f"GnuBG stderr:\n{stderr}")
 
-            if result.returncode != 0:
+            if returncode != 0:
                 raise subprocess.CalledProcessError(
-                    result.returncode,
+                    returncode,
                     [self.gnubg_path, "-t", "-c", command_file],
-                    output=result.stdout,
-                    stderr=result.stderr
+                    output=stdout,
+                    stderr=stderr
                 )
 
             if progress_callback:

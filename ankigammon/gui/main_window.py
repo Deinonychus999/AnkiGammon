@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QMessageBox, QInputDialog, QApplication
 )
-from PySide6.QtCore import Qt, Signal, Slot, QUrl, QSettings, QSize
+from PySide6.QtCore import Qt, Signal, Slot, QUrl, QSettings, QSize, QThread
 from PySide6.QtGui import QAction, QKeySequence, QDesktopServices
 from PySide6.QtWebEngineWidgets import QWebEngineView
 import qtawesome as qta
@@ -22,6 +22,158 @@ from ankigammon.models import Decision, Move
 from ankigammon.gui.widgets import PositionListWidget
 from ankigammon.gui.dialogs import SettingsDialog, ExportDialog, InputDialog, ImportOptionsDialog
 from ankigammon.gui.resources import get_resource_path
+
+
+class MatchAnalysisWorker(QThread):
+    """
+    Background thread for GnuBG match file analysis.
+
+    Signals:
+        status_message(str): status update message
+        finished(bool, str, list, int): success, message, decisions, total_count
+    """
+
+    status_message = Signal(str)
+    finished = Signal(bool, str, list, int)
+
+    def __init__(self, file_path: str, settings: Settings, threshold: float,
+                 include_player_x: bool, include_player_o: bool,
+                 filter_func, max_mcq_options: int):
+        super().__init__()
+        self.file_path = file_path
+        self.settings = settings
+        self.threshold = threshold
+        self.include_player_x = include_player_x
+        self.include_player_o = include_player_o
+        self.filter_func = filter_func
+        self.max_mcq_options = max_mcq_options
+        self._cancelled = False
+        self._analyzer = None
+
+    def cancel(self):
+        """Request cancellation of analysis."""
+        self._cancelled = True
+        # Terminate GnuBG process if analyzer is running
+        if self._analyzer is not None:
+            self._analyzer.terminate()
+
+    def run(self):
+        """Analyze match file in background thread."""
+        from ankigammon.utils.gnubg_analyzer import GNUBGAnalyzer
+        from ankigammon.parsers.gnubg_match_parser import parse_gnubg_match_files
+        import logging
+        import shutil
+        from pathlib import Path
+        import subprocess
+
+        logger = logging.getLogger(__name__)
+
+        try:
+            # Check for cancellation before starting
+            if self._cancelled:
+                self.finished.emit(False, "Cancelled", [], 0)
+                return
+
+            # Create analyzer
+            self.status_message.emit(f"Analyzing match with GnuBG ({self.settings.gnubg_analysis_ply}-ply)...")
+
+            self._analyzer = GNUBGAnalyzer(
+                self.settings.gnubg_path,
+                self.settings.gnubg_analysis_ply
+            )
+
+            # Analyze match
+            def progress_callback(status: str):
+                if self._cancelled:
+                    return
+                self.status_message.emit(status)
+
+            exported_files = self._analyzer.analyze_match_file(
+                self.file_path,
+                max_moves=self.max_mcq_options,
+                progress_callback=progress_callback
+            )
+
+            # Check for cancellation after analysis
+            if self._cancelled:
+                # Cleanup temp files before returning
+                for temp_file in exported_files:
+                    try:
+                        temp_dir = Path(temp_file).parent
+                        shutil.rmtree(temp_dir)
+                        break
+                    except:
+                        pass
+                self.finished.emit(False, "Cancelled", [], 0)
+                return
+
+            logger.info(f"GnuBG exported {len(exported_files)} file(s)")
+
+            # Parse exported files
+            self.status_message.emit(f"Parsing analysis from {len(exported_files)} game(s)...")
+
+            all_decisions = parse_gnubg_match_files(exported_files)
+            total_count = len(all_decisions)
+
+            # Check for cancellation after parsing
+            if self._cancelled:
+                # Cleanup temp files before returning
+                for temp_file in exported_files:
+                    try:
+                        temp_dir = Path(temp_file).parent
+                        shutil.rmtree(temp_dir)
+                        break
+                    except:
+                        pass
+                self.finished.emit(False, "Cancelled", [], 0)
+                return
+
+            logger.info(f"Parsed {total_count} positions from match")
+
+            # Filter based on user options
+            self.status_message.emit("Filtering positions by error threshold...")
+
+            decisions = self.filter_func(
+                all_decisions,
+                self.threshold,
+                self.include_player_x,
+                self.include_player_o
+            )
+
+            logger.info(f"Filtered to {len(decisions)} positions (threshold: {self.threshold})")
+
+            # Cleanup temp files
+            self.status_message.emit("Cleaning up temporary files...")
+            for temp_file in exported_files:
+                try:
+                    temp_dir = Path(temp_file).parent
+                    shutil.rmtree(temp_dir)
+                    break  # Only need to remove directory once
+                except Exception as e:
+                    logger.warning(f"Failed to cleanup temp files: {e}")
+
+            # Final cancellation check
+            if self._cancelled:
+                self.finished.emit(False, "Cancelled", [], 0)
+                return
+
+            self.finished.emit(True, "Success", decisions, total_count)
+
+        except subprocess.CalledProcessError as e:
+            if self._cancelled:
+                self.finished.emit(False, "Cancelled", [], 0)
+            else:
+                logger.error(f"GnuBG analysis failed: {e}")
+                error_msg = f"GnuBG analysis failed:\n\n{e.stderr if e.stderr else str(e)}"
+                self.finished.emit(False, error_msg, [], 0)
+
+        except Exception as e:
+            if self._cancelled:
+                self.finished.emit(False, "Cancelled", [], 0)
+            else:
+                logger.error(f"Match import failed: {e}", exc_info=True)
+                error_msg = f"Failed to import match file:\n\n{str(e)}"
+                self.finished.emit(False, error_msg, [], 0)
 
 
 class MainWindow(QMainWindow):
@@ -986,12 +1138,8 @@ class MainWindow(QMainWindow):
         """
         from PySide6.QtWidgets import QMessageBox, QProgressDialog
         from PySide6.QtCore import Qt
-        from ankigammon.utils.gnubg_analyzer import GNUBGAnalyzer
-        from ankigammon.parsers.gnubg_match_parser import parse_gnubg_match_files
         from ankigammon.gui.dialogs.import_options_dialog import ImportOptionsDialog
         import logging
-        import shutil
-        from pathlib import Path
 
         logger = logging.getLogger(__name__)
 
@@ -1027,88 +1175,93 @@ class MainWindow(QMainWindow):
         # Get filter options
         threshold, include_player_x, include_player_o = import_dialog.get_options()
 
-        # Create progress dialog
-        progress = QProgressDialog(self)
+        # Create progress dialog with spinner
+        progress = QProgressDialog(
+            f"Analyzing match with GnuBG ({self.settings.gnubg_analysis_ply}-ply)...",
+            "Cancel",
+            0,
+            0,
+            self
+        )
         progress.setWindowTitle("Analyzing Match")
         progress.setWindowModality(Qt.WindowModal)
         progress.setMinimumDuration(0)  # Show immediately
-        progress.setRange(0, 0)  # Indeterminate
-        progress.setCancelButton(None)  # Can't cancel gnubg analysis
-        progress.setMinimumWidth(400)
+        progress.setMinimumWidth(500)
 
-        def update_progress(status: str):
-            progress.setLabelText(status)
-            QApplication.processEvents()
+        # Store results
+        self._analysis_results = None
 
-        try:
-            # Analyze match
-            update_progress("Analyzing match... this may take several minutes")
+        # Create and configure worker thread
+        self._analysis_worker = MatchAnalysisWorker(
+            file_path=file_path,
+            settings=self.settings,
+            threshold=threshold,
+            include_player_x=include_player_x,
+            include_player_o=include_player_o,
+            filter_func=self._filter_decisions_by_import_options,
+            max_mcq_options=self.settings.max_mcq_options
+        )
 
-            analyzer = GNUBGAnalyzer(
-                self.settings.gnubg_path,
-                self.settings.gnubg_analysis_ply
+        # Connect signals
+        self._analysis_worker.status_message.connect(
+            lambda msg: progress.setLabelText(msg)
+        )
+        self._analysis_worker.finished.connect(
+            lambda success, message, decisions, total: self._on_analysis_finished(
+                success, message, decisions, total, progress
             )
+        )
+        progress.canceled.connect(self._analysis_worker.cancel)
 
-            exported_files = analyzer.analyze_match_file(
-                file_path,
-                max_moves=self.settings.max_mcq_options,
-                progress_callback=update_progress
-            )
+        # Start worker
+        self._analysis_worker.start()
 
-            logger.info(f"GnuBG exported {len(exported_files)} file(s)")
+        # Show progress dialog (blocks until worker emits finished signal or user cancels)
+        result = progress.exec()
 
-            # Parse exported files
-            update_progress(f"Parsing analysis from {len(exported_files)} game(s)...")
-
-            all_decisions = parse_gnubg_match_files(exported_files)
-            total_count = len(all_decisions)
-
-            logger.info(f"Parsed {total_count} positions from match")
-
-            # Filter based on user options
-            update_progress("Filtering positions by error threshold...")
-
-            decisions = self._filter_decisions_by_import_options(
-                all_decisions,
-                threshold,
-                include_player_x,
-                include_player_o
-            )
-
-            logger.info(f"Filtered to {len(decisions)} positions (threshold: {threshold})")
-
-            # Cleanup temp files
-            update_progress("Cleaning up temporary files...")
-            for temp_file in exported_files:
-                try:
-                    temp_dir = Path(temp_file).parent
-                    shutil.rmtree(temp_dir)
-                    break  # Only need to remove directory once
-                except Exception as e:
-                    logger.warning(f"Failed to cleanup temp files: {e}")
-
-            progress.close()
-            return decisions, total_count
-
-        except subprocess.CalledProcessError as e:
-            progress.close()
-            QMessageBox.critical(
-                self,
-                "Analysis Failed",
-                f"GnuBG analysis failed:\n\n{e.stderr if e.stderr else str(e)}"
-            )
-            logger.error(f"GnuBG analysis failed: {e}")
+        # Check if user cancelled
+        if progress.wasCanceled() or self._analysis_results is None:
+            logger.info("Analysis cancelled by user")
+            # Wait for worker to finish cleanup (max 2 seconds)
+            # Worker might have already been deleted by _on_analysis_finished
+            if hasattr(self, '_analysis_worker'):
+                self._analysis_worker.wait(2000)
             return None, None
 
-        except Exception as e:
-            progress.close()
-            QMessageBox.critical(
-                self,
-                "Import Failed",
-                f"Failed to import match file:\n\n{str(e)}"
-            )
-            logger.error(f"Match import failed: {e}", exc_info=True)
-            return None, None
+        # Return results
+        return self._analysis_results
+
+    @Slot(bool, str, list, int, object)
+    def _on_analysis_finished(self, success: bool, message: str,
+                             decisions: List[Decision], total_count: int,
+                             progress_dialog):
+        """Handle completion of match analysis worker."""
+        from PySide6.QtWidgets import QMessageBox
+        import logging
+
+        logger = logging.getLogger(__name__)
+
+        if success:
+            logger.info(f"Analysis completed: {len(decisions)} positions filtered from {total_count} total")
+            self._analysis_results = (decisions, total_count)
+            # Use accept() to close dialog without triggering cancel state
+            progress_dialog.accept()
+        else:
+            # Only show error message if it wasn't a user cancellation
+            if message != "Cancelled":
+                QMessageBox.critical(
+                    self,
+                    "Analysis Failed",
+                    message
+                )
+            self._analysis_results = (None, None)
+            # Close dialog (cancel state already set if user cancelled)
+            progress_dialog.close()
+
+        # Cleanup worker
+        if hasattr(self, '_analysis_worker'):
+            self._analysis_worker.deleteLater()
+            del self._analysis_worker
 
     @Slot()
     def on_import_file_clicked(self):

@@ -1239,10 +1239,6 @@ class CardGenerator:
             parts.append(f"<code>{decision.xgid}</code>")
         if decision.source_file:
             parts.append(f"Source: {decision.source_file}")
-        if decision.game_number:
-            parts.append(f"Game #{decision.game_number}")
-        if decision.move_number:
-            parts.append(f"Move #{decision.move_number}")
 
         if parts:
             return f"""
