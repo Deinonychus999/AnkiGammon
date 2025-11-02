@@ -321,7 +321,7 @@ class MainWindow(QMainWindow):
         self.btn_import_file.setIcon(qta.icon('fa6s.file-import', color='#1e1e2e'))
         self.btn_import_file.setIconSize(QSize(18, 18))
         self.btn_import_file.clicked.connect(self.on_import_file_clicked)
-        self.btn_import_file.setToolTip("Import .xg or .mat file")
+        self.btn_import_file.setToolTip("Import .xg, .mat, or .txt match file")
         self.btn_import_file.setCursor(Qt.PointingHandCursor)
         btn_row_layout.addWidget(self.btn_import_file, stretch=1)
 
@@ -579,7 +579,7 @@ class MainWindow(QMainWindow):
         overlay_layout.addWidget(icon_label)
 
         # Text
-        text_label = QLabel("Drop .xg file to import")
+        text_label = QLabel("Drop file to import")
         text_label.setStyleSheet("""
             QLabel {
                 color: #89b4fa;
@@ -1273,7 +1273,7 @@ class MainWindow(QMainWindow):
             self,
             "Import Backgammon File",
             "",
-            "All Supported Files (*.xg *.mat);;XG Binary (*.xg);;Match Files (*.mat);;All Files (*.*)"
+            "All Supported Files (*.xg *.mat *.txt);;XG Binary (*.xg);;Match Files (*.mat *.txt);;All Files (*)"
         )
 
         if not file_path:
@@ -1285,16 +1285,14 @@ class MainWindow(QMainWindow):
     def dragEnterEvent(self, event):
         """Handle drag enter event - accept if it contains valid files."""
         if event.mimeData().hasUrls():
-            # Check if any of the URLs are .xg or .mat files
+            # Accept any file - format detector will validate
             urls = event.mimeData().urls()
             for url in urls:
                 if url.isLocalFile():
-                    file_path = url.toLocalFile()
-                    if file_path.endswith('.xg') or file_path.endswith('.mat'):
-                        # Show visual overlay
-                        self._show_drop_overlay()
-                        event.acceptProposedAction()
-                        return
+                    # Show visual overlay
+                    self._show_drop_overlay()
+                    event.acceptProposedAction()
+                    return
         event.ignore()
 
     def dragLeaveEvent(self, event):
@@ -1303,7 +1301,7 @@ class MainWindow(QMainWindow):
         event.accept()
 
     def dropEvent(self, event):
-        """Handle drop event - import the dropped .xg files."""
+        """Handle drop event - import the dropped backgammon files."""
         # Hide overlay immediately
         self._hide_drop_overlay()
 
@@ -1316,9 +1314,8 @@ class MainWindow(QMainWindow):
         for url in urls:
             if url.isLocalFile():
                 file_path = url.toLocalFile()
-                if file_path.endswith('.xg') or file_path.endswith('.mat'):
-                    # Import the file using the existing import logic
-                    self._import_file(file_path)
+                # Import any file - format detector will validate
+                self._import_file(file_path)
 
         event.acceptProposedAction()
 

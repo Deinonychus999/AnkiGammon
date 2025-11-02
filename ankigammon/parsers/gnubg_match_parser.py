@@ -32,10 +32,10 @@ class GNUBGMatchParser:
 
         try:
             with open(mat_file_path, 'r', encoding='utf-8') as f:
-                # Read first 500 bytes (header section)
-                header = f.read(500)
+                # Read first 1000 characters (header section)
+                header = f.read(1000)
 
-                # Look for player names in header
+                # Try Format 1: Semicolon header (OpenGammon, Backgammon Studio)
                 # Format: ; [Player 1 "PlayerName"]
                 player1_match = re.search(r';\s*\[Player 1\s+"([^"]+)"\]', header, re.IGNORECASE)
                 player2_match = re.search(r';\s*\[Player 2\s+"([^"]+)"\]', header, re.IGNORECASE)
@@ -44,6 +44,19 @@ class GNUBGMatchParser:
                     player1 = player1_match.group(1)
                 if player2_match:
                     player2 = player2_match.group(1)
+
+                # Try Format 2: Score line (plain text match files)
+                # Format: PlayerName1 : Score [whitespace] PlayerName2 : Score
+                # Example: " Double98 : 0                        Deinonychus999 : 0"
+                if player1 == "Player 1" or player2 == "Player 2":
+                    score_match = re.search(
+                        r'^\s*([A-Za-z0-9_]+)\s*:\s*\d+\s+([A-Za-z0-9_]+)\s*:\s*\d+',
+                        header,
+                        re.MULTILINE
+                    )
+                    if score_match:
+                        player1 = score_match.group(1)
+                        player2 = score_match.group(2)
 
         except Exception:
             # If parsing fails, return defaults
