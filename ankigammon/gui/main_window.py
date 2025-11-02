@@ -158,20 +158,11 @@ class MainWindow(QMainWindow):
         title.setAlignment(Qt.AlignCenter)
         layout.addWidget(title)
 
-        # Button row: Add Positions and Import File
+        # Button row: Import File and Add Positions
         btn_row = QWidget()
         btn_row_layout = QHBoxLayout(btn_row)
         btn_row_layout.setContentsMargins(0, 0, 0, 0)
         btn_row_layout.setSpacing(8)
-
-        # Add Positions button (primary) - blue background needs dark icons
-        self.btn_add_positions = QPushButton("  Add Positions...")
-        self.btn_add_positions.setIcon(qta.icon('fa6s.clipboard-list', color='#1e1e2e'))
-        self.btn_add_positions.setIconSize(QSize(18, 18))
-        self.btn_add_positions.clicked.connect(self.on_add_positions_clicked)
-        self.btn_add_positions.setToolTip("Paste position IDs or full XG analysis")
-        self.btn_add_positions.setCursor(Qt.PointingHandCursor)
-        btn_row_layout.addWidget(self.btn_add_positions, stretch=1)
 
         # Import File button (equal primary) - full-sized with text + icon
         self.btn_import_file = QPushButton("  Import File...")
@@ -181,6 +172,15 @@ class MainWindow(QMainWindow):
         self.btn_import_file.setToolTip("Import .xg or .mat file")
         self.btn_import_file.setCursor(Qt.PointingHandCursor)
         btn_row_layout.addWidget(self.btn_import_file, stretch=1)
+
+        # Add Positions button (primary) - blue background needs dark icons
+        self.btn_add_positions = QPushButton("  Add Positions...")
+        self.btn_add_positions.setIcon(qta.icon('fa6s.clipboard-list', color='#1e1e2e'))
+        self.btn_add_positions.setIconSize(QSize(18, 18))
+        self.btn_add_positions.clicked.connect(self.on_add_positions_clicked)
+        self.btn_add_positions.setToolTip("Paste position IDs or full XG analysis")
+        self.btn_add_positions.setCursor(Qt.PointingHandCursor)
+        btn_row_layout.addWidget(self.btn_add_positions, stretch=1)
 
         layout.addWidget(btn_row)
 
