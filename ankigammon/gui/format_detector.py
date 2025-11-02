@@ -20,6 +20,7 @@ class InputFormat(Enum):
     FULL_ANALYSIS = "full_analysis"
     XG_BINARY = "xg_binary"
     MATCH_FILE = "match_file"
+    SGF_FILE = "sgf_file"
     UNKNOWN = "unknown"
 
 
@@ -154,6 +155,20 @@ class FormatDetector:
                 position_previews=["XG binary format"]
             )
 
+        # Check for SGF file format
+        if FormatDetector.is_sgf_file(data):
+            warnings = []
+            if not self.settings.is_gnubg_available():
+                warnings.append("GnuBG required for match analysis (not configured)")
+
+            return DetectionResult(
+                format=InputFormat.SGF_FILE,
+                count=1,  # Will be updated after analysis
+                details="SGF backgammon match file (.sgf)",
+                warnings=warnings,
+                position_previews=["SGF file - requires analysis"]
+            )
+
         # Check for match file format
         if FormatDetector.is_match_file(data):
             warnings = []
@@ -235,6 +250,49 @@ class FormatDetector:
                          if re.search(indicator, header, re.IGNORECASE))
 
             # If we see 3+ match indicators, it's probably a match file
+            return matches >= 3
+
+        except:
+            return False
+
+    @staticmethod
+    def is_sgf_file(data: bytes) -> bool:
+        """
+        Check if data is an SGF (Smart Game Format) backgammon file.
+
+        SGF files for backgammon should have:
+        - (;FF[4]GM[6]... - SGF format 4, Game type 6 (backgammon)
+        - Properties like PB[], PW[], MI[], etc.
+
+        Args:
+            data: Raw file data
+
+        Returns:
+            True if this is an SGF backgammon file
+        """
+        try:
+            # Try UTF-8 decoding
+            text = data.decode('utf-8', errors='ignore')
+
+            # Check for SGF structure: starts with (; and contains FF[4]GM[6]
+            if not text.lstrip().startswith('(;'):
+                return False
+
+            # Check for backgammon game type (GM[6])
+            if 'GM[6]' not in text[:200]:
+                return False
+
+            # Check for typical backgammon SGF properties
+            sgf_indicators = [
+                'FF[4]',  # File format 4
+                'GM[6]',  # Game type 6 (backgammon)
+                'PB[',    # Player Black
+                'PW[',    # Player White
+            ]
+
+            matches = sum(1 for indicator in sgf_indicators if indicator in text[:500])
+
+            # If we see 3+ SGF indicators, it's probably an SGF file
             return matches >= 3
 
         except:

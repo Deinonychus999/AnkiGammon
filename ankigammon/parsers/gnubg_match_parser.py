@@ -65,12 +65,13 @@ class GNUBGMatchParser:
         return player1, player2
 
     @staticmethod
-    def parse_match_files(file_paths: List[str]) -> List[Decision]:
+    def parse_match_files(file_paths: List[str], is_sgf_source: bool = False) -> List[Decision]:
         """
         Parse multiple gnubg match export files into Decision objects.
 
         Args:
             file_paths: List of paths to text files (one per game)
+            is_sgf_source: True if original source was SGF file (scores need swapping)
 
         Returns:
             List of Decision objects for all positions with analysis
@@ -86,7 +87,7 @@ class GNUBGMatchParser:
         logger.info(f"\n=== Parsing {len(file_paths)} game files ===")
         for i, file_path in enumerate(file_paths, 1):
             logger.info(f"\nGame {i}: {Path(file_path).name}")
-            decisions = GNUBGMatchParser.parse_file(file_path)
+            decisions = GNUBGMatchParser.parse_file(file_path, is_sgf_source=is_sgf_source)
             logger.info(f"  Parsed {len(decisions)} decisions")
 
             # Show cube decisions for debugging
@@ -105,12 +106,13 @@ class GNUBGMatchParser:
         return all_decisions
 
     @staticmethod
-    def parse_file(file_path: str) -> List[Decision]:
+    def parse_file(file_path: str, is_sgf_source: bool = False) -> List[Decision]:
         """
         Parse single gnubg match export file.
 
         Args:
             file_path: Path to text file
+            is_sgf_source: True if original source was SGF file (scores need swapping)
 
         Returns:
             List of Decision objects
@@ -123,11 +125,35 @@ class GNUBGMatchParser:
 
         # Extract match metadata
         metadata = GNUBGMatchParser._parse_match_metadata(content)
+        metadata['is_sgf_source'] = is_sgf_source
 
         # Parse all positions in the file
         decisions = GNUBGMatchParser._parse_positions(content, metadata)
 
         return decisions
+
+    @staticmethod
+    def _get_scores_from_metadata(pos_metadata: Dict, is_sgf_source: bool) -> Tuple[int, int]:
+        """
+        Extract scores from GNUID metadata, swapping for SGF sources.
+
+        Args:
+            pos_metadata: Metadata dict from GNUID parsing
+            is_sgf_source: True if original source was SGF file
+
+        Returns:
+            Tuple of (score_x, score_o) correctly mapped for the source type
+        """
+        score_x = pos_metadata.get('score_x', 0)
+        score_o = pos_metadata.get('score_o', 0)
+
+        # SGF files: GnuBG encodes White=O, Black=X in GNUID
+        # But our model expects X=top, O=bottom
+        # So swap the scores for SGF sources
+        if is_sgf_source:
+            score_x, score_o = score_o, score_x
+
+        return score_x, score_o
 
     @staticmethod
     def _parse_match_metadata(text: str) -> Dict:
@@ -294,14 +320,19 @@ class GNUBGMatchParser:
         except:
             return None
 
+        # Get scores (swap if SGF source)
+        score_x, score_o = GNUBGMatchParser._get_scores_from_metadata(
+            pos_metadata, metadata.get('is_sgf_source', False)
+        )
+
         # Generate XGID for score matrix support
         xgid = position.to_xgid(
             cube_value=pos_metadata.get('cube_value', 1),
             cube_owner=pos_metadata.get('cube_owner', CubeState.CENTERED),
             dice=None,  # Cube decision happens before dice roll
             on_roll=on_roll,
-            score_x=pos_metadata.get('score_x', 0),
-            score_o=pos_metadata.get('score_o', 0),
+            score_x=score_x,
+            score_o=score_o,
             match_length=metadata.get('match_length', 0),
             crawford_jacoby=1 if pos_metadata.get('crawford', False) else 0
         )
@@ -540,6 +571,11 @@ class GNUBGMatchParser:
         }
         candidate_moves.sort(key=lambda m: order_map.get(m.notation, 99))
 
+        # Get scores (swap if SGF source)
+        score_x, score_o = GNUBGMatchParser._get_scores_from_metadata(
+            pos_metadata, metadata.get('is_sgf_source', False)
+        )
+
         # Create Decision object
         decision = Decision(
             position=position,
@@ -547,8 +583,8 @@ class GNUBGMatchParser:
             dice=None,  # Cube decision happens before dice roll
             decision_type=DecisionType.CUBE_ACTION,
             candidate_moves=candidate_moves,
-            score_x=pos_metadata.get('score_x', 0),
-            score_o=pos_metadata.get('score_o', 0),
+            score_x=score_x,
+            score_o=score_o,
             match_length=metadata.get('match_length', 0),
             cube_value=pos_metadata.get('cube_value', 1),
             cube_owner=pos_metadata.get('cube_owner', CubeState.CENTERED),
@@ -646,14 +682,19 @@ class GNUBGMatchParser:
         except:
             return None
 
+        # Get scores (swap if SGF source)
+        score_x, score_o = GNUBGMatchParser._get_scores_from_metadata(
+            pos_metadata, metadata.get('is_sgf_source', False)
+        )
+
         # Generate XGID for score matrix support
         xgid = position.to_xgid(
             cube_value=pos_metadata.get('cube_value', 1),
             cube_owner=pos_metadata.get('cube_owner', CubeState.CENTERED),
             dice=None,  # Cube decision happens before dice roll
             on_roll=on_roll,
-            score_x=pos_metadata.get('score_x', 0),
-            score_o=pos_metadata.get('score_o', 0),
+            score_x=score_x,
+            score_o=score_o,
             match_length=metadata.get('match_length', 0),
             crawford_jacoby=1 if pos_metadata.get('crawford', False) else 0
         )
@@ -891,6 +932,11 @@ class GNUBGMatchParser:
         }
         candidate_moves.sort(key=lambda m: order_map.get(m.notation, 99))
 
+        # Get scores (swap if SGF source)
+        score_x, score_o = GNUBGMatchParser._get_scores_from_metadata(
+            pos_metadata, metadata.get('is_sgf_source', False)
+        )
+
         # Create Decision object
         decision = Decision(
             position=position,
@@ -898,8 +944,8 @@ class GNUBGMatchParser:
             dice=None,  # Cube decision happens before dice roll
             decision_type=DecisionType.CUBE_ACTION,
             candidate_moves=candidate_moves,
-            score_x=pos_metadata.get('score_x', 0),
-            score_o=pos_metadata.get('score_o', 0),
+            score_x=score_x,
+            score_o=score_o,
             match_length=metadata.get('match_length', 0),
             cube_value=pos_metadata.get('cube_value', 1),
             cube_owner=pos_metadata.get('cube_owner', CubeState.CENTERED),
@@ -977,14 +1023,19 @@ class GNUBGMatchParser:
         except:
             return None
 
+        # Get scores (swap if SGF source)
+        score_x, score_o = GNUBGMatchParser._get_scores_from_metadata(
+            pos_metadata, metadata.get('is_sgf_source', False)
+        )
+
         # Generate XGID for score matrix support
         xgid = position.to_xgid(
             cube_value=pos_metadata.get('cube_value', 1),
             cube_owner=pos_metadata.get('cube_owner', CubeState.CENTERED),
             dice=(dice1, dice2),
             on_roll=on_roll,
-            score_x=pos_metadata.get('score_x', 0),
-            score_o=pos_metadata.get('score_o', 0),
+            score_x=score_x,
+            score_o=score_o,
             match_length=metadata.get('match_length', 0),
             crawford_jacoby=1 if pos_metadata.get('crawford', False) else 0
         )
@@ -1083,6 +1134,11 @@ class GNUBGMatchParser:
         if not candidate_moves:
             return None
 
+        # Get scores (swap if SGF source)
+        score_x, score_o = GNUBGMatchParser._get_scores_from_metadata(
+            pos_metadata, metadata.get('is_sgf_source', False)
+        )
+
         # Create Decision object
         decision = Decision(
             position=position,
@@ -1090,8 +1146,8 @@ class GNUBGMatchParser:
             dice=(dice1, dice2),
             decision_type=DecisionType.CHECKER_PLAY,
             candidate_moves=candidate_moves,
-            score_x=pos_metadata.get('score_x', 0),
-            score_o=pos_metadata.get('score_o', 0),
+            score_x=score_x,
+            score_o=score_o,
             match_length=metadata.get('match_length', 0),
             cube_value=pos_metadata.get('cube_value', 1),
             cube_owner=pos_metadata.get('cube_owner', CubeState.CENTERED),
@@ -1104,14 +1160,15 @@ class GNUBGMatchParser:
 
 
 # Helper function for easy import
-def parse_gnubg_match_files(file_paths: List[str]) -> List[Decision]:
+def parse_gnubg_match_files(file_paths: List[str], is_sgf_source: bool = False) -> List[Decision]:
     """
     Parse gnubg match export files into Decision objects.
 
     Args:
         file_paths: List of paths to exported text files
+        is_sgf_source: True if original source was SGF file (scores need swapping)
 
     Returns:
         List of Decision objects
     """
-    return GNUBGMatchParser.parse_match_files(file_paths)
+    return GNUBGMatchParser.parse_match_files(file_paths, is_sgf_source=is_sgf_source)

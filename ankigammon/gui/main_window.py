@@ -112,7 +112,10 @@ class MatchAnalysisWorker(QThread):
             # Parse exported files
             self.status_message.emit(f"Parsing analysis from {len(exported_files)} game(s)...")
 
-            all_decisions = parse_gnubg_match_files(exported_files)
+            # Detect if source was SGF file (need to swap scores)
+            is_sgf_source = self.file_path.endswith('.sgf')
+
+            all_decisions = parse_gnubg_match_files(exported_files, is_sgf_source=is_sgf_source)
             total_count = len(all_decisions)
 
             # Check for cancellation after parsing
@@ -1130,8 +1133,10 @@ class MainWindow(QMainWindow):
         """
         Import match file with analysis via GnuBG.
 
+        Supports both .mat (Jellyfish) and .sgf (Smart Game Format) files.
+
         Args:
-            file_path: Path to .mat match file
+            file_path: Path to match file (.mat or .sgf)
 
         Returns:
             Tuple of (filtered_decisions, total_count) or (None, None) if cancelled/failed
@@ -1156,9 +1161,18 @@ class MainWindow(QMainWindow):
                 self.on_settings_clicked()
             return None, None
 
-        # Extract player names from .mat file
+        # Extract player names based on file type
         from ankigammon.parsers.gnubg_match_parser import GNUBGMatchParser
-        player1_name, player2_name = GNUBGMatchParser.extract_player_names_from_mat(file_path)
+        from pathlib import Path
+
+        file_ext = Path(file_path).suffix.lower()
+        if file_ext == '.sgf':
+            # Extract from SGF file
+            from ankigammon.parsers.sgf_parser import extract_player_names_from_sgf
+            player1_name, player2_name = extract_player_names_from_sgf(file_path)
+        else:
+            # Extract from .mat file
+            player1_name, player2_name = GNUBGMatchParser.extract_player_names_from_mat(file_path)
 
         # Show import options dialog with actual player names
         import_dialog = ImportOptionsDialog(
@@ -1273,7 +1287,7 @@ class MainWindow(QMainWindow):
             self,
             "Import Backgammon File",
             "",
-            "All Supported Files (*.xg *.mat *.txt);;XG Binary (*.xg);;Match Files (*.mat *.txt);;All Files (*)"
+            "All Supported Files (*.xg *.mat *.txt *.sgf);;XG Binary (*.xg);;Match Files (*.mat *.txt *.sgf);;All Files (*)"
         )
 
         if not file_path:
@@ -1395,8 +1409,9 @@ class MainWindow(QMainWindow):
                     # User cancelled
                     return
 
-            elif result.format == InputFormat.MATCH_FILE:
+            elif result.format == InputFormat.MATCH_FILE or result.format == InputFormat.SGF_FILE:
                 # Import match file with analysis
+                # Both .mat and .sgf files are handled the same way
                 decisions, total_count = self._import_match_file(file_path)
                 if decisions is None:
                     # User cancelled or error occurred
@@ -1406,7 +1421,7 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(
                     self,
                     "Unknown Format",
-                    f"Could not detect file format.\n\nSupported formats:\n- XG binary files (.xg)\n- Match files (.mat)\n\n{result.details}"
+                    f"Could not detect file format.\n\nSupported formats:\n- XG binary files (.xg)\n- Match files (.mat, .sgf)\n\n{result.details}"
                 )
                 return
 

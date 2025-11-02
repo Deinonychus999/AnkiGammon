@@ -156,8 +156,10 @@ class GNUBGAnalyzer:
         """
         Analyze entire match file using gnubg and export to text files.
 
+        Supports both .mat (Jellyfish) and .sgf (Smart Game Format) files.
+
         Args:
-            mat_file_path: Path to .mat match file
+            mat_file_path: Path to match file (.mat or .sgf)
             max_moves: Maximum number of candidate moves to show (default: 8)
             progress_callback: Optional callback(status_message) for progress updates
 
@@ -166,7 +168,7 @@ class GNUBGAnalyzer:
             Caller is responsible for cleaning up these temp files after parsing.
 
         Raises:
-            FileNotFoundError: If mat_file not found
+            FileNotFoundError: If match file not found
             subprocess.CalledProcessError: If gnubg execution fails
             RuntimeError: If export files were not created
         """
@@ -193,13 +195,20 @@ class GNUBGAnalyzer:
         if ' ' in output_path_str:
             output_path_str = f'"{output_path_str}"'
 
+        # Use appropriate import command based on file type
+        file_ext = mat_path.suffix.lower()
+        if file_ext == '.sgf':
+            import_cmd = f"load match {mat_path_str}"  # SGF files use 'load match'
+        else:
+            import_cmd = f"import mat {mat_path_str}"  # .mat files use 'import mat'
+
         commands = [
             "set automatic game off",
             "set automatic roll off",
             f"set analysis chequerplay evaluation plies {self.analysis_ply}",
             f"set analysis cubedecision evaluation plies {self.analysis_ply}",
             f"set export moves number {max_moves}",
-            f"import mat {mat_path_str}",
+            import_cmd,
             "analyse match",
             f"export match text {output_path_str}",
         ]
@@ -297,10 +306,10 @@ class GNUBGAnalyzer:
                     f"Expected files in: {temp_dir}\n"
                     f"Files found: {[f.name for f in temp_files]}\n\n"
                 )
-                if result.stdout:
-                    error_msg += f"GnuBG output:\n{result.stdout[:500]}\n"
-                if result.stderr:
-                    error_msg += f"GnuBG errors:\n{result.stderr[:500]}"
+                if stdout:
+                    error_msg += f"GnuBG output:\n{stdout[:500]}\n"
+                if stderr:
+                    error_msg += f"GnuBG errors:\n{stderr[:500]}"
 
                 raise RuntimeError(error_msg)
 
