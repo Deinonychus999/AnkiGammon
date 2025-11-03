@@ -866,3 +866,47 @@ class TestXGBinaryParser:
                notation == "20/15* 13/8 15/5" or \
                notation == "13/8 20/15* 15/5", \
             f"Expected notation with hit at point 15, got: {notation}"
+
+    def test_single_hit_on_same_destination(self):
+        """
+        Test that only the first checker to land on a point shows a hit marker.
+
+        When two checkers land on the same destination and there's a blot,
+        only the first checker hits. The second lands on an empty point.
+
+        Expected: "6/1* 4/1" (one hit marker)
+        Not: "6/1* 4/1*" (two hit markers)
+        """
+        # Create a position with opponent blot at point 1
+        position = Position()
+        for i in range(26):
+            position.points[i] = 0
+
+        # Player X on roll
+        # In XG binary positions, the player on roll has negative checkers,
+        # opponent has positive checkers
+        position.points[6] = -1  # X's checker at point 6
+        position.points[4] = -1  # X's checker at point 4
+        position.points[1] = 1   # O's blot at point 1 (will be hit)
+
+        # XG move notation (0-based): 5/0 3/0
+        # Standard notation (1-based): 6/1* 4/1
+        # Only the FIRST checker (6/1) should show hit marker
+        xg_moves = (5, 0, 3, 0, -1, -1, -1, -1)
+
+        notation = XGBinaryParser._convert_move_notation(
+            xg_moves,
+            position=position,
+            on_roll=Player.X
+        )
+
+        # Check that exactly one hit marker exists
+        hit_count = notation.count('*')
+        assert hit_count == 1, f"Expected 1 hit marker, found {hit_count} in: {notation}"
+
+        # Check that 6/1 has the hit marker
+        assert "6/1*" in notation, f"First move (6/1) should have hit marker in: {notation}"
+
+        # Check that 4/1 does NOT have hit marker
+        assert "4/1*" not in notation, f"Second move (4/1) should not have hit marker in: {notation}"
+        assert "4/1" in notation, f"Second move (4/1) should be present without hit marker in: {notation}"

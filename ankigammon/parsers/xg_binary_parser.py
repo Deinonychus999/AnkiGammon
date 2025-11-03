@@ -689,7 +689,7 @@ class XGBinaryParser:
                     # Opponent should PASS
                     # Compare No Double vs Double/Pass
                     if no_double_move.equity >= double_pass_move.equity:
-                        best_move_notation = "No Double/Take"
+                        best_move_notation = "Too good/Pass"
                         best_equity = no_double_move.equity
                     else:
                         best_move_notation = "Double/Pass"
@@ -698,7 +698,10 @@ class XGBinaryParser:
                     # Opponent should TAKE
                     # Compare No Double vs Double/Take
                     if no_double_move.equity >= double_take_move.equity:
-                        best_move_notation = "No Double/Take"
+                        if no_double_move.equity > double_pass_move.equity:
+                            best_move_notation = "Too good/Take"
+                        else:
+                            best_move_notation = "No Double/Take"
                         best_equity = no_double_move.equity
                     else:
                         best_move_notation = "Double/Take"
@@ -973,6 +976,10 @@ class XGBinaryParser:
         used = [False] * len(sub_moves)
         combined_moves = []
 
+        # Track destination points that have been hit.
+        # Only the first checker to land on a point can hit a blot.
+        destinations_hit = set()
+
         # Sort sub-moves by from_point descending to process in order
         sorted_indices = sorted(range(len(sub_moves)),
                                key=lambda i: sub_moves[i][0],
@@ -996,11 +1003,14 @@ class XGBinaryParser:
                 for next_idx in from_point_map[to_point]:
                     if not used[next_idx]:
                         # Check for hit at current destination before extending chain.
+                        # Only mark as hit if this is the first checker to this destination.
                         hit_at_current = False
                         if position and on_roll and 0 <= to_point <= 23:
-                            checker_count = position.points[to_point + 1]
-                            if checker_count == 1:
-                                hit_at_current = True
+                            if to_point not in destinations_hit:
+                                checker_count = position.points[to_point + 1]
+                                if checker_count == 1:
+                                    hit_at_current = True
+                                    # Don't add to destinations_hit here - let final check handle it
 
                         if hit_at_current:
                             # Stop extending to preserve hit marker at this point.
@@ -1016,15 +1026,18 @@ class XGBinaryParser:
                 if not extended:
                     break
 
-            # Check for hit at the final destination
+            # Check for hit at the final destination.
+            # Only mark as hit if this is the first checker to this destination.
             hit = False
             if position and on_roll and 0 <= to_point <= 23:
-                # Convert 0-based to 1-based for position lookup
-                checker_count = position.points[to_point + 1]
-                # Hit occurs if opponent has exactly 1 checker at destination
-                # After perspective transform, opponent checkers are always positive
-                if checker_count == 1:
-                    hit = True
+                if to_point not in destinations_hit:
+                    # Convert 0-based to 1-based for position lookup
+                    checker_count = position.points[to_point + 1]
+                    # Hit occurs if opponent has exactly 1 checker at destination.
+                    # After perspective transform, opponent checkers are always positive.
+                    if checker_count == 1:
+                        hit = True
+                        destinations_hit.add(to_point)
 
             combined_moves.append((from_point, to_point, hit))
 
