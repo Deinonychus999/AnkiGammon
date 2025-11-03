@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.0.2] - 2025-11-03
+
+### Fixed
+- Linux missing dependencies in AppImage
+- XG binary parser now correctly handles hit markers in move notation
+- Improved accuracy of move notation for positions with intermediate hits
+
+### Changed
+- Migrated test suite from unittest to pytest
+- Enhanced XG binary parser move notation conversion algorithm
+
+### Removed
+- Removed unused BeautifulSoup4 and lxml dependencies to reduce package size
+
 ## [1.0.1] - 2025-11-02
 
 ### Added
