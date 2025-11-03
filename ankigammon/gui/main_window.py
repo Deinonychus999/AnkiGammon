@@ -1092,8 +1092,17 @@ class MainWindow(QMainWindow):
                     filtered.append(decision)
                     logger.info(f"DEBUG: Added cube decision to filtered list")
             else:
-                # For checker play, use absolute value of xg_error if available
-                error_magnitude = abs(played_move.xg_error) if played_move.xg_error is not None else played_move.error
+                # For checker play from XG binary files, use XG's authoritative ErrMove field
+                # Otherwise fall back to recalculated error
+                if decision.xg_error_move is not None:
+                    # Use XG's ErrMove field (already absolute value)
+                    error_magnitude = decision.xg_error_move
+                elif played_move.xg_error is not None:
+                    # Use XG text parser's calculated error
+                    error_magnitude = abs(played_move.xg_error)
+                else:
+                    # Use recalculated error (for other sources)
+                    error_magnitude = played_move.error
 
                 # Only include if error is at or above threshold
                 if error_magnitude < threshold:

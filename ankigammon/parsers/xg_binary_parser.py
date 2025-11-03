@@ -131,6 +131,8 @@ class XGBinaryParser:
                             logger.debug(f"Match header: version={file_version}, match_length={match_length}")
 
                         elif isinstance(record, xgstruct.HeaderGameEntry):
+                            # XG binary stores scores from Player 1's perspective
+                            # Scores are swapped during position flip when Player 2 is on roll
                             score_x = record.Score1
                             score_o = record.Score2
                             crawford = bool(record.CrawfordApply)
@@ -289,18 +291,33 @@ class XGBinaryParser:
                 flipped_points[i] = -position.points[25 - i]
             position.points = flipped_points
             position.x_off, position.o_off = position.o_off, position.x_off
+            # Swap scores to match flipped perspective
+            score_x, score_o = score_o, score_x
 
         # Get dice
         dice = tuple(move_entry.Dice) if move_entry.Dice else None
 
         # Parse cube state
-        cube_value = abs(move_entry.CubeA) if move_entry.CubeA != 0 else 1
-        if move_entry.CubeA > 0:
-            cube_owner = CubeState.X_OWNS  # Player X owns
-        elif move_entry.CubeA < 0:
-            cube_owner = CubeState.O_OWNS  # Player O owns
-        else:
+        # CubeA encoding: sign indicates owner, absolute value is log2 of cube value
+        # 0 = centered at 1, ±1 = owned at 2^1=2, ±2 = owned at 2^2=4, etc.
+        if move_entry.CubeA == 0:
+            cube_value = 1
             cube_owner = CubeState.CENTERED
+        else:
+            cube_value = 2 ** abs(move_entry.CubeA)
+            # XG binary sign convention: Positive = XG Player 1, Negative = XG Player 2
+            # Mapping: XG Player 1 → Player.O, XG Player 2 → Player.X
+            if move_entry.CubeA > 0:
+                cube_owner = CubeState.O_OWNS  # XG Player 1 owns
+            else:
+                cube_owner = CubeState.X_OWNS  # XG Player 2 owns
+
+        # Swap cube owner if position was flipped
+        if on_roll == Player.X:
+            if cube_owner == CubeState.X_OWNS:
+                cube_owner = CubeState.O_OWNS
+            elif cube_owner == CubeState.O_OWNS:
+                cube_owner = CubeState.X_OWNS
 
         # Parse candidate moves from analysis
         moves = []
@@ -389,6 +406,14 @@ class XGBinaryParser:
                 move.error = abs(best_equity - move.equity)
                 move.xg_error = move.equity - best_equity  # Negative for worse moves
 
+        # Extract XG's error value for the played move
+        # This is the authoritative error for filtering purposes
+        xg_err_move = None
+        if hasattr(move_entry, 'ErrMove'):
+            err_move_raw = move_entry.ErrMove
+            if err_move_raw != -1000:  # -1000 indicates not analyzed
+                xg_err_move = abs(err_move_raw)  # Use absolute value for error magnitude
+
         # Generate XGID for the position
         crawford_jacoby = 1 if crawford else 0
         xgid = position.to_xgid(
@@ -415,6 +440,7 @@ class XGBinaryParser:
             cube_owner=cube_owner,
             decision_type=DecisionType.CHECKER_PLAY,
             candidate_moves=moves,
+            xg_error_move=xg_err_move,  # XG's authoritative error value
             xgid=xgid
         )
 
@@ -473,13 +499,19 @@ class XGBinaryParser:
         )
 
         # Parse cube state
-        cube_value = abs(cube_entry.CubeB) if cube_entry.CubeB != 0 else 1
-        if cube_entry.CubeB > 0:
-            cube_owner = CubeState.X_OWNS
-        elif cube_entry.CubeB < 0:
-            cube_owner = CubeState.O_OWNS
-        else:
+        # CubeB encoding: sign indicates owner, absolute value is log2 of cube value
+        # 0 = centered at 1, ±1 = owned at 2^1=2, ±2 = owned at 2^2=4, etc.
+        if cube_entry.CubeB == 0:
+            cube_value = 1
             cube_owner = CubeState.CENTERED
+        else:
+            cube_value = 2 ** abs(cube_entry.CubeB)
+            # XG binary sign convention: Positive = XG Player 1, Negative = XG Player 2
+            # Mapping: XG Player 1 → Player.O, XG Player 2 → Player.X
+            if cube_entry.CubeB > 0:
+                cube_owner = CubeState.O_OWNS  # XG Player 1 owns
+            else:
+                cube_owner = CubeState.X_OWNS  # XG Player 2 owns
 
         # Parse cube decisions from Doubled analysis
         moves = []
@@ -795,6 +827,13 @@ class XGBinaryParser:
             position.points = flipped_points
             # Swap borne-off counts
             position.x_off, position.o_off = position.o_off, position.x_off
+            # Swap scores to match flipped perspective
+            score_x, score_o = score_o, score_x
+            # Swap cube owner to match flipped perspective
+            if cube_owner == CubeState.X_OWNS:
+                cube_owner = CubeState.O_OWNS
+            elif cube_owner == CubeState.O_OWNS:
+                cube_owner = CubeState.X_OWNS
 
         # Generate XGID for the position
         crawford_jacoby = 1 if crawford else 0
@@ -967,10 +1006,9 @@ class XGBinaryParser:
                 # Convert 0-based to 1-based for position lookup
                 checker_count = position.points[to_point + 1]
                 # Hit occurs if opponent has exactly 1 checker at destination
-                if on_roll == Player.X and checker_count == -1:
-                    hit = True  # X hitting O
-                elif on_roll == Player.O and checker_count == 1:
-                    hit = True  # O hitting X
+                # After perspective transform, opponent checkers are always positive
+                if checker_count == 1:
+                    hit = True
 
             combined_moves.append((from_point, to_point, hit))
 

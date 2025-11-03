@@ -154,19 +154,12 @@ class CardGenerator:
         """
         base_metadata = decision.get_metadata_text()
 
-        # Get actual checker color from the renderer's color scheme
-        if decision.on_roll == Player.X:
-            checker_color = self.renderer.color_scheme.checker_x
-        else:
-            checker_color = self.renderer.color_scheme.checker_o
+        # On-roll player uses bottom color after perspective transform
+        checker_color = self.renderer.color_scheme.checker_o
 
-        # Replace "White" or "Black" with colored circle
+        # Replace "Black" with colored circle
         colored_circle = f'<span style="color: {checker_color}; font-size: 1.8em;">●</span>'
-
-        if decision.on_roll == Player.X:
-            metadata_html = base_metadata.replace("White", colored_circle)
-        else:
-            metadata_html = base_metadata.replace("Black", colored_circle)
+        metadata_html = base_metadata.replace("Black", colored_circle)
 
         return metadata_html
 
@@ -682,6 +675,8 @@ class CardGenerator:
 
         # Prepare animation parameters
         on_roll_player = 'X' if decision.on_roll == Player.X else 'O'
+        # Ghost checkers use bottom player's color after perspective transform
+        ghost_checker_color = self.renderer.color_scheme.checker_o
         checker_x_color = self.renderer.color_scheme.checker_x
         checker_o_color = self.renderer.color_scheme.checker_o
         checker_border_color = self.renderer.color_scheme.checker_border
@@ -695,6 +690,7 @@ class CardGenerator:
     const moveData = {move_data_json};
     const moveResultSVGs = {move_result_svgs_json};
     const onRollPlayer = '{on_roll_player}';
+    const ghostCheckerColor = '{ghost_checker_color}';
     const checkerXColor = '{checker_x_color}';
     const checkerOColor = '{checker_o_color}';
     const checkerBorderColor = '{checker_border_color}';
@@ -887,8 +883,8 @@ class CardGenerator:
         const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
         g.setAttribute('class', 'ghost-checker');
 
-        // Determine checker color based on which player is moving
-        const checkerColor = onRollPlayer === 'X' ? checkerXColor : checkerOColor;
+        // Use bottom player's color after perspective transform
+        const checkerColor = ghostCheckerColor;
 
         // Create the checker circle
         const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
@@ -1268,10 +1264,12 @@ class CardGenerator:
         if move.resulting_position:
             resulting_pos = move.resulting_position
         else:
+            # On-roll player is at bottom after perspective transform
+            move_player = Player.O
             resulting_pos = MoveParser.apply_move(
                 decision.position,
                 move.notation,
-                decision.on_roll
+                move_player
             )
 
         return self.renderer.render_svg(

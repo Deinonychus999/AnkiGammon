@@ -242,6 +242,9 @@ class Decision:
     cube_error: Optional[float] = None  # Doubler's error on double/no double decision (-1000 if not analyzed)
     take_error: Optional[float] = None  # Responder's error on take/pass decision (-1000 if not analyzed)
 
+    # XG binary error (for checker play from .xg files)
+    xg_error_move: Optional[float] = None  # XG's ErrMove field - authoritative error for filtering
+
     # Winning chances percentages (for cube decisions)
     player_win_pct: Optional[float] = None
     player_gammon_pct: Optional[float] = None
@@ -325,8 +328,8 @@ class Decision:
         else:
             cube_str = f"{self.cube_value}"
 
-        # Map player enum to display name (X = White/top, O = Black/bottom)
-        player_name = "White" if self.on_roll == Player.X else "Black"
+        # Position flipping places on-roll player at bottom
+        player_name = "Black"
 
         # Build metadata string based on game type
         if self.match_length > 0:
