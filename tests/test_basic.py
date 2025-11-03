@@ -9,6 +9,7 @@ from ankigammon.utils.gnuid import parse_gnuid, encode_gnuid
 from ankigammon.utils.move_parser import MoveParser
 from ankigammon.renderer.svg_board_renderer import SVGBoardRenderer
 from ankigammon.parsers.xg_text_parser import XGTextParser
+from ankigammon.parsers.xg_binary_parser import XGBinaryParser
 
 
 class TestXGIDParsing:
@@ -802,3 +803,66 @@ eXtreme Gammon Version: 2.10, MET: Kazaross XG2"""
         metadata_text = decision.get_metadata_text()
         assert "Crawford" in metadata_text
         assert "5pt" in metadata_text
+
+
+class TestXGBinaryParser:
+    """Test XG binary parser move notation conversion."""
+
+    def test_compound_move_with_intermediate_hit(self):
+        """
+        Test that hits at intermediate points are preserved in compound moves.
+
+        When a move involves multiple sub-moves (e.g., 20/15 then 15/5),
+        and there's a hit at an intermediate point (e.g., at point 15),
+        the notation should preserve the hit marker at that intermediate point.
+
+        Expected: "20/15* 15/5 13/8" (shows hit at point 15)
+        Not: "20/5 13/8" (loses the hit marker)
+        """
+        # Create a position with an opponent blot at point 15
+        position = Position()
+        # Clear all checkers first
+        for i in range(26):
+            position.points[i] = 0
+
+        # Set up position: Player O on roll (bottom player)
+        # Place O checker at point 20 (will move from here)
+        position.points[20] = -1  # O's checker (negative)
+
+        # Place X checker at point 15 (will be hit)
+        position.points[15] = 1   # X's blot (positive)
+
+        # Place O checker at point 13
+        position.points[13] = -1  # O's checker
+
+        # XG move notation (0-based): 19/14 14/4 12/7
+        # Standard notation (1-based): 20/15* 15/5 13/8
+        # The first move 20/15 should hit the X blot at point 15
+        xg_moves = (19, 14, 14, 4, 12, 7, -1, -1)
+
+        # Convert move notation
+        notation = XGBinaryParser._convert_move_notation(
+            xg_moves,
+            position=position,
+            on_roll=Player.O
+        )
+
+        # Verify the hit marker is present
+        assert "*" in notation, "Hit marker should be present in the notation"
+
+        # Verify the hit is at point 15 (intermediate point)
+        assert "20/15*" in notation or "15*" in notation, \
+            "Hit should be shown at the intermediate point (15)"
+
+        # Verify the move is NOT fully combined into "20/5"
+        # The compound move should be split at the hit point
+        if "20/5" in notation:
+            assert "20/15*" in notation, \
+                "If showing 20/5, must also show 20/15* for the hit"
+
+        # The expected notation should be "20/15* 15/5 13/8" or similar
+        # (order may vary, but hit at 15 must be shown)
+        assert notation == "20/15* 15/5 13/8" or \
+               notation == "20/15* 13/8 15/5" or \
+               notation == "13/8 20/15* 15/5", \
+            f"Expected notation with hit at point 15, got: {notation}"

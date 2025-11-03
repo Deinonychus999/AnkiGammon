@@ -968,7 +968,8 @@ class XGBinaryParser:
                 from_point_map[from_point] = []
             from_point_map[from_point].append(idx)
 
-        # Pass 3: Greedily build maximal chains
+        # Pass 3: Build chains with intermediate hit detection.
+        # Stop chain building at intermediate hits to preserve hit markers in notation.
         used = [False] * len(sub_moves)
         combined_moves = []
 
@@ -985,14 +986,29 @@ class XGBinaryParser:
             from_point, to_point = sub_moves[start_idx]
             used[start_idx] = True
 
-            # Extend the chain as far as possible
+            # Build a chain of intermediate points for hit checking
+            chain_points = [from_point, to_point]
+
+            # Extend the chain as far as possible, checking for hits at each step
             while to_point in from_point_map:
                 # Find an unused move that starts from current to_point
                 extended = False
                 for next_idx in from_point_map[to_point]:
                     if not used[next_idx]:
+                        # Check for hit at current destination before extending chain.
+                        hit_at_current = False
+                        if position and on_roll and 0 <= to_point <= 23:
+                            checker_count = position.points[to_point + 1]
+                            if checker_count == 1:
+                                hit_at_current = True
+
+                        if hit_at_current:
+                            # Stop extending to preserve hit marker at this point.
+                            break
+
                         _, next_to = sub_moves[next_idx]
                         to_point = next_to
+                        chain_points.append(to_point)
                         used[next_idx] = True
                         extended = True
                         break
@@ -1000,7 +1016,7 @@ class XGBinaryParser:
                 if not extended:
                     break
 
-            # Check for hit if position is available
+            # Check for hit at the final destination
             hit = False
             if position and on_roll and 0 <= to_point <= 23:
                 # Convert 0-based to 1-based for position lookup
