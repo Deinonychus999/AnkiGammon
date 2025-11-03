@@ -19,19 +19,18 @@ class MoveParser:
 
         Returns:
             List of (from_point, to_point) tuples
-            Use 0 for X bar, 25 for O bar, 26 for bearing off
+            Point 0 = X bar, Point 25 = O bar, Point 26 = bearing off
 
         Examples:
             "13/9 6/5" -> [(13, 9), (6, 5)]
-            "bar/22" -> [(0, 22)]  # X entering from bar
-            "6/off" -> [(6, 26)]  # Bearing off
-            "6/4(4)" -> [(6, 4), (6, 4), (6, 4), (6, 4)]  # Repetition notation
+            "bar/22" -> [(0, 22)]
+            "6/off" -> [(6, 26)]
+            "6/4(4)" -> [(6, 4), (6, 4), (6, 4), (6, 4)]
         """
         notation = notation.strip().lower()
 
-        # Handle special cases
         if notation in ['double', 'take', 'drop', 'pass', 'accept', 'decline']:
-            return []  # Cube actions have no checker movement
+            return []
 
         moves = []
 
@@ -42,49 +41,41 @@ class MoveParser:
             if not part or '/' not in part:
                 continue
 
-            # Check for repetition notation like "6/4(4)" meaning "move 4 checkers from 6 to 4"
+            # Check for repetition notation like "6/4(4)"
             repetition_count = 1
             repetition_match = re.search(r'\((\d+)\)$', part)
             if repetition_match:
                 repetition_count = int(repetition_match.group(1))
-                # Remove the repetition notation from the part
                 part = re.sub(r'\(\d+\)$', '', part)
 
             # Handle compound notation like "6/5*/3" or "24/23/22"
-            # Split by '/' and remove asterisks to get all points in the sequence
             segments = part.split('/')
-
-            # Remove asterisks from each segment
             segments = [seg.rstrip('*') for seg in segments]
 
-            # If there are more than 2 segments, this is compound notation
-            # Convert it to consecutive moves: "6/5/3" -> [(6,5), (5,3)]
+            # Convert compound notation to consecutive moves: "6/5/3" -> [(6,5), (5,3)]
             if len(segments) > 2:
                 for i in range(len(segments) - 1):
                     from_str = segments[i]
                     to_str = segments[i + 1]
 
-                    # Parse 'from' point
                     if 'bar' in from_str:
-                        from_point = 0  # X bar (we'll adjust for O later)
+                        from_point = 0
                     else:
                         try:
                             from_point = int(from_str)
                         except ValueError:
                             continue
 
-                    # Parse 'to' point
                     if 'off' in to_str:
-                        to_point = 26  # Bearing off
+                        to_point = 26
                     elif 'bar' in to_str:
-                        to_point = 0  # Will be adjusted based on context
+                        to_point = 0
                     else:
                         try:
                             to_point = int(to_str)
                         except ValueError:
                             continue
 
-                    # Add the move repetition_count times
                     for _ in range(repetition_count):
                         moves.append((from_point, to_point))
             else:
@@ -95,28 +86,24 @@ class MoveParser:
                 if not to_str:
                     continue
 
-                # Parse 'from' point
                 if 'bar' in from_str:
-                    from_point = 0  # X bar (we'll adjust for O later)
+                    from_point = 0
                 else:
                     try:
                         from_point = int(from_str)
                     except ValueError:
                         continue
 
-                # Parse 'to' point
                 if 'off' in to_str:
-                    to_point = 26  # Bearing off
+                    to_point = 26
                 elif 'bar' in to_str:
-                    # Hit - destination is the bar (rare in notation)
-                    to_point = 0  # Will be adjusted based on context
+                    to_point = 0
                 else:
                     try:
                         to_point = int(to_str)
                     except ValueError:
                         continue
 
-                # Add the move repetition_count times (handles notation like "6/4(4)")
                 for _ in range(repetition_count):
                     moves.append((from_point, to_point))
 
@@ -139,67 +126,46 @@ class MoveParser:
         moves = MoveParser.parse_move_notation(notation)
 
         for from_point, to_point in moves:
-            # In backgammon notation, both players use the SAME numbering (1-24)
-            # The position array also uses this same numbering:
-            #   - points[1] = point 1 (O's 1-point)
-            #   - points[24] = point 24 (X's 1-point, O's 24-point)
-            #
-            # X moves from high numbers to low (24->1), O moves from low to high (1->24)
-            # No coordinate conversion is needed - notation matches position indices directly!
-
-            # The only special handling needed is for bar points:
-            # - X's bar is at position[0]
-            # - O's bar is at position[25]
-            # parse_move_notation() returns 0 for "bar", so correct it for O
+            # Adjust bar points for player perspective
             if from_point == 0 and player == Player.O:
                 from_point = 25
             if to_point == 0 and player == Player.X:
-                to_point = 25  # When X hits, opponent goes to bar 25
+                to_point = 25
 
-            # Move checker
-            if from_point == 26:  # Bearing off (from)
-                # This shouldn't happen in normal notation
+            if from_point == 26:
                 continue
 
-            # Remove from source
             if new_pos.points[from_point] == 0:
-                # Invalid move - no checker to move
                 continue
 
             if player == Player.X:
                 if new_pos.points[from_point] > 0:
                     new_pos.points[from_point] -= 1
                 else:
-                    # Wrong player's checker
                     continue
-            else:  # Player.O
+            else:
                 if new_pos.points[from_point] < 0:
                     new_pos.points[from_point] += 1
                 else:
-                    # Wrong player's checker
                     continue
 
-            # Add to destination
-            if to_point == 26:  # Bearing off
+            if to_point == 26:
                 if player == Player.X:
                     new_pos.x_off += 1
                 else:
                     new_pos.o_off += 1
             else:
-                # Check for hitting
                 target_count = new_pos.points[to_point]
 
                 if player == Player.X:
                     if target_count == -1:
-                        # Hit O's blot
-                        new_pos.points[25] -= 1  # Send to O's bar
+                        new_pos.points[25] -= 1
                         new_pos.points[to_point] = 1
                     else:
                         new_pos.points[to_point] += 1
-                else:  # Player.O
+                else:
                     if target_count == 1:
-                        # Hit X's blot
-                        new_pos.points[0] += 1  # Send to X's bar
+                        new_pos.points[0] += 1
                         new_pos.points[to_point] = -1
                     else:
                         new_pos.points[to_point] -= 1
@@ -212,14 +178,13 @@ class MoveParser:
         Format a single move as notation.
 
         Args:
-            from_point: Source point (0-25, or 26 for bearing off)
+            from_point: Source point
             to_point: Destination point
             player: Player making the move
 
         Returns:
             Move notation string (e.g., "13/9", "bar/22", "6/off")
         """
-        # Handle special points
         if from_point == 0 and player == Player.X:
             from_str = "bar"
         elif from_point == 25 and player == Player.O:

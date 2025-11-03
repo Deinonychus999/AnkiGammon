@@ -92,14 +92,12 @@ class AnkiConnect:
 
     def create_model(self) -> None:
         """Create the XG Backgammon note type if it doesn't exist."""
-        # Check if model already exists
         model_names = self.invoke('modelNames')
         if MODEL_NAME in model_names:
-            # Update the styling of existing model
+            # Update styling for existing model
             self.invoke('updateModelStyling', model={'name': MODEL_NAME, 'css': CARD_CSS})
             return
 
-        # Create new model
         model = {
             'modelName': MODEL_NAME,
             'inOrderFields': ['Front', 'Back'],
@@ -124,14 +122,13 @@ class AnkiConnect:
         Add a note to Anki.
 
         Args:
-            front: Front HTML (with embedded SVG)
-            back: Back HTML (with embedded SVG)
+            front: Front HTML with embedded SVG
+            back: Back HTML with embedded SVG
             tags: List of tags
 
         Returns:
             Note ID
         """
-        # Create note
         note = {
             'deckName': self.deck_name,
             'modelName': MODEL_NAME,
@@ -161,31 +158,27 @@ class AnkiConnect:
 
         Args:
             decisions: List of Decision objects
-            output_dir: Directory for configuration (no media files needed)
-            show_options: Show multiple choice options (text-based)
+            output_dir: Directory for configuration
+            show_options: Show multiple choice options
             color_scheme: Board color scheme name
             interactive_moves: Enable interactive move visualization
-            orientation: Board orientation ("clockwise" or "counter-clockwise")
+            orientation: Board orientation
 
         Returns:
             Dictionary with export statistics
         """
-        # Test connection
         if not self.test_connection():
             raise Exception("Cannot connect to Anki-Connect")
 
-        # Create model and deck
         self.create_model()
         self.create_deck()
 
-        # Create renderer with color scheme
         from ankigammon.renderer.color_schemes import get_scheme
         from ankigammon.renderer.svg_board_renderer import SVGBoardRenderer
 
         scheme = get_scheme(color_scheme)
         renderer = SVGBoardRenderer(color_scheme=scheme, orientation=orientation)
 
-        # Create card generator
         card_gen = CardGenerator(
             output_dir=output_dir,
             show_options=show_options,
@@ -193,7 +186,6 @@ class AnkiConnect:
             renderer=renderer
         )
 
-        # Generate and add cards
         added = 0
         skipped = 0
         errors = []

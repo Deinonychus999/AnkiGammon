@@ -76,11 +76,7 @@ def parse_xgid(xgid: str) -> Tuple[Position, dict]:
     match_length = int(parts[8]) if len(parts) > 8 else 0
     max_cube = int(parts[9]) if len(parts) > 9 else 8
 
-    # Parse position
-    # CRITICAL: The position encoding depends on whose turn it is!
-    # When turn=1 (BOTTOM/O on roll), the encoding is from O's perspective
-    # When turn=-1 (TOP/X on roll), the encoding is from X's perspective
-    # We need to pass the turn to correctly interpret the position
+    # Parse position (encoding is perspective-dependent based on turn)
     position = _parse_position_string(position_str, turn)
 
     # Parse metadata
@@ -90,10 +86,8 @@ def parse_xgid(xgid: str) -> Tuple[Position, dict]:
     cube_value = 2 ** cube_value_log if cube_value_log >= 0 else 1
     metadata['cube_value'] = cube_value
 
-    # Cube owner
-    # NOTE: Unlike position encoding, cube ownership is ABSOLUTE (not perspective-dependent)
+    # Cube owner (absolute, not perspective-dependent)
     # -1 = TOP player (X), 0 = centered, 1 = BOTTOM player (O)
-    # This is consistent with bar positions which are also absolute
     if cube_position == 0:
         cube_state = CubeState.CENTERED
     elif cube_position == -1:
@@ -142,26 +136,20 @@ def _parse_position_string(pos_str: str, turn: int) -> Position:
     """
     Parse the position encoding part of XGID.
 
-    Format: 26 characters
+    The 26-character position string is encoded from the perspective of the player on roll:
 
-    CRITICAL: The ENTIRE position encoding depends on whose turn it is!
+    When turn=1 (O on roll):
+    - Char 0: X's bar, Chars 1-24: points 1-24, Char 25: O's bar
+    - lowercase = X checkers, uppercase = O checkers
 
-    When turn=1 (O on roll - standard view):
-    - Char 0: X's bar (top)
-    - Chars 1-24: points 1-24 in standard order
-    - Char 25: O's bar (bottom)
-    - lowercase='X', uppercase='O'
+    When turn=-1 (X on roll):
+    - Char 0: O's bar, Chars 1-24: points in reverse (24-1), Char 25: X's bar
+    - lowercase = X checkers, uppercase = O checkers
 
-    When turn=-1 (X on roll - flipped view):
-    - Char 0: O's bar (top in X's view)
-    - Chars 1-24: points 24-1 in REVERSED order
-    - Char 25: X's bar (bottom in X's view)
-    - lowercase='X', uppercase='O' (stays the same)
-
-    In our internal model, we always use:
-    - points[0] = X's bar (TOP player in standard orientation)
-    - points[1-24] = board points (point 1 = O's home, point 24 = X's home)
-    - points[25] = O's bar (BOTTOM player in standard orientation)
+    Internal model (always consistent):
+    - points[0] = X's bar (TOP player)
+    - points[1-24] = board points (1 = O's home, 24 = X's home)
+    - points[25] = O's bar (BOTTOM player)
     """
     if len(pos_str) != 26:
         raise ValueError(f"Position string must be 26 characters, got {len(pos_str)}")
@@ -169,27 +157,19 @@ def _parse_position_string(pos_str: str, turn: int) -> Position:
     position = Position()
 
     if turn == 1:
-        # O is on roll - encoding is from O's perspective (standard)
-        # Char 0: X's bar (top), Char 25: O's bar (bottom)
-        # Chars 1-24: points 1-24 in standard order
+        # O on roll: standard perspective
         position.points[0] = _decode_checker_count(pos_str[0], turn)
         position.points[25] = _decode_checker_count(pos_str[25], turn)
 
         for i in range(1, 25):
             position.points[i] = _decode_checker_count(pos_str[i], turn)
     else:
-        # X is on roll - encoding is from X's perspective (FLIPPED!)
-        # The ENTIRE position is flipped, including bars:
-        # Char 0: O's bar (top in X's view), Char 25: X's bar (bottom in X's view)
-        # Chars 1-24: points from X's perspective -> need to reverse
+        # X on roll: flipped perspective - bars and points are reversed
+        position.points[0] = _decode_checker_count(pos_str[25], turn)  # X's bar
+        position.points[25] = _decode_checker_count(pos_str[0], turn)  # O's bar
 
-        # Bars need to be swapped!
-        position.points[0] = _decode_checker_count(pos_str[25], turn)  # X's bar comes from char 25
-        position.points[25] = _decode_checker_count(pos_str[0], turn)  # O's bar comes from char 0
-
-        # Board points - reverse the numbering
+        # Board points: reverse mapping
         for i in range(1, 25):
-            # Point i in our model comes from point (25-i) in the XGID
             position.points[i] = _decode_checker_count(pos_str[25 - i], turn)
 
     # Calculate borne-off checkers (each player starts with 15)
@@ -206,15 +186,15 @@ def _decode_checker_count(char: str, turn: int) -> int:
     """
     Decode a single character to checker count.
 
-    CRITICAL: The uppercase/lowercase mapping CHANGES based on whose turn it is!
+    The uppercase/lowercase mapping depends on whose turn it is:
 
-    When turn=1 (O on roll - O's perspective):
+    When turn=1 (O on roll):
     - lowercase = X checkers (positive)
     - uppercase = O checkers (negative)
 
-    When turn=-1 (X on roll - X's perspective):
-    - lowercase = O checkers (negative) - FLIPPED!
-    - uppercase = X checkers (positive) - FLIPPED!
+    When turn=-1 (X on roll):
+    - lowercase = O checkers (negative)
+    - uppercase = X checkers (positive)
 
     Args:
         char: The character to decode
@@ -240,7 +220,7 @@ def _decode_checker_count(char: str, turn: int) -> int:
         # O's perspective: lowercase=X, uppercase=O
         return count if is_lowercase else -count
     else:
-        # X's perspective: lowercase=O, uppercase=X (FLIPPED!)
+        # X's perspective: lowercase=O, uppercase=X
         return -count if is_lowercase else count
 
 
@@ -323,17 +303,17 @@ def _encode_position_string(position: Position, turn: int) -> str:
     """
     Encode a position to the 26-character XGID format.
 
-    CRITICAL: The ENTIRE position encoding depends on whose turn it is!
+    The encoding depends on whose turn it is:
 
-    When turn=1 (O on roll - standard view):
-    - Char 0: X's bar (our points[0])
-    - Chars 1-24: points in standard order (our points[1-24])
-    - Char 25: O's bar (our points[25])
+    When turn=1 (O on roll):
+    - Char 0: X's bar (points[0])
+    - Chars 1-24: points in standard order (points[1-24])
+    - Char 25: O's bar (points[25])
 
-    When turn=-1 (X on roll - flipped view):
-    - Char 0: O's bar (our points[25])
-    - Chars 1-24: points in REVERSED order (char 1 = points[24], char 24 = points[1])
-    - Char 25: X's bar (our points[0])
+    When turn=-1 (X on roll):
+    - Char 0: O's bar (points[25])
+    - Chars 1-24: points in reversed order
+    - Char 25: X's bar (points[0])
 
     Args:
         position: The position to encode
@@ -345,27 +325,19 @@ def _encode_position_string(position: Position, turn: int) -> str:
     chars = [''] * 26
 
     if turn == 1:
-        # O is on roll - encoding is from O's perspective (standard)
-        # Char 0: X's bar (top), Char 25: O's bar (bottom)
-        # Chars 1-24: points 1-24 in standard order
+        # O on roll: standard perspective
         chars[0] = _encode_checker_count(position.points[0], turn)
         chars[25] = _encode_checker_count(position.points[25], turn)
 
         for i in range(1, 25):
             chars[i] = _encode_checker_count(position.points[i], turn)
     else:
-        # X is on roll - encoding is from X's perspective (FLIPPED!)
-        # The ENTIRE position is flipped, including bars:
-        # Char 0: O's bar (top in X's view), Char 25: X's bar (bottom in X's view)
-        # Chars 1-24: points from X's perspective -> need to reverse
+        # X on roll: flipped perspective - bars and points are reversed
+        chars[0] = _encode_checker_count(position.points[25], turn)  # O's bar
+        chars[25] = _encode_checker_count(position.points[0], turn)  # X's bar
 
-        # Bars need to be swapped!
-        chars[0] = _encode_checker_count(position.points[25], turn)  # O's bar goes to char 0
-        chars[25] = _encode_checker_count(position.points[0], turn)  # X's bar goes to char 25
-
-        # Board points - reverse the numbering
+        # Board points: reverse mapping
         for i in range(1, 25):
-            # Point i in our model goes to char (25-i) in the XGID
             chars[25 - i] = _encode_checker_count(position.points[i], turn)
 
     return ''.join(chars)
@@ -375,17 +347,17 @@ def _encode_checker_count(count: int, turn: int) -> str:
     """
     Encode checker count to a single character.
 
-    CRITICAL: The uppercase/lowercase mapping CHANGES based on whose turn it is!
+    The uppercase/lowercase mapping depends on whose turn it is:
 
-    When turn=1 (O on roll - O's perspective):
+    When turn=1 (O on roll):
     - 0 = '-'
     - positive (X) = lowercase 'a' to 'p'
     - negative (O) = uppercase 'A' to 'P'
 
-    When turn=-1 (X on roll - X's perspective):
+    When turn=-1 (X on roll):
     - 0 = '-'
-    - positive (X) = uppercase 'A' to 'P' - FLIPPED!
-    - negative (O) = lowercase 'a' to 'p' - FLIPPED!
+    - positive (X) = uppercase 'A' to 'P'
+    - negative (O) = lowercase 'a' to 'p'
 
     Args:
         count: Checker count (positive for X, negative for O, 0 for empty)
@@ -402,18 +374,14 @@ def _encode_checker_count(count: int, turn: int) -> str:
         abs_count = 16
 
     if turn == 1:
-        # O's perspective: lowercase=X (positive), uppercase=O (negative)
+        # O's perspective: lowercase=X, uppercase=O
         if count > 0:
-            # X checkers -> lowercase
             return chr(ord('a') + abs_count - 1)
         else:
-            # O checkers -> uppercase
             return chr(ord('A') + abs_count - 1)
     else:
-        # X's perspective: uppercase=X (positive), lowercase=O (negative) - FLIPPED!
+        # X's perspective: uppercase=X, lowercase=O
         if count > 0:
-            # X checkers -> uppercase
             return chr(ord('A') + abs_count - 1)
         else:
-            # O checkers -> lowercase
             return chr(ord('a') + abs_count - 1)

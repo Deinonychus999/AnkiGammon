@@ -57,8 +57,7 @@ class GnuBGValidationWorker(QThread):
                 raise
 
             # Try to run gnubg with -t (text mode) and -c (command file)
-            # On Windows, prevent console window from appearing
-            # Use longer timeout since first launch can be slow (loading neural networks)
+            # Suppress console window on Windows; allow extra time for neural network loading
             kwargs = {
                 'capture_output': True,
                 'text': True,
@@ -75,8 +74,7 @@ class GnuBGValidationWorker(QThread):
             # Check if it's actually GNU Backgammon
             output = result.stdout + result.stderr
             if "GNU Backgammon" in output or result.returncode == 0:
-                # Check if it's the GUI version (which may not work properly on Windows)
-                # Use stem to get filename without extension (works cross-platform)
+                # Check for GUI version and recommend CLI version on Windows
                 exe_name = path_obj.stem.lower()
                 if sys.platform == 'win32' and "cli" not in exe_name and exe_name == "gnubg":
                     self.validation_complete.emit(
@@ -258,7 +256,7 @@ class SettingsDialog(QDialog):
         self.cmb_gnubg_ply.setCursor(Qt.PointingHandCursor)
         form.addRow("Analysis Depth (ply):", self.cmb_gnubg_ply)
 
-        # Score matrix generation with inline warning
+        # Score matrix generation
         matrix_layout = QHBoxLayout()
         self.chk_generate_score_matrix = QCheckBox("Generate score matrix for cube decisions")
         self.chk_generate_score_matrix.setCursor(Qt.PointingHandCursor)
@@ -299,7 +297,7 @@ class SettingsDialog(QDialog):
         self.chk_show_options.setChecked(self.settings.show_options)
         self.chk_interactive_moves.setChecked(self.settings.interactive_moves)
 
-        # Max MCQ options (combobox has values 2-10, setting value is 2-10, so index is value-2)
+        # Max MCQ options dropdown (index is value minus 2)
         self.cmb_max_mcq_options.setCurrentIndex(self.settings.max_mcq_options - 2)
 
         # Initialize max options enabled state based on show options checkbox

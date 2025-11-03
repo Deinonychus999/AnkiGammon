@@ -41,17 +41,15 @@ class SGFParser:
             - None for invalid letter
         """
         if letter == 'y':
-            return 0  # bar
+            return 0
         elif letter == 'z':
-            return 25  # off
-        elif letter in SGFParser.POINT_LETTERS[:24]:  # a-x
+            return 25
+        elif letter in SGFParser.POINT_LETTERS[:24]:
             index = SGFParser.POINT_LETTERS.index(letter)
 
             if player == 'W':
-                # White moves from low to high: a=1, b=2... x=24
                 return index + 1
-            else:  # Black
-                # Black moves from high to low: a=24, b=23... x=1
+            else:
                 return 24 - index
         else:
             return None
@@ -77,7 +75,6 @@ class SGFParser:
         elif move_str == 'drop':
             return "", "Drops"
 
-        # Parse dice roll (first 2 characters)
         if len(move_str) < 2:
             return "", ""
 
@@ -85,13 +82,10 @@ class SGFParser:
         if not dice.isdigit():
             return "", ""
 
-        # Parse move pairs (remaining characters in pairs)
         move_part = move_str[2:]
         if len(move_part) % 2 != 0:
-            # Odd number of letters, invalid
             return dice, ""
 
-        # Convert letter pairs to moves
         moves = []
         for i in range(0, len(move_part), 2):
             from_letter = move_part[i]
@@ -103,7 +97,6 @@ class SGFParser:
             if from_point is None or to_point is None:
                 continue
 
-            # Convert to standard notation
             from_str = 'bar' if from_point == 0 else str(from_point)
             to_str = 'off' if to_point == 25 else str(to_point)
 
@@ -129,7 +122,6 @@ class SGFParser:
         with open(file_path, 'r', encoding='utf-8') as f:
             content = f.read()
 
-        # Split into individual games (each game is wrapped in parentheses)
         games_raw = re.findall(r'\(([^()]+)\)', content)
 
         games = []
@@ -140,7 +132,6 @@ class SGFParser:
         for game_raw in games_raw:
             game_data = SGFParser._parse_game(game_raw)
 
-            # Extract player names from first game
             if player_white is None:
                 player_white = game_data.get('player_white', 'White')
             if player_black is None:
@@ -171,7 +162,6 @@ class SGFParser:
             'moves': []
         }
 
-        # Split by semicolons to get properties
         parts = game_str.split(';')
 
         for part in parts:
@@ -179,7 +169,6 @@ class SGFParser:
             if not part:
                 continue
 
-            # Extract properties: PROP[value]
             props = re.findall(r'([A-Z]+)\[([^\]]*)\]', part)
 
             for prop_name, prop_value in props:
@@ -192,7 +181,6 @@ class SGFParser:
                 elif prop_name == 'RU':
                     game_data['rules'] = prop_value
                 elif prop_name == 'MI':
-                    # Parse match info: MI[length:11][game:0][bs:0][ws:0]
                     mi_match = re.search(r'length:(\d+)', prop_value)
                     if mi_match:
                         game_data['match_length'] = int(mi_match.group(1))
@@ -209,7 +197,6 @@ class SGFParser:
                     if ws_match:
                         game_data['white_score'] = int(ws_match.group(1))
 
-            # Parse moves: B[...] or W[...]
             move_match = re.match(r'^([BW])\[([^\]]+)\]', part)
             if move_match:
                 player = move_match.group(1)
@@ -238,7 +225,6 @@ class SGFParser:
         """
         lines = []
 
-        # Header
         player_white = sgf_data.get('player_white', 'White')
         player_black = sgf_data.get('player_black', 'Black')
         match_length = sgf_data.get('match_length', 0)
@@ -246,7 +232,6 @@ class SGFParser:
         lines.append(f" {match_length} point match")
         lines.append("")
 
-        # Process each game
         for game_idx, game in enumerate(sgf_data['games'], start=1):
             white_score = game.get('white_score', 0)
             black_score = game.get('black_score', 0)
@@ -254,14 +239,12 @@ class SGFParser:
             lines.append(f" Game {game_idx}")
             lines.append(f" {player_black} : {black_score}                        {player_white} : {white_score}")
 
-            # Process moves
             move_num = 0
             for move in game['moves']:
                 player_name = player_white if move['player'] == 'W' else player_black
                 dice = move['dice']
                 notation = move['notation']
 
-                # Handle cube actions
                 if 'Doubles' in notation:
                     lines.append(f" {move_num})  Doubles => 2")
                 elif 'Takes' in notation:
@@ -269,16 +252,12 @@ class SGFParser:
                 elif 'Drops' in notation:
                     lines.append(f" {move_num})  Drops")
                 else:
-                    # Regular move
                     if dice:
                         move_num += 1
-                        # Format: " 1) 52: 13/8 24/22"
                         lines.append(f" {move_num}) {dice}: {notation}")
 
-            # Game result
             result = game.get('result', '')
             if result:
-                # Parse result like "W+2" or "B+1"
                 result_match = re.match(r'([WB])\+(\d+)', result)
                 if result_match:
                     winner = 'White' if result_match.group(1) == 'W' else 'Black'
@@ -303,12 +282,9 @@ def extract_player_names_from_sgf(sgf_file_path: str) -> Tuple[str, str]:
     """
     try:
         data = SGFParser.parse_sgf_file(sgf_file_path)
-        # Return player names in the order they appear in GnuBG score line
-        # Score line: "White score, Black score"
-        # Match parser assigns: first → player_o_name, second → player_x_name
         return (
-            data.get('player_white', 'Player 1'),  # Top checkbox → Player.O
-            data.get('player_black', 'Player 2')   # Bottom checkbox → Player.X
+            data.get('player_white', 'Player 1'),
+            data.get('player_black', 'Player 2')
         )
     except Exception:
         return ('Player 1', 'Player 2')

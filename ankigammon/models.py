@@ -188,16 +188,16 @@ class Move:
     """
     Represents a candidate move with its analysis.
     """
-    notation: str  # e.g., "13/9 6/5" or "double/take" (for MCQ and answer display)
+    notation: str  # Move notation for MCQ and answer display (e.g., "13/9 6/5" or "double/take")
     equity: float  # Equity of this move
-    error: float = 0.0  # Error compared to best move (0 for best move)
-    rank: int = 1  # Rank among all candidates (including synthetic, 1 = best)
+    error: float = 0.0  # Error compared to best move (0 for best)
+    rank: int = 1  # Rank among all candidates, including synthetic moves (1 = best)
     xg_rank: Optional[int] = None  # Order in XG's "Cubeful Equities:" section (1-3)
-    xg_error: Optional[float] = None  # Error as shown by XG (relative to first option in Cubeful Equities)
-    xg_notation: Optional[str] = None  # Original notation from XG (e.g., "No double" not "No double/Take")
-    resulting_position: Optional[Position] = None  # Position after this move (if available)
-    from_xg_analysis: bool = True  # True if from XG's analysis, False if synthetically generated
-    was_played: bool = False  # True if this was the move actually played in the game
+    xg_error: Optional[float] = None  # Error relative to first option in XG's Cubeful Equities
+    xg_notation: Optional[str] = None  # Original notation from XG (e.g., "No double" vs "No double/Take")
+    resulting_position: Optional[Position] = None  # Position after applying this move
+    from_xg_analysis: bool = True  # Whether from XG's analysis (True) or synthetically generated (False)
+    was_played: bool = False  # Whether this move was actually played in the game
     # Winning chances percentages
     player_win_pct: Optional[float] = None  # Player winning percentage (e.g., 52.68)
     player_gammon_pct: Optional[float] = None  # Player gammon percentage (e.g., 14.35)
@@ -226,11 +226,11 @@ class Decision:
 
     # Game context
     on_roll: Player = Player.O
-    dice: Optional[Tuple[int, int]] = None  # None for cube decisions
+    dice: Optional[Tuple[int, int]] = None  # Dice roll (None for cube decisions)
     score_x: int = 0
     score_o: int = 0
-    match_length: int = 0  # 0 for money games
-    crawford: bool = False  # True if Crawford game (no doubling allowed)
+    match_length: int = 0  # Match length (0 for money games)
+    crawford: bool = False  # Whether this is a Crawford game
     cube_value: int = 1
     cube_owner: CubeState = CubeState.CENTERED
 
@@ -239,9 +239,8 @@ class Decision:
     candidate_moves: List[Move] = field(default_factory=list)
 
     # Cube decision errors (only for CUBE_ACTION decisions)
-    # These distinguish between the doubler's error and the responder's error
-    cube_error: Optional[float] = None  # Error made by doubler on double/no double decision (-1000 if not analyzed)
-    take_error: Optional[float] = None  # Error made by responder on take/pass decision (-1000 if not analyzed)
+    cube_error: Optional[float] = None  # Doubler's error on double/no double decision (-1000 if not analyzed)
+    take_error: Optional[float] = None  # Responder's error on take/pass decision (-1000 if not analyzed)
 
     # Winning chances percentages (for cube decisions)
     player_win_pct: Optional[float] = None
@@ -257,7 +256,7 @@ class Decision:
     move_number: Optional[int] = None
 
     # User annotations
-    note: Optional[str] = None  # User's note/comment/explanation for this position
+    note: Optional[str] = None  # User's note or explanation for this position
 
     def get_best_move(self) -> Optional[Move]:
         """Get the best move (rank 1)."""
@@ -289,7 +288,7 @@ class Decision:
         doubler = self.on_roll
         responder = Player.X if self.on_roll == Player.O else Player.O
 
-        # Get errors (ignore -1000 which means not analyzed)
+        # Extract errors (-1000 indicates not analyzed)
         doubler_error = self.cube_error if self.cube_error and self.cube_error != -1000 else None
         responder_error = self.take_error if self.take_error and self.take_error != -1000 else None
 
@@ -304,39 +303,33 @@ class Decision:
         """Get short display text for list views."""
         # Build score/game type string
         if self.match_length > 0:
-            # Match play - show score and match info
             score = f"{self.score_x}-{self.score_o} of {self.match_length}"
             if self.crawford:
                 score += " Crawford"
         else:
-            # Money game - just show "Money"
             score = "Money"
 
         if self.decision_type == DecisionType.CHECKER_PLAY:
             dice_str = f"{self.dice[0]}{self.dice[1]}" if self.dice else "—"
             return f"Checker | {dice_str} | {score}"
         else:
-            # Cube decision - no dice to show
             return f"Cube | {score}"
 
     def get_metadata_text(self) -> str:
         """Get formatted metadata for card display."""
         dice_str = f"{self.dice[0]}{self.dice[1]}" if self.dice else "N/A"
 
-        # Show em dash when cube is centered, otherwise just show value
+        # Display em dash for centered cube, otherwise show value
         if self.cube_owner == CubeState.CENTERED:
             cube_str = "—"
         else:
             cube_str = f"{self.cube_value}"
 
-        # Map Player enum to color names
-        # Player.X = TOP player (plays with white checkers from top)
-        # Player.O = BOTTOM player (plays with black checkers from bottom)
+        # Map player enum to display name (X = White/top, O = Black/bottom)
         player_name = "White" if self.on_roll == Player.X else "Black"
 
         # Build metadata string based on game type
         if self.match_length > 0:
-            # Match play - show score and match info
             match_str = f"{self.match_length}pt"
             if self.crawford:
                 match_str += " (Crawford)"
@@ -348,7 +341,6 @@ class Decision:
                 f"Match: {match_str}"
             )
         else:
-            # Money game - don't show score, just "Money"
             return (
                 f"{player_name} | "
                 f"Dice: {dice_str} | "

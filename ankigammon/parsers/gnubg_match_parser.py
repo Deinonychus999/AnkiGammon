@@ -35,8 +35,7 @@ class GNUBGMatchParser:
                 # Read first 1000 characters (header section)
                 header = f.read(1000)
 
-                # Try Format 1: Semicolon header (OpenGammon, Backgammon Studio)
-                # Format: ; [Player 1 "PlayerName"]
+                # Format 1: Semicolon header (OpenGammon, Backgammon Studio)
                 player1_match = re.search(r';\s*\[Player 1\s+"([^"]+)"\]', header, re.IGNORECASE)
                 player2_match = re.search(r';\s*\[Player 2\s+"([^"]+)"\]', header, re.IGNORECASE)
 
@@ -45,9 +44,7 @@ class GNUBGMatchParser:
                 if player2_match:
                     player2 = player2_match.group(1)
 
-                # Try Format 2: Score line (plain text match files)
-                # Format: PlayerName1 : Score [whitespace] PlayerName2 : Score
-                # Example: " Double98 : 0                        Deinonychus999 : 0"
+                # Format 2: Score line (plain text match files)
                 if player1 == "Player 1" or player2 == "Player 2":
                     score_match = re.search(
                         r'^\s*([A-Za-z0-9_]+)\s*:\s*\d+\s+([A-Za-z0-9_]+)\s*:\s*\d+',
@@ -59,7 +56,6 @@ class GNUBGMatchParser:
                         player2 = score_match.group(2)
 
         except Exception:
-            # If parsing fails, return defaults
             pass
 
         return player1, player2
@@ -147,9 +143,7 @@ class GNUBGMatchParser:
         score_x = pos_metadata.get('score_x', 0)
         score_o = pos_metadata.get('score_o', 0)
 
-        # SGF files: GnuBG encodes White=O, Black=X in GNUID
-        # But our model expects X=top, O=bottom
-        # So swap the scores for SGF sources
+        # Swap scores for SGF sources due to different player encodings
         if is_sgf_source:
             score_x, score_o = score_o, score_x
 
@@ -223,7 +217,6 @@ class GNUBGMatchParser:
                     if checker_decision:
                         decisions.append(checker_decision)
                 except Exception as e:
-                    # Log parsing errors for debugging
                     import logging
                     logger = logging.getLogger(__name__)
                     logger.warning(f"Failed to parse position at line {i}: {e}")
@@ -338,23 +331,15 @@ class GNUBGMatchParser:
         )
 
         # Extract winning chances from "Cube analysis" section
-        # Format (cube_section_idx points to "Cube analysis" line):
-        #   Cube analysis                                <-- cube_section_idx
-        #   1-ply cubeless equity  -0.009 (Money:  -0.009)  <-- +1 line
-        #     0.493 0.138 0.006 - 0.507 0.132 0.006   <-- +2 lines (probabilities)
-        #   Cubeful equities:
         no_double_probs = None
-        for offset in range(1, 10):  # Search forward from cube_section_idx
+        for offset in range(1, 10):
             if cube_section_idx + offset >= len(lines):
                 break
             line = lines[cube_section_idx + offset]
 
-            # Look for "1-ply cubeless equity" line
             if '1-ply cubeless equity' in line:
-                # Probabilities are on the next line
                 if cube_section_idx + offset + 1 < len(lines):
                     prob_line = lines[cube_section_idx + offset + 1]
-                    # Format: "  0.493 0.138 0.006 - 0.507 0.132 0.006"
                     prob_match = re.match(
                         r'\s*(0\.\d+)\s+(0\.\d+)\s+(0\.\d+)\s+-\s+(0\.\d+)\s+(0\.\d+)\s+(0\.\d+)',
                         prob_line
@@ -395,51 +380,43 @@ class GNUBGMatchParser:
             return None
 
         # Find cube error and which action was taken
-        # Look for cube-specific error messages and * markers
-        cube_error = None  # Doubler's error
-        take_error = None  # Responder's error
+        cube_error = None
+        take_error = None
         doubled = False
         cube_action_taken = None
 
-        # Search for error message - it appears BEFORE "Cube analysis" section
-        # Start searching from the beginning of this move, not from "Cube analysis"
+        # Search for error message before "Cube analysis" section
         for offset in range(0, cube_section_idx - start_idx + 20):
             if start_idx + offset >= len(lines):
                 break
             line = lines[start_idx + offset]
 
-            # Check for doubling action: "* PlayerName doubles"
+            # Check for doubling action
             double_match = re.search(r'\*\s+\w+\s+doubles', line)
             if double_match:
                 doubled = True
 
-            # Check for response action: "* PlayerName accepts" or "* PlayerName passes" or "* PlayerName rejects"
+            # Check for response action
             response_match = re.search(r'\*\s+\w+\s+(accepts|passes|rejects)', line)
             if response_match:
                 action = response_match.group(1)
-                # Normalize: "rejects" means the same as "passes"
                 cube_action_taken = "passes" if action == "rejects" else action
 
-            # Look for cube-specific error messages
-            # Format: "Alert: wrong take|bad double|wrong double|missed double|wrong pass ( -X.XXX)!"
+            # Look for cube error messages
             cube_alert_match = re.search(r'Alert: (wrong take|bad double|wrong double|missed double|wrong pass)\s+\(\s*([+-]?\d+\.\d+)\s*\)', line, re.IGNORECASE)
             if cube_alert_match:
                 error_type = cube_alert_match.group(1).lower()
                 error_value = abs(float(cube_alert_match.group(2)))
 
-                # Assign to correct error field based on error type
                 if "take" in error_type or "pass" in error_type:
-                    take_error = error_value  # Responder made error (wrong take or wrong pass)
+                    take_error = error_value
                 elif "double" in error_type or "missed" in error_type:
-                    cube_error = error_value  # Doubler made error (bad double or missed double)
+                    cube_error = error_value
 
-            # Stop at "Rolled XX:" (actual move content) or board diagram for next move
-            # Don't stop at "Move number" header - the error appears between the header and the content
             if re.match(r'Rolled \d\d', line):
                 break
             if re.match(r'\s*GNU Backgammon\s+Position ID:', line):
-                # Found board diagram for next move, stop here
-                if cube_error is not None:  # But only if we already found the error
+                if cube_error is not None:
                     break
 
         # Only create decision if there was an error (either doubler or responder)
@@ -450,8 +427,6 @@ class GNUBGMatchParser:
         from ankigammon.models import Move
         candidate_moves = []
 
-        # GnuBG provides 3 equities, but we create 5 options like XG does
-        # Extract the 3 equities
         nd_equity = equities.get("No double", 0.0)
         dt_equity = equities.get("Double, take", 0.0)
         dp_equity = equities.get("Double, pass", 0.0)
@@ -467,11 +442,9 @@ class GNUBGMatchParser:
         if doubled and cube_action_taken is None:
             was_dt = True
 
-        # Check if proper action indicates "Too good"
         is_too_good = "too good" in proper_action.lower() if proper_action else False
 
-        # Create all 5 moves
-        # 1. No Double/Take
+        # Create all 5 move options
         candidate_moves.append(Move(
             notation="No Double/Take",
             equity=nd_equity,
@@ -480,7 +453,6 @@ class GNUBGMatchParser:
             was_played=was_nd
         ))
 
-        # 2. Double/Take
         candidate_moves.append(Move(
             notation="Double/Take",
             equity=dt_equity,
@@ -489,27 +461,23 @@ class GNUBGMatchParser:
             was_played=was_dt and not is_too_good
         ))
 
-        # 3. Too Good/Take (synthetic - uses Double/Pass equity)
         candidate_moves.append(Move(
             notation="Too Good/Take",
             equity=dp_equity,
             error=abs(best_equity - dp_equity),
-            rank=1,  # Will be recalculated
+            rank=1,
             was_played=was_dt and is_too_good,
-            from_xg_analysis=False  # Synthetic option
+            from_xg_analysis=False
         ))
 
-        # 4. Too Good/Pass (synthetic - uses Double/Pass equity)
         candidate_moves.append(Move(
             notation="Too Good/Pass",
             equity=dp_equity,
             error=abs(best_equity - dp_equity),
-            rank=1,  # Will be recalculated
+            rank=1,
             was_played=was_dp and is_too_good,
-            from_xg_analysis=False  # Synthetic option
+            from_xg_analysis=False
         ))
-
-        # 5. Double/Pass
         candidate_moves.append(Move(
             notation="Double/Pass",
             equity=dp_equity,
@@ -518,20 +486,14 @@ class GNUBGMatchParser:
             was_played=was_dp and not is_too_good
         ))
 
-        # Determine best move based on proper action (not just raw equity)
-        # In "Too good" situations, raw equities are misleading
+        # Determine best move based on proper action
         if proper_action and "too good to double, pass" in proper_action.lower():
-            # Too good to double, if you did opponent would pass
             best_move_notation = "Too Good/Pass"
-            # For error calculation, use "No double" equity (the actual correct action)
             best_equity_for_errors = nd_equity
         elif proper_action and "too good to double, take" in proper_action.lower():
-            # Too good to double, if you did opponent would take
             best_move_notation = "Too Good/Take"
-            # For error calculation, use "No double" equity
             best_equity_for_errors = nd_equity
         elif proper_action and "no double" in proper_action.lower():
-            # Not strong enough to double yet
             best_move_notation = "No Double/Take"
             best_equity_for_errors = nd_equity
         elif proper_action and "double, take" in proper_action.lower():
@@ -541,27 +503,24 @@ class GNUBGMatchParser:
             best_move_notation = "Double/Pass"
             best_equity_for_errors = dp_equity
         else:
-            # Fallback: use equity
             best_move = max(candidate_moves, key=lambda m: m.equity)
             best_move_notation = best_move.notation
             best_equity_for_errors = best_move.equity
 
-        # Set ranks: proper action gets rank 1, others ranked by equity
+        # Set ranks
         for move in candidate_moves:
             if move.notation == best_move_notation:
                 move.rank = 1
             else:
-                # Rank other moves by equity (excluding the best move)
                 better_count = sum(1 for m in candidate_moves
                                  if m.notation != best_move_notation and m.equity > move.equity)
                 move.rank = 2 + better_count
 
-        # Recalculate errors based on actual best equity (not synthetic option equity)
+        # Recalculate errors based on best equity
         for move in candidate_moves:
             move.error = abs(best_equity_for_errors - move.equity)
 
-        # Sort by logical order (not by rank) to maintain consistent display
-        # Order: No Double, Double/Take, Double/Pass, Too Good/Take, Too Good/Pass
+        # Sort by logical order for consistent display
         order_map = {
             "No Double/Take": 1,
             "Double/Take": 2,
@@ -591,9 +550,8 @@ class GNUBGMatchParser:
             crawford=pos_metadata.get('crawford', False),
             xgid=xgid,
             move_number=move_number,
-            cube_error=cube_error,  # Doubler's error
-            take_error=take_error,  # Responder's error
-            # Add decision-level winning chances from "No double" evaluation
+            cube_error=cube_error,
+            take_error=take_error,
             player_win_pct=no_double_probs[0] * 100 if no_double_probs else None,
             player_gammon_pct=no_double_probs[1] * 100 if no_double_probs else None,
             player_backgammon_pct=no_double_probs[2] * 100 if no_double_probs else None,
@@ -700,23 +658,15 @@ class GNUBGMatchParser:
         )
 
         # Extract winning chances from "Cube analysis" section
-        # Format (cube_section_idx points to "Cube analysis" line):
-        #   Cube analysis                                <-- cube_section_idx
-        #   1-ply cubeless equity  -0.009 (Money:  -0.009)  <-- +1 line
-        #     0.493 0.138 0.006 - 0.507 0.132 0.006   <-- +2 lines (probabilities)
-        #   Cubeful equities:
         no_double_probs = None
-        for offset in range(1, 10):  # Search forward from cube_section_idx
+        for offset in range(1, 10):
             if cube_section_idx + offset >= len(lines):
                 break
             line = lines[cube_section_idx + offset]
 
-            # Look for "1-ply cubeless equity" line
             if '1-ply cubeless equity' in line:
-                # Probabilities are on the next line
                 if cube_section_idx + offset + 1 < len(lines):
                     prob_line = lines[cube_section_idx + offset + 1]
-                    # Format: "  0.493 0.138 0.006 - 0.507 0.132 0.006"
                     prob_match = re.match(
                         r'\s*(0\.\d+)\s+(0\.\d+)\s+(0\.\d+)\s+-\s+(0\.\d+)\s+(0\.\d+)\s+(0\.\d+)',
                         prob_line
@@ -762,37 +712,33 @@ class GNUBGMatchParser:
         doubled = False
         cube_action_taken = None
 
-        # Search for error message - it appears BEFORE "Cube analysis" section
-        # Start searching from the beginning of this move, not from "Cube analysis"
+        # Search for error message before "Cube analysis" section
         for offset in range(0, cube_section_idx - start_idx + 20):
             if start_idx + offset >= len(lines):
                 break
             line = lines[start_idx + offset]
 
-            # Check for doubling action: "* PlayerName doubles"
+            # Check for doubling action
             double_match = re.search(r'\*\s+\w+\s+doubles', line)
             if double_match:
                 doubled = True
 
-            # Check for response action: "* PlayerName accepts" or "* PlayerName passes" or "* PlayerName rejects"
+            # Check for response action
             response_match = re.search(r'\*\s+\w+\s+(accepts|passes|rejects)', line)
             if response_match:
                 action = response_match.group(1)
-                # Normalize: "rejects" means the same as "passes"
                 cube_action_taken = "passes" if action == "rejects" else action
 
-            # Look for cube-specific error messages
-            # Format: "Alert: wrong take|bad double|wrong double|missed double|wrong pass ( -X.XXX)!"
+            # Look for cube error messages
             cube_alert_match = re.search(r'Alert: (wrong take|bad double|wrong double|missed double|wrong pass)\s+\(\s*([+-]?\d+\.\d+)\s*\)', line, re.IGNORECASE)
             if cube_alert_match:
                 error_type = cube_alert_match.group(1).lower()
                 error_value = abs(float(cube_alert_match.group(2)))
 
-                # Assign to correct error field based on error type
                 if "take" in error_type or "pass" in error_type:
-                    take_error = error_value  # Responder made error (wrong take or wrong pass)
+                    take_error = error_value
                 elif "double" in error_type or "missed" in error_type:
-                    cube_error = error_value  # Doubler made error (bad double or missed double)
+                    cube_error = error_value
 
             # Stop when we encounter actual move content (board diagram or dice roll)
             # Don't stop at "Move number" header - the error appears between the header and the content
@@ -811,8 +757,6 @@ class GNUBGMatchParser:
         from ankigammon.models import Move
         candidate_moves = []
 
-        # GnuBG provides 3 equities, but we create 5 options like XG does
-        # Extract the 3 equities
         nd_equity = equities.get("No double", 0.0)
         dt_equity = equities.get("Double, take", 0.0)
         dp_equity = equities.get("Double, pass", 0.0)
@@ -828,11 +772,9 @@ class GNUBGMatchParser:
         if doubled and cube_action_taken is None:
             was_dt = True
 
-        # Check if proper action indicates "Too good"
         is_too_good = "too good" in proper_action.lower() if proper_action else False
 
-        # Create all 5 moves
-        # 1. No Double/Take
+        # Create all 5 move options
         candidate_moves.append(Move(
             notation="No Double/Take",
             equity=nd_equity,
@@ -841,7 +783,6 @@ class GNUBGMatchParser:
             was_played=was_nd
         ))
 
-        # 2. Double/Take
         candidate_moves.append(Move(
             notation="Double/Take",
             equity=dt_equity,
@@ -850,27 +791,23 @@ class GNUBGMatchParser:
             was_played=was_dt and not is_too_good
         ))
 
-        # 3. Too Good/Take (synthetic - uses Double/Pass equity)
         candidate_moves.append(Move(
             notation="Too Good/Take",
             equity=dp_equity,
             error=abs(best_equity - dp_equity),
-            rank=1,  # Will be recalculated
+            rank=1,
             was_played=was_dt and is_too_good,
-            from_xg_analysis=False  # Synthetic option
+            from_xg_analysis=False
         ))
 
-        # 4. Too Good/Pass (synthetic - uses Double/Pass equity)
         candidate_moves.append(Move(
             notation="Too Good/Pass",
             equity=dp_equity,
             error=abs(best_equity - dp_equity),
-            rank=1,  # Will be recalculated
+            rank=1,
             was_played=was_dp and is_too_good,
-            from_xg_analysis=False  # Synthetic option
+            from_xg_analysis=False
         ))
-
-        # 5. Double/Pass
         candidate_moves.append(Move(
             notation="Double/Pass",
             equity=dp_equity,
@@ -879,20 +816,14 @@ class GNUBGMatchParser:
             was_played=was_dp and not is_too_good
         ))
 
-        # Determine best move based on proper action (not just raw equity)
-        # In "Too good" situations, raw equities are misleading
+        # Determine best move based on proper action
         if proper_action and "too good to double, pass" in proper_action.lower():
-            # Too good to double, if you did opponent would pass
             best_move_notation = "Too Good/Pass"
-            # For error calculation, use "No double" equity (the actual correct action)
             best_equity_for_errors = nd_equity
         elif proper_action and "too good to double, take" in proper_action.lower():
-            # Too good to double, if you did opponent would take
             best_move_notation = "Too Good/Take"
-            # For error calculation, use "No double" equity
             best_equity_for_errors = nd_equity
         elif proper_action and "no double" in proper_action.lower():
-            # Not strong enough to double yet
             best_move_notation = "No Double/Take"
             best_equity_for_errors = nd_equity
         elif proper_action and "double, take" in proper_action.lower():
@@ -902,27 +833,24 @@ class GNUBGMatchParser:
             best_move_notation = "Double/Pass"
             best_equity_for_errors = dp_equity
         else:
-            # Fallback: use equity
             best_move = max(candidate_moves, key=lambda m: m.equity)
             best_move_notation = best_move.notation
             best_equity_for_errors = best_move.equity
 
-        # Set ranks: proper action gets rank 1, others ranked by equity
+        # Set ranks
         for move in candidate_moves:
             if move.notation == best_move_notation:
                 move.rank = 1
             else:
-                # Rank other moves by equity (excluding the best move)
                 better_count = sum(1 for m in candidate_moves
                                  if m.notation != best_move_notation and m.equity > move.equity)
                 move.rank = 2 + better_count
 
-        # Recalculate errors based on actual best equity (not synthetic option equity)
+        # Recalculate errors based on best equity
         for move in candidate_moves:
             move.error = abs(best_equity_for_errors - move.equity)
 
-        # Sort by logical order (not by rank) to maintain consistent display
-        # Order: No Double, Double/Take, Double/Pass, Too Good/Take, Too Good/Pass
+        # Sort by logical order for consistent display
         order_map = {
             "No Double/Take": 1,
             "Double/Take": 2,
@@ -952,9 +880,8 @@ class GNUBGMatchParser:
             crawford=pos_metadata.get('crawford', False),
             xgid=xgid,
             move_number=move_number,
-            cube_error=cube_error,  # Doubler's error
-            take_error=take_error,  # Responder's error
-            # Add decision-level winning chances from "No double" evaluation
+            cube_error=cube_error,
+            take_error=take_error,
             player_win_pct=no_double_probs[0] * 100 if no_double_probs else None,
             player_gammon_pct=no_double_probs[1] * 100 if no_double_probs else None,
             player_backgammon_pct=no_double_probs[2] * 100 if no_double_probs else None,
@@ -1070,11 +997,6 @@ class GNUBGMatchParser:
             return None
 
         # Parse candidate moves
-        # Format:
-        #      1. Cubeful 1-ply    24/14                        Eq.:  +0.016
-        #        0.509 0.125 0.005 - 0.491 0.133 0.005
-        # *    2. Cubeful 1-ply    24/18 13/9                   Eq.:  +0.015 ( -0.001)
-        #        0.505 0.136 0.007 - 0.495 0.138 0.006
         candidate_moves = []
         for offset in range(1, 100):
             if start_idx + offset >= len(lines):
@@ -1086,7 +1008,6 @@ class GNUBGMatchParser:
                 break
 
             # Parse move line
-            # Note: GnuBG puts a space inside the error parentheses: "( -0.096)" not "(-0.096)"
             move_match = re.match(
                 r'\s*\*?\s*(\d+)\.\s+Cubeful\s+\d+-ply\s+(.+?)\s+Eq\.:\s+([+-]?\d+\.\d+)(?:\s+\(\s*([+-]?\d+\.\d+)\s*\))?',
                 line
@@ -1097,7 +1018,6 @@ class GNUBGMatchParser:
                 equity = float(move_match.group(3))
                 move_error = float(move_match.group(4)) if move_match.group(4) else 0.0
 
-                # Check if this is the move that was played
                 was_played = (move_played and notation == move_played)
 
                 # Parse probabilities from next line
@@ -1115,7 +1035,7 @@ class GNUBGMatchParser:
                 move = Move(
                     notation=notation,
                     equity=equity,
-                    error=abs(move_error),  # Absolute error
+                    error=abs(move_error),
                     rank=rank,
                     was_played=was_played
                 )

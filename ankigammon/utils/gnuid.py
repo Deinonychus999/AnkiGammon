@@ -86,8 +86,7 @@ def _decode_position_id(position_id: str) -> Position:
     """
     Decode a 14-character Position ID into a Position object.
 
-    GNUID Position IDs always encode from Player 1 (X/top player)'s perspective,
-    regardless of who is on roll.
+    Position IDs always encode from Player X's perspective.
 
     Args:
         position_id: 14-character Base64 string
@@ -114,8 +113,7 @@ def _decode_position_id(position_id: str) -> Position:
     # Decode bit string into TanBoard structure
     # Format: [player0-25points][player1-25points]
     # Each point: [N consecutive 1s][separator 0]
-    # This matches GNU Backgammon's oldPositionFromKey() function
-    anBoard = [[0] * 25 for _ in range(2)]  # [2 players][25 points]
+    anBoard = [[0] * 25 for _ in range(2)]
 
     bit_idx = 0
     player = 0  # Start with player 0 (X)
@@ -151,21 +149,21 @@ def _decode_position_id(position_id: str) -> Position:
 
 def _convert_tanboard_to_position(anBoard: list) -> Position:
     """
-    Convert TanBoard structure to our internal Position model.
+    Convert TanBoard structure to internal Position model.
 
-    TanBoard structure (from GNU Backgammon):
-    - anBoard[0][0-23] = Player 0 (X/top) checkers on points 0-23
-    - anBoard[0][24] = Player 0 (X) bar
-    - anBoard[1][0-23] = Player 1 (O/bottom) checkers on points 0-23
-    - anBoard[1][24] = Player 1 (O) bar
+    TanBoard structure:
+    - anBoard[0][0-23] = Player X checkers on points 0-23
+    - anBoard[0][24] = Player X bar
+    - anBoard[1][0-23] = Player O checkers on points 0-23
+    - anBoard[1][24] = Player O bar
 
-    Point numbering in TanBoard (player-relative):
-    - Player 0 (X): anBoard[0][0] = point 24, anBoard[0][23] = point 1 (reverse mapping)
-    - Player 1 (O): anBoard[1][0] = point 1, anBoard[1][23] = point 24 (direct mapping)
+    Point numbering mapping:
+    - Player X: anBoard[0][0] = point 24, anBoard[0][23] = point 1
+    - Player O: anBoard[1][0] = point 1, anBoard[1][23] = point 24
 
-    Our internal model:
+    Internal model:
     - points[0] = X's bar
-    - points[1-24] = board points (1 = O's ace, 24 = X's ace)
+    - points[1-24] = board points
     - points[25] = O's bar
     - Positive values = X checkers, Negative values = O checkers
 
@@ -177,17 +175,17 @@ def _convert_tanboard_to_position(anBoard: list) -> Position:
     """
     position = Position()
 
-    # Player 0 (X) - reverse numbering, positive values
+    # Player X with reverse numbering
     for i in range(24):
-        our_point = 24 - i  # anBoard[0][0] → point 24, anBoard[0][23] → point 1
-        position.points[our_point] += anBoard[0][i]  # Positive for X
-    position.points[0] = anBoard[0][24]  # X's bar
+        our_point = 24 - i
+        position.points[our_point] += anBoard[0][i]
+    position.points[0] = anBoard[0][24]
 
-    # Player 1 (O) - direct numbering, negative values
+    # Player O with direct numbering
     for i in range(24):
-        our_point = i + 1  # anBoard[1][0] → point 1, anBoard[1][23] → point 24
-        position.points[our_point] -= anBoard[1][i]  # Negative for O
-    position.points[25] = -anBoard[1][24]  # O's bar
+        our_point = i + 1
+        position.points[our_point] -= anBoard[1][i]
+    position.points[25] = -anBoard[1][24]
 
     # Calculate borne-off checkers
     total_x = sum(count for count in position.points if count > 0)
@@ -201,29 +199,27 @@ def _convert_tanboard_to_position(anBoard: list) -> Position:
 
 def _convert_position_to_tanboard(position: Position) -> list:
     """
-    Convert our internal Position model to TanBoard structure.
-
-    This is the inverse of _convert_tanboard_to_position.
+    Convert internal Position model to TanBoard structure.
 
     Args:
-        position: Our internal position
+        position: Internal position
 
     Returns:
         TanBoard structure [2 players][25 points]
     """
     anBoard = [[0] * 25 for _ in range(2)]
 
-    # Player 0 (X) - reverse mapping: point p → anBoard[0][24-p]
+    # Player X with reverse mapping
     for our_point in range(1, 25):
         if position.points[our_point] > 0:
             anBoard[0][24 - our_point] = position.points[our_point]
-    anBoard[0][24] = position.points[0]  # X's bar
+    anBoard[0][24] = position.points[0]
 
-    # Player 1 (O) - direct mapping: point p → anBoard[1][p-1]
+    # Player O with direct mapping
     for our_point in range(1, 25):
         if position.points[our_point] < 0:
             anBoard[1][our_point - 1] = -position.points[our_point]
-    anBoard[1][24] = -position.points[25] if position.points[25] < 0 else 0  # O's bar
+    anBoard[1][24] = -position.points[25] if position.points[25] < 0 else 0
 
     return anBoard
 
@@ -234,7 +230,7 @@ def _convert_gnuid_to_position(
     on_roll: Player
 ) -> Position:
     """
-    Convert GNUID perspective arrays to our internal Position model.
+    Convert GNUID perspective arrays to internal Position model.
 
     Args:
         player_checkers: Checkers from player on roll's perspective [0-25]
@@ -246,44 +242,25 @@ def _convert_gnuid_to_position(
     """
     position = Position()
 
-    # GNUID point mapping from player on roll's perspective:
-    # Points 0-23 are board points from player's ace point (1) through opponent's ace (24)
-    # Point 24 is player's bar
-    # Point 25 is opponent's bar
-
     if on_roll == Player.X:
-        # X is on roll, so player = X, opponent = O
-        # GNUID point 0 = X's point 24 (X's ace, looking from X's perspective)
-        # GNUID point 23 = X's point 1 (O's ace, looking from X's perspective)
-        # GNUID point 24 = X's bar (our point 0)
-        # GNUID point 25 = O's bar (our point 25)
-
-        # Map board points (reverse numbering for X's perspective)
+        # Map board points with reverse numbering
         for gnuid_pt in range(24):
             our_pt = 24 - gnuid_pt
-            position.points[our_pt] = player_checkers[gnuid_pt]  # X checkers (positive)
-            position.points[our_pt] -= opponent_checkers[gnuid_pt]  # O checkers (negative)
+            position.points[our_pt] = player_checkers[gnuid_pt]
+            position.points[our_pt] -= opponent_checkers[gnuid_pt]
 
-        # Map bars
-        position.points[0] = player_checkers[24]  # X's bar
-        position.points[25] = -opponent_checkers[25]  # O's bar
+        position.points[0] = player_checkers[24]
+        position.points[25] = -opponent_checkers[25]
 
     else:
-        # O is on roll, so player = O, opponent = X
-        # GNUID point 0 = O's point 1 (O's ace)
-        # GNUID point 23 = O's point 24 (X's ace)
-        # GNUID point 24 = O's bar (our point 25)
-        # GNUID point 25 = X's bar (our point 0)
-
-        # Map board points (direct mapping)
+        # Map board points with direct numbering
         for gnuid_pt in range(24):
             our_pt = gnuid_pt + 1
-            position.points[our_pt] = -player_checkers[gnuid_pt]  # O checkers (negative)
-            position.points[our_pt] += opponent_checkers[gnuid_pt]  # X checkers (positive)
+            position.points[our_pt] = -player_checkers[gnuid_pt]
+            position.points[our_pt] += opponent_checkers[gnuid_pt]
 
-        # Map bars
-        position.points[25] = -player_checkers[24]  # O's bar
-        position.points[0] = opponent_checkers[25]  # X's bar
+        position.points[25] = -player_checkers[24]
+        position.points[0] = opponent_checkers[25]
 
     # Calculate borne-off checkers
     total_x = sum(count for count in position.points if count > 0)
@@ -323,23 +300,21 @@ def _decode_match_id(match_id: str) -> Dict:
         for i in range(8):
             bits.append((byte >> i) & 1)
 
-    # Extract fields (total 72 bits)
     metadata = {}
 
-    # Bits 0-3: Cube value (log2)
+    # Bits 0-3: Cube value
     cube_log = _extract_bits(bits, 0, 4)
     metadata['cube_value'] = 2 ** cube_log if cube_log < 15 else 1
 
-    # Bits 4-5: Cube owner (00=player0, 01=player1, 11=centered)
+    # Bits 4-5: Cube owner
     cube_owner_bits = _extract_bits(bits, 4, 2)
     if cube_owner_bits == 3:
         metadata['cube_owner'] = CubeState.CENTERED
     elif cube_owner_bits == 0:
-        metadata['cube_owner'] = CubeState.X_OWNS  # Player 0 = X
+        metadata['cube_owner'] = CubeState.X_OWNS
     else:
-        metadata['cube_owner'] = CubeState.O_OWNS  # Player 1 = O
+        metadata['cube_owner'] = CubeState.O_OWNS
 
-    # Bit 6: Move (who rolled)
     # Bit 7: Crawford
     metadata['crawford'] = bits[7] == 1
 
@@ -347,7 +322,7 @@ def _decode_match_id(match_id: str) -> Dict:
     game_state = _extract_bits(bits, 8, 3)
     metadata['game_state'] = game_state
 
-    # Bit 11: Turn (0=player0/X, 1=player1/O)
+    # Bit 11: Turn
     turn_bit = bits[11]
     metadata['on_roll'] = Player.O if turn_bit == 1 else Player.X
 
@@ -366,17 +341,17 @@ def _decode_match_id(match_id: str) -> Dict:
     if die0 > 0 and die1 > 0:
         metadata['dice'] = (die0, die1)
 
-    # Bits 21-35: Match length (15 bits)
+    # Bits 21-35: Match length
     match_length = _extract_bits(bits, 21, 15)
     metadata['match_length'] = match_length
 
-    # Bits 36-50: Player 0 score (15 bits)
+    # Bits 36-50: Player X score
     score_0 = _extract_bits(bits, 36, 15)
-    metadata['score_x'] = score_0  # Player 0 = X
+    metadata['score_x'] = score_0
 
-    # Bits 51-65: Player 1 score (15 bits)
+    # Bits 51-65: Player O score
     score_1 = _extract_bits(bits, 51, 15)
-    metadata['score_o'] = score_1  # Player 1 = O
+    metadata['score_o'] = score_1
 
     return metadata
 
@@ -484,10 +459,10 @@ def _encode_position_id(position: Position) -> str:
 
 def _convert_position_to_gnuid(position: Position, on_roll: Player) -> Tuple[list, list]:
     """
-    Convert our internal Position to GNUID perspective arrays.
+    Convert internal Position to GNUID perspective arrays.
 
     Args:
-        position: Our internal position
+        position: Internal position
         on_roll: Player on roll
 
     Returns:
@@ -497,44 +472,30 @@ def _convert_position_to_gnuid(position: Position, on_roll: Player) -> Tuple[lis
     opponent_checkers = [0] * 26
 
     if on_roll == Player.X:
-        # X is on roll
-        # GNUID point 0 = our point 24 (X's ace)
-        # GNUID point 23 = our point 1 (O's ace)
-        # GNUID point 24 = our point 0 (X's bar)
-        # GNUID point 25 = our point 25 (O's bar)
-
-        # Map board points (reverse)
+        # Map board points with reverse numbering
         for our_pt in range(1, 25):
             gnuid_pt = 24 - our_pt
             count = position.points[our_pt]
             if count > 0:
-                player_checkers[gnuid_pt] = count  # X checkers
+                player_checkers[gnuid_pt] = count
             elif count < 0:
-                opponent_checkers[gnuid_pt] = -count  # O checkers
+                opponent_checkers[gnuid_pt] = -count
 
-        # Map bars
-        player_checkers[24] = position.points[0]  # X's bar
-        opponent_checkers[25] = -position.points[25]  # O's bar
+        player_checkers[24] = position.points[0]
+        opponent_checkers[25] = -position.points[25]
 
     else:
-        # O is on roll
-        # GNUID point 0 = our point 1 (O's ace)
-        # GNUID point 23 = our point 24 (X's ace)
-        # GNUID point 24 = our point 25 (O's bar)
-        # GNUID point 25 = our point 0 (X's bar)
-
-        # Map board points (direct)
+        # Map board points with direct numbering
         for our_pt in range(1, 25):
             gnuid_pt = our_pt - 1
             count = position.points[our_pt]
             if count < 0:
-                player_checkers[gnuid_pt] = -count  # O checkers
+                player_checkers[gnuid_pt] = -count
             elif count > 0:
-                opponent_checkers[gnuid_pt] = count  # X checkers
+                opponent_checkers[gnuid_pt] = count
 
-        # Map bars
-        player_checkers[24] = -position.points[25]  # O's bar
-        opponent_checkers[25] = position.points[0]  # X's bar
+        player_checkers[24] = -position.points[25]
+        opponent_checkers[25] = position.points[0]
 
     return player_checkers, opponent_checkers
 
@@ -555,10 +516,9 @@ def _encode_match_id(
     Returns:
         12-character Base64 Match ID
     """
-    # Build 72-bit array
     bits = [0] * 72
 
-    # Bits 0-3: Cube value (log2)
+    # Bits 0-3: Cube value
     cube_log = 0
     temp = cube_value
     while temp > 1:
@@ -570,23 +530,19 @@ def _encode_match_id(
     if cube_owner == CubeState.CENTERED:
         cube_owner_val = 3
     elif cube_owner == CubeState.X_OWNS:
-        cube_owner_val = 0  # Player 0
+        cube_owner_val = 0
     else:
-        cube_owner_val = 1  # Player 1
+        cube_owner_val = 1
     _set_bits(bits, 4, 2, cube_owner_val)
 
-    # Bit 6: Move (0 for now)
     # Bit 7: Crawford
     bits[7] = 1 if crawford else 0
 
-    # Bits 8-10: Game state (1 = playing)
+    # Bits 8-10: Game state
     _set_bits(bits, 8, 3, 1)
 
     # Bit 11: Turn
     bits[11] = 1 if on_roll == Player.O else 0
-
-    # Bit 12: Doubled (0 for now)
-    # Bits 13-14: Resigned (0 for now)
 
     # Bits 15-17: Die 0
     # Bits 18-20: Die 1
@@ -597,20 +553,19 @@ def _encode_match_id(
     # Bits 21-35: Match length
     _set_bits(bits, 21, 15, match_length)
 
-    # Bits 36-50: Player 0 score
+    # Bits 36-50: Player X score
     _set_bits(bits, 36, 15, score_x)
 
-    # Bits 51-65: Player 1 score
+    # Bits 51-65: Player O score
     _set_bits(bits, 51, 15, score_o)
 
-    # Pack into 9 bytes
+    # Pack into bytes
     match_bytes = bytearray(9)
     for i in range(72):
         byte_idx = i // 8
         bit_idx = i % 8
         match_bytes[byte_idx] |= (bits[i] << bit_idx)
 
-    # Base64 encode (remove padding)
     match_id = base64.b64encode(bytes(match_bytes)).decode('ascii').rstrip('=')
 
     return match_id

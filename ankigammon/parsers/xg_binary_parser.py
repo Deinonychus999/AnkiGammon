@@ -172,15 +172,13 @@ class XGBinaryParser:
         """
         Transform XG binary position array to internal Position model.
 
-        XG binary format uses OPPOSITE sign convention from AnkiGammon:
+        XG binary format uses opposite sign convention from AnkiGammon:
         - XG: Positive = O checkers, Negative = X checkers
         - AnkiGammon: Positive = X checkers, Negative = O checkers
 
-        Therefore, we need to invert all signs when copying the position.
-
-        IMPORTANT: This method only handles sign inversion. XG binary ALWAYS stores
-        positions from O's (Player 1's) perspective. The caller must flip the position
-        if it needs to be shown from X's perspective.
+        This method inverts all signs during the conversion. XG binary always stores
+        positions from O's (Player 1's) perspective. The caller is responsible for
+        flipping the position when it needs to be shown from X's perspective.
 
         Args:
             raw_points: Raw 26-element position array from XG binary
@@ -322,11 +320,11 @@ class XGBinaryParser:
                 # XG Format: [Lose_BG, Lose_G, Lose_S, Win_S, Win_G, Win_BG, Equity]
                 # Indices:   [0]      [1]     [2]     [3]    [4]    [5]     [6]
                 #
-                # IMPORTANT: Despite the naming, these are CUMULATIVE probabilities:
-                #   Lose_S (index 2) = TOTAL losses (all types: normal + gammon + backgammon)
+                # These are cumulative probabilities:
+                #   Lose_S (index 2) = Total losses (all types: normal + gammon + backgammon)
                 #   Lose_G (index 1) = Gammon + backgammon losses (subset of Lose_S)
                 #   Lose_BG (index 0) = Backgammon losses only (subset of Lose_G)
-                #   Win_S (index 3) = TOTAL wins (all types: normal + gammon + backgammon)
+                #   Win_S (index 3) = Total wins (all types: normal + gammon + backgammon)
                 #   Win_G (index 4) = Gammon + backgammon wins (subset of Win_S)
                 #   Win_BG (index 5) = Backgammon wins only (subset of Win_G)
                 #   Equity (index 6) = Overall equity value
@@ -448,10 +446,10 @@ class XGBinaryParser:
         - Eval: Win probabilities for "No Double" scenario
         - EvalDouble: Win probabilities for "Double/Take" scenario
 
-        IMPORTANT: For cube decisions, we always need to show the position from the
-        doubler's perspective (the player who has the cube decision), regardless of
-        whether the error was made by the doubler or the responder. This is critical
-        for score matrix generation and consistent position display.
+        Note: For cube decisions, the position is shown from the doubler's perspective
+        (the player who has the cube decision), regardless of whether the error was
+        made by the doubler or the responder. This ensures consistency for score
+        matrix generation and position display.
 
         Args:
             cube_entry: CubeEntry from xgstruct
@@ -464,8 +462,8 @@ class XGBinaryParser:
             Decision object with 5 cube options, or None if unanalyzed
         """
         # Determine player on roll from ActiveP
-        # IMPORTANT: ActiveP may represent the responder for take/pass errors,
-        # but we always need to show cube decisions from the doubler's perspective
+        # Note: ActiveP may represent the responder for take/pass errors,
+        # but we always show cube decisions from the doubler's perspective
         active_player = Player.O if cube_entry.ActiveP == 1 else Player.X
 
         # Create position with perspective transformation (using active_player)
@@ -737,15 +735,14 @@ class XGBinaryParser:
                 take_error = err_take_raw
 
         # Determine who the doubler is (the player making the cube decision)
-        # For cube decisions, we ALWAYS want to show the position from the doubler's perspective,
+        # For cube decisions, we show the position from the doubler's perspective,
         # even if the error was made by the responder on the take/pass decision.
         #
-        # CRITICAL UNDERSTANDING:
+        # Key relationships:
         # - ActiveP = the player who had the cube decision (on roll)
         # - cube_error = error made by ActiveP on the double/no double decision
-        # - take_error = error made by the OPPONENT of ActiveP on the take/pass decision
+        # - take_error = error made by the opponent of ActiveP on the take/pass decision
         #
-        # Therefore, ActiveP is ALWAYS the potential doubler (the player who had access to the cube).
         # The doubler is determined by:
         # 1. If cube is owned by X: only X can redouble (X is the doubler)
         # 2. If cube is owned by O: only O can redouble (O is the doubler)
@@ -780,8 +777,8 @@ class XGBinaryParser:
         # Always use doubler as on_roll for cube decisions
         on_roll = doubler
 
-        # CRITICAL: XG binary ALWAYS stores positions from O's (Player 1's) perspective
-        # If the doubler is X, we need to flip the position to show it from X's perspective
+        # XG binary always stores positions from O's (Player 1's) perspective
+        # If the doubler is X, flip the position to show it from X's perspective
         if doubler == Player.X:
             logger.debug(
                 f"Flipping position from O's perspective to X's perspective (doubler is X)"
@@ -873,13 +870,12 @@ class XGBinaryParser:
         """
         Convert XG move notation to readable format with compound move combination and hit detection.
 
-        IMPORTANT: XG binary uses 0-based indexing for board points in move notation.
-        - XG binary: 0-23 for board points
-        - Standard notation: 1-24 for board points
-        - Therefore, we add 1 to convert board point numbers to standard notation
+        XG binary uses 0-based indexing for board points in move notation, while standard
+        backgammon notation uses 1-based indexing. This method adds 1 to all board point
+        numbers during conversion.
 
-        XG binary stores compound moves as separate sub-moves (e.g., 20/16 16/15)
-        but standard notation combines them (e.g., 20/15*). This function:
+        XG binary stores compound moves as separate sub-moves (e.g., 20/16 16/15), but
+        standard notation combines them (e.g., 20/15*). This function:
         1. Converts 0-based to 1-based point numbering
         2. Combines consecutive sub-moves into compound moves
         3. Detects and marks hits with *
@@ -889,7 +885,7 @@ class XGBinaryParser:
         Special values:
         - -1: End of move list OR bearing off (when used as destination)
         - 24: Bar (both players when entering)
-        - 0-23: Board points (0-based, must add 1 for standard notation)
+        - 0-23: Board points (0-based, add 1 for standard notation)
 
         Args:
             xg_moves: Tuple of 8 integers

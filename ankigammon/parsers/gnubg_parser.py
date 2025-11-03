@@ -119,7 +119,6 @@ class GNUBGParser:
                 equity = float(match.group(3))
                 error_str = match.group(4)
 
-                # Parse error (if shown)
                 error = float(error_str) if error_str else 0.0
                 abs_error = abs(error)
 
@@ -134,7 +133,6 @@ class GNUBGParser:
                 if i + 1 < len(lines):
                     prob_match = prob_pattern.match(lines[i + 1])
                     if prob_match:
-                        # Convert from decimal to percentage
                         player_win = float(prob_match.group(1)) * 100
                         player_gammon = float(prob_match.group(2)) * 100
                         player_backgammon = float(prob_match.group(3)) * 100
@@ -238,10 +236,8 @@ class GNUBGParser:
             equity = float(match.group(2))
             error_str = match.group(3)
 
-            # Parse gnubg's error (in parentheses)
             gnubg_error = float(error_str) if error_str else 0.0
 
-            # Normalize notation: "Double, take" -> "Double/Take"
             normalized = notation.replace(', ', '/').replace(',', '/')
             normalized = GNUBGParser._normalize_cube_notation(normalized)
 
@@ -290,7 +286,7 @@ class GNUBGParser:
         if double_pass_eq is not None:
             option_equities[f"{double_term}/Pass"] = double_pass_eq
 
-        # For "Too good" options, use same equity as Double/Pass
+        # Assign equities for synthetic "Too good" options
         if double_pass_eq is not None:
             option_equities["Too good/Take"] = double_pass_eq
             option_equities["Too good/Pass"] = double_pass_eq

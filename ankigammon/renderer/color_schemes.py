@@ -21,7 +21,7 @@ class ColorScheme:
     dice_color: str   # Dice color (usually matches pale checker)
 
 
-# Define 5 beautiful color schemes
+# Available color schemes
 CLASSIC = ColorScheme(
     name="Classic",
     board_light="#DEB887",    # Burlywood

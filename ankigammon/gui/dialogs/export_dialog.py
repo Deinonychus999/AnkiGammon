@@ -69,8 +69,6 @@ class AnalysisWorker(QThread):
             # Progress callback for parallel analysis
             def progress_callback(completed: int, total_positions: int):
                 if self._cancelled:
-                    # Note: We can't easily cancel ProcessPoolExecutor mid-flight,
-                    # but we'll check after analysis completes
                     return
                 self.progress.emit(completed, total_positions)
                 self.status_message.emit(
@@ -200,8 +198,7 @@ class ExportWorker(QThread):
             base_progress = i / total
             position_progress_range = 1.0 / total  # How much progress this position represents
 
-            # Estimate sub-steps (used for progress bar calculation)
-            # Steps: render positions (1), score matrix (N cells), generate card (1)
+            # Calculate sub-steps for progress tracking: render, score matrix (if applicable), generate card
             has_score_matrix = (
                 decision.decision_type.name == 'CUBE_ACTION' and
                 decision.match_length > 0 and
@@ -211,13 +208,13 @@ class ExportWorker(QThread):
             matrix_steps = (decision.match_length - 1) ** 2 if has_score_matrix else 0
             total_substeps = 2 + matrix_steps  # render + matrix + generate card
 
-            current_substep = [0]  # Use list for mutable counter in nested function
+            current_substep = [0]  # Mutable counter for nested function
 
             # Progress callback for sub-steps
             def progress_callback(message: str):
                 current_substep[0] += 1
-                # Calculate progress within this position
-                substep_progress = min(current_substep[0] / total_substeps, 0.95)  # Cap at 95% until Anki add
+                # Calculate progress within this position (cap at 95% until Anki add completes)
+                substep_progress = min(current_substep[0] / total_substeps, 0.95)
                 overall_progress = base_progress + (substep_progress * position_progress_range)
                 self.progress.emit(overall_progress)
                 self.status_message.emit(f"Position {i+1}/{total}: {message}")
@@ -234,7 +231,7 @@ class ExportWorker(QThread):
 
             self.progress.emit(base_progress)
 
-            # Generate card (progress_callback will emit sub-steps and update progress)
+            # Generate card with progress tracking
             card_data = card_gen.generate_card(decision)
 
             # Add to Anki
@@ -296,7 +293,7 @@ class ExportWorker(QThread):
                 base_progress = i / total
                 position_progress_range = 1.0 / total
 
-                # Estimate sub-steps (same logic as AnkiConnect)
+                # Calculate sub-steps for progress tracking
                 has_score_matrix = (
                     decision.decision_type.name == 'CUBE_ACTION' and
                     decision.match_length > 0 and

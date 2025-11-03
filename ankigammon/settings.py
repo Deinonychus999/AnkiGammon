@@ -53,12 +53,12 @@ class Settings:
         try:
             with open(self.config_path, 'r', encoding='utf-8') as f:
                 loaded = json.load(f)
-                # Merge with defaults to handle new settings
+                # Merge with defaults to ensure new settings have default values
                 settings = self.DEFAULT_SETTINGS.copy()
                 settings.update(loaded)
                 return settings
         except (json.JSONDecodeError, IOError):
-            # If file is corrupted or unreadable, use defaults
+            # Use defaults if file is corrupted or unreadable
             return self.DEFAULT_SETTINGS.copy()
 
     def _save(self) -> None:

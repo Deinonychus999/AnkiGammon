@@ -39,7 +39,7 @@ class AnimationController:
         self.board_height = board_height
         self.point_height_ratio = point_height_ratio
 
-        # Calculate board dimensions (match SVGBoardRenderer calculations)
+        # Board dimensions matching SVGBoardRenderer
         self.margin = 20
         self.cube_area_width = 70
         self.bearoff_area_width = 100
@@ -57,7 +57,6 @@ class AnimationController:
 
         self.checker_radius = min(self.point_width * 0.45, 25)
 
-        # Board origin (matches SVGBoardRenderer)
         self.board_x = self.margin + self.cube_area_width
         self.board_y = self.margin
 
@@ -87,34 +86,25 @@ class AnimationController:
                  checker_index * (self.checker_radius * 2 + 2))
             return (bar_center_x, y)
 
-        # Handle bear-off (special marker -1)
+        # Handle bear-off
         if point_num == -1:
-            # Return off-board position (will be animated to bear-off tray)
-            # X-coordinate: center of bearoff area
             bearoff_x = self.board_x + self.playing_width + 50
-
-            # Y-coordinate: bottom of appropriate tray where thin rectangles are drawn
-            # (matches SVGBoardRenderer._draw_bearoff checker placement)
-            checker_height = 50  # Must match SVGBoardRenderer
+            checker_height = 50
 
             if player == Player.X:
-                # X uses top tray (not flipped)
                 tray_bottom = self.board_y + self.board_height_inner / 2 - 10
                 bearoff_y = tray_bottom - 10 - checker_height
             else:
-                # O uses bottom tray (not flipped)
                 tray_bottom = self.board_y + self.board_height_inner - 10
                 bearoff_y = tray_bottom - 10 - checker_height
 
             return (bearoff_x, bearoff_y)
 
-        # Handle regular board points (1-24)
         if point_num < 1 or point_num > 24:
             raise ValueError(f"Invalid point number: {point_num}")
 
         x, y_base, is_top = self._get_point_position(point_num)
 
-        # Calculate checker position in stack
         if is_top:
             y = y_base + self.checker_radius + checker_index * (self.checker_radius * 2 + 2)
         else:
@@ -239,27 +229,22 @@ function animatePositionTransition() {{
         svg_id_result: str
     ) -> str:
         """Generate GSAP-based arc animation JavaScript."""
-        # Parse the move to get checker movements
         moves = AnimationHelper.parse_move_notation(move_notation, on_roll)
 
         if not moves:
-            # Fall back to fade if no moves can be parsed
             return self._generate_fade_animation(svg_id_original, svg_id_result, duration)
 
-        # Calculate movements with coordinates
+        # Calculate movement coordinates
         movements = []
         for from_point, to_point in moves:
-            # Get checker stack index (always move top checker)
             checker_index = 0
 
-            # Get start and end coordinates
             start_x, start_y = self.get_point_coordinates(from_point, checker_index)
-            # For bearoff moves (to_point == -1), pass the player information
             end_x, end_y = self.get_point_coordinates(to_point, checker_index, player=on_roll if to_point == -1 else None)
 
-            # Calculate control point for arc (parabolic curve)
+            # Calculate arc control point
             mid_x = (start_x + end_x) / 2
-            mid_y = min(start_y, end_y) - 80  # Arc upward
+            mid_y = min(start_y, end_y) - 80
 
             movements.append({
                 'from_point': from_point,

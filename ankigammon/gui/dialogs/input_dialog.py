@@ -24,6 +24,7 @@ from PySide6.QtWebEngineWidgets import QWebEngineView
 from ankigammon.settings import Settings
 from ankigammon.models import Decision, Position, Player, CubeState, DecisionType
 from ankigammon.parsers.xg_text_parser import XGTextParser
+from ankigammon.gui.dialogs.settings_dialog import SettingsDialog
 from ankigammon.utils.gnuid import parse_gnuid
 from ankigammon.utils.ogid import parse_ogid
 from ankigammon.utils.xgid import parse_xgid
@@ -49,7 +50,7 @@ class PendingPositionItem(QListWidgetItem):
         # Use consistent display format
         self.setText(self.decision.get_short_display_text())
 
-        # Icon based on status - use semantic colors
+        # Icon based on analysis status
         if self.needs_analysis:
             self.setIcon(qta.icon('fa6s.magnifying-glass', color='#89b4fa'))  # Info blue
         else:
@@ -80,7 +81,7 @@ class PendingListWidget(QListWidget):
         # Enable smooth scrolling
         self.setVerticalScrollMode(QListWidget.ScrollPerPixel)
 
-        # Enable multi-selection (Ctrl+Click, Shift+Click)
+        # Enable multi-selection with Ctrl/Shift+Click
         self.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
 
         # Enable context menu
@@ -111,7 +112,7 @@ class PendingListWidget(QListWidget):
     @Slot()
     def _show_context_menu(self, pos):
         """Show context menu for edit note and delete actions."""
-        # Get all selected items (not just the one at pos)
+        # Get all selected items
         selected_items = self.selectedItems()
 
         if not selected_items:
@@ -119,10 +120,9 @@ class PendingListWidget(QListWidget):
 
         # Create context menu
         menu = QMenu(self)
-        # Set cursor pointer for the menu
         menu.setCursor(Qt.PointingHandCursor)
 
-        # Edit Note action (only for single selection)
+        # Edit Note action (single selection only)
         if len(selected_items) == 1:
             item = selected_items[0]
             edit_note_action = QAction(
@@ -135,7 +135,7 @@ class PendingListWidget(QListWidget):
 
             menu.addSeparator()
 
-        # Delete action (works for single or multiple)
+        # Delete action (supports single or multiple selections)
         delete_text = "Delete" if len(selected_items) == 1 else f"Delete {len(selected_items)} Items"
         delete_action = QAction(
             qta.icon('fa6s.trash', color='#f38ba8'),  # Red delete icon
@@ -179,7 +179,7 @@ class PendingListWidget(QListWidget):
         if not selected_items:
             return
 
-        # Build confirmation message
+        # Confirm deletion
         if len(selected_items) == 1:
             item = selected_items[0]
             message = f"Delete pending position?\n\n{item.decision.get_short_display_text()}"
@@ -188,7 +188,7 @@ class PendingListWidget(QListWidget):
             message = f"Delete {len(selected_items)} selected pending position(s)?"
             title = "Delete Positions"
 
-        # Confirm deletion
+        # Show confirmation dialog
         reply = QMessageBox.question(
             self,
             title,
@@ -197,20 +197,17 @@ class PendingListWidget(QListWidget):
         )
 
         if reply == QMessageBox.Yes:
-            # Get row indices and sort in descending order
+            # Delete in descending order to avoid index shifting
             rows_to_delete = sorted([self.row(item) for item in selected_items], reverse=True)
-
-            # Delete from widget (highest to lowest to avoid index shifting)
             for row in rows_to_delete:
                 self.takeItem(row)
 
-            # Emit single signal with all deleted row indices
+            # Emit signal with deleted indices
             self.items_deleted.emit(rows_to_delete)
 
     def keyPressEvent(self, event: QKeyEvent):
         """Handle keyboard events for deletion."""
         if event.key() in (Qt.Key_Delete, Qt.Key_Backspace):
-            # Support multi-selection deletion via keyboard
             self._delete_selected_items()
         else:
             super().keyPressEvent(event)
@@ -269,7 +266,7 @@ class InputDialog(QDialog):
         right_widget = self._create_pending_panel()
         splitter.addWidget(right_widget)
 
-        # Set initial splitter ratio (50/50 balanced)
+        # Set initial splitter ratio
         splitter.setStretchFactor(0, 50)
         splitter.setStretchFactor(1, 50)
 
@@ -423,17 +420,17 @@ class InputDialog(QDialog):
 
         layout.addLayout(header_layout)
 
-        # Create a vertical splitter between pending list and preview
+        # Create vertical splitter for pending list and preview
         splitter = QSplitter(Qt.Vertical)
-        splitter.setChildrenCollapsible(False)  # Prevent collapsing sections
+        splitter.setChildrenCollapsible(False)
 
-        # Top section: Pending list
+        # Pending list
         self.pending_list = PendingListWidget()
         self.pending_list.currentItemChanged.connect(self._on_selection_changed)
         self.pending_list.items_deleted.connect(self._on_items_deleted)
         splitter.addWidget(self.pending_list)
 
-        # Bottom section: Preview pane
+        # Preview pane
         preview_container = QWidget()
         preview_layout = QVBoxLayout(preview_container)
         preview_layout.setContentsMargins(0, 8, 0, 0)
@@ -444,14 +441,14 @@ class InputDialog(QDialog):
         preview_layout.addWidget(preview_label)
 
         self.preview = QWebEngineView()
-        self.preview.setContextMenuPolicy(Qt.NoContextMenu)  # Disable browser context menu
-        self.preview.setMinimumHeight(400)  # Increased for better board visibility
+        self.preview.setContextMenuPolicy(Qt.NoContextMenu)
+        self.preview.setMinimumHeight(400)
         self.preview.setHtml(self._get_empty_preview_html())
-        preview_layout.addWidget(self.preview, stretch=1)  # Allow preview to expand
+        preview_layout.addWidget(self.preview, stretch=1)
 
         splitter.addWidget(preview_container)
 
-        # Set initial splitter ratio (25% pending list, 75% preview)
+        # Set splitter proportions
         splitter.setStretchFactor(0, 25)
         splitter.setStretchFactor(1, 75)
 
@@ -496,11 +493,12 @@ class InputDialog(QDialog):
                 QMessageBox.Yes | QMessageBox.No
             )
             if reply == QMessageBox.Yes:
-                # TODO: Open settings dialog
-                pass
+                # Open settings dialog to configure GnuBG
+                dialog = SettingsDialog(self.settings, self)
+                dialog.exec()
             return
 
-        # Parse the input
+        # Parse input
         try:
             decisions = self._parse_input(text, result.format)
 
@@ -514,7 +512,7 @@ class InputDialog(QDialog):
 
             # Add to pending list
             for decision in decisions:
-                # Check if decision actually has analysis (candidate_moves populated)
+                # Check if decision has analysis data
                 needs_analysis = not bool(decision.candidate_moves)
                 self.pending_decisions.append(decision)
 
@@ -569,16 +567,8 @@ class InputDialog(QDialog):
         return []
 
     def _parse_position_id(self, position_id: str) -> Decision:
-        """
-        Parse a single position ID (XGID, GNUID, or OGID) into a Decision.
-
-        Args:
-            position_id: Position ID string
-
-        Returns:
-            Decision object or None if parsing fails
-        """
-        # Try XGID first
+        """Parse a single position ID (XGID, GNUID, or OGID) into a Decision."""
+        # Try XGID
         if 'XGID=' in position_id or ':' in position_id:
             try:
                 position, metadata = parse_xgid(position_id)
@@ -586,7 +576,7 @@ class InputDialog(QDialog):
             except:
                 pass
 
-        # Try GNUID (14:12 Base64 format)
+        # Try GNUID
         if ':' in position_id:
             parts = position_id.split(':')
             if len(parts) >= 2 and len(parts[0]) == 14 and len(parts[1]) == 12:
@@ -596,7 +586,7 @@ class InputDialog(QDialog):
                 except:
                     pass
 
-        # Try OGID (base-26 format)
+        # Try OGID
         if ':' in position_id:
             try:
                 position, metadata = parse_ogid(position_id)
@@ -610,15 +600,11 @@ class InputDialog(QDialog):
         """Create a Decision object from position and metadata."""
         from ankigammon.utils.xgid import encode_xgid
 
-        # Determine Crawford status from metadata
-        # Note: crawford_jacoby field means different things in different contexts:
-        #   - Match play (match_length > 0): crawford_jacoby = 1 means Crawford rule
-        #   - Money game (match_length = 0): crawford_jacoby = 1 means Jacoby rule
-        # The crawford boolean should ONLY be set for Crawford matches, not Jacoby money games
+        # Determine Crawford status (only applies to match play, not money games)
         match_length = metadata.get('match_length', 0)
         crawford = False
 
-        if match_length > 0:  # Only set crawford=True for match play
+        if match_length > 0:
             if 'crawford' in metadata and metadata['crawford']:
                 crawford = True
             elif 'crawford_jacoby' in metadata and metadata['crawford_jacoby'] > 0:
@@ -651,7 +637,7 @@ class InputDialog(QDialog):
             cube_value=metadata.get('cube_value', 1),
             cube_owner=metadata.get('cube_owner', CubeState.CENTERED),
             decision_type=DecisionType.CUBE_ACTION if not metadata.get('dice') else DecisionType.CHECKER_PLAY,
-            candidate_moves=[]  # Empty moves list - will be filled by GnuBG analysis
+            candidate_moves=[]  # Will be populated by GnuBG analysis
         )
 
     @Slot()
@@ -676,7 +662,7 @@ class InputDialog(QDialog):
     @Slot(list)
     def _on_items_deleted(self, indices: list):
         """Handle deletion of multiple pending items."""
-        # Sort indices in descending order and delete
+        # Delete in descending order
         for index in sorted(indices, reverse=True):
             if 0 <= index < len(self.pending_decisions):
                 self.pending_decisions.pop(index)

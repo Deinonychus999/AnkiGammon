@@ -72,14 +72,14 @@ class CardGenerator:
         if card_id is None:
             card_id = self._generate_id()
 
-        # Validate that we have candidate moves to generate a card
+        # Ensure decision has candidate moves
         if not decision.candidate_moves:
             raise ValueError(
                 "Cannot generate card: decision has no candidate moves. "
-                "For XGID-only input, please use GnuBG analysis to populate moves."
+                "For XGID-only input, use GnuBG analysis to populate moves."
             )
 
-        # Generate position SVG (before move)
+        # Generate position SVG
         position_svg = self._render_position_svg(decision)
 
         # Prepare candidate moves
@@ -90,14 +90,13 @@ class CardGenerator:
         else:
             candidates = decision.candidate_moves[:max_options]
 
-        # Shuffle candidates for MCQ (but not for cube decisions - they have meaningful order)
+        # Shuffle candidates for MCQ (preserve order for cube decisions)
         if decision.decision_type == DecisionType.CUBE_ACTION:
-            # Don't shuffle cube decisions - keep logical order:
-            # No Double/Take, Double/Take, Double/Pass, Too Good/Take, Too Good/Pass
+            # Preserve logical order for cube actions
             shuffled_candidates = candidates
             answer_index = next((i for i, c in enumerate(candidates) if c and c.rank == 1), 0)
         else:
-            # Shuffle checker play decisions for MCQ
+            # Randomize order for checker play
             shuffled_candidates, answer_index = self._shuffle_candidates(candidates)
 
         # Generate card front
@@ -115,13 +114,13 @@ class CardGenerator:
         best_move = decision.get_best_move()
 
         if not self.interactive_moves:
-            # Only render the best move's resulting position (no animation)
+            # Render only the best move's resulting position
             if best_move:
                 result_svg = self._render_resulting_position_svg(decision, best_move)
             else:
                 result_svg = None
         else:
-            # Interactive mode: generate result SVGs for all moves (for proper number display)
+            # Render all move results for interactive visualization
             if self.progress_callback:
                 self.progress_callback(f"Rendering board positions...")
             for candidate in candidates:
@@ -396,13 +395,12 @@ class CardGenerator:
         table_rows = []
         letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J']
 
-        # Filter to only show moves from analysis (not synthetic)
+        # Filter analysis moves (exclude synthetic options)
         analysis_moves = [m for m in candidates if m and m.from_xg_analysis]
 
-        # Sort cube decisions by logical order, checker plays by error
+        # Sort moves by type
         if decision.decision_type == DecisionType.CUBE_ACTION:
-            # Cube decisions: always show in logical order
-            # No double, Double/take, Double/pass
+            # Preserve standard cube action order
             cube_order_map = {
                 "No double": 1,
                 "Double, take": 2,
@@ -413,7 +411,7 @@ class CardGenerator:
                 key=lambda m: cube_order_map.get(m.xg_notation if m.xg_notation else m.notation, 99)
             )
         else:
-            # Checker plays: sort by error (best first)
+            # Sort checker plays by error magnitude
             sorted_candidates = sorted(
                 analysis_moves,
                 key=lambda m: abs(m.error) if m.error is not None else 999.0
@@ -446,7 +444,7 @@ class CardGenerator:
                 row_class = f"{rank_class} clickable-move-row"
                 row_attrs = wgb_attrs
 
-            # Generate inline W/G/B display (only for checker play, not cube decisions)
+            # Include W/G/B data for checker play decisions
             if decision.decision_type == DecisionType.CHECKER_PLAY:
                 wgb_inline_html = self._format_wgb_inline(move, decision)
             else:
@@ -504,7 +502,7 @@ class CardGenerator:
             {original_position_svg}
         </div>
     </div>'''
-            # Change title and hide animation tip for cube decisions
+            # Set title based on decision type
             if is_cube_decision:
                 analysis_title = '<h4>Cube Actions Analysis:</h4>'
             else:
@@ -515,7 +513,7 @@ class CardGenerator:
     <div class="position-svg">
         {result_position_svg or original_position_svg}
     </div>'''
-            # Change title for cube decisions
+            # Set title based on decision type
             if is_cube_decision:
                 analysis_title = '<h4>Cube Actions Analysis:</h4>'
             else:
@@ -527,7 +525,7 @@ class CardGenerator:
         if is_cube_decision and decision.player_win_pct is not None:
             winning_chances_html = self._generate_winning_chances_html(decision)
 
-        # For cube decisions with W/G/B, create side-by-side layout
+        # Use side-by-side layout for cube decisions with W/G/B data
         if is_cube_decision and winning_chances_html:
             analysis_and_chances = f"""
     <div class="analysis-container">
@@ -611,7 +609,7 @@ class CardGenerator:
         move_result_svgs: Dict[str, str]
     ) -> str:
         """
-        Generate JavaScript for animating actual checker movements on the board.
+        Generate JavaScript for animating checker movements.
 
         Args:
             decision: The decision with the original position
@@ -621,44 +619,38 @@ class CardGenerator:
         Returns:
             HTML script tags with animation code
         """
-        # Build move data with coordinates for each checker movement
+        # Calculate coordinates for each checker movement
         move_data = {}
 
         for candidate in candidates:
             if not candidate:
                 continue
 
-            # Parse move notation to get individual checker movements
+            # Parse move notation into individual checker movements
             from ankigammon.renderer.animation_helper import AnimationHelper
             movements = AnimationHelper.parse_move_notation(candidate.notation, decision.on_roll)
 
             if not movements:
                 continue
 
-            # Calculate coordinates for each movement
-            # We need to track the position state as we animate
+            # Track position state during animation
             move_animations = []
-
-            # Create a copy of the position to track changes during the move
             current_position = decision.position.copy()
 
             for from_point, to_point in movements:
-                # Get starting coordinates (top of stack at from_point)
-                # Cap at max visible checkers (5 for points, 3 for bar)
+                # Calculate start coordinates (top checker at source point)
                 from_count = abs(current_position.points[from_point]) if 0 <= from_point <= 25 else 0
                 from_max_visible = 3 if (from_point == 0 or from_point == 25) else 5
-                from_index = min(max(0, from_count - 1), from_max_visible - 1)  # Top visible checker
+                from_index = min(max(0, from_count - 1), from_max_visible - 1)
                 start_x, start_y = self.animation_controller.get_point_coordinates(from_point, from_index)
 
-                # Get ending coordinates (where it lands at to_point - on top of existing checkers)
-                # Cap at max visible checkers to avoid landing above visible stack
+                # Calculate end coordinates (top of destination stack)
                 if to_point >= 0 and to_point <= 25:
                     to_count = abs(current_position.points[to_point])
                     to_max_visible = 3 if (to_point == 0 or to_point == 25) else 5
-                    to_index = min(to_count, to_max_visible - 1)  # Land on last visible position
+                    to_index = min(to_count, to_max_visible - 1)
                     end_x, end_y = self.animation_controller.get_point_coordinates(to_point, to_index)
                 else:
-                    # Bear-off or special case
                     end_x, end_y = self.animation_controller.get_point_coordinates(to_point, 0)
 
                 move_animations.append({
@@ -670,7 +662,7 @@ class CardGenerator:
                     'end_y': end_y
                 })
 
-                # Update position for next movement calculation
+                # Update position state for next movement
                 if 0 <= from_point <= 25:
                     if current_position.points[from_point] > 0:
                         current_position.points[from_point] -= 1
@@ -688,14 +680,13 @@ class CardGenerator:
         move_data_json = json.dumps(move_data)
         move_result_svgs_json = json.dumps(move_result_svgs)
 
-        # Get player on roll and checker colors
+        # Prepare animation parameters
         on_roll_player = 'X' if decision.on_roll == Player.X else 'O'
         checker_x_color = self.renderer.color_scheme.checker_x
         checker_o_color = self.renderer.color_scheme.checker_o
         checker_border_color = self.renderer.color_scheme.checker_border
         checker_radius = self.renderer.checker_radius
 
-        # Generate animation JavaScript
         script = f"""
 <script>
 // Checker movement animation system
@@ -1175,16 +1166,15 @@ class CardGenerator:
             decision: The cube decision
 
         Returns:
-            HTML string with score matrix, or empty string if generation fails
+            HTML string with score matrix, or empty string if unavailable
         """
-        # Only generate if GnuBG is available
         if not self.settings.is_gnubg_available():
             return ""
 
         try:
             from ankigammon.analysis.score_matrix import generate_score_matrix, format_matrix_as_html
 
-            # Calculate current score (away from match)
+            # Calculate away scores
             current_player_away = decision.match_length - (
                 decision.score_o if decision.on_roll == Player.O else decision.score_x
             )
@@ -1192,7 +1182,6 @@ class CardGenerator:
                 decision.score_x if decision.on_roll == Player.O else decision.score_o
             )
 
-            # Generate matrix with progress callback
             matrix = generate_score_matrix(
                 xgid=decision.xgid,
                 match_length=decision.match_length,
@@ -1201,7 +1190,6 @@ class CardGenerator:
                 progress_callback=self.progress_callback
             )
 
-            # Format as HTML
             matrix_html = format_matrix_as_html(
                 matrix=matrix,
                 current_player_away=current_player_away,
@@ -1212,8 +1200,6 @@ class CardGenerator:
             return matrix_html
 
         except Exception as e:
-            # Silently fail if matrix generation fails
-            # (e.g., GnuBG not available, analysis error)
             print(f"Warning: Failed to generate score matrix: {e}")
             return ""
 

@@ -100,21 +100,20 @@ def parse_ogid(ogid: str) -> Tuple[Position, Dict]:
         cube_value_char = cube_str[1]
         cube_action_char = cube_str[2]
 
-        # Cube value: 0->1, 1->2, 2->4, etc.
+        # Cube value stored as log2 (0->1, 1->2, 2->4, etc.)
         cube_value_log = int(cube_value_char)
         metadata['cube_value'] = 2 ** cube_value_log
 
-        # Cube owner: W=White/X, B=Black/O, N=Neutral, D=Dead
+        # Map cube owner character to internal cube state
         if cube_owner_char == 'W':
-            metadata['cube_owner'] = CubeState.X_OWNS  # White = X in our model
+            metadata['cube_owner'] = CubeState.X_OWNS
         elif cube_owner_char == 'B':
-            metadata['cube_owner'] = CubeState.O_OWNS  # Black = O in our model
+            metadata['cube_owner'] = CubeState.O_OWNS
         elif cube_owner_char == 'N':
             metadata['cube_owner'] = CubeState.CENTERED
-        else:  # D or ?
-            metadata['cube_owner'] = CubeState.CENTERED  # Default to centered
+        else:
+            metadata['cube_owner'] = CubeState.CENTERED
 
-        # Cube action (O=Offered, T=Taken, P=Passed, N=Normal)
         metadata['cube_action'] = cube_action_char
 
     # Parse optional fields
@@ -128,35 +127,34 @@ def parse_ogid(ogid: str) -> Tuple[Position, Dict]:
                 metadata['dice'] = (d1, d2)
 
     if len(parts) > 4 and parts[4]:
-        # Field 5: Turn (W or B) - represents who is on roll
-        # W = White/X on roll, B = Black/O on roll
+        # Field 5: Turn (W or B)
         turn_str = parts[4].upper()
         if turn_str == 'W':
-            metadata['on_roll'] = Player.X  # White = X
+            metadata['on_roll'] = Player.X
         elif turn_str == 'B':
-            metadata['on_roll'] = Player.O  # Black = O
+            metadata['on_roll'] = Player.O
 
     if len(parts) > 5 and parts[5]:
         # Field 6: Game state (e.g., IW, FB)
         metadata['game_state'] = parts[5]
 
     if len(parts) > 6 and parts[6]:
-        # Field 7: White/X score
+        # Field 7: X score
         metadata['score_x'] = int(parts[6])
 
     if len(parts) > 7 and parts[7]:
-        # Field 8: Black/O score
+        # Field 8: O score
         metadata['score_o'] = int(parts[7])
 
     if len(parts) > 8 and parts[8]:
-        # Field 9: Match length (e.g., "7", "5C", "9G15")
+        # Field 9: Match length with optional modifiers (e.g., "7", "5C", "9G15")
         match_str = parts[8]
         match_regex = re.compile(r'(\d+)([LCG]?)(\d*)')
         match = match_regex.match(match_str)
         if match:
             metadata['match_length'] = int(match.group(1))
             if match.group(2):
-                metadata['match_modifier'] = match.group(2)  # L, C, or G
+                metadata['match_modifier'] = match.group(2)
             if match.group(3):
                 metadata['match_max_games'] = int(match.group(3))
 
@@ -176,25 +174,25 @@ def _parse_ogid_position(white_str: str, black_str: str) -> Position:
     Parse OGID position strings into a Position object.
 
     Args:
-        white_str: White/X checker positions (e.g., "11jjjjjhhhccccc")
-        black_str: Black/O checker positions (e.g., "ooddddd88866666")
+        white_str: X checker positions (e.g., "11jjjjjhhhccccc")
+        black_str: O checker positions (e.g., "ooddddd88866666")
 
     Returns:
         Position object with checkers placed
     """
     position = Position()
 
-    # Parse White/X checkers (positive in our model)
+    # Parse X checkers (positive values)
     for char in white_str:
         point = _char_to_point(char)
-        position.points[point] += 1  # Positive for X
+        position.points[point] += 1
 
-    # Parse Black/O checkers (negative in our model)
+    # Parse O checkers (negative values)
     for char in black_str:
         point = _char_to_point(char)
-        position.points[point] -= 1  # Negative for O
+        position.points[point] -= 1
 
-    # Calculate borne-off checkers (each player starts with 15)
+    # Calculate borne-off checkers
     total_x = sum(count for count in position.points if count > 0)
     total_o = sum(abs(count) for count in position.points if count < 0)
 
@@ -229,12 +227,12 @@ def encode_ogid(
         cube_value: Doubling cube value
         cube_owner: Who owns the cube
         cube_action: Cube action (N=Normal, O=Offered, T=Taken, P=Passed)
-        dice: Dice values (if any)
+        dice: Dice values
         on_roll: Player on roll
         game_state: Game state code (e.g., "IW", "FB")
-        score_x: White/X player's score
-        score_o: Black/O player's score
-        match_length: Match length (points to win)
+        score_x: X player's score
+        score_o: O player's score
+        match_length: Match length in points
         match_modifier: Match modifier (L, C, or G)
         match_max_games: Max games for Galaxie format
         move_id: Move sequence number
@@ -245,32 +243,29 @@ def encode_ogid(
         OGID string
     """
     # Encode position strings
-    white_chars = []  # X/White checkers
-    black_chars = []  # O/Black checkers
+    white_chars = []
+    black_chars = []
 
     for point_idx in range(26):
         count = position.points[point_idx]
         if count > 0:
-            # X/White checkers (positive)
             white_chars.extend([_point_to_char(point_idx)] * count)
         elif count < 0:
-            # O/Black checkers (negative)
             black_chars.extend([_point_to_char(point_idx)] * abs(count))
 
-    # Sort characters (OGID format convention)
+    # Sort characters per OGID format
     white_str = ''.join(sorted(white_chars))
     black_str = ''.join(sorted(black_chars))
 
-    # Encode cube state (3 characters)
-    # Owner
+    # Encode cube state (3 characters: owner, value, action)
     if cube_owner == CubeState.X_OWNS:
-        cube_owner_char = 'W'  # White = X
+        cube_owner_char = 'W'
     elif cube_owner == CubeState.O_OWNS:
-        cube_owner_char = 'B'  # Black = O
+        cube_owner_char = 'B'
     else:
-        cube_owner_char = 'N'  # Neutral
+        cube_owner_char = 'N'
 
-    # Value as log2
+    # Convert cube value to log2
     cube_value_log = 0
     temp = cube_value
     while temp > 1:
@@ -278,19 +273,15 @@ def encode_ogid(
         cube_value_log += 1
     cube_value_char = str(cube_value_log)
 
-    # Action
     cube_action_char = cube_action
 
     cube_str = f"{cube_owner_char}{cube_value_char}{cube_action_char}"
 
-    # Build OGID string
     ogid_parts = [white_str, black_str, cube_str]
 
-    # If only_position is True, return just the first 3 fields
     if only_position:
         return ':'.join(ogid_parts)
 
-    # Add optional fields
     # Field 4: Dice
     if dice:
         ogid_parts.append(f"{dice[0]}{dice[1]}")

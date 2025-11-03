@@ -95,13 +95,13 @@ class ImportOptionsDialog(QDialog):
         group = QGroupBox("Player Selection")
         form = QFormLayout(group)
 
-        # Player 1 from XG file = Player.O internally (BOTTOM/Black)
+        # Player checkboxes (XG file player 1 = internal Player.O, player 2 = Player.X)
         self.chk_player_o = QCheckBox(self.player1_name)
         self.chk_player_o.setCursor(Qt.PointingHandCursor)
         self.chk_player_o.stateChanged.connect(self._update_ok_button_state)
         form.addRow(self.chk_player_o)
 
-        # Player 2 from XG file = Player.X internally (TOP/White)
+        # Player 2 checkbox
         self.chk_player_x = QCheckBox(self.player2_name)
         self.chk_player_x.setCursor(Qt.PointingHandCursor)
         self.chk_player_x.stateChanged.connect(self._update_ok_button_state)

@@ -44,10 +44,8 @@ class FormatDetector:
         """
         Detect format from input text.
 
-        Algorithm:
-        1. Split text into potential positions
-        2. For each position, check for XGID/GNUID and analysis
-        3. Classify based on what's present
+        Splits text into positions, checks for position IDs and analysis markers,
+        then classifies as position IDs only or full analysis.
 
         Args:
             text: Input text to analyze
@@ -110,7 +108,6 @@ class FormatDetector:
             )
 
         elif any(pt == "full_analysis" for pt in position_types) and any(pt == "position_id" for pt in position_types):
-            # Mixed input
             full_count = sum(1 for pt in position_types if pt == "full_analysis")
             id_count = sum(1 for pt in position_types if pt == "position_id")
 
@@ -119,7 +116,7 @@ class FormatDetector:
                 warnings.append(f"{id_count} position(s) need GnuBG analysis (not configured)")
 
             return DetectionResult(
-                format=InputFormat.FULL_ANALYSIS,  # Treat as full analysis, will handle IDs
+                format=InputFormat.FULL_ANALYSIS,
                 count=len(positions),
                 details=f"Mixed input: {full_count} with analysis, {id_count} ID(s) only",
                 warnings=warnings,
@@ -137,7 +134,7 @@ class FormatDetector:
 
     def detect_binary(self, data: bytes) -> DetectionResult:
         """
-        Detect format from binary data (for file imports).
+        Detect format from binary data for file imports.
 
         Args:
             data: Raw binary data from file
@@ -145,17 +142,15 @@ class FormatDetector:
         Returns:
             DetectionResult with format classification
         """
-        # Check for XG binary format
         if self._is_xg_binary(data):
             return DetectionResult(
                 format=InputFormat.XG_BINARY,
-                count=1,  # Binary files typically contain 1 game (will be updated after parsing)
+                count=1,
                 details="eXtreme Gammon binary file (.xg)",
                 warnings=[],
                 position_previews=["XG binary format"]
             )
 
-        # Check for SGF file format
         if FormatDetector.is_sgf_file(data):
             warnings = []
             if not self.settings.is_gnubg_available():
@@ -163,13 +158,12 @@ class FormatDetector:
 
             return DetectionResult(
                 format=InputFormat.SGF_FILE,
-                count=1,  # Will be updated after analysis
+                count=1,
                 details="SGF backgammon match file (.sgf)",
                 warnings=warnings,
                 position_previews=["SGF file - requires analysis"]
             )
 
-        # Check for match file format
         if FormatDetector.is_match_file(data):
             warnings = []
             if not self.settings.is_gnubg_available():
@@ -177,13 +171,12 @@ class FormatDetector:
 
             return DetectionResult(
                 format=InputFormat.MATCH_FILE,
-                count=1,  # Will be updated after analysis
+                count=1,
                 details="Backgammon match file (.mat)",
                 warnings=warnings,
                 position_previews=["Match file - requires analysis"]
             )
 
-        # Try decoding as text and use text detection
         try:
             text = data.decode('utf-8', errors='ignore')
             return self.detect(text)
@@ -205,15 +198,10 @@ class FormatDetector:
     @staticmethod
     def is_match_file(data: bytes) -> bool:
         """
-        Check if data is a backgammon match file (.mat format).
+        Check if data is a backgammon match file.
 
-        Match files can be in two formats:
-        1. With headers (OpenGammon, Backgammon Studio):
-           ; [Site "OpenGammon"]
-           ; [Player 1 "..."]
-        2. Plain text:
-           15 point match
-           Game 1
+        Supports header format (OpenGammon, Backgammon Studio) with semicolon
+        comments, or plain text format with match indicators.
 
         Args:
             data: Raw file data
@@ -222,20 +210,15 @@ class FormatDetector:
             True if this is a match file
         """
         try:
-            # Try UTF-8 decoding
             text = data.decode('utf-8', errors='ignore')
 
-            # Check for .mat header format (semicolon comments)
             if text.lstrip().startswith(';'):
                 return True
 
-            # Check for plain text match format
-            # Look for "N point match" in first few lines
             first_lines = '\n'.join(text.split('\n')[:10])
             if re.search(r'\d+\s+point\s+match', first_lines, re.IGNORECASE):
                 return True
 
-            # Check for match-specific keywords in first 500 chars
             header = text[:500]
             match_indicators = [
                 'point match',
@@ -249,7 +232,6 @@ class FormatDetector:
             matches = sum(1 for indicator in match_indicators
                          if re.search(indicator, header, re.IGNORECASE))
 
-            # If we see 3+ match indicators, it's probably a match file
             return matches >= 3
 
         except:
@@ -260,9 +242,7 @@ class FormatDetector:
         """
         Check if data is an SGF (Smart Game Format) backgammon file.
 
-        SGF files for backgammon should have:
-        - (;FF[4]GM[6]... - SGF format 4, Game type 6 (backgammon)
-        - Properties like PB[], PW[], MI[], etc.
+        Verifies SGF structure with format 4 and game type 6 (backgammon).
 
         Args:
             data: Raw file data
@@ -271,28 +251,23 @@ class FormatDetector:
             True if this is an SGF backgammon file
         """
         try:
-            # Try UTF-8 decoding
             text = data.decode('utf-8', errors='ignore')
 
-            # Check for SGF structure: starts with (; and contains FF[4]GM[6]
             if not text.lstrip().startswith('(;'):
                 return False
 
-            # Check for backgammon game type (GM[6])
             if 'GM[6]' not in text[:200]:
                 return False
 
-            # Check for typical backgammon SGF properties
             sgf_indicators = [
-                'FF[4]',  # File format 4
-                'GM[6]',  # Game type 6 (backgammon)
-                'PB[',    # Player Black
-                'PW[',    # Player White
+                'FF[4]',
+                'GM[6]',
+                'PB[',
+                'PW[',
             ]
 
             matches = sum(1 for indicator in sgf_indicators if indicator in text[:500])
 
-            # If we see 3+ SGF indicators, it's probably an SGF file
             return matches >= 3
 
         except:
@@ -302,22 +277,15 @@ class FormatDetector:
         """
         Split text into individual position blocks.
 
-        Positions are separated by:
-        - Multiple blank lines (2+)
-        - "eXtreme Gammon Version:" marker
-        - New XGID/OGID/GNUID line after a complete position
+        Separates positions by XGID/OGID/GNUID markers, keeping position IDs
+        with their associated analysis content.
         """
-        # First, try splitting by eXtreme Gammon version markers
         positions = []
 
-        # Split by XGID, OGID, or GNUID lines, keeping the position ID with its analysis
-        # Pattern matches XGID=, OGID (base-26), or GNUID (base64)
         sections = re.split(r'(XGID=[^\n]+|^[0-9a-p]+:[0-9a-p]+:[A-Z0-9]{3}[^\n]*|^[A-Za-z0-9+/]{14}:[A-Za-z0-9+/]{12})', text, flags=re.MULTILINE)
 
-        # Recombine position ID with following content
         current_pos = ""
         for i, section in enumerate(sections):
-            # Check if this section starts with a position ID
             if (section.startswith('XGID=') or
                 re.match(r'^[0-9a-p]+:[0-9a-p]+:[A-Z0-9]{3}', section) or
                 re.match(r'^[A-Za-z0-9+/]{14}:[A-Za-z0-9+/]{12}$', section)):
@@ -330,7 +298,6 @@ class FormatDetector:
         if current_pos:
             positions.append(current_pos.strip())
 
-        # Also check for simple line-by-line XGID/GNUID format
         if not positions:
             lines = [line.strip() for line in text.split('\n') if line.strip()]
             if all(self._is_position_id_line(line) for line in lines):
@@ -340,17 +307,12 @@ class FormatDetector:
 
     def _is_position_id_line(self, line: str) -> bool:
         """Check if a single line is a position ID (XGID, GNUID, or OGID)."""
-        # XGID format
         if line.startswith('XGID='):
             return True
 
-        # OGID format (base-26 encoding: 0-9a-p characters, at least 3 fields)
-        # Format: P1:P2:CUBE[:...] where P1 and P2 use only 0-9a-p
         if re.match(r'^[0-9a-p]+:[0-9a-p]+:[A-Z0-9]{3}', line):
             return True
 
-        # GNUID format (base64: PositionID:MatchID = 14 chars:12 chars)
-        # Check for base64 chars after checking OGID to avoid confusion
         if re.match(r'^[A-Za-z0-9+/]{14}:[A-Za-z0-9+/]{12}$', line):
             return True
 
@@ -358,24 +320,21 @@ class FormatDetector:
 
     def _classify_position(self, text: str) -> Tuple[str, str]:
         """
-        Classify a single position block.
+        Classify a single position block as position ID, full analysis, or unknown.
 
         Returns:
-            (type, preview) where type is "position_id", "full_analysis", or "unknown"
+            (type, preview) tuple
         """
         has_xgid = 'XGID=' in text
         has_ogid = bool(re.match(r'^[0-9a-p]+:[0-9a-p]+:[A-Z0-9]{3}', text.strip()))
         has_gnuid = bool(re.match(r'^[A-Za-z0-9+/=]+:[A-Za-z0-9+/=]+$', text.strip()))
 
-        # Check for analysis markers
         has_checker_play = bool(re.search(r'\beq:', text, re.IGNORECASE))
         has_cube_decision = bool(re.search(r'Cubeful Equities:|Proper cube action:', text, re.IGNORECASE))
         has_board = bool(re.search(r'\+13-14-15-16-17-18', text))
 
-        # Extract preview
         preview = self._extract_preview(text, has_xgid, has_ogid, has_gnuid)
 
-        # Classification logic
         if (has_xgid or has_ogid or has_gnuid):
             if has_checker_play or has_cube_decision or has_board:
                 return ("full_analysis", preview)
@@ -389,9 +348,8 @@ class FormatDetector:
         if has_xgid:
             match = re.search(r'XGID=([^\n]+)', text)
             if match:
-                xgid = match.group(1)[:50]  # First 50 chars
+                xgid = match.group(1)[:50]
 
-                # Try to find player/dice info
                 player_match = re.search(r'([XO]) to play (\d+)', text)
                 if player_match:
                     player = player_match.group(1)
@@ -401,12 +359,10 @@ class FormatDetector:
                 return f"XGID={xgid}..."
 
         elif has_ogid:
-            # Extract player/dice from OGID if possible
             parts = text.strip().split(':')
             if len(parts) >= 5:
                 dice = parts[3] if len(parts) > 3 and parts[3] else "to roll"
                 turn = parts[4] if len(parts) > 4 and parts[4] else ""
-                # OGID color is inverted: W sent → B on roll, B sent → W on roll
                 player = "Black" if turn == "W" else "White" if turn == "B" else "?"
                 if dice and dice != "to roll":
                     return f"{player} to play {dice}"

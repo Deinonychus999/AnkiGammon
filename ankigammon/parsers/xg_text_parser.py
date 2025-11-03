@@ -90,13 +90,12 @@ class XGTextParser:
         # Parse game info (players, score, cube, etc.)
         game_info = XGTextParser._parse_game_info(analysis_section)
         if game_info:
-            # Update metadata with parsed info, but DON'T overwrite XGID data!
-            # XGID data is authoritative because it accounts for perspective correctly
-            # The ASCII board representation may show cube ownership from a flipped perspective
+            # Update metadata with parsed info. XGID data takes precedence where it exists
+            # since it correctly accounts for perspective in all position encodings.
             for key, value in game_info.items():
                 if key not in metadata or key == 'decision_type':
-                    # Only add if not already in metadata (from XGID)
-                    # Exception: decision_type can only come from ASCII parsing
+                    # Add values not present in XGID metadata
+                    # decision_type can only come from text parsing
                     metadata[key] = value
 
         # Parse move analysis
@@ -108,10 +107,7 @@ class XGTextParser:
         # Parse global winning chances (for cube decisions)
         winning_chances = XGTextParser._parse_winning_chances(analysis_section)
 
-        # Determine decision type
-        # If not explicitly set in metadata, infer from dice:
-        # - No dice (dice='00' in XGID) = CUBE_ACTION
-        # - Has dice = CHECKER_PLAY
+        # Determine decision type from metadata or dice presence
         if 'decision_type' in metadata:
             decision_type = metadata['decision_type']
         elif 'dice' not in metadata or metadata.get('dice') is None:
@@ -120,15 +116,11 @@ class XGTextParser:
             decision_type = DecisionType.CHECKER_PLAY
 
         # Determine Crawford status from multiple sources
-        # Priority: 1) Text parsing, 2) XGID crawford_jacoby, 3) OGID match_modifier, 4) GNUID crawford
-        # Note: crawford_jacoby field means different things in different contexts:
-        #   - Match play (match_length > 0): crawford_jacoby = 1 means Crawford rule
-        #   - Money game (match_length = 0): crawford_jacoby = 1 means Jacoby rule
-        # The crawford boolean should ONLY be set for Crawford matches, not Jacoby money games
+        # The crawford_jacoby field indicates Crawford rule for matches or Jacoby rule for money games
         match_length = metadata.get('match_length', 0)
         crawford = False
 
-        if match_length > 0:  # Only set crawford=True for match play
+        if match_length > 0:
             if 'crawford' in metadata and metadata['crawford']:
                 crawford = True
             elif 'crawford_jacoby' in metadata and metadata['crawford_jacoby'] > 0:
@@ -249,10 +241,9 @@ class XGTextParser:
         """
         info = {}
 
-        # First, parse the player designation to build mapping
-        # "X:Player 1   O:Player 2" means X is Player 1, O is Player 2
-        # Player 1 = BOTTOM player = Player.O in our internal model
-        # Player 2 = TOP player = Player.X in our internal model
+        # Parse player designation and map to internal model
+        # Player 1 = BOTTOM player = Player.O
+        # Player 2 = TOP player = Player.X
         xo_to_player = {}
         player_designation = re.search(
             r'([XO]):Player\s+(\d+)',
@@ -263,13 +254,13 @@ class XGTextParser:
             label = player_designation.group(1).upper()  # 'X' or 'O'
             player_num = int(player_designation.group(2))  # 1 or 2
 
-            # Map: Player 1 = BOTTOM = Player.O, Player 2 = TOP = Player.X
+            # Map player number to internal representation
             if player_num == 1:
                 xo_to_player[label] = Player.O
             else:
                 xo_to_player[label] = Player.X
 
-            # Also get the other player
+            # Parse the other player
             other_label = 'O' if label == 'X' else 'X'
             other_player_designation = re.search(
                 rf'{other_label}:Player\s+(\d+)',
@@ -310,7 +301,6 @@ class XGTextParser:
             info['match_length'] = 0
 
         # Parse cube info
-        # "Cube: 2, O own cube" or "Cube: 4, X own cube" or "Cube: 1"
         cube_match = re.search(
             r'Cube:\s*(\d+)(?:,\s*([XO])\s+own\s+cube)?',
             text,
@@ -321,7 +311,6 @@ class XGTextParser:
             owner_label = cube_match.group(2)
             if owner_label:
                 owner_label = owner_label.upper()
-                # Use mapping if available
                 if owner_label in xo_to_player:
                     owner_player = xo_to_player[owner_label]
                     if owner_player == Player.X:
@@ -329,7 +318,7 @@ class XGTextParser:
                     else:
                         info['cube_owner'] = CubeState.O_OWNS
                 else:
-                    # Fallback: old behavior
+                    # Fallback if player mapping not found
                     if owner_label == 'X':
                         info['cube_owner'] = CubeState.X_OWNS
                     elif owner_label == 'O':
@@ -338,20 +327,18 @@ class XGTextParser:
                 info['cube_owner'] = CubeState.CENTERED
 
         # Parse turn info
-        # "X to play 63" or "O to play 52" or "X to roll" or "O on roll"
         turn_match = re.search(
             r'([XO])\s+(?:to\s+play|to\s+roll|on\s+roll)(?:\s+(\d)(\d))?',
             text,
             re.IGNORECASE
         )
         if turn_match:
-            player_label = turn_match.group(1).upper()  # 'X' or 'O' from text
+            player_label = turn_match.group(1).upper()
 
-            # Use the mapping if available, otherwise fall back to simple mapping
             if player_label in xo_to_player:
                 info['on_roll'] = xo_to_player[player_label]
             else:
-                # Fallback: assume X=Player.X, O=Player.O (old behavior)
+                # Fallback if player mapping not found
                 info['on_roll'] = Player.X if player_label == 'X' else Player.O
 
             dice1 = turn_match.group(2)
@@ -405,13 +392,11 @@ class XGTextParser:
             equity = float(match.group(3))
             error_str = match.group(4)
 
-            # Parse error (if present in parentheses)
-            # For checker play, preserve the sign (negative means worse than best)
+            # Parse error if present
             if error_str:
-                xg_error = float(error_str)  # Preserve sign from XG
-                error = abs(xg_error)  # Internal error (always positive)
+                xg_error = float(error_str)
+                error = abs(xg_error)
             else:
-                # First move has no error
                 xg_error = 0.0
                 error = 0.0
 
@@ -434,8 +419,8 @@ class XGTextParser:
                 equity=equity,
                 error=error,
                 rank=rank,
-                xg_error=xg_error,  # Store XG's error with sign
-                xg_notation=notation,  # For checker play, XG notation same as regular notation
+                xg_error=xg_error,
+                xg_notation=notation,
                 player_win_pct=winning_chances.get('player_win_pct'),
                 player_gammon_pct=winning_chances.get('player_gammon_pct'),
                 player_backgammon_pct=winning_chances.get('player_backgammon_pct'),
@@ -526,15 +511,13 @@ class XGTextParser:
             re.MULTILINE | re.IGNORECASE
         )
 
-        # Store parsed equities and XG errors in order they appear
-        # This preserves XG's original order (No double, Double/Take, Double/Pass)
-        xg_moves_data = []  # List of (normalized_notation, equity, xg_error, xg_order)
+        # Store parsed equities in order they appear
+        xg_moves_data = []
         for i, match in enumerate(pattern.finditer(text), 1):
             notation = match.group(1).strip()
             equity = float(match.group(2))
             error_str = match.group(3)
 
-            # Parse XG's error (in parentheses) - preserve the sign (+ or -)
             xg_error = float(error_str) if error_str else 0.0
 
             # Normalize notation
@@ -576,10 +559,7 @@ class XGTextParser:
             f"Too good/Pass"
         ]
 
-        # Assign equities and determine best move
-        # The equities we have from XG are: No double, Double/Take, Double/Pass
-        # We need to infer equities for "Too good" options
-
+        # Assign equities from XG's analysis
         no_double_eq = equity_map.get("No Double", None)
         double_take_eq = equity_map.get("Double/Take", None)
         double_pass_eq = equity_map.get("Double/Pass", None)
@@ -587,41 +567,29 @@ class XGTextParser:
         # Build option list with equities
         option_equities = {}
         if no_double_eq is not None:
-            # "No Double/Take" means we don't double and opponent would take if we did
             option_equities[f"No {double_term}/Take"] = no_double_eq
         if double_take_eq is not None:
             option_equities[f"{double_term}/Take"] = double_take_eq
         if double_pass_eq is not None:
             option_equities[f"{double_term}/Pass"] = double_pass_eq
 
-        # For "Too good" options, use the same equity as the corresponding action
-        # Too good/Take means we're too good to double, so opponent should drop
-        # This has the same practical equity as Double/Pass
+        # Assign equities for synthetic "Too good" options
         if double_pass_eq is not None:
             option_equities["Too good/Take"] = double_pass_eq
             option_equities["Too good/Pass"] = double_pass_eq
 
-        # Determine which is the best option based on "Best Cube action:" text
-        # Format can be:
-        #   "No redouble / Take" means "No redouble/Take" (we don't double, opponent would take)
-        #   "Redouble / Take" means "Redouble/Take" (we double, opponent takes)
-        #   "Too good to redouble / Pass" means "Too good/Pass"
+        # Determine best option from "Best Cube action:" text
         best_notation = None
         if best_action_text:
             text_lower = best_action_text.lower()
             if 'too good' in text_lower:
-                # "Too good to redouble / Take" or "Too good to redouble / Pass"
-                # The part after the slash is what opponent would do
                 if 'take' in text_lower:
                     best_notation = "Too good/Take"
                 elif 'pass' in text_lower or 'drop' in text_lower:
                     best_notation = "Too good/Pass"
             elif ('no double' in text_lower or 'no redouble' in text_lower):
-                # "No redouble / Take" means we don't double, opponent would take
                 best_notation = f"No {double_term}/Take"
             elif ('double' in text_lower or 'redouble' in text_lower):
-                # This is tricky: "Redouble / Take" vs "No redouble / Take"
-                # We already handled "No redouble" above, so this must be actual double
                 if 'take' in text_lower:
                     best_notation = f"{double_term}/Take"
                 elif 'pass' in text_lower or 'drop' in text_lower:
@@ -633,22 +601,19 @@ class XGTextParser:
         # Create Move objects for all 5 options
         for i, option in enumerate(all_options):
             equity = option_equities.get(option, 0.0)
-            # Mark "Too good" options as synthetic (not from XG's analysis)
             is_from_xg = not option.startswith("Too good")
 
-            # Get XG's error, order, and original notation for this move if it's from XG
+            # Get XG metadata for moves from analysis
             xg_error_val = None
             xg_order = None
             xg_notation_val = None
             if is_from_xg:
-                # Look up the original notation (without /Take suffix for No Double)
                 base_notation = option.replace(f"No {double_term}/Take", "No Double")
                 base_notation = base_notation.replace(f"{double_term}/Take", "Double/Take")
                 base_notation = base_notation.replace(f"{double_term}/Pass", "Double/Pass")
 
                 if base_notation in xg_data_map:
                     _, _, xg_error_val, xg_order = xg_data_map[base_notation]
-                    # Store the XG notation with proper terminology
                     if base_notation == "No Double":
                         xg_notation_val = f"No {double_term.lower()}"
                     else:
@@ -657,40 +622,36 @@ class XGTextParser:
             moves.append(Move(
                 notation=option,
                 equity=equity,
-                error=0.0,  # Will calculate below (error relative to best)
-                rank=0,  # Will assign ranks below
-                xg_rank=xg_order,  # Order in XG's Cubeful Equities section
-                xg_error=xg_error_val,  # Error as shown by XG
-                xg_notation=xg_notation_val,  # Original XG notation for analysis table
+                error=0.0,
+                rank=0,
+                xg_rank=xg_order,
+                xg_error=xg_error_val,
+                xg_notation=xg_notation_val,
                 from_xg_analysis=is_from_xg
             ))
 
         # Sort by equity (highest first) to determine ranking
         moves.sort(key=lambda m: m.equity, reverse=True)
 
-        # Assign ranks: best move gets rank 1, rest get 2-5 based on equity
+        # Assign ranks based on best move and equity
         if best_notation:
-            # Best move was identified from "Best Cube action:" line
             rank_counter = 1
             for move in moves:
                 if move.notation == best_notation:
                     move.rank = 1
                 else:
-                    # Assign ranks 2-5 based on equity order, skipping the best
                     if rank_counter == 1:
                         rank_counter = 2
                     move.rank = rank_counter
                     rank_counter += 1
         else:
-            # Best wasn't identified, rank purely by equity
             for i, move in enumerate(moves):
                 move.rank = i + 1
 
-        # Calculate errors relative to best move (for our internal use)
+        # Calculate errors relative to best move
         if moves:
             best_move = next((m for m in moves if m.rank == 1), moves[0])
             best_equity = best_move.equity
-
             for move in moves:
                 if move.rank != 1:
                     move.error = abs(best_equity - move.equity)
@@ -702,9 +663,7 @@ class XGTextParser:
 
     @staticmethod
     def _clean_move_notation(notation: str) -> str:
-        """Clean up move notation."""
-        # Remove engine names like "XG Roller+", "Roller++", "3-ply", etc.
-        # These appear at the start of the notation
+        """Clean up move notation by removing engine names and normalizing cube actions."""
         notation = re.sub(r'^(XG\s+)?(?:Roller\+*|rollout|\d+-ply)\s+', '', notation, flags=re.IGNORECASE)
 
         # Remove extra whitespace

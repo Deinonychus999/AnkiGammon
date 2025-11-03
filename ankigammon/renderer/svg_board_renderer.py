@@ -34,8 +34,7 @@ class SVGBoardRenderer:
         self.color_scheme = color_scheme
         self.orientation = orientation
 
-        # Calculate dimensions (same logic as PNG renderer)
-        # Use internal width of 900 for calculations, but viewBox can be cropped
+        # Calculate board dimensions
         self.internal_width = 900
         self.margin = 20
         self.cube_area_width = 70
@@ -205,7 +204,7 @@ class SVGBoardRenderer:
 """
 
     def _draw_full_background(self) -> str:
-        """Draw the full SVG background (covers entire viewBox)."""
+        """Draw the full SVG background."""
         return f'''
 <rect x="0" y="0" width="{self.width}" height="{self.height}"
       fill="{self.color_scheme.board_light}"/>
@@ -237,12 +236,12 @@ class SVGBoardRenderer:
         Map point number to visual position index based on orientation.
 
         Counter-clockwise:
-          Top: 13 14 15 16 17 18 | 19 20 21 22 23 24
-          Bottom: 12 11 10 9 8 7 | 6 5 4 3 2 1
+          Top: 13-18 (left), 19-24 (right)
+          Bottom: 12-7 (left), 6-1 (right)
 
         Clockwise (horizontally mirrored):
-          Top: 24 23 22 21 20 19 | 18 17 16 15 14 13
-          Bottom: 1 2 3 4 5 6 | 7 8 9 10 11 12
+          Top: 24-19 (left), 18-13 (right)
+          Bottom: 1-6 (left), 7-12 (right)
 
         Args:
             point_num: Point number (1-24)
@@ -251,30 +250,23 @@ class SVGBoardRenderer:
             Visual index for rendering (0-23)
         """
         if self.orientation == "clockwise":
-            # Simple horizontal mirror
+            # Horizontal mirror transformation
             if point_num <= 12:
-                # Points 1-12: bottom row, mirror horizontally
-                # Point 1 → visual 11, Point 12 → visual 0
                 return 12 - point_num
             else:
-                # Points 13-24: top row, both quadrants need reversal
-                # Point 13 → visual 23, Point 18 → visual 18
-                # Point 19 → visual 17, Point 24 → visual 12
                 return 36 - point_num
         else:
-            # Counter-clockwise: standard layout
+            # Standard counter-clockwise layout
             return point_num - 1
 
     def _draw_points(self, board_x: float, board_y: float) -> str:
         """Draw the triangular points with numbers."""
         svg_parts = ['<g class="points">']
 
-        # Iterate through all point numbers (1-24)
         for point_num in range(1, 25):
-            # Get visual position for this point
             visual_idx = self._get_visual_point_index(point_num)
 
-            # Determine point position based on visual index
+            # Calculate point position based on visual index
             if visual_idx < 6:
                 # Bottom right quadrant (visual positions 0-5)
                 x = board_x + self.half_width + self.bar_width + (5 - visual_idx) * self.point_width
@@ -338,10 +330,8 @@ class SVGBoardRenderer:
             player = Player.X if count > 0 else Player.O
             num_checkers = abs(count)
 
-            # Get point position
             x, y_base, is_top = self._get_point_position(point_idx, board_x, board_y)
 
-            # Draw checkers
             for checker_num in range(min(num_checkers, 5)):
                 if is_top:
                     y = y_base + self.checker_radius + checker_num * (self.checker_radius * 2 + 2)
@@ -350,7 +340,6 @@ class SVGBoardRenderer:
 
                 cx = x + self.point_width / 2
 
-                # Add animation data attributes
                 checker_attrs = f'data-point="{point_idx}" data-checker-index="{checker_num}"'
                 if move_data:
                     checker_attrs += f' data-move-info=\'{json.dumps(move_data)}\''
@@ -444,27 +433,21 @@ class SVGBoardRenderer:
         svg_parts = []
         max_visible = min(count, 3)
 
-        # Bar point: 0 for X (top), 25 for O (bottom)
         bar_point = 0 if player == Player.X else 25
 
-        # Calculate starting Y position - start from center and go outward
+        # Calculate starting position from center with spacing between players
         board_center_y = board_y + self.board_height / 2
-        # Add extra spacing to separate the two players more
         separation_offset = self.checker_radius * 2 + 10
 
         for i in range(max_visible):
             if top:
-                # X checkers: start below center, stack toward bottom
                 y = board_center_y + separation_offset + i * (self.checker_radius * 2 + 2)
             else:
-                # O checkers: start above center, stack toward top
                 y = board_center_y - separation_offset - i * (self.checker_radius * 2 + 2)
 
-            # Add data attributes for animation
             checker_attrs = f'data-point="{bar_point}" data-checker-index="{i}"'
 
             if i == max_visible - 1 and count > max_visible:
-                # Last visible checker - show count
                 svg_parts.append(
                     self._draw_checker_with_number(center_x, y, player, count, checker_attrs)
                 )
@@ -505,7 +488,7 @@ class SVGBoardRenderer:
         def get_color(player: Player) -> str:
             return self.color_scheme.checker_x if player == Player.X else self.color_scheme.checker_o
 
-        # Top tray (reduced height to make room for score display)
+        # Top tray
         tray_top = board_y + 10
         tray_bottom = board_y + self.board_height / 2 - 70
 
@@ -517,7 +500,6 @@ class SVGBoardRenderer:
       stroke-width="2"/>
 ''')
 
-        # Draw stacked checkers for top player
         top_count = get_off_count(top_player)
         if top_count > 0:
             row_width = checkers_per_row * checker_width + (checkers_per_row - 1) * checker_spacing_x
@@ -538,7 +520,7 @@ class SVGBoardRenderer:
       stroke-width="1"/>
 ''')
 
-        # Bottom tray (reduced height to make room for score display)
+        # Bottom tray
         tray_top = board_y + self.board_height / 2 + 70
         tray_bottom = board_y + self.board_height - 10
 
@@ -550,7 +532,6 @@ class SVGBoardRenderer:
       stroke-width="2"/>
 ''')
 
-        # Draw stacked checkers for bottom player
         bottom_count = get_off_count(bottom_player)
         if bottom_count > 0:
             row_width = checkers_per_row * checker_width + (checkers_per_row - 1) * checker_spacing_x
@@ -591,7 +572,6 @@ class SVGBoardRenderer:
         die_size = 50
         die_spacing = 15
 
-        # Position dice on the right half of the board
         total_dice_width = 2 * die_size + die_spacing
         right_half_start = board_x + self.half_width + self.bar_width
         die_x = right_half_start + (self.half_width - total_dice_width) / 2
@@ -609,7 +589,6 @@ class SVGBoardRenderer:
 <rect class="die" x="{x}" y="{y}" width="{size}" height="{size}" rx="5"/>
 ''']
 
-        # Draw pips
         pip_radius = size / 10
         center = size / 2
 
@@ -645,11 +624,9 @@ class SVGBoardRenderer:
         """Draw the doubling cube."""
         cube_size = 50
 
-        # Center the cube in the area from left edge to board start
-        # board_x = margin + cube_area_width
         cube_area_center = (self.margin + self.cube_area_width) / 2
 
-        # Position cube based on owner
+        # Position based on cube owner
         if cube_owner == CubeState.CENTERED:
             cube_x = cube_area_center - cube_size / 2
             cube_y = board_y + (self.board_height - cube_size) / 2
@@ -660,7 +637,6 @@ class SVGBoardRenderer:
             cube_x = cube_area_center - cube_size / 2
             cube_y = board_y + 10 if not flipped else board_y + self.board_height - cube_size - 10
 
-        # Draw cube
         text = "64" if cube_owner == CubeState.CENTERED else str(cube_value)
 
         return f'''
@@ -714,20 +690,14 @@ class SVGBoardRenderer:
         if match_length == 0:
             return ""
 
-        # Position scores in the middle area between bear-off trays
         bearoff_x = board_x + self.playing_width + 10
         bearoff_width = self.bearoff_area_width - 20
         center_x = bearoff_x + bearoff_width / 2
-
-        # Center vertically in the board
         center_y = board_y + self.board_height / 2
 
-        # Box dimensions
         box_width = 60
         box_height = 35
         box_spacing = 5
-
-        # Calculate positions for 3 boxes stacked vertically
         total_height = 3 * box_height + 2 * box_spacing
         start_y = center_y - total_height / 2
 
@@ -775,10 +745,7 @@ class SVGBoardRenderer:
         if point_idx < 1 or point_idx > 24:
             raise ValueError(f"Invalid point index: {point_idx}")
 
-        # Get visual position based on orientation
         visual_idx = self._get_visual_point_index(point_idx)
-
-        # Calculate position based on visual index
         if visual_idx < 6:
             # Bottom right quadrant (visual positions 0-5)
             x = board_x + self.half_width + self.bar_width + (5 - visual_idx) * self.point_width

@@ -26,36 +26,27 @@ class AnimationHelper:
         if not notation or notation == "Can't move":
             return moves
 
-        # Split by spaces to get individual checker moves
         parts = notation.strip().split()
 
         for part in parts:
             if '/' not in part:
                 continue
 
-            # Check for repetition notation like "6/4(4)" meaning "move 4 checkers from 6 to 4"
+            # Handle repetition notation like "6/4(4)"
             repetition_count = 1
             repetition_match = re.search(r'\((\d+)\)$', part)
             if repetition_match:
                 repetition_count = int(repetition_match.group(1))
-                # Remove the repetition notation from the part
                 part = re.sub(r'\(\d+\)$', '', part)
 
-            # Handle compound notation like "6/5*/3" or "24/23/22"
-            # Split by '/' and remove asterisks to get all points in the sequence
+            # Handle compound notation like "6/5*/3"
             segments = part.split('/')
-
-            # Remove asterisks from each segment
             segments = [seg.rstrip('*') for seg in segments]
-
-            # If there are more than 2 segments, this is compound notation
-            # Convert it to consecutive moves: "6/5/3" -> [(6,5), (5,3)]
             if len(segments) > 2:
+                # Convert compound notation to individual moves
                 for i in range(len(segments) - 1):
                     from_str = segments[i]
                     to_str = segments[i + 1]
-
-                    # Parse "from" point
                     if from_str.lower() == 'bar':
                         from_point = 0 if on_roll == Player.X else 25
                     elif from_str.lower() == 'off':
@@ -66,7 +57,6 @@ class AnimationHelper:
                         except ValueError:
                             continue
 
-                    # Parse "to" point
                     if to_str.lower() == 'bar':
                         to_point = 25 if on_roll == Player.X else 0
                     elif to_str.lower() == 'off':
@@ -77,23 +67,18 @@ class AnimationHelper:
                         except ValueError:
                             continue
 
-                    # Add the move repetition_count times
                     for _ in range(repetition_count):
                         moves.append((from_point, to_point))
             else:
-                # Simple notation like "6/5" or "bar/22"
                 from_str = segments[0]
                 to_str = segments[1] if len(segments) > 1 else ''
 
                 if not to_str:
                     continue
 
-                # Parse "from" point
                 if from_str.lower() == 'bar':
-                    # Bar position depends on player
                     from_point = 0 if on_roll == Player.X else 25
                 elif from_str.lower() == 'off':
-                    # Bearing off - skip (no visual animation needed)
                     continue
                 else:
                     try:
@@ -101,12 +86,9 @@ class AnimationHelper:
                     except ValueError:
                         continue
 
-                # Parse "to" point
                 if to_str.lower() == 'bar':
-                    # Opponent bar
                     to_point = 25 if on_roll == Player.X else 0
                 elif to_str.lower() == 'off':
-                    # Bearing off - use special marker (-1)
                     to_point = -1
                 else:
                     try:
@@ -114,7 +96,6 @@ class AnimationHelper:
                     except ValueError:
                         continue
 
-                # Add the move repetition_count times (handles notation like "6/4(4)")
                 for _ in range(repetition_count):
                     moves.append((from_point, to_point))
 
@@ -144,7 +125,6 @@ class AnimationHelper:
         if not moves:
             return ""
 
-        # Generate GSAP animation code
         js_code = f"""
 <script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/gsap.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/MotionPathPlugin.min.js"></script>
@@ -152,30 +132,23 @@ class AnimationHelper:
 if (typeof gsap !== 'undefined') {{
     gsap.registerPlugin(MotionPathPlugin);
 
-    // Animation data
     const moves = {moves};
     const duration = {duration};
     const stagger = {stagger};
 
-    // Animate checkers
     function animateMove() {{
         moves.forEach((move, index) => {{
             const [fromPoint, toPoint] = move;
-
-            // Find checker at fromPoint
             const checkers = document.querySelectorAll('.checker[data-point="' + fromPoint + '"]');
 
             if (checkers.length > 0) {{
-                const checker = checkers[0]; // Animate first checker at point
-
-                // Calculate target position (simplified - would need actual point coordinates)
-                // This is a placeholder - actual implementation would calculate SVG coordinates
+                const checker = checkers[0];
 
                 gsap.to(checker, {{
                     duration: duration,
                     delay: index * stagger,
                     attr: {{
-                        cx: '+=100',  // Placeholder translation
+                        cx: '+=100',
                         cy: '+=0'
                     }},
                     ease: 'power2.inOut'
@@ -183,9 +156,6 @@ if (typeof gsap !== 'undefined') {{
             }}
         }});
     }}
-
-    // Optionally auto-play animation or add button to trigger
-    // animateMove();
 }}
 </script>
 """

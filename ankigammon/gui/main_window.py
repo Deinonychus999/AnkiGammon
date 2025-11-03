@@ -630,7 +630,7 @@ class MainWindow(QMainWindow):
             if 0 <= index < len(self.current_decisions):
                 self.current_decisions.pop(index)
 
-        # Refresh list ONCE (more efficient)
+        # Refresh the position list
         self.position_list.set_decisions(self.current_decisions)
 
         # Disable export and hide clear all if no positions remain
@@ -825,7 +825,7 @@ class MainWindow(QMainWindow):
 
     def show_decision(self, decision: Decision):
         """Display a decision in the preview pane."""
-        # Generate SVG using existing renderer (zero changes!)
+        # Generate SVG for the position
         svg = self.renderer.render_svg(
             decision.position,
             dice=decision.dice,
@@ -987,36 +987,28 @@ class MainWindow(QMainWindow):
 
     def _ensure_played_move_in_candidates(self, decision: Decision, played_move: Move) -> None:
         """
-        Ensure the played move is in the top 5 candidates for MCQ display.
+        Ensure the played move is in the top N candidates for MCQ display.
 
-        When exporting blunders, the actual move played might not be in XG's top 5
-        analyzed moves. This method injects it into the candidate list so students
-        can see what mistake they made.
+        If the played move is not in the top N analyzed moves (where N is max_mcq_options),
+        insert it at position N-1 (last slot) to ensure it appears as an option.
 
         Args:
             decision: The decision object to modify
             played_move: The move that was actually played
         """
-        # Check if played move is already in the top 5 candidates
-        top_5 = decision.candidate_moves[:5]
+        # Get the number of MCQ options from settings
+        max_options = self.settings.max_mcq_options
 
-        # If played move is already in top 5, nothing to do
-        if played_move in top_5:
+        # Check if played move is already in the top N candidates
+        top_n = decision.candidate_moves[:max_options]
+
+        # If played move is already in top N, nothing to do
+        if played_move in top_n:
             return
 
-        # Played move is NOT in top 5 - we need to inject it
-        # At this point, we know there must be at least 5 other moves
-        # (otherwise played_move would be in top_5)
-        #
-        # Strategy: Remove played_move from its current position (6th or worse)
-        # and insert it at position 4 (5th slot, 0-indexed)
-
-        # Remove played_move from wherever it currently is
+        # Move is not in top N - insert it at position N-1 (last slot)
         decision.candidate_moves.remove(played_move)
-
-        # Insert at position 4 (5th slot, 0-indexed)
-        # This replaces what was previously the 5th move
-        decision.candidate_moves.insert(4, played_move)
+        decision.candidate_moves.insert(max_options - 1, played_move)
 
     def _filter_decisions_by_import_options(
         self,
@@ -1054,17 +1046,13 @@ class MainWindow(QMainWindow):
             # Find the move that was actually played in the game
             played_move = next((m for m in decision.candidate_moves if m.was_played), None)
 
-            # Fallback: if no move is marked as played, skip this decision
-            # (This should not happen with proper XG files, but handles edge cases)
+            # Skip if no move is marked as played
             if not played_move:
                 continue
 
-            # Handle CUBE_ACTION and CHECKER_PLAY differently
-            # For cube decisions, errors are at Decision level (cube_error/take_error)
-            # For checker play, errors are at Move level (played_move.error)
-
+            # Handle cube and checker play decisions differently
             if decision.decision_type == DecisionType.CUBE_ACTION:
-                # For CUBE_ACTION decisions, check which player actually made the error
+                # Check which player made the error
                 attr = decision.get_cube_error_attribution()
                 doubler = attr['doubler']
                 responder = attr['responder']
@@ -1099,14 +1087,12 @@ class MainWindow(QMainWindow):
                 logger.info(f"DEBUG: include_decision={include_decision} (include_player_x={include_player_x}, include_player_o={include_player_o})")
 
                 if include_decision:
-                    # Ensure the played move is in the top candidates for MCQ display
+                    # Include the played move in MCQ candidates
                     self._ensure_played_move_in_candidates(decision, played_move)
                     filtered.append(decision)
                     logger.info(f"DEBUG: Added cube decision to filtered list")
             else:
-                # For CHECKER_PLAY decisions, error is at Move level
-                # Use xg_error if available (convert to absolute value),
-                # otherwise use error (already positive)
+                # For checker play, use absolute value of xg_error if available
                 error_magnitude = abs(played_move.xg_error) if played_move.xg_error is not None else played_move.error
 
                 # Only include if error is at or above threshold
@@ -1119,8 +1105,7 @@ class MainWindow(QMainWindow):
                 if decision.on_roll == Player.O and not include_player_o:
                     continue
 
-                # Ensure the played move is in the top 5 candidates for MCQ display
-                # This is critical for blunders - students need to see what mistake they made!
+                # Include the played move in MCQ candidates
                 self._ensure_played_move_in_candidates(decision, played_move)
                 filtered.append(decision)
 
@@ -1236,8 +1221,7 @@ class MainWindow(QMainWindow):
         # Check if user cancelled
         if progress.wasCanceled() or self._analysis_results is None:
             logger.info("Analysis cancelled by user")
-            # Wait for worker to finish cleanup (max 2 seconds)
-            # Worker might have already been deleted by _on_analysis_finished
+            # Wait for worker to finish cleanup
             if hasattr(self, '_analysis_worker'):
                 self._analysis_worker.wait(2000)
             return None, None
@@ -1258,10 +1242,9 @@ class MainWindow(QMainWindow):
         if success:
             logger.info(f"Analysis completed: {len(decisions)} positions filtered from {total_count} total")
             self._analysis_results = (decisions, total_count)
-            # Use accept() to close dialog without triggering cancel state
             progress_dialog.accept()
         else:
-            # Only show error message if it wasn't a user cancellation
+            # Show error message unless user cancelled
             if message != "Cancelled":
                 QMessageBox.critical(
                     self,
@@ -1269,7 +1252,6 @@ class MainWindow(QMainWindow):
                     message
                 )
             self._analysis_results = (None, None)
-            # Close dialog (cancel state already set if user cancelled)
             progress_dialog.close()
 
         # Cleanup worker
@@ -1330,12 +1312,10 @@ class MainWindow(QMainWindow):
             if url.isLocalFile():
                 file_paths.append(url.toLocalFile())
 
-        # Accept the drop event IMMEDIATELY to unblock Windows Explorer
+        # Accept the drop event immediately
         event.acceptProposedAction()
 
-        # Defer the actual import processing to the next event loop iteration
-        # This ensures the drop event completes and Windows Explorer is released
-        # before we do any heavy processing or show dialogs
+        # Defer import processing to avoid blocking the UI
         for file_path in file_paths:
             QTimer.singleShot(0, lambda fp=file_path: self._import_file(fp))
 
@@ -1411,7 +1391,6 @@ class MainWindow(QMainWindow):
 
             elif result.format == InputFormat.MATCH_FILE or result.format == InputFormat.SGF_FILE:
                 # Import match file with analysis
-                # Both .mat and .sgf files are handled the same way
                 decisions, total_count = self._import_match_file(file_path)
                 if decisions is None:
                     # User cancelled or error occurred
