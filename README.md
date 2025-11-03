@@ -229,6 +229,7 @@ The GUI Settings dialog provides:
 - macOS: Right-click → Open on first run, or go to System Settings → Privacy & Security → "Open Anyway"
 - Linux: Make the AppImage executable with `chmod +x AnkiGammon-x86_64.AppImage`
 - Linux (Ubuntu 22.04+): Install FUSE 2 with `sudo apt install libfuse2` or `sudo apt install libfuse2t64` (Ubuntu 24.04)
+- Linux (running from source): If you get `ImportError: libxkbcommon.so.0`, install Qt dependencies with `sudo apt install libxkbcommon0 libxcb1`
 
 ## For Developers
 
@@ -349,7 +350,11 @@ macOS:
 
 Linux:
 - Ensure executable has execute permissions: `chmod +x ankigammon`
-- May need to install dependencies on minimal systems: `sudo apt install libxcb1`
+- If running from source, install Qt/X11 dependencies:
+  ```bash
+  sudo apt install libxkbcommon0 libxkbcommon-x11-0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-xinerama0 libxcb-xfixes0 libxcb-shape0 libxcb-cursor0 libxcb1
+  ```
+- For minimal install (just the essentials): `sudo apt install libxkbcommon0 libxcb1`
 
 ## Requirements
 
