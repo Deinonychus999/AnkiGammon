@@ -1,11 +1,6 @@
 """Basic tests for AnkiGammon functionality."""
 
-import unittest
-from pathlib import Path
-import sys
-
-# Add parent directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
+import pytest
 
 from ankigammon.models import Position, Player, CubeState, Decision, Move, DecisionType
 from ankigammon.utils.xgid import parse_xgid, encode_xgid
@@ -16,7 +11,7 @@ from ankigammon.renderer.svg_board_renderer import SVGBoardRenderer
 from ankigammon.parsers.xg_text_parser import XGTextParser
 
 
-class TestXGIDParsing(unittest.TestCase):
+class TestXGIDParsing:
     """Test XGID parsing and encoding."""
 
     def test_parse_basic_xgid(self):
@@ -25,17 +20,17 @@ class TestXGIDParsing(unittest.TestCase):
         position, metadata = parse_xgid(xgid)
 
         # Check cube
-        self.assertEqual(metadata['cube_value'], 2)  # 2^1
-        self.assertEqual(metadata['cube_owner'], CubeState.O_OWNS)  # 1 = O owns
+        assert metadata['cube_value'] == 2  # 2^1
+        assert metadata['cube_owner'] == CubeState.O_OWNS  # 1 = O owns
 
         # Check turn
-        self.assertEqual(metadata['on_roll'], Player.X)  # -1 = X's turn
+        assert metadata['on_roll'] == Player.X  # -1 = X's turn
 
         # Check dice
-        self.assertEqual(metadata['dice'], (6, 3))
+        assert metadata['dice'] == (6, 3)
 
         # Check match
-        self.assertEqual(metadata['match_length'], 5)
+        assert metadata['match_length'] == 5
 
     def test_encode_xgid(self):
         """Test encoding a position to XGID."""
@@ -49,8 +44,8 @@ class TestXGIDParsing(unittest.TestCase):
             match_length=7
         )
 
-        self.assertIn("XGID=", xgid)
-        self.assertIn(":1:", xgid)  # Cube value 2^1
+        assert "XGID=" in xgid
+        assert ":1:" in xgid  # Cube value 2^1
 
     def test_xgid_roundtrip(self):
         """Test encoding and decoding produces same result."""
@@ -73,12 +68,12 @@ class TestXGIDParsing(unittest.TestCase):
         position2, metadata2 = parse_xgid(new_xgid)
 
         # Compare key fields
-        self.assertEqual(position.points, position2.points)
-        self.assertEqual(metadata['cube_value'], metadata2['cube_value'])
-        self.assertEqual(metadata['on_roll'], metadata2['on_roll'])
+        assert position.points == position2.points
+        assert metadata['cube_value'] == metadata2['cube_value']
+        assert metadata['on_roll'] == metadata2['on_roll']
 
 
-class TestOGIDParsing(unittest.TestCase):
+class TestOGIDParsing:
     """Test OGID parsing and encoding."""
 
     def test_parse_position_only_ogid(self):
@@ -88,21 +83,21 @@ class TestOGIDParsing(unittest.TestCase):
 
         # Check position - starting position
         # White/X: 2 on pt1, 5 on pt12(c), 3 on pt17(h), 5 on pt19(j)
-        self.assertEqual(position.points[1], 2)   # 2 X checkers on point 1
-        self.assertEqual(position.points[12], 5)  # 5 X checkers on point 12 (c)
-        self.assertEqual(position.points[17], 3)  # 3 X checkers on point 17 (h)
-        self.assertEqual(position.points[19], 5)  # 5 X checkers on point 19 (j)
+        assert position.points[1] == 2   # 2 X checkers on point 1
+        assert position.points[12] == 5  # 5 X checkers on point 12 (c)
+        assert position.points[17] == 3  # 3 X checkers on point 17 (h)
+        assert position.points[19] == 5  # 5 X checkers on point 19 (j)
 
         # Black/O: 2 on pt24(o), 5 on pt13(d), 3 on pt8, 5 on pt6
-        self.assertEqual(position.points[24], -2)  # 2 O checkers on point 24
-        self.assertEqual(position.points[13], -5)  # 5 O checkers on point 13 (d)
-        self.assertEqual(position.points[8], -3)   # 3 O checkers on point 8
-        self.assertEqual(position.points[6], -5)   # 5 O checkers on point 6
+        assert position.points[24] == -2  # 2 O checkers on point 24
+        assert position.points[13] == -5  # 5 O checkers on point 13 (d)
+        assert position.points[8] == -3   # 3 O checkers on point 8
+        assert position.points[6] == -5   # 5 O checkers on point 6
 
         # Check cube - neutral at 1
-        self.assertEqual(metadata['cube_value'], 1)
-        self.assertEqual(metadata['cube_owner'], CubeState.CENTERED)
-        self.assertEqual(metadata['cube_action'], 'N')
+        assert metadata['cube_value'] == 1
+        assert metadata['cube_owner'] == CubeState.CENTERED
+        assert metadata['cube_action'] == 'N'
 
     def test_parse_full_ogid(self):
         """Test parsing full OGID with all metadata fields."""
@@ -110,15 +105,15 @@ class TestOGIDParsing(unittest.TestCase):
         position, metadata = parse_ogid(ogid)
 
         # Check metadata
-        self.assertEqual(metadata['cube_value'], 1)
-        self.assertEqual(metadata['cube_owner'], CubeState.CENTERED)
-        self.assertEqual(metadata['dice'], (6, 5))
-        self.assertEqual(metadata['on_roll'], Player.X)  # W = White = X
-        self.assertEqual(metadata['game_state'], 'IW')
-        self.assertEqual(metadata['score_x'], 0)
-        self.assertEqual(metadata['score_o'], 0)
-        self.assertEqual(metadata['match_length'], 7)
-        self.assertEqual(metadata['move_id'], 0)
+        assert metadata['cube_value'] == 1
+        assert metadata['cube_owner'] == CubeState.CENTERED
+        assert metadata['dice'] == (6, 5)
+        assert metadata['on_roll'] == Player.X  # W = White = X
+        assert metadata['game_state'] == 'IW'
+        assert metadata['score_x'] == 0
+        assert metadata['score_o'] == 0
+        assert metadata['match_length'] == 7
+        assert metadata['move_id'] == 0
 
     def test_parse_ogid_with_cube_doubled(self):
         """Test parsing OGID with doubled cube."""
@@ -126,28 +121,28 @@ class TestOGIDParsing(unittest.TestCase):
         position, metadata = parse_ogid(ogid)
 
         # Check cube - White owns at 4, offered
-        self.assertEqual(metadata['cube_value'], 4)  # 2^2
-        self.assertEqual(metadata['cube_owner'], CubeState.X_OWNS)  # White = X
-        self.assertEqual(metadata['cube_action'], 'O')  # Offered
+        assert metadata['cube_value'] == 4  # 2^2
+        assert metadata['cube_owner'] == CubeState.X_OWNS  # White = X
+        assert metadata['cube_action'] == 'O'  # Offered
 
         # Check other metadata
-        self.assertEqual(metadata['dice'], (4, 3))
-        self.assertEqual(metadata['on_roll'], Player.O)  # B = Black = O
-        self.assertEqual(metadata['score_x'], 2)
-        self.assertEqual(metadata['score_o'], 1)
-        self.assertEqual(metadata['match_length'], 7)
-        self.assertEqual(metadata['move_id'], 15)
+        assert metadata['dice'] == (4, 3)
+        assert metadata['on_roll'] == Player.O  # B = Black = O
+        assert metadata['score_x'] == 2
+        assert metadata['score_o'] == 1
+        assert metadata['match_length'] == 7
+        assert metadata['move_id'] == 15
 
     def test_parse_ogid_crawford_game(self):
         """Test parsing OGID with Crawford game modifier."""
         ogid = "11jjjjjhhhccccc:ooddddd88866666:N0N:65:W:IW:6:5:7C:42"
         position, metadata = parse_ogid(ogid)
 
-        self.assertEqual(metadata['match_length'], 7)
-        self.assertEqual(metadata['match_modifier'], 'C')  # Crawford
-        self.assertEqual(metadata['score_x'], 6)
-        self.assertEqual(metadata['score_o'], 5)
-        self.assertEqual(metadata['move_id'], 42)
+        assert metadata['match_length'] == 7
+        assert metadata['match_modifier'] == 'C'  # Crawford
+        assert metadata['score_x'] == 6
+        assert metadata['score_o'] == 5
+        assert metadata['move_id'] == 42
 
     def test_encode_position_only_ogid(self):
         """Test encoding position to OGID (position-only format)."""
@@ -166,16 +161,16 @@ class TestOGIDParsing(unittest.TestCase):
 
         # Should have exactly 3 fields
         parts = ogid.split(':')
-        self.assertEqual(len(parts), 3)
+        assert len(parts) == 3
 
         # Field 1: White/X checkers (sorted)
-        self.assertEqual(parts[0], "11ccccchhhjjjjj")
+        assert parts[0] == "11ccccchhhjjjjj"
 
         # Field 2: Black/O checkers (sorted)
-        self.assertEqual(parts[1], "66666888dddddoo")
+        assert parts[1] == "66666888dddddoo"
 
         # Field 3: Cube state
-        self.assertEqual(parts[2], "N0N")
+        assert parts[2] == "N0N"
 
     def test_encode_full_ogid(self):
         """Test encoding position with full metadata."""
@@ -197,17 +192,17 @@ class TestOGIDParsing(unittest.TestCase):
         )
 
         parts = ogid.split(':')
-        self.assertGreaterEqual(len(parts), 10)
+        assert len(parts) >= 10
 
         # Check key fields
-        self.assertEqual(parts[2], "W2T")  # Cube: White owns 4 (2^2), Taken
-        self.assertEqual(parts[3], "65")   # Dice
-        self.assertEqual(parts[4], "W")    # White to move
-        self.assertEqual(parts[5], "IW")   # Game state
-        self.assertEqual(parts[6], "2")    # White score
-        self.assertEqual(parts[7], "1")    # Black score
-        self.assertEqual(parts[8], "7")    # Match length
-        self.assertEqual(parts[9], "10")   # Move ID
+        assert parts[2] == "W2T"  # Cube: White owns 4 (2^2), Taken
+        assert parts[3] == "65"   # Dice
+        assert parts[4] == "W"    # White to move
+        assert parts[5] == "IW"   # Game state
+        assert parts[6] == "2"    # White score
+        assert parts[7] == "1"    # Black score
+        assert parts[8] == "7"    # Match length
+        assert parts[9] == "10"   # Move ID
 
     def test_ogid_roundtrip(self):
         """Test encoding and decoding produces same result."""
@@ -233,10 +228,10 @@ class TestOGIDParsing(unittest.TestCase):
         position2, metadata2 = parse_ogid(new_ogid)
 
         # Compare key fields
-        self.assertEqual(position.points, position2.points)
-        self.assertEqual(metadata['cube_value'], metadata2['cube_value'])
-        self.assertEqual(metadata['on_roll'], metadata2['on_roll'])
-        self.assertEqual(metadata['dice'], metadata2['dice'])
+        assert position.points == position2.points
+        assert metadata['cube_value'] == metadata2['cube_value']
+        assert metadata['on_roll'] == metadata2['on_roll']
+        assert metadata['dice'] == metadata2['dice']
 
     def test_position_from_ogid(self):
         """Test Position.from_ogid() class method."""
@@ -244,10 +239,10 @@ class TestOGIDParsing(unittest.TestCase):
         position = Position.from_ogid(ogid)
 
         # Check starting position
-        self.assertEqual(position.points[1], 2)
-        self.assertEqual(position.points[19], 5)
-        self.assertEqual(position.points[24], -2)
-        self.assertEqual(position.points[13], -5)
+        assert position.points[1] == 2
+        assert position.points[19] == 5
+        assert position.points[24] == -2
+        assert position.points[13] == -5
 
     def test_position_to_ogid(self):
         """Test Position.to_ogid() instance method."""
@@ -265,13 +260,13 @@ class TestOGIDParsing(unittest.TestCase):
         # Parse back
         parsed_pos, metadata = parse_ogid(ogid)
 
-        self.assertEqual(parsed_pos.points[1], 2)
-        self.assertEqual(parsed_pos.points[6], -3)
-        self.assertEqual(metadata['cube_value'], 2)
-        self.assertEqual(metadata['cube_owner'], CubeState.O_OWNS)
+        assert parsed_pos.points[1] == 2
+        assert parsed_pos.points[6] == -3
+        assert metadata['cube_value'] == 2
+        assert metadata['cube_owner'] == CubeState.O_OWNS
 
 
-class TestGNUIDParsing(unittest.TestCase):
+class TestGNUIDParsing:
     """Test GNUID parsing and encoding."""
 
     def test_parse_starting_position(self):
@@ -284,12 +279,12 @@ class TestGNUIDParsing(unittest.TestCase):
         total_x = sum(count for count in position.points if count > 0)
         total_o = sum(abs(count) for count in position.points if count < 0)
 
-        self.assertEqual(total_x + position.x_off, 15)
-        self.assertEqual(total_o + position.o_off, 15)
+        assert total_x + position.x_off == 15
+        assert total_o + position.o_off == 15
 
         # Metadata should have cube and match info
-        self.assertIn('cube_value', metadata)
-        self.assertIn('cube_owner', metadata)
+        assert 'cube_value' in metadata
+        assert 'cube_owner' in metadata
 
     def test_parse_position_only_gnuid(self):
         """Test parsing GNUID with position ID only (no match ID)."""
@@ -300,8 +295,8 @@ class TestGNUIDParsing(unittest.TestCase):
         total_x = sum(count for count in position.points if count > 0)
         total_o = sum(abs(count) for count in position.points if count < 0)
 
-        self.assertEqual(total_x + position.x_off, 15)
-        self.assertEqual(total_o + position.o_off, 15)
+        assert total_x + position.x_off == 15
+        assert total_o + position.o_off == 15
 
     def test_parse_gnuid_with_prefix(self):
         """Test parsing GNUID with GNUID= or GNUBGID prefix."""
@@ -312,7 +307,7 @@ class TestGNUIDParsing(unittest.TestCase):
         position2, _ = parse_gnuid(gnuid2)
 
         # Both should parse to same position
-        self.assertEqual(position1.points, position2.points)
+        assert position1.points == position2.points
 
     def test_parse_gnuid_with_match_metadata(self):
         """Test parsing GNUID with full match metadata."""
@@ -321,10 +316,10 @@ class TestGNUIDParsing(unittest.TestCase):
         position, metadata = parse_gnuid(gnuid)
 
         # Should have match metadata
-        self.assertIn('cube_value', metadata)
-        self.assertIn('on_roll', metadata)
-        self.assertIn('score_x', metadata)
-        self.assertIn('score_o', metadata)
+        assert 'cube_value' in metadata
+        assert 'on_roll' in metadata
+        assert 'score_x' in metadata
+        assert 'score_o' in metadata
 
     def test_encode_position_only_gnuid(self):
         """Test encoding position to GNUID (position-only format)."""
@@ -338,9 +333,9 @@ class TestGNUIDParsing(unittest.TestCase):
         gnuid = encode_gnuid(position, on_roll=Player.X, only_position=True)
 
         # Should be exactly 14 characters (Position ID only)
-        self.assertEqual(len(gnuid), 14)
+        assert len(gnuid) == 14
         # Should be valid Base64
-        self.assertTrue(all(c in 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/' for c in gnuid))
+        assert all(c in 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/' for c in gnuid)
 
     def test_encode_full_gnuid(self):
         """Test encoding position with full metadata."""
@@ -360,9 +355,9 @@ class TestGNUIDParsing(unittest.TestCase):
 
         # Should have format: PositionID:MatchID
         parts = gnuid.split(':')
-        self.assertEqual(len(parts), 2)
-        self.assertEqual(len(parts[0]), 14)  # Position ID
-        self.assertEqual(len(parts[1]), 12)  # Match ID
+        assert len(parts) == 2
+        assert len(parts[0]) == 14  # Position ID
+        assert len(parts[1]) == 12  # Match ID
 
     def test_gnuid_roundtrip(self):
         """Test encoding and decoding produces same result."""
@@ -391,13 +386,13 @@ class TestGNUIDParsing(unittest.TestCase):
         # Positions should match (at least structurally)
         total_x1 = sum(c for c in position.points if c > 0)
         total_x2 = sum(c for c in position2.points if c > 0)
-        self.assertEqual(total_x1, total_x2)
+        assert total_x1 == total_x2
 
         # Metadata should match
-        self.assertEqual(metadata['cube_value'], 1)
-        self.assertEqual(metadata['on_roll'], Player.X)
-        self.assertEqual(metadata['dice'], (5, 2))
-        self.assertEqual(metadata['match_length'], 7)
+        assert metadata['cube_value'] == 1
+        assert metadata['on_roll'] == Player.X
+        assert metadata['dice'] == (5, 2)
+        assert metadata['match_length'] == 7
 
     def test_position_from_gnuid(self):
         """Test Position.from_gnuid() class method."""
@@ -408,8 +403,8 @@ class TestGNUIDParsing(unittest.TestCase):
         total_x = sum(count for count in position.points if count > 0)
         total_o = sum(abs(count) for count in position.points if count < 0)
 
-        self.assertEqual(total_x + position.x_off, 15)
-        self.assertEqual(total_o + position.o_off, 15)
+        assert total_x + position.x_off == 15
+        assert total_o + position.o_off == 15
 
     def test_position_to_gnuid(self):
         """Test Position.to_gnuid() instance method."""
@@ -428,14 +423,14 @@ class TestGNUIDParsing(unittest.TestCase):
         parsed_pos, metadata = parse_gnuid(gnuid)
 
         # Verify metadata
-        self.assertEqual(metadata['cube_value'], 2)
-        self.assertEqual(metadata['cube_owner'], CubeState.X_OWNS)
-        self.assertEqual(metadata['dice'], (4, 3))
+        assert metadata['cube_value'] == 2
+        assert metadata['cube_owner'] == CubeState.X_OWNS
+        assert metadata['dice'] == (4, 3)
 
         # Verify total checkers match (position encoding may have perspective issues)
         total_checkers_orig = sum(abs(c) for c in position.points)
         total_checkers_parsed = sum(abs(c) for c in parsed_pos.points)
-        self.assertEqual(total_checkers_orig, total_checkers_parsed)
+        assert total_checkers_orig == total_checkers_parsed
 
     def test_gnuid_crawford_game(self):
         """Test GNUID encoding/decoding with Crawford game."""
@@ -454,44 +449,44 @@ class TestGNUIDParsing(unittest.TestCase):
         # Parse back
         _, metadata = parse_gnuid(gnuid)
 
-        self.assertEqual(metadata['crawford'], True)
-        self.assertEqual(metadata['score_x'], 6)
-        self.assertEqual(metadata['score_o'], 5)
-        self.assertEqual(metadata['match_length'], 7)
+        assert metadata['crawford'] is True
+        assert metadata['score_x'] == 6
+        assert metadata['score_o'] == 5
+        assert metadata['match_length'] == 7
 
 
-class TestMoveParser(unittest.TestCase):
+class TestMoveParser:
     """Test move notation parsing."""
 
     def test_parse_simple_move(self):
         """Test parsing simple move notation."""
         moves = MoveParser.parse_move_notation("13/9 6/5")
-        self.assertEqual(len(moves), 2)
-        self.assertEqual(moves[0], (13, 9))
-        self.assertEqual(moves[1], (6, 5))
+        assert len(moves) == 2
+        assert moves[0] == (13, 9)
+        assert moves[1] == (6, 5)
 
     def test_parse_bar_move(self):
         """Test parsing bar entry."""
         moves = MoveParser.parse_move_notation("bar/22")
-        self.assertEqual(len(moves), 1)
-        self.assertEqual(moves[0], (0, 22))
+        assert len(moves) == 1
+        assert moves[0] == (0, 22)
 
     def test_parse_bearoff(self):
         """Test parsing bear-off move."""
         moves = MoveParser.parse_move_notation("6/off")
-        self.assertEqual(len(moves), 1)
-        self.assertEqual(moves[0], (6, 26))
+        assert len(moves) == 1
+        assert moves[0] == (6, 26)
 
 
-class TestPosition(unittest.TestCase):
+class TestPosition:
     """Test Position model."""
 
     def test_position_creation(self):
         """Test creating a position."""
         position = Position()
-        self.assertEqual(len(position.points), 26)
-        self.assertEqual(position.x_off, 0)
-        self.assertEqual(position.o_off, 0)
+        assert len(position.points) == 26
+        assert position.x_off == 0
+        assert position.o_off == 0
 
     def test_position_copy(self):
         """Test copying a position."""
@@ -504,18 +499,18 @@ class TestPosition(unittest.TestCase):
         copy.x_off = 1
 
         # Original should be unchanged
-        self.assertEqual(position.points[1], 5)
-        self.assertEqual(position.x_off, 2)
+        assert position.points[1] == 5
+        assert position.x_off == 2
 
     def test_from_xgid(self):
         """Test creating position from XGID."""
         xgid = "XGID=---BBBBAAA---Ac-bbccbAA-A-:1:1:-1:63:4:3:0:5:8"
         position = Position.from_xgid(xgid)
 
-        self.assertEqual(len(position.points), 26)
+        assert len(position.points) == 26
 
 
-class TestDecision(unittest.TestCase):
+class TestDecision:
     """Test Decision model."""
 
     def test_decision_creation(self):
@@ -533,8 +528,8 @@ class TestDecision(unittest.TestCase):
             candidate_moves=moves
         )
 
-        self.assertEqual(decision.on_roll, Player.O)
-        self.assertEqual(len(decision.candidate_moves), 2)
+        assert decision.on_roll == Player.O
+        assert len(decision.candidate_moves) == 2
 
     def test_get_best_move(self):
         """Test getting best move."""
@@ -550,9 +545,9 @@ class TestDecision(unittest.TestCase):
         )
 
         best = decision.get_best_move()
-        self.assertIsNotNone(best)
-        self.assertEqual(best.rank, 1)
-        self.assertEqual(best.notation, "13/9 6/5")
+        assert best is not None
+        assert best.rank == 1
+        assert best.notation == "13/9 6/5"
 
     def test_short_display_text(self):
         """Test short display text for different game types."""
@@ -568,7 +563,7 @@ class TestDecision(unittest.TestCase):
             match_length=0,
             decision_type=DecisionType.CHECKER_PLAY
         )
-        self.assertEqual(decision.get_short_display_text(), "Checker | 63 | Money")
+        assert decision.get_short_display_text() == "Checker | 63 | Money"
 
         # Match game - with match length
         decision = Decision(
@@ -580,7 +575,7 @@ class TestDecision(unittest.TestCase):
             match_length=7,
             decision_type=DecisionType.CHECKER_PLAY
         )
-        self.assertEqual(decision.get_short_display_text(), "Checker | 52 | 3-4 of 7")
+        assert decision.get_short_display_text() == "Checker | 52 | 3-4 of 7"
 
         # Crawford game - with match length and Crawford flag
         decision = Decision(
@@ -593,7 +588,7 @@ class TestDecision(unittest.TestCase):
             crawford=True,
             decision_type=DecisionType.CHECKER_PLAY
         )
-        self.assertEqual(decision.get_short_display_text(), "Checker | 66 | 1-4 of 5 Crawford")
+        assert decision.get_short_display_text() == "Checker | 66 | 1-4 of 5 Crawford"
 
         # Cube decision in Crawford game
         decision = Decision(
@@ -605,10 +600,10 @@ class TestDecision(unittest.TestCase):
             crawford=True,
             decision_type=DecisionType.CUBE_ACTION
         )
-        self.assertEqual(decision.get_short_display_text(), "Cube | 6-5 of 7 Crawford")
+        assert decision.get_short_display_text() == "Cube | 6-5 of 7 Crawford"
 
 
-class TestSVGBoardRenderer(unittest.TestCase):
+class TestSVGBoardRenderer:
     """Test SVG board renderer."""
 
     def test_render_svg_generates_valid_markup(self):
@@ -624,13 +619,13 @@ class TestSVGBoardRenderer(unittest.TestCase):
         svg = renderer.render_svg(position, Player.O, dice=(3, 5))
 
         # Check that it's valid SVG
-        self.assertIn('<svg', svg)
-        self.assertIn('viewBox="0 0 880 600"', svg)
-        self.assertIn('</svg>', svg)
-        self.assertGreater(len(svg), 5000)  # Should be a reasonable size
+        assert '<svg' in svg
+        assert 'viewBox="0 0 880 600"' in svg
+        assert '</svg>' in svg
+        assert len(svg) > 5000  # Should be a reasonable size
 
 
-class TestXGTextParser(unittest.TestCase):
+class TestXGTextParser:
     """Test XG text parser."""
 
     def test_parse_cube_decision(self):
@@ -658,27 +653,27 @@ Best Cube action: No redouble / Take
 eXtreme Gammon Version: 2.10"""
 
         decisions = XGTextParser.parse_string(text)
-        self.assertEqual(len(decisions), 1)
+        assert len(decisions) == 1
 
         decision = decisions[0]
-        self.assertEqual(decision.decision_type, DecisionType.CUBE_ACTION)
-        self.assertEqual(decision.cube_value, 2)
+        assert decision.decision_type == DecisionType.CUBE_ACTION
+        assert decision.cube_value == 2
         # Should have all 5 cube options
-        self.assertEqual(len(decision.candidate_moves), 5)
+        assert len(decision.candidate_moves) == 5
 
         # Check best move (rank 1)
         best_move = decision.get_best_move()
-        self.assertEqual(best_move.notation, "No Redouble/Take")
-        self.assertAlmostEqual(best_move.equity, 0.172, places=3)
-        self.assertEqual(best_move.rank, 1)
+        assert best_move.notation == "No Redouble/Take"
+        assert best_move.equity == pytest.approx(0.172, abs=0.001)
+        assert best_move.rank == 1
 
         # Verify all 5 options are present
         notations = [m.notation for m in decision.candidate_moves]
-        self.assertIn("No Redouble/Take", notations)
-        self.assertIn("Redouble/Take", notations)
-        self.assertIn("Redouble/Pass", notations)
-        self.assertIn("Too good/Take", notations)
-        self.assertIn("Too good/Pass", notations)
+        assert "No Redouble/Take" in notations
+        assert "Redouble/Take" in notations
+        assert "Redouble/Pass" in notations
+        assert "Too good/Take" in notations
+        assert "Too good/Pass" in notations
 
     def test_parse_too_good_cube_decision(self):
         """Test parsing 'Too good' cube decision analysis."""
@@ -705,25 +700,25 @@ Best Cube action: Too good to redouble / Pass
 eXtreme Gammon Version: 2.10"""
 
         decisions = XGTextParser.parse_string(text)
-        self.assertEqual(len(decisions), 1)
+        assert len(decisions) == 1
 
         decision = decisions[0]
-        self.assertEqual(decision.decision_type, DecisionType.CUBE_ACTION)
-        self.assertEqual(decision.cube_value, 2)
-        self.assertEqual(len(decision.candidate_moves), 5)
+        assert decision.decision_type == DecisionType.CUBE_ACTION
+        assert decision.cube_value == 2
+        assert len(decision.candidate_moves) == 5
 
         # Check best move is "Too good/Pass"
         best_move = decision.get_best_move()
-        self.assertEqual(best_move.notation, "Too good/Pass")
-        self.assertEqual(best_move.rank, 1)
+        assert best_move.notation == "Too good/Pass"
+        assert best_move.rank == 1
 
         # Verify all 5 options are present with "Redouble" terminology
         notations = [m.notation for m in decision.candidate_moves]
-        self.assertIn("No Redouble/Take", notations)
-        self.assertIn("Redouble/Take", notations)
-        self.assertIn("Redouble/Pass", notations)
-        self.assertIn("Too good/Take", notations)
-        self.assertIn("Too good/Pass", notations)
+        assert "No Redouble/Take" in notations
+        assert "Redouble/Take" in notations
+        assert "Redouble/Pass" in notations
+        assert "Too good/Take" in notations
+        assert "Too good/Pass" in notations
 
     def test_parse_checker_play(self):
         """Test parsing checker play analysis."""
@@ -740,24 +735,24 @@ X to play 54
 
     2. 3-ply       13/9 6/1                     eq:+0.026 (-0.140)
       Player:   44.31% (G:10.20% B:0.06%)
-      Opponent: 55.69% (G:10.99% B:0.24%)
+      Opponent: 55.69% (G:10.59% B:0.24%)
 
 eXtreme Gammon Version: 2.10"""
 
         decisions = XGTextParser.parse_string(text)
-        self.assertEqual(len(decisions), 1)
+        assert len(decisions) == 1
 
         decision = decisions[0]
-        self.assertEqual(decision.decision_type, DecisionType.CHECKER_PLAY)
-        self.assertEqual(decision.dice, (5, 4))
-        self.assertEqual(len(decision.candidate_moves), 2)
+        assert decision.decision_type == DecisionType.CHECKER_PLAY
+        assert decision.dice == (5, 4)
+        assert len(decision.candidate_moves) == 2
 
         # Check moves
-        self.assertEqual(decision.candidate_moves[0].notation, "13/4")
-        self.assertAlmostEqual(decision.candidate_moves[0].equity, 0.165, places=3)
+        assert decision.candidate_moves[0].notation == "13/4"
+        assert decision.candidate_moves[0].equity == pytest.approx(0.165, abs=0.001)
 
-        self.assertEqual(decision.candidate_moves[1].notation, "13/9 6/1")
-        self.assertAlmostEqual(decision.candidate_moves[1].error, 0.140, places=3)
+        assert decision.candidate_moves[1].notation == "13/9 6/1"
+        assert decision.candidate_moves[1].error == pytest.approx(0.140, abs=0.001)
 
     def test_parse_crawford_game(self):
         """Test parsing Crawford game match info."""
@@ -793,26 +788,17 @@ X to play 66
 eXtreme Gammon Version: 2.10, MET: Kazaross XG2"""
 
         decisions = XGTextParser.parse_string(text)
-        self.assertEqual(len(decisions), 1)
+        assert len(decisions) == 1
 
         decision = decisions[0]
         # Check Crawford flag is set
-        self.assertTrue(decision.crawford)
+        assert decision.crawford is True
         # Check match length
-        self.assertEqual(decision.match_length, 5)
+        assert decision.match_length == 5
         # Check scores
-        self.assertEqual(decision.score_x, 1)
-        self.assertEqual(decision.score_o, 4)
+        assert decision.score_x == 1
+        assert decision.score_o == 4
         # Check metadata text includes Crawford indicator
         metadata_text = decision.get_metadata_text()
-        self.assertIn("Crawford", metadata_text)
-        self.assertIn("5pt", metadata_text)
-
-
-def run_tests():
-    """Run all tests."""
-    unittest.main()
-
-
-if __name__ == '__main__':
-    run_tests()
+        assert "Crawford" in metadata_text
+        assert "5pt" in metadata_text

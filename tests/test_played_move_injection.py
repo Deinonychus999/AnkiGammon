@@ -1,25 +1,18 @@
 """Test for played move injection feature."""
 
-import unittest
-from pathlib import Path
-import sys
-
-# Add parent directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
+import pytest
 
 from ankigammon.models import Position, Player, Decision, Move, DecisionType
-from ankigammon.gui.main_window import MainWindow
 from ankigammon.settings import Settings
 
 
-class TestPlayedMoveInjection(unittest.TestCase):
+class TestPlayedMoveInjection:
     """Test that played moves are injected into top N candidates for MCQ display."""
 
-    def setUp(self):
+    def setup_method(self):
         """Set up test fixtures."""
         self.settings = Settings()
         self.settings.max_mcq_options = 5  # Default to 5 for these tests
-        # Note: MainWindow requires PySide6, so we'll test the method directly
 
     def test_played_move_already_in_top_5(self):
         """Test that nothing happens if played move is already in top N."""
@@ -64,8 +57,8 @@ class TestPlayedMoveInjection(unittest.TestCase):
         mock._ensure_played_move_in_candidates(decision, played_move)
 
         # Verify: candidate_moves should be unchanged
-        self.assertEqual(decision.candidate_moves[2], played_move)
-        self.assertEqual(len(decision.candidate_moves), 7)
+        assert decision.candidate_moves[2] == played_move
+        assert len(decision.candidate_moves) == 7
 
     def test_played_move_not_in_top_5(self):
         """Test that played move is injected when it's not in top N."""
@@ -112,18 +105,18 @@ class TestPlayedMoveInjection(unittest.TestCase):
 
         # Verify: played move should now be at position 4 (5th slot, with max_mcq_options=5)
         max_options = self.settings.max_mcq_options
-        self.assertEqual(decision.candidate_moves[max_options - 1], played_move)
-        self.assertTrue(decision.candidate_moves[max_options - 1].was_played)
-        self.assertEqual(decision.candidate_moves[max_options - 1].notation, "24/21 24/18")
+        assert decision.candidate_moves[max_options - 1] == played_move
+        assert decision.candidate_moves[max_options - 1].was_played is True
+        assert decision.candidate_moves[max_options - 1].notation == "24/21 24/18"
 
         # The Nth best move should have been pushed down
         top_n_after = decision.candidate_moves[:max_options]
-        self.assertIn(played_move, top_n_after)
+        assert played_move in top_n_after
 
         # Original Nth move should now be at position N or later
-        self.assertNotEqual(decision.candidate_moves[max_options - 1], original_5th)
-        self.assertEqual(decision.candidate_moves[max_options - 1].notation, "24/21 24/18")  # Played move
-        self.assertEqual(original_5th.notation, "13/10 13/7")  # Original 5th move
+        assert decision.candidate_moves[max_options - 1] != original_5th
+        assert decision.candidate_moves[max_options - 1].notation == "24/21 24/18"  # Played move
+        assert original_5th.notation == "13/10 13/7"  # Original 5th move
 
     def test_played_move_is_last(self):
         """Test that played move is injected when it's the worst move."""
@@ -164,12 +157,12 @@ class TestPlayedMoveInjection(unittest.TestCase):
 
         # Verify: played move should now be at position N-1 (last slot)
         max_options = self.settings.max_mcq_options
-        self.assertEqual(decision.candidate_moves[max_options - 1], played_move)
-        self.assertTrue(decision.candidate_moves[max_options - 1].was_played)
+        assert decision.candidate_moves[max_options - 1] == played_move
+        assert decision.candidate_moves[max_options - 1].was_played is True
 
         # Verify it's now in top N
         top_n_after = decision.candidate_moves[:max_options]
-        self.assertIn(played_move, top_n_after)
+        assert played_move in top_n_after
 
     def test_played_move_with_custom_max_options(self):
         """Test that function respects custom max_mcq_options setting."""
@@ -215,14 +208,10 @@ class TestPlayedMoveInjection(unittest.TestCase):
         mock._ensure_played_move_in_candidates(decision, played_move)
 
         # Verify: played move should now be at position 2 (3rd slot, with max_mcq_options=3)
-        self.assertEqual(decision.candidate_moves[2], played_move)
-        self.assertTrue(decision.candidate_moves[2].was_played)
+        assert decision.candidate_moves[2] == played_move
+        assert decision.candidate_moves[2].was_played is True
 
         # Verify it's now in top 3
         top_3_after = decision.candidate_moves[:3]
-        self.assertIn(played_move, top_3_after)
-        self.assertEqual(len(top_3_after), 3)
-
-
-if __name__ == '__main__':
-    unittest.main()
+        assert played_move in top_3_after
+        assert len(top_3_after) == 3

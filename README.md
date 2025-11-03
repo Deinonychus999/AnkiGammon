@@ -7,9 +7,9 @@ A graphical application for converting backgammon positions into Anki flashcards
 ## Features
 
 - **Modern GUI interface** - Easy-to-use graphical application, no command-line needed
-- **Multiple position format support** - XGID (eXtreme Gammon), OGID (OpenGammon), and GNUID (GNU Backgammon)
+- **Multiple input formats** - XGID/OGID/GNUID position IDs, XG binary files (.xg), match files (.mat), SGF files
 - **Direct XG export support** - Copy/paste positions from eXtreme Gammon
-- **Smart rendering** - Automatic board image generation from position IDs
+- **File import** - Drag-and-drop or import entire match files for batch processing
 - **Automatic format detection** - Paste any supported format, the app detects it automatically
 - **Two export methods**:
   - AnkiConnect: Push directly to Anki (recommended)
@@ -84,9 +84,13 @@ ankigammon  # Launches the GUI
    - macOS: Open AnkiGammon from Applications folder
    - Linux: Double-click `AnkiGammon-x86_64.AppImage`
    - From PyPI install: Run `ankigammon` in terminal
-2. **Paste positions** - Copy analysis from eXtreme Gammon (Ctrl+C) and paste into the application
-3. **Configure settings** - Choose color scheme, board orientation, and export method in Settings
-4. **Generate cards** - Click "Generate Cards" to create Anki flashcards
+2. **Add positions**:
+   - Paste analysis from eXtreme Gammon (Ctrl+C with analysis or Ctrl+Shift+C for position ID only)
+   - Import files: Ctrl+O or drag-and-drop (.xg, .mat, .sgf, .txt)
+3. **Configure settings** - Choose color scheme, board orientation, and export method (Ctrl+,)
+4. **Generate cards** - Click "Generate Cards" (Ctrl+E) to create Anki flashcards
+
+**Keyboard shortcuts:** Ctrl+N (add), Ctrl+O (import), Ctrl+E (export), Ctrl+, (settings), Ctrl+Q (quit)
 
 ### Getting Positions from eXtreme Gammon
 
@@ -110,11 +114,13 @@ Score is X:3 O:4 5 pt.(s) match.
       Opponent: 20.54% (G:2.22% B:0.06%)
 ```
 
-## Supported Position Formats
+## Supported Formats
 
-AnkiGammon supports three backgammon position ID formats, with automatic detection:
+AnkiGammon supports multiple input formats with automatic detection:
 
-### XGID (eXtreme Gammon ID) - Primary Format
+### Position ID Formats
+
+#### XGID (eXtreme Gammon ID) - Primary Format
 **Format:** `XGID=PPPPPPPPPPPPPPPPPPPPPPPPPP:CV:CP:T:D:S1:S2:CJ:ML:MC`
 
 The standard XG format with 9 colon-separated fields including position, cube state, dice, and match info.
@@ -124,7 +130,7 @@ The standard XG format with 9 colon-separated fields including position, cube st
 XGID=---BBBBAAA---Ac-bbccbAA-A-:1:1:-1:63:4:3:0:5:8
 ```
 
-### OGID (OpenGammon Position ID) - Alternative Format
+#### OGID (OpenGammon Position ID) - Alternative Format
 **Format:** `P1:P2:CUBE[:DICE[:TURN[:STATE[:S1[:S2[:ML[:MID[:NCHECKERS]]]]]]]]`
 
 Human-readable base-26 encoding with optional metadata fields. More verbose but easier to understand.
@@ -134,7 +140,7 @@ Human-readable base-26 encoding with optional metadata fields. More verbose but 
 cccccggggg:ddddiiiiii:N0N:63:W:IW:4:3:7:1:15
 ```
 
-### GNUID (GNU Backgammon ID) - GnuBG Format
+#### GNUID (GNU Backgammon ID) - GnuBG Format
 **Format:** `PositionID:MatchID` (Base64 encoded)
 
 Compact format used by GNU Backgammon. 14-character Position ID + 12-character Match ID.
@@ -145,6 +151,14 @@ Compact format used by GNU Backgammon. 14-character Position ID + 12-character M
 ```
 
 GNUID fully supports position encoding and decoding, including all checker positions, bars, cube state, and match metadata.
+
+### File Formats
+
+- **XG Binary files (.xg)** - eXtreme Gammon native format
+- **Match files (.mat, .txt)** - GNU Backgammon match exports
+- **SGF files (.sgf)** - Smart Game Format for backgammon
+
+Import via Ctrl+O or drag-and-drop directly onto the window.
 
 ### Format Detection
 
