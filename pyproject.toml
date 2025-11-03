@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ankigammon"
-version = "1.0.0"
+version = "1.0.1"
 description = "Convert eXtreme Gammon backgammon analysis into Anki flashcards"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -12,12 +12,11 @@ authors = [
     {name = "AnkiGammon Contributors", email = "admin@ankigammon.com"},
 ]
 keywords = ["anki", "flashcards", "backgammon", "extreme-gammon", "xg", "learning", "spaced-repetition"]
-license = {text = "MIT"}
+license = "MIT"
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: End Users/Desktop",
     "Topic :: Games/Entertainment :: Board Games",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",

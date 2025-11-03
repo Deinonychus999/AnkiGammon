@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.0.1] - 2025-11-02
+
+### Added
+- SGF (Smart Game Format) file import support for backgammon positions
+- Match file import support (.mat format and plain text match files)
+- Player name extraction from match file headers
+- Import options dialog for filtering positions by player and decision type
+- Winning chances extraction from GNU Backgammon cube analysis
+- Score matrix display on cube decision flashcards
+- Match analysis progress feedback in GUI
+
+### Improved
+- File import responsiveness with background processing
+- XG binary parser now extracts cube decisions and winning probabilities
+- XGID generation for score matrix position encoding
+- Format detection for multiple file types (XG, MAT, SGF, plain text)
+- Main window button layout for better workflow
+- Card generation with enhanced metadata display
+
+
 ## [1.0.0] - 2025-10-31
 
 ### Added
