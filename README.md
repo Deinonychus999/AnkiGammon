@@ -340,7 +340,7 @@ Linux:
 ## Requirements
 
 - Python 3.8+ (for development install only)
-- Dependencies automatically installed via `pip install .`: genanki, requests, beautifulsoup4, lxml, PySide6, qtawesome
+- Dependencies automatically installed via `pip install .`: genanki, requests, PySide6, qtawesome
 - For standalone executable: No requirements - Python and all dependencies are bundled
 
 ## Legal

@@ -67,26 +67,6 @@ The xgdatatools code is based upon Delphi data structures provided by Xavier Duf
 
 ---
 
-### beautifulsoup4 (MIT License)
-
-**Copyright:** Copyright (c) 2004-present Leonard Richardson
-**License:** MIT License
-**Website:** https://www.crummy.com/software/BeautifulSoup/
-
-Used for parsing HTML and XML content.
-
----
-
-### lxml (BSD-3-Clause)
-
-**Copyright:** Copyright (c) 2004 Infrae. Main development by Stefan Behnel and contributors.
-**License:** BSD 3-Clause License
-**Website:** https://lxml.de/
-
-Used for XML processing.
-
----
-
 ### genanki (MIT License)
 
 **Copyright:** Copyright (c) 2021 Kerrick Staley

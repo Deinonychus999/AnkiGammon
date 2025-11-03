@@ -26,8 +26,6 @@ classifiers = [
 ]
 dependencies = [
     # Core dependencies
-    "beautifulsoup4>=4.12.0",
-    "lxml>=4.9.0",
     "genanki>=0.13.0",
     "requests>=2.31.0",
     # GUI dependencies
