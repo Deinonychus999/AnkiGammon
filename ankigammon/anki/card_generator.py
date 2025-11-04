@@ -443,7 +443,18 @@ class CardGenerator:
             else:
                 wgb_inline_html = ""
 
-            table_rows.append(f"""
+            # Cube decisions omit rank column
+            if is_cube_decision:
+                table_rows.append(f"""
+<tr class="{row_class}" {row_attrs}>
+    <td>
+        <div class="move-notation">{display_notation}</div>{wgb_inline_html}
+    </td>
+    <td>{move.equity:.3f}</td>
+    <td>{error_str}</td>
+</tr>""")
+            else:
+                table_rows.append(f"""
 <tr class="{row_class}" {row_attrs}>
     <td>{display_rank}</td>
     <td>
@@ -518,25 +529,39 @@ class CardGenerator:
         if is_cube_decision and decision.player_win_pct is not None:
             winning_chances_html = self._generate_winning_chances_html(decision)
 
-        # Use side-by-side layout for cube decisions with W/G/B data
-        if is_cube_decision and winning_chances_html:
-            analysis_and_chances = f"""
-    <div class="analysis-container">
-        <div class="analysis-section">
-            {analysis_title}
-            <table class="moves-table">
-                <thead>
+        # Prepare table headers based on decision type
+        if is_cube_decision:
+            table_headers = """
+                    <tr>
+                        <th>Action</th>
+                        <th>Equity</th>
+                        <th>Error</th>
+                    </tr>"""
+        else:
+            table_headers = """
                     <tr>
                         <th>Rank</th>
                         <th>Move</th>
                         <th>Equity</th>
                         <th>Error</th>
-                    </tr>
+                    </tr>"""
+
+        # Generate analysis table
+        analysis_table = f"""
+            {analysis_title}
+            <table class="moves-table">
+                <thead>{table_headers}
                 </thead>
                 <tbody {table_body_id}>
                     {''.join(table_rows)}
                 </tbody>
-            </table>
+            </table>"""
+
+        # Wrap with appropriate layout
+        if is_cube_decision and winning_chances_html:
+            analysis_and_chances = f"""
+    <div class="analysis-container">
+        <div class="analysis-section">{analysis_table}
         </div>
         <div class="chances-section">
             <h4>Winning Chances:</h4>
@@ -546,21 +571,7 @@ class CardGenerator:
 """
         else:
             analysis_and_chances = f"""
-    <div class="analysis">
-        {analysis_title}
-        <table class="moves-table">
-            <thead>
-                <tr>
-                    <th>Rank</th>
-                    <th>Move</th>
-                    <th>Equity</th>
-                    <th>Error</th>
-                </tr>
-            </thead>
-            <tbody {table_body_id}>
-                {''.join(table_rows)}
-            </tbody>
-        </table>
+    <div class="analysis">{analysis_table}
     </div>
 """
 
