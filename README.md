@@ -6,31 +6,21 @@ A graphical application for converting backgammon positions into Anki flashcards
 
 ## Features
 
-- **Modern GUI interface** - Easy-to-use graphical application, no command-line needed
+- **Modern GUI interface** - Easy-to-use graphical application with drag-and-drop support
 - **Multiple input formats** - XGID/OGID/GNUID position IDs, XG binary files (.xg), match files (.mat), SGF files
-- **Direct XG export support** - Copy/paste positions from eXtreme Gammon
-- **File import** - Drag-and-drop or import entire match files for batch processing
+- **Direct XG export support** - Copy/paste pre-analyzed positions from eXtreme Gammon
+- **File import with filtering** - Drag-and-drop files with error threshold and player selection
+- **GNU Backgammon integration** - Analyze unanalyzed positions automatically
 - **Automatic format detection** - Paste any supported format, the app detects it automatically
 - **Two export methods**:
   - AnkiConnect: Push directly to Anki (recommended)
   - APKG: Self-contained package for manual import
-- **Customizable appearance** - 6 color schemes and board orientation options
-- **Complete analysis** - Top 5 moves with equities and error calculations
+- **Customizable appearance** - 6 color schemes, board orientation, configurable MCQ options (2-10)
+- **Position management** - Multi-select, add notes, preview positions before export
 
 ## Installation
 
-[![PyPI version](https://badge.fury.io/py/ankigammon.svg)](https://pypi.org/project/ankigammon/)
-
-### Quick Install (PyPI - Recommended for Python users)
-
-If you have Python 3.8+ installed:
-
-```bash
-pip install ankigammon
-ankigammon  # Launch the GUI
-```
-
-### Standalone Executable (No Python required)
+### Standalone Executable (Recommended)
 
 Download pre-built executables from [GitHub Releases](https://github.com/Deinonychus999/AnkiGammon/releases):
 
@@ -66,6 +56,17 @@ AnkiGammon is not code-signed because that requires a $99/year Apple Developer a
 - Ubuntu 22.04: `sudo apt install libfuse2`
 - Ubuntu 24.04: `sudo apt install libfuse2t64`
 
+### Install via pip
+
+[![PyPI version](https://badge.fury.io/py/ankigammon.svg)](https://pypi.org/project/ankigammon/)
+
+If you have Python 3.8+ installed:
+
+```bash
+pip install ankigammon
+ankigammon  # Launch the GUI
+```
+
 ### Development Install
 
 For developers who want to run from source:
@@ -84,79 +85,59 @@ ankigammon  # Launches the GUI
    - macOS: Open AnkiGammon from Applications folder
    - Linux: Double-click `AnkiGammon-x86_64.AppImage`
    - From PyPI install: Run `ankigammon` in terminal
-2. **Add positions**:
-   - Paste analysis from eXtreme Gammon (Ctrl+C with analysis or Ctrl+Shift+C for position ID only)
-   - Import files: Ctrl+O or drag-and-drop (.xg, .mat, .sgf, .txt)
+2. **Add positions** (choose one or more methods):
+   - **Paste XG analysis**: Press Ctrl+N, paste pre-analyzed positions from eXtreme Gammon (Ctrl+C)
+   - **Paste position IDs**: Press Ctrl+N, paste XGID/OGID/GNUID strings (requires GNU Backgammon for analysis)
+   - **Import files**: Press Ctrl+O or drag-and-drop files (.xg, .mat, .sgf, .txt)
+     - For match files: Choose error threshold and which player's mistakes to import
 3. **Configure settings** - Choose color scheme, board orientation, and export method (Ctrl+,)
 4. **Generate cards** - Click "Generate Cards" (Ctrl+E) to create Anki flashcards
 
-**Keyboard shortcuts:** Ctrl+N (add), Ctrl+O (import), Ctrl+E (export), Ctrl+, (settings), Ctrl+Q (quit)
+### Keyboard Shortcuts
 
-### Getting Positions from eXtreme Gammon
+- **Ctrl+N** - Add positions
+- **Ctrl+O** - Import file
+- **Ctrl+E** - Export cards
+- **Ctrl+,** - Settings
+- **Ctrl+Q** - Quit
+- **Delete/Backspace** - Remove selected positions
 
-1. In eXtreme Gammon, analyze a position
-2. Press Ctrl+C to copy the full analysis
-3. Paste into AnkiGammon's input area
-4. Click "Generate Cards"
+### Position Analysis
 
-**Example XG export format:**
-```
-XGID=---BBBBAAA---Ac-bbccbAA-A-:1:1:-1:63:4:3:0:5:8
-
-X:Player 2   O:Player 1
-Score is X:3 O:4 5 pt.(s) match.
- +13-14-15-16-17-18------19-20-21-22-23-24-+
- |          O  O  O |   | O  O  O  O       |
- ...
-
-    1. XG Roller+  11/8 11/5                    eq:+0.589
-      Player:   79.46% (G:17.05% B:0.67%)
-      Opponent: 20.54% (G:2.22% B:0.06%)
-```
+Unanalyzed positions (position IDs, match files, SGF files) can be analyzed using GNU Backgammon if configured in Settings (see Customization Options below).
 
 ## Supported Formats
 
 AnkiGammon supports multiple input formats with automatic detection:
 
-### Position ID Formats
+### XG Text Export (Pre-Analyzed)
 
-#### XGID (eXtreme Gammon ID) - Primary Format
-**Format:** `XGID=PPPPPPPPPPPPPPPPPPPPPPPPPP:CV:CP:T:D:S1:S2:CJ:ML:MC`
+Import **pre-analyzed positions** directly from eXtreme Gammon:
 
-The standard XG format with 9 colon-separated fields including position, cube state, dice, and match info.
+1. In eXtreme Gammon, analyze a position
+2. Press Ctrl+C to copy the full analysis
+3. Paste into AnkiGammon's input area
 
-**Example:**
-```
-XGID=---BBBBAAA---Ac-bbccbAA-A-:1:1:-1:63:4:3:0:5:8
-```
+### Position ID Formats (Unanalyzed)
 
-#### OGID (OpenGammon Position ID) - Alternative Format
-**Format:** `P1:P2:CUBE[:DICE[:TURN[:STATE[:S1[:S2[:ML[:MID[:NCHECKERS]]]]]]]]`
+Position IDs encode positions without move analysis. Configure GNU Backgammon in Settings to enable automatic analysis.
 
-Human-readable base-26 encoding with optional metadata fields. More verbose but easier to understand.
+- **XGID (eXtreme Gammon ID)** - 26-character position string + metadata fields
+  - Example: `XGID=---BBBBAAA---Ac-bbccbAA-A-:1:1:-1:63:4:3:0:5:8`
 
-**Example:**
-```
-cccccggggg:ddddiiiiii:N0N:63:W:IW:4:3:7:1:15
-```
+- **OGID (OpenGammon Position ID)** - Base-26 position encoding with colon-separated fields
+  - Example: `cccccggggg:ddddiiiiii:N0N:63:W:IW:4:3:7:1:15`
 
-#### GNUID (GNU Backgammon ID) - GnuBG Format
-**Format:** `PositionID:MatchID` (Base64 encoded)
+- **GNUID (GNU Backgammon ID)** - Compact Base64 format (PositionID:MatchID)
+  - Example: `4HPwATDgc/ABMA:8IhuACAACAAE`
 
-Compact format used by GNU Backgammon. 14-character Position ID + 12-character Match ID.
-
-**Example:**
-```
-4HPwATDgc/ABMA:8IhuACAACAAE
-```
-
-GNUID fully supports position encoding and decoding, including all checker positions, bars, cube state, and match metadata.
+All formats fully support position encoding, cube state, dice, and match metadata.
 
 ### File Formats
 
-- **XG Binary files (.xg)** - eXtreme Gammon native format
-- **Match files (.mat, .txt)** - GNU Backgammon match exports
-- **SGF files (.sgf)** - Smart Game Format for backgammon
+- **XG Binary files (.xg)** - eXtreme Gammon native format (includes pre-analysis from XG)
+- **Match files (.mat, .txt)** - GNU Backgammon match exports (requires GNU Backgammon for analysis)
+- **SGF files (.sgf)** - Smart Game Format for backgammon (requires GNU Backgammon for analysis)
 
 Import via Ctrl+O or drag-and-drop directly onto the window.
 
@@ -192,24 +173,38 @@ Each position becomes one Anki card:
 **Front:**
 - Board image showing the position
 - Metadata: player on roll, dice, score, cube, match length
-- Multiple choice: 5 candidate moves (labeled A-E, shuffled)
+- Multiple choice: Candidate moves (configurable 2-10, labeled A-J, shuffled)
 - Optional text move descriptions
 
 **Back:**
 - Position image and metadata
-- Ranked table of top 5 moves with equity and error
+- Ranked table of moves with equity and error
 - Correct answer highlighted
 - Source position ID for reference
+- Explanation (if added)
+- Score matrix showing optimal cube actions across all match scores (if enabled)
 
 ## Customization Options
 
-The GUI Settings dialog provides:
+Open Settings with **Ctrl+,** to configure:
+
+**Appearance:**
 - **Color Schemes**: Choose from 6 built-in themes (Classic, Forest, Ocean, Desert, Sunset, Midnight)
-- **Board Orientation**: Counter-clockwise or Clockwise orientation
-- **Deck Name**: Customize your Anki deck name
+- **Board Orientation**: Counter-clockwise (default) or Clockwise orientation
+- **Number of MCQ Options**: Configure how many moves to display (2-10, default: 5)
+
+**Card Options:**
 - **Show Move Options**: Toggle text move descriptions on card front
-- **Interactive Moves**: Enable/disable move visualization
+- **Interactive Moves**: Enable/disable animated move visualization
+
+**Export:**
+- **Deck Name**: Customize your Anki deck name
 - **Export Method**: Choose between AnkiConnect or APKG output
+
+**Analysis:**
+- **GNU Backgammon Path**: Configure path to `gnubg-cli` executable for automatic position analysis
+- **Analysis Ply**: Set depth (0-4, default: 3)
+- **Score Matrix**: Generate cube decision matrix for all match scores (optional, time-consuming)
 
 ## Troubleshooting
 
@@ -220,9 +215,7 @@ The GUI Settings dialog provides:
 
 **"No decisions found in input"**
 - Ensure input includes position ID lines (XGID, OGID, or GNUID format)
-- Make sure move analysis includes equity values (eq:)
-- Copy the full position from XG (press Ctrl+C)
-- For GNUID format: Consider using XGID or OGID instead due to known limitations
+- Copy the full analyzed position from XG (press Ctrl+C)
 
 **Application won't start**
 - Windows: Click "More info" → "Run anyway" if SmartScreen blocks the app
@@ -295,18 +288,6 @@ cd dist
 ./ankigammon
 ```
 
-### Project Structure
-
-- `ankigammon/` - Main package code
-  - `parsers/` - XG text format parsers
-  - `renderer/` - Board image generation (SVG-based)
-  - `anki/` - Anki card generation and export
-  - `utils/` - Position format encoding/decoding (XGID, OGID, GNUID)
-  - `gui/` - GUI components and format detection
-- `tests/` - Unit tests (includes tests for all three formats)
-- `ankigammon.spec` - PyInstaller configuration for GUI build
-- `build_executable.bat/.sh` - Build scripts
-
 ### Settings Storage
 
 User preferences (color scheme, deck name, board orientation, etc.) are automatically saved to:
@@ -318,43 +299,12 @@ Settings persist across application restarts, even when using the standalone exe
 
 ### Troubleshooting Build Issues
 
-**ImportError during build:**
-- Add missing module to `hiddenimports` in `ankigammon.spec`
+**Missing modules in executable:**
+- Add the module to `hiddenimports` in `ankigammon.spec`
+- Or try: `pyinstaller --collect-all ankigammon ankigammon.spec`
 
-**"Module not found" when running executable:**
-- Check the module is in `hiddenimports`
-- Try: `pyinstaller --collect-all ankigammon ankigammon.spec`
-
-**Executable too large:**
-- Remove unused dependencies from requirements.txt
-- Add more items to `excludes` in ankigammon.spec
-
-**Executable won't run:**
-- Test on clean machine without Python installed
-- Check Windows Defender / antivirus isn't blocking it
-- Look at build warnings: `pyinstaller ankigammon.spec > build.log 2>&1`
-
-**Platform-Specific Issues:**
-
-Windows:
-- Some antivirus software may flag PyInstaller executables as suspicious (false positive)
-- Users may need to add an exception in their antivirus
-- To reduce false positives: Sign executable with code signing certificate
-
-macOS:
-- First run may show "cannot be opened because it is from an unidentified developer"
-- Solution 1: Right-click executable → Open → Open anyway
-- Solution 2: System Settings → Privacy & Security → Allow anyway
-- Solution 3: Remove quarantine: `xattr -cr dist/ankigammon`
-- For distribution: Sign with Apple Developer certificate and notarize
-
-Linux:
-- Ensure executable has execute permissions: `chmod +x ankigammon`
-- If running from source, install Qt/X11 dependencies:
-  ```bash
-  sudo apt install libxkbcommon0 libxkbcommon-x11-0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-xinerama0 libxcb-xfixes0 libxcb-shape0 libxcb-cursor0 libxcb1
-  ```
-- For minimal install (just the essentials): `sudo apt install libxkbcommon0 libxcb1`
+**macOS code signing:**
+- Remove quarantine for local testing: `xattr -cr dist/ankigammon`
 
 ## Requirements
 
@@ -362,33 +312,8 @@ Linux:
 - Dependencies automatically installed via `pip install .`: genanki, requests, PySide6, qtawesome
 - For standalone executable: No requirements - Python and all dependencies are bundled
 
-## Legal
-
-### Third-Party Software
-
-This application uses several LGPL-licensed components:
-- **PySide6** (LGPL-3.0) - Qt framework Python bindings for the GUI
-- **xgdatatools** (LGPL-2.1) - Modules for parsing eXtreme Gammon binary file formats
-
-See [THIRD-PARTY-LICENSES.md](THIRD-PARTY-LICENSES.md) for complete license information and attributions for all dependencies.
-
-### Trademarks
-
-- "eXtreme Gammon" and "XG" are registered trademarks of GameSite 2000 Ltd.
-- "Anki" is a trademark of Ankitects Pty Ltd
-- "Qt" is a trademark of The Qt Company Ltd.
-- GNU Backgammon is part of the GNU Project
-
-**This project is not affiliated with or endorsed by the creators of eXtreme Gammon, Anki, Qt, GNU Backgammon, or any other mentioned software.**
-
-### Position Format Specifications
-
-- **XGID format** specification is publicly documented by eXtreme Gammon (GameSite 2000 Ltd.) with explicit permission for redistribution: "This information can freely redistributed"
-- **XG binary format** parsing is implemented using xgdatatools (LGPL-2.1) by Michael Petch, based on Delphi data structures provided by Xavier Dufaure de Citres
-- **GNUID format** is documented in the GNU Backgammon manual (GPL-3.0 project); our implementation is original code that reads/writes this format without incorporating GPL code
-
-All position encoding/decoding implementations in this project are original code, except for the xgdatatools modules used for XG binary file parsing.
-
 ## License
 
 AnkiGammon is licensed under the MIT License. See [LICENSE](LICENSE) for details.
+
+For third-party licenses and attributions, see [THIRD-PARTY-LICENSES.md](THIRD-PARTY-LICENSES.md).
