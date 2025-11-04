@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
     QLabel, QDialogButtonBox
 )
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QShowEvent
 
 from ankigammon.settings import Settings
 
@@ -114,6 +115,13 @@ class ImportOptionsDialog(QDialog):
         form.addRow(self.lbl_warning)
 
         return group
+
+    def showEvent(self, event: QShowEvent):
+        """Reload settings when dialog is about to be shown."""
+        super().showEvent(event)
+        # Reload settings every time the dialog is shown to ensure we have
+        # the latest values (in case a previous dialog in the import sequence updated them)
+        self._load_settings()
 
     def _load_settings(self):
         """Load current settings into widgets."""

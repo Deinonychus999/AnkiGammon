@@ -194,6 +194,9 @@ class MainWindow(QMainWindow):
             orientation=settings.board_orientation
         )
         self.color_scheme_actions = {}  # Store references to color scheme menu actions
+        self._gnubg_check_shown = False  # Track if we've shown GnuBG config dialog in current import batch
+        self._import_queue = []  # Queue for sequential file imports
+        self._import_in_progress = False  # Track if an import is currently being processed
 
         # Enable drag and drop
         self.setAcceptDrops(True)
@@ -1144,15 +1147,18 @@ class MainWindow(QMainWindow):
 
         # Check if GnuBG is configured
         if not self.settings.is_gnubg_available():
-            result = QMessageBox.question(
-                self,
-                "GnuBG Required",
-                "Match file analysis requires GNU Backgammon.\n\n"
-                "Would you like to configure it in Settings?",
-                QMessageBox.Yes | QMessageBox.No
-            )
-            if result == QMessageBox.Yes:
-                self.on_settings_clicked()
+            # Only show the dialog once per import batch
+            if not self._gnubg_check_shown:
+                self._gnubg_check_shown = True
+                result = QMessageBox.question(
+                    self,
+                    "GnuBG Required",
+                    "Match file analysis requires GNU Backgammon.\n\n"
+                    "Would you like to configure it in Settings?",
+                    QMessageBox.Yes | QMessageBox.No
+                )
+                if result == QMessageBox.Yes:
+                    self.on_settings_clicked()
             return None, None
 
         # Extract player names based on file type
@@ -1284,8 +1290,12 @@ class MainWindow(QMainWindow):
         if not file_path:
             return
 
-        # Use the shared import logic
-        self._import_file(file_path)
+        # Reset GnuBG check flag for this import
+        self._gnubg_check_shown = False
+
+        # Add to import queue and start processing
+        self._import_queue.append(file_path)
+        self._process_import_queue()
 
     def dragEnterEvent(self, event):
         """Handle drag enter event - accept if it contains valid files."""
@@ -1324,9 +1334,14 @@ class MainWindow(QMainWindow):
         # Accept the drop event immediately
         event.acceptProposedAction()
 
-        # Defer import processing to avoid blocking the UI
-        for file_path in file_paths:
-            QTimer.singleShot(0, lambda fp=file_path: self._import_file(fp))
+        # Reset GnuBG check flag for this batch of imports
+        self._gnubg_check_shown = False
+
+        # Add files to import queue
+        self._import_queue.extend(file_paths)
+
+        # Start processing the queue
+        self._process_import_queue()
 
     def _show_drop_overlay(self):
         """Show the drop overlay with proper sizing."""
@@ -1338,6 +1353,31 @@ class MainWindow(QMainWindow):
     def _hide_drop_overlay(self):
         """Hide the drop overlay."""
         self.drop_overlay.hide()
+
+    def _process_import_queue(self):
+        """Process files from the import queue sequentially."""
+        # If already processing or queue is empty, do nothing
+        if self._import_in_progress or not self._import_queue:
+            return
+
+        # Mark as in progress
+        self._import_in_progress = True
+
+        # Get next file from queue
+        file_path = self._import_queue.pop(0)
+
+        # Use QTimer to defer processing to avoid blocking the UI
+        # This also ensures the dialog from the previous import has fully closed
+        def process_file():
+            try:
+                self._import_file(file_path)
+            finally:
+                # Mark as not in progress and process next file
+                self._import_in_progress = False
+                # Use QTimer to ensure UI updates properly between imports
+                QTimer.singleShot(100, self._process_import_queue)
+
+        QTimer.singleShot(0, process_file)
 
     def _import_file(self, file_path: str):
         """
