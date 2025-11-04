@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.0.3] - 2025-11-04
+
+### Improved
+- Multi-file import process for better handling of batch imports
+- Linux build configuration now targets Ubuntu 22.04 for better compatibility
+
 ## [1.0.2] - 2025-11-03
 
 ### Fixed
