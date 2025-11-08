@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.0.4] - 2025-11-08
+
+### Improved
+- Import dialog now remembers player selection by name across multiple file imports
+- Cube action analysis table on flashcards now uses cleaner "Action" column header
+- Card back layout simplified by removing redundant rank column from cube decisions
+
+### Fixed
+- Layout shift issue in import dialog during player selection
+
 ## [1.0.3] - 2025-11-04
 
 ### Improved
