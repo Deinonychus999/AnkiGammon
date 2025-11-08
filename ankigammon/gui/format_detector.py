@@ -212,7 +212,10 @@ class FormatDetector:
         try:
             text = data.decode('utf-8', errors='ignore')
 
-            if text.lstrip().startswith(';'):
+            # Strip UTF-8 BOM if present (not considered whitespace by lstrip())
+            text = text.lstrip('\ufeff').lstrip()
+
+            if text.startswith(';'):
                 return True
 
             first_lines = '\n'.join(text.split('\n')[:10])

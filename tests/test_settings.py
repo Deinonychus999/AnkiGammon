@@ -77,3 +77,67 @@ class TestSettings:
         assert settings.get("custom_key") == "custom_value"
         assert settings.get("nonexistent_key") is None
         assert settings.get("nonexistent_key", "default") == "default"
+
+    def test_import_selected_player_names_default(self):
+        """Test default value for import_selected_player_names."""
+        settings = Settings(config_path=self.config_path)
+        assert settings.import_selected_player_names == []
+
+    def test_save_import_selected_player_names(self):
+        """Test saving selected player names."""
+        settings = Settings(config_path=self.config_path)
+        settings.import_selected_player_names = ["Alice", "Bob"]
+
+        # Verify file was updated
+        with open(self.config_path, 'r') as f:
+            data = json.load(f)
+        assert data["import_selected_player_names"] == ["Alice", "Bob"]
+
+    def test_load_import_selected_player_names(self):
+        """Test loading selected player names."""
+        settings1 = Settings(config_path=self.config_path)
+        settings1.import_selected_player_names = ["Charlie", "Diana"]
+
+        # Reload and verify
+        settings2 = Settings(config_path=self.config_path)
+        assert settings2.import_selected_player_names == ["Charlie", "Diana"]
+
+    def test_import_selected_player_names_single_player(self):
+        """Test saving a single selected player name."""
+        settings = Settings(config_path=self.config_path)
+        settings.import_selected_player_names = ["Alice"]
+
+        # Reload and verify
+        settings2 = Settings(config_path=self.config_path)
+        assert settings2.import_selected_player_names == ["Alice"]
+
+    def test_import_selected_player_names_empty_list(self):
+        """Test saving an empty list clears selection."""
+        settings = Settings(config_path=self.config_path)
+        settings.import_selected_player_names = ["Alice", "Bob"]
+
+        # Clear selection
+        settings.import_selected_player_names = []
+
+        # Reload and verify
+        settings2 = Settings(config_path=self.config_path)
+        assert settings2.import_selected_player_names == []
+
+    def test_import_selected_player_names_validation_and_normalization(self):
+        """Test that setter validates, normalizes, and deduplicates names."""
+        settings = Settings(config_path=self.config_path)
+
+        settings.import_selected_player_names = [
+            "  Alice  ",
+            "Bob",
+            "alice",  # Duplicate (case-insensitive)
+            "",       # Empty
+            "   ",    # Whitespace only
+            "Charlie"
+        ]
+
+        # Trimmed, deduplicated, empty removed
+        assert settings.import_selected_player_names == ["Alice", "Bob", "Charlie"]
+
+        settings2 = Settings(config_path=self.config_path)
+        assert settings2.import_selected_player_names == ["Alice", "Bob", "Charlie"]

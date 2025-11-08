@@ -27,6 +27,7 @@ class Settings:
         "import_error_threshold": 0.080,
         "import_include_player_x": True,
         "import_include_player_o": True,
+        "import_selected_player_names": [],
         "max_mcq_options": 5,
     }
 
@@ -210,6 +211,35 @@ class Settings:
     def import_include_player_o(self, value: bool) -> None:
         """Set whether to include Player O mistakes in imports."""
         self.set("import_include_player_o", value)
+
+    @property
+    def import_selected_player_names(self) -> list[str]:
+        """Get the list of previously selected player names."""
+        return self._settings.get("import_selected_player_names", [])
+
+    @import_selected_player_names.setter
+    def import_selected_player_names(self, value: list[str]) -> None:
+        """Set the list of previously selected player names."""
+        if not isinstance(value, list):
+            value = []
+
+        validated = []
+        seen = set()
+        for name in value:
+            if not isinstance(name, str):
+                continue
+
+            trimmed = name.strip()
+            if not trimmed:
+                continue
+
+            # Case-insensitive deduplication
+            key = trimmed.lower()
+            if key not in seen:
+                seen.add(key)
+                validated.append(trimmed)
+
+        self.set("import_selected_player_names", validated)
 
     @property
     def max_mcq_options(self) -> int:
