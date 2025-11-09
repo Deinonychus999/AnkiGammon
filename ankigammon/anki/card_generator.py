@@ -388,6 +388,9 @@ class CardGenerator:
         table_rows = []
         letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J']
 
+        # Determine decision type for formatting
+        is_cube_decision = decision.decision_type == DecisionType.CUBE_ACTION
+
         # Filter analysis moves (exclude synthetic options)
         analysis_moves = [m for m in candidates if m and m.from_xg_analysis]
 
@@ -496,8 +499,6 @@ class CardGenerator:
 """
 
         # Generate position viewer HTML
-        is_cube_decision = decision.decision_type == DecisionType.CUBE_ACTION
-
         if self.interactive_moves:
             # Interactive mode: single board with animated checkers
             position_viewer_html = f'''
