@@ -21,6 +21,8 @@ from ankigammon.renderer.color_schemes import get_scheme
 from ankigammon.models import Decision, Move
 from ankigammon.gui.widgets import PositionListWidget
 from ankigammon.gui.dialogs import SettingsDialog, ExportDialog, InputDialog, ImportOptionsDialog
+from ankigammon.gui.dialogs.update_dialog import UpdateDialog, CheckingUpdateDialog, NoUpdateDialog, UpdateCheckFailedDialog
+from ankigammon.gui.update_checker import VersionCheckerThread
 from ankigammon.gui.resources import get_resource_path
 
 
@@ -197,6 +199,7 @@ class MainWindow(QMainWindow):
         self._gnubg_check_shown = False  # Track if we've shown GnuBG config dialog in current import batch
         self._import_queue = []  # Queue for sequential file imports
         self._import_in_progress = False  # Track if an import is currently being processed
+        self._version_checker_thread = None  # Version checker thread
 
         # Enable drag and drop
         self.setAcceptDrops(True)
@@ -208,6 +211,10 @@ class MainWindow(QMainWindow):
 
         # Create drop overlay (will be shown during drag operations)
         self._create_drop_overlay()
+
+        # Start background version check if enabled
+        if self.settings.check_for_updates:
+            QTimer.singleShot(2000, self._check_for_updates_background)
 
     def _setup_ui(self):
         """Initialize the user interface."""
@@ -525,6 +532,12 @@ class MainWindow(QMainWindow):
 
         # Help menu
         help_menu = menubar.addMenu("&Help")
+
+        act_check_updates = QAction("&Check for Updates...", self)
+        act_check_updates.triggered.connect(self.check_for_updates_manual)
+        help_menu.addAction(act_check_updates)
+
+        help_menu.addSeparator()
 
         act_website = QAction("&Visit Website", self)
         act_website.triggered.connect(self.show_website)
@@ -1495,6 +1508,91 @@ class MainWindow(QMainWindow):
                 self,
                 "Import Failed",
                 f"Failed to import file:\n{str(e)}"
+            )
+
+    def _check_for_updates_background(self):
+        """Check for updates in the background (non-blocking)."""
+        from datetime import datetime
+
+        # Check if snoozed
+        snooze_until = self.settings.snooze_update_until
+        if snooze_until:
+            try:
+                snooze_time = datetime.fromisoformat(snooze_until)
+                if datetime.now() < snooze_time:
+                    return  # Still snoozed
+            except (ValueError, AttributeError):
+                pass
+
+        # Start background check
+        self._version_checker_thread = VersionCheckerThread(
+            current_version=__version__,
+            force_check=False
+        )
+        self._version_checker_thread.update_available.connect(self._on_update_available)
+        self._version_checker_thread.start()
+
+    @Slot()
+    def check_for_updates_manual(self):
+        """Manually check for updates (triggered by menu item)."""
+        # Show checking dialog
+        checking_dialog = CheckingUpdateDialog(self)
+        checking_dialog.show()
+        QApplication.processEvents()
+
+        # Start version check
+        self._version_checker_thread = VersionCheckerThread(
+            current_version=__version__,
+            force_check=True  # Force check even if recently checked
+        )
+
+        def on_check_complete():
+            checking_dialog.close()
+
+        def on_check_failed():
+            checking_dialog.close()
+            failed_dialog = UpdateCheckFailedDialog(self, __version__)
+            failed_dialog.exec()
+
+        self._version_checker_thread.update_available.connect(self._on_update_available)
+        self._version_checker_thread.check_failed.connect(on_check_failed)
+        self._version_checker_thread.check_complete.connect(on_check_complete)
+        self._version_checker_thread.finished.connect(lambda: self._on_manual_check_no_update(checking_dialog))
+        self._version_checker_thread.start()
+
+    def _on_manual_check_no_update(self, checking_dialog):
+        """Handle manual check when no update is found."""
+        # Only show "no update" dialog if update_available or check_failed wasn't emitted
+        if not hasattr(self._version_checker_thread, '_update_emitted') and not hasattr(self._version_checker_thread, '_check_failed'):
+            checking_dialog.close()
+            no_update = NoUpdateDialog(self, __version__)
+            no_update.exec()
+
+    @Slot(dict)
+    def _on_update_available(self, release_info: dict):
+        """Handle update availability notification.
+
+        Args:
+            release_info: Release information from GitHub API
+        """
+        from datetime import datetime
+
+        # Mark that update was emitted (for manual check)
+        if self._version_checker_thread:
+            self._version_checker_thread._update_emitted = True
+
+        # Show update dialog
+        dialog = UpdateDialog(self, release_info, __version__)
+        result = dialog.exec()
+
+        # Handle user action
+        if dialog.user_action == 'snooze':
+            # Snooze for 24 hours
+            self.settings.snooze_update_until = dialog.get_snooze_until()
+        elif dialog.user_action == 'skip':
+            # Skip this version entirely (set snooze to far future)
+            self.settings.snooze_update_until = (
+                datetime(2099, 1, 1).isoformat()
             )
 
     def resizeEvent(self, event):

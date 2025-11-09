@@ -29,6 +29,9 @@ class Settings:
         "import_include_player_o": True,
         "import_selected_player_names": [],
         "max_mcq_options": 5,
+        "check_for_updates": True,
+        "last_update_check": None,
+        "snooze_update_until": None,
     }
 
     def __init__(self, config_path: Optional[Path] = None):
@@ -252,6 +255,36 @@ class Settings:
         if value < 2 or value > 10:
             raise ValueError("max_mcq_options must be between 2 and 10")
         self.set("max_mcq_options", value)
+
+    @property
+    def check_for_updates(self) -> bool:
+        """Get whether to check for updates on startup."""
+        return self._settings.get("check_for_updates", True)
+
+    @check_for_updates.setter
+    def check_for_updates(self, value: bool) -> None:
+        """Set whether to check for updates on startup."""
+        self.set("check_for_updates", value)
+
+    @property
+    def last_update_check(self) -> Optional[str]:
+        """Get the timestamp of the last update check (ISO format)."""
+        return self._settings.get("last_update_check", None)
+
+    @last_update_check.setter
+    def last_update_check(self, value: Optional[str]) -> None:
+        """Set the timestamp of the last update check (ISO format)."""
+        self.set("last_update_check", value)
+
+    @property
+    def snooze_update_until(self) -> Optional[str]:
+        """Get the timestamp to snooze update notifications until (ISO format)."""
+        return self._settings.get("snooze_update_until", None)
+
+    @snooze_update_until.setter
+    def snooze_update_until(self, value: Optional[str]) -> None:
+        """Set the timestamp to snooze update notifications until (ISO format)."""
+        self.set("snooze_update_until", value)
 
     def is_gnubg_available(self) -> bool:
         """
