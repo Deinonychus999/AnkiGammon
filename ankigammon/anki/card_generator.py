@@ -578,7 +578,7 @@ class CardGenerator:
 
         # Generate score matrix for cube decisions if enabled
         score_matrix_html = ''
-        if is_cube_decision and decision.match_length > 0 and self.settings.get('generate_score_matrix', False):
+        if is_cube_decision and decision.match_length > 0 and self.settings.generate_score_matrix:
             score_matrix_html = self._generate_score_matrix_html(decision)
             if score_matrix_html:
                 score_matrix_html = f"\n{score_matrix_html}"

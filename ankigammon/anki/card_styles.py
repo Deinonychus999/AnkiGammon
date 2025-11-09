@@ -927,6 +927,11 @@ button.animate-btn:disabled {
     background-color: rgba(156, 39, 176, 0.3);
 }
 
+.score-matrix-table .action-no-alternatives {
+    background-color: rgba(158, 158, 158, 0.15);
+    color: #999;
+}
+
 /* Low error cells - more transparent to show it's a close decision */
 .score-matrix-table .action-double-take.low-error {
     background-color: rgba(76, 175, 80, 0.12);
@@ -981,6 +986,11 @@ button.animate-btn:disabled {
 
 .night_mode .score-matrix-table .action-too-good {
     background-color: rgba(156, 39, 176, 0.4);
+}
+
+.night_mode .score-matrix-table .action-no-alternatives {
+    background-color: rgba(158, 158, 158, 0.25);
+    color: #bbb;
 }
 
 /* Dark mode low error cells */

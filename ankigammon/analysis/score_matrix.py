@@ -31,33 +31,37 @@ class ScoreMatrixCell:
         - D/P cell: shows ND error, then D/T error
 
         Returns:
-            String like "24/543" (errors scaled by 1000)
+            String like "24/543" (errors scaled by 1000), or "—" if no alternatives exist
         """
-        # Helper to scale error
+        if self.error_no_double is None and self.error_double is None and self.error_pass is None:
+            return "—"
+
         def scale_error(error: Optional[float]) -> int:
             return int(round(error * 1000)) if error is not None else 0
 
-        # Get all three errors
         nd_error = scale_error(self.error_no_double)
         dt_error = scale_error(self.error_double)
         dp_error = scale_error(self.error_pass)
 
-        # Determine which two to show based on best action
-        # Order: ND, D/T, D/P (skip the one matching the cell)
         best_action_upper = self.best_action.upper()
 
         if best_action_upper in ["N/T", "TG/T", "TG/P"]:
-            # Skip ND error (TG is a variant of no double)
-            return f"{dt_error}/{dp_error}"
+            displayed_errors = [dt_error, dp_error]
         elif best_action_upper == "D/T":
-            # Skip D/T error
-            return f"{nd_error}/{dp_error}"
+            displayed_errors = [nd_error, dp_error]
         elif best_action_upper == "D/P":
-            # Skip D/P error
-            return f"{nd_error}/{dt_error}"
+            displayed_errors = [nd_error, dt_error]
         else:
-            # Fallback: show first two
-            return f"{nd_error}/{dt_error}"
+            displayed_errors = [nd_error, dt_error]
+
+        if self.error_double is None and self.error_pass is None and best_action_upper in ["N/T", "TG/T", "TG/P"]:
+            return "—"
+        if self.error_no_double is None and self.error_pass is None and best_action_upper == "D/T":
+            return "—"
+        if self.error_no_double is None and self.error_double is None and best_action_upper == "D/P":
+            return "—"
+
+        return f"{displayed_errors[0]}/{displayed_errors[1]}"
 
     def has_low_errors(self, threshold: int = 20) -> bool:
         """
@@ -174,12 +178,12 @@ def generate_score_matrix(
                 score_x = score_on_roll
                 score_o = score_opponent
 
-            # Create modified XGID with this score
+            # IMPORTANT: Score matrix always uses INITIAL DOUBLE (cube=1, centered)
             modified_xgid = encode_xgid(
                 position=position,
-                cube_value=metadata.get('cube_value', 1),
-                cube_owner=metadata.get('cube_owner'),
-                dice=None,  # Cube decision has no dice
+                cube_value=1,
+                cube_owner=None,
+                dice=None,
                 on_roll=on_roll,
                 score_x=score_x,
                 score_o=score_o,
@@ -339,15 +343,21 @@ def format_matrix_as_html(
                 current_opponent_away == opponent_away
             )
 
-            # Get CSS class based on best action
             action_class = _get_action_css_class(cell.best_action)
             current_class = " current-score" if is_current else ""
             low_error_class = " low-error" if cell.has_low_errors() else ""
+            formatted_errors = cell.format_errors()
 
-            html += f'<td class="{action_class}{current_class}{low_error_class}">'
-            html += f'<div class="action">{cell.best_action}</div>'
-            html += f'<div class="errors">{cell.format_errors()}</div>'
-            html += '</td>'
+            # Show only em dash when no alternatives available
+            if formatted_errors == "—":
+                html += f'<td class="action-no-alternatives{current_class}">'
+                html += f'<div class="action">—</div>'
+                html += '</td>'
+            else:
+                html += f'<td class="{action_class}{current_class}{low_error_class}">'
+                html += f'<div class="action">{cell.best_action}</div>'
+                html += f'<div class="errors">{formatted_errors}</div>'
+                html += '</td>'
 
         html += '</tr>\n'
 

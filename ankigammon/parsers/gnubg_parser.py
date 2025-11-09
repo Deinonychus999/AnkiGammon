@@ -200,6 +200,10 @@ class GNUBGParser:
 
             Proper cube action: No double
 
+        Note: Score matrix generation always uses initial double (cube=1), so
+        "You cannot double" should not occur. This handler is for edge cases
+        and non-matrix analysis. Returns move that displays as "—" in matrix.
+
         Generates all 5 cube options (like XG parser):
         - No double/Take
         - Double/Take
@@ -214,6 +218,20 @@ class GNUBGParser:
             List of Move objects with all 5 cube options
         """
         moves = []
+
+        # Handle "You cannot double" (restricted doubling at certain match scores)
+        if 'You cannot double' in text or 'you cannot double' in text:
+            moves.append(Move(
+                notation="No Double/Take",
+                equity=0.0,  # No equity info available
+                error=0.0,
+                rank=1,
+                xg_error=0.0,
+                xg_notation="No Double/Take",
+                xg_rank=1,
+                from_xg_analysis=True
+            ))
+            return moves
 
         # Look for "Cubeful equities:" section
         if 'Cubeful equities' not in text and 'cubeful equities' not in text:
