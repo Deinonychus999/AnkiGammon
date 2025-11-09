@@ -36,8 +36,8 @@ class VersionChecker:
         Returns:
             Dict with release info or None if failed:
             {
-                'version': '1.0.5',
-                'name': 'Version 1.0.5',
+                'version': '1.0.6',
+                'name': 'Version 1.0.6',
                 'release_notes': '...',
                 'download_url': 'https://...',
                 'published_at': '2024-01-15T10:30:00Z'
@@ -103,7 +103,7 @@ class VersionChecker:
         """Check if latest version is newer than current.
 
         Args:
-            current: Current version string (e.g., "1.0.5")
+            current: Current version string (e.g., "1.0.6")
             latest: Latest version string
 
         Returns:

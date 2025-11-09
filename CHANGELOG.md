@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.6] - 2025-11-09
+
+### Added
+- Automatic update notifications to alert users when new versions are available
+- Manual update check via Help menu
+- Update notification caching to avoid excessive GitHub API calls
+- Direct download links for platform-specific installers in update dialog
+
 ## [1.0.5] - 2025-11-09
 
 ### Fixed
