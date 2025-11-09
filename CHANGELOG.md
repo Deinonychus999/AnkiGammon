@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.5] - 2025-11-09
+
+### Fixed
+- UnboundLocalError when generating card backs for certain decision types
+- Score matrix generation now correctly handles redouble positions
+- Score matrix styling improvements for better readability
+
 ## [1.0.4] - 2025-11-08
 
 ### Improved
