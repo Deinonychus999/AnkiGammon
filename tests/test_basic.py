@@ -22,7 +22,9 @@ class TestXGIDParsing:
 
         # Check cube
         assert metadata['cube_value'] == 2  # 2^1
-        assert metadata['cube_owner'] == CubeState.O_OWNS  # 1 = O owns
+        # Cube position is perspective-dependent:
+        # turn=-1 (X on roll), cube_position=1 (BOTTOM in X's view) = X owns
+        assert metadata['cube_owner'] == CubeState.X_OWNS
 
         # Check turn
         assert metadata['on_roll'] == Player.X  # -1 = X's turn

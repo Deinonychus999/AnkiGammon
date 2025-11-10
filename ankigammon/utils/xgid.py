@@ -86,14 +86,13 @@ def parse_xgid(xgid: str) -> Tuple[Position, dict]:
     cube_value = 2 ** cube_value_log if cube_value_log >= 0 else 1
     metadata['cube_value'] = cube_value
 
-    # Cube owner (absolute, not perspective-dependent)
-    # -1 = TOP player (X), 0 = centered, 1 = BOTTOM player (O)
+    # Cube owner is perspective-dependent (flipped when X is on roll)
     if cube_position == 0:
         cube_state = CubeState.CENTERED
     elif cube_position == -1:
-        cube_state = CubeState.X_OWNS  # TOP = X
+        cube_state = CubeState.X_OWNS if turn == 1 else CubeState.O_OWNS
     else:  # cube_position == 1
-        cube_state = CubeState.O_OWNS  # BOTTOM = O
+        cube_state = CubeState.O_OWNS if turn == 1 else CubeState.X_OWNS
     metadata['cube_owner'] = cube_state
 
     # Turn: 1 = BOTTOM player (O), -1 = TOP player (X)
@@ -267,13 +266,13 @@ def encode_xgid(
         temp_cube //= 2
         cube_value_log += 1
 
-    # Cube position: -1 = TOP (X), 0 = centered, 1 = BOTTOM (O)
-    if cube_owner == CubeState.X_OWNS:
-        cube_position = -1
-    elif cube_owner == CubeState.O_OWNS:
-        cube_position = 1
-    else:
+    # Cube position is perspective-dependent (flipped when X is on roll)
+    if cube_owner == CubeState.CENTERED:
         cube_position = 0
+    elif turn == 1:
+        cube_position = -1 if cube_owner == CubeState.X_OWNS else 1
+    else:
+        cube_position = 1 if cube_owner == CubeState.X_OWNS else -1
 
     # Dice
     if dice:
