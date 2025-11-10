@@ -20,7 +20,7 @@ from ankigammon.renderer.svg_board_renderer import SVGBoardRenderer
 from ankigammon.renderer.color_schemes import get_scheme
 from ankigammon.models import Decision, Move
 from ankigammon.gui.widgets import PositionListWidget
-from ankigammon.gui.dialogs import SettingsDialog, ExportDialog, InputDialog, ImportOptionsDialog
+from ankigammon.gui.dialogs import SettingsDialog, ExportDialog, InputDialog, ImportOptionsDialog, ShortcutsDialog
 from ankigammon.gui.dialogs.update_dialog import UpdateDialog, CheckingUpdateDialog, NoUpdateDialog, UpdateCheckFailedDialog
 from ankigammon.gui.update_checker import VersionCheckerThread
 from ankigammon.gui.resources import get_resource_path
@@ -536,6 +536,13 @@ class MainWindow(QMainWindow):
         # Help menu
         help_menu = menubar.addMenu("&Help")
 
+        act_shortcuts = QAction("&Tips && Shortcuts", self)
+        act_shortcuts.setShortcut("Ctrl+/")
+        act_shortcuts.triggered.connect(self.show_shortcuts_dialog)
+        help_menu.addAction(act_shortcuts)
+
+        help_menu.addSeparator()
+
         act_check_updates = QAction("&Check for Updates...", self)
         act_check_updates.triggered.connect(self.check_for_updates_manual)
         help_menu.addAction(act_check_updates)
@@ -981,6 +988,12 @@ class MainWindow(QMainWindow):
     def show_website(self):
         """Open the project website."""
         QDesktopServices.openUrl(QUrl("https://ankigammon.com/"))
+
+    @Slot()
+    def show_shortcuts_dialog(self):
+        """Show keyboard shortcuts reference dialog."""
+        dialog = ShortcutsDialog(self)
+        dialog.exec()
 
     @Slot()
     def show_about_dialog(self):
