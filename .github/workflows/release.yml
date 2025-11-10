@@ -1,10 +1,12 @@
 name: Build and Release
 
-# Only runs when you publish a GitHub Release (not on every commit)
-# To trigger: GitHub → Releases → Draft a new release → Publish
+# Triggers when you push a version tag (e.g., v1.0.10)
+# To trigger: git tag v1.0.10 && git push origin v1.0.10
+# This builds assets FIRST, then creates the release with assets already attached
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - 'v*.*.*'
 
 jobs:
   build-windows:
@@ -205,6 +207,15 @@ jobs:
       contents: write
 
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Extract changelog for this version
+        uses: mindsers/changelog-reader-action@v2
+        id: changelog
+        with:
+          version: ${{ github.ref_name }}
+
       - name: Download Windows artifact
         uses: actions/download-artifact@v4
         with:
@@ -223,6 +234,7 @@ jobs:
       - name: Upload Release Assets
         uses: softprops/action-gh-release@v1
         with:
+          body: ${{ steps.changelog.outputs.changes }}
           files: |
             ankigammon-windows.zip
             AnkiGammon-macOS.dmg
