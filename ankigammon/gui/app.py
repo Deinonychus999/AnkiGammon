@@ -127,7 +127,13 @@ def main():
     Returns:
         int: Application exit code
     """
+    import multiprocessing
     import logging
+
+    # CRITICAL: Required for PyInstaller + multiprocessing on Windows
+    # Without this, worker processes will spawn new GUI windows when using ProcessPoolExecutor
+    multiprocessing.freeze_support()
+
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
