@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.0.8] - 2025-11-09
+
+### Improved
+- Update dialog now renders release notes with markdown formatting for better readability
+- Update notifications now show cumulative changelogs from all missed versions instead of just the latest
+- Update check cache duration reduced from 24 hours to 6 hours for faster update discovery
+
+### Fixed
+- Release date in update dialog now displays in local timezone instead of UTC
+
 ## [1.0.7] - 2025-11-09
 
 ### Fixed
