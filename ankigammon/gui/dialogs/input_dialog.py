@@ -25,6 +25,7 @@ from ankigammon.settings import Settings
 from ankigammon.models import Decision, Position, Player, CubeState, DecisionType
 from ankigammon.parsers.xg_text_parser import XGTextParser
 from ankigammon.gui.dialogs.settings_dialog import SettingsDialog
+from ankigammon.gui import silent_messagebox
 from ankigammon.utils.gnuid import parse_gnuid
 from ankigammon.utils.ogid import parse_ogid
 from ankigammon.utils.xgid import parse_xgid
@@ -189,14 +190,14 @@ class PendingListWidget(QListWidget):
             title = "Delete Positions"
 
         # Show confirmation dialog
-        reply = QMessageBox.question(
+        reply = silent_messagebox.question(
             self,
             title,
             message,
-            QMessageBox.Yes | QMessageBox.No
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
 
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             # Delete in descending order to avoid index shifting
             rows_to_delete = sorted([self.row(item) for item in selected_items], reverse=True)
             for row in rows_to_delete:
@@ -467,7 +468,7 @@ class InputDialog(QDialog):
         result = self.input_widget.get_last_result()
 
         if not text.strip():
-            QMessageBox.warning(
+            silent_messagebox.warning(
                 self,
                 "No Input",
                 "Please paste some text first"
@@ -475,7 +476,7 @@ class InputDialog(QDialog):
             return
 
         if not result or result.format == InputFormat.UNKNOWN:
-            QMessageBox.warning(
+            silent_messagebox.warning(
                 self,
                 "Invalid Format",
                 "Could not detect valid position format.\n\n"
@@ -485,14 +486,14 @@ class InputDialog(QDialog):
 
         # Check for GnuBG requirement
         if result.format == InputFormat.POSITION_IDS and not self.settings.is_gnubg_available():
-            reply = QMessageBox.question(
+            reply = silent_messagebox.question(
                 self,
                 "GnuBG Required",
                 "Position IDs require GnuBG analysis, but GnuBG is not configured.\n\n"
                 "Would you like to configure GnuBG in Settings?",
-                QMessageBox.Yes | QMessageBox.No
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
             )
-            if reply == QMessageBox.Yes:
+            if reply == QMessageBox.StandardButton.Yes:
                 # Open settings dialog to configure GnuBG
                 dialog = SettingsDialog(self.settings, self)
                 dialog.exec()
@@ -503,7 +504,7 @@ class InputDialog(QDialog):
             decisions = self._parse_input(text, result.format)
 
             if not decisions:
-                QMessageBox.warning(
+                silent_messagebox.warning(
                     self,
                     "Parse Failed",
                     "Could not parse any valid positions from input."
@@ -530,7 +531,7 @@ class InputDialog(QDialog):
                 self.pending_list.setCurrentRow(len(self.pending_decisions) - len(decisions))
 
         except Exception as e:
-            QMessageBox.critical(
+            silent_messagebox.critical(
                 self,
                 "Parse Error",
                 f"Failed to parse input:\n{str(e)}"
@@ -646,14 +647,14 @@ class InputDialog(QDialog):
         if not self.pending_decisions:
             return
 
-        reply = QMessageBox.question(
+        reply = silent_messagebox.question(
             self,
             "Clear All",
             f"Remove all {len(self.pending_decisions)} pending position(s)?",
-            QMessageBox.Yes | QMessageBox.No
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
 
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             self.pending_decisions.clear()
             self.pending_list.clear()
             self._update_count_label()

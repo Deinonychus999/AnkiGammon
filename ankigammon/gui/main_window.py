@@ -24,6 +24,7 @@ from ankigammon.gui.dialogs import SettingsDialog, ExportDialog, InputDialog, Im
 from ankigammon.gui.dialogs.update_dialog import UpdateDialog, CheckingUpdateDialog, NoUpdateDialog, UpdateCheckFailedDialog
 from ankigammon.gui.update_checker import VersionCheckerThread
 from ankigammon.gui.resources import get_resource_path
+from ankigammon.gui import silent_messagebox
 
 
 class MatchAnalysisWorker(QThread):
@@ -336,7 +337,7 @@ class MainWindow(QMainWindow):
         self.btn_import_file.setIcon(qta.icon('fa6s.file-import', color='#1e1e2e'))
         self.btn_import_file.setIconSize(QSize(18, 18))
         self.btn_import_file.clicked.connect(self.on_import_file_clicked)
-        self.btn_import_file.setToolTip("Import .xg, .mat, or .txt match file")
+        self.btn_import_file.setToolTip("Import .xg, .mat, .txt, or .sgf file")
         self.btn_import_file.setCursor(Qt.PointingHandCursor)
         btn_row_layout.addWidget(self.btn_import_file, stretch=1)
 
@@ -739,15 +740,15 @@ class MainWindow(QMainWindow):
             return
 
         # Show confirmation dialog
-        reply = QMessageBox.question(
+        reply = silent_messagebox.question(
             self,
             "Clear All Positions",
             f"Are you sure you want to clear all {len(self.current_decisions)} position(s)?",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
         )
 
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             # Clear all decisions
             self.current_decisions.clear()
             self.position_list.set_decisions(self.current_decisions)
@@ -955,7 +956,7 @@ class MainWindow(QMainWindow):
     def on_export_clicked(self):
         """Handle export button click."""
         if not self.current_decisions:
-            QMessageBox.warning(
+            silent_messagebox.warning(
                 self,
                 "No Positions",
                 "Please add positions first"
@@ -1167,14 +1168,14 @@ class MainWindow(QMainWindow):
             # Only show the dialog once per import batch
             if not self._gnubg_check_shown:
                 self._gnubg_check_shown = True
-                result = QMessageBox.question(
+                result = silent_messagebox.question(
                     self,
                     "GnuBG Required",
                     "Match file analysis requires GNU Backgammon.\n\n"
                     "Would you like to configure it in Settings?",
-                    QMessageBox.Yes | QMessageBox.No
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
                 )
-                if result == QMessageBox.Yes:
+                if result == QMessageBox.StandardButton.Yes:
                     self.on_settings_clicked()
             return None, None
 
@@ -1279,7 +1280,7 @@ class MainWindow(QMainWindow):
         else:
             # Show error message unless user cancelled
             if message != "Cancelled":
-                QMessageBox.critical(
+                silent_messagebox.critical(
                     self,
                     "Analysis Failed",
                     message
@@ -1465,7 +1466,7 @@ class MainWindow(QMainWindow):
                     return
 
             else:
-                QMessageBox.warning(
+                silent_messagebox.warning(
                     self,
                     "Unknown Format",
                     f"Could not detect file format.\n\nSupported formats:\n- XG binary files (.xg)\n- Match files (.mat, .sgf)\n\n{result.details}"
@@ -1488,7 +1489,7 @@ class MainWindow(QMainWindow):
             if total_count > filtered_count:
                 message += f"\n(filtered from {total_count} total positions)"
 
-            QMessageBox.information(
+            silent_messagebox.information(
                 self,
                 "Import Successful",
                 message
@@ -1497,20 +1498,20 @@ class MainWindow(QMainWindow):
             logger.info(f"Successfully imported {len(decisions)} positions from {file_path}")
 
         except FileNotFoundError:
-            QMessageBox.critical(
+            silent_messagebox.critical(
                 self,
                 "File Not Found",
                 f"Could not find file: {file_path}"
             )
         except ValueError as e:
-            QMessageBox.critical(
+            silent_messagebox.critical(
                 self,
                 "Invalid Format",
                 f"Invalid file format:\n{str(e)}"
             )
         except Exception as e:
             logger.error(f"Failed to import file {file_path}: {e}", exc_info=True)
-            QMessageBox.critical(
+            silent_messagebox.critical(
                 self,
                 "Import Failed",
                 f"Failed to import file:\n{str(e)}"

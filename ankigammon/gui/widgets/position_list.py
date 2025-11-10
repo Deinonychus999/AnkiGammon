@@ -13,6 +13,7 @@ import qtawesome as qta
 
 from ankigammon.models import Decision, DecisionType, Player
 from ankigammon.gui.dialogs.note_dialog import NoteEditDialog
+from ankigammon.gui import silent_messagebox
 
 
 class PositionListItem(QListWidgetItem):
@@ -136,14 +137,14 @@ class PositionListWidget(QListWidget):
             message = f"Delete {len(selected_items)} selected position(s)?"
             title = "Delete Positions"
 
-        reply = QMessageBox.question(
+        reply = silent_messagebox.question(
             self,
             title,
             message,
-            QMessageBox.Yes | QMessageBox.No
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
 
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             indices_to_delete = sorted([item.index for item in selected_items], reverse=True)
             rows_to_delete = sorted([self.row(item) for item in selected_items], reverse=True)
             for row in rows_to_delete:
