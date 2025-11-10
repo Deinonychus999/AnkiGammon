@@ -24,7 +24,8 @@ class Settings:
         "generate_score_matrix": False,
         "board_orientation": "counter-clockwise",
         "last_apkg_directory": None,
-        "import_error_threshold": 0.080,
+        "import_checker_error_threshold": 0.080,
+        "import_cube_error_threshold": 0.080,
         "import_include_player_x": True,
         "import_include_player_o": True,
         "import_selected_player_names": [],
@@ -186,14 +187,24 @@ class Settings:
         self.set("last_apkg_directory", value)
 
     @property
-    def import_error_threshold(self) -> float:
-        """Get the error threshold for XG file imports."""
-        return self._settings.get("import_error_threshold", 0.080)
+    def import_checker_error_threshold(self) -> float:
+        """Get the error threshold for checker play decisions."""
+        return self._settings.get("import_checker_error_threshold", 0.080)
 
-    @import_error_threshold.setter
-    def import_error_threshold(self, value: float) -> None:
-        """Set the error threshold for XG file imports."""
-        self.set("import_error_threshold", value)
+    @import_checker_error_threshold.setter
+    def import_checker_error_threshold(self, value: float) -> None:
+        """Set the error threshold for checker play decisions."""
+        self.set("import_checker_error_threshold", value)
+
+    @property
+    def import_cube_error_threshold(self) -> float:
+        """Get the error threshold for cube decisions."""
+        return self._settings.get("import_cube_error_threshold", 0.080)
+
+    @import_cube_error_threshold.setter
+    def import_cube_error_threshold(self, value: float) -> None:
+        """Set the error threshold for cube decisions."""
+        self.set("import_cube_error_threshold", value)
 
     @property
     def import_include_player_x(self) -> bool:

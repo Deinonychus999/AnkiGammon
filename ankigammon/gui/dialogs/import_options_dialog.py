@@ -19,15 +19,15 @@ class ImportOptionsDialog(QDialog):
     Dialog for configuring XG import filtering options.
 
     Allows users to filter imported positions by:
-    - Error threshold (only import mistakes above this threshold)
+    - Error thresholds (separate for checker play and cube decisions)
     - Player selection (import mistakes from X, O, or both)
 
     Signals:
-        options_accepted(float, bool, bool): Emitted when user accepts
-            Args: (threshold, include_player_x, include_player_o)
+        options_accepted(float, float, bool, bool): Emitted when user accepts
+            Args: (checker_threshold, cube_threshold, include_player_x, include_player_o)
     """
 
-    options_accepted = Signal(float, bool, bool)
+    options_accepted = Signal(float, float, bool, bool)
 
     def __init__(
         self,
@@ -76,18 +76,28 @@ class ImportOptionsDialog(QDialog):
 
     def _create_threshold_group(self) -> QGroupBox:
         """Create error threshold settings group."""
-        group = QGroupBox("Error Threshold")
+        group = QGroupBox("Error Thresholds")
         form = QFormLayout(group)
 
-        # Threshold spinbox
-        self.spin_threshold = QDoubleSpinBox()
-        self.spin_threshold.setMinimum(0.000)
-        self.spin_threshold.setMaximum(1.000)
-        self.spin_threshold.setSingleStep(0.001)
-        self.spin_threshold.setDecimals(3)
-        self.spin_threshold.setValue(0.080)
-        self.spin_threshold.setCursor(Qt.PointingHandCursor)
-        form.addRow("Minimum Error:", self.spin_threshold)
+        # Checker play threshold spinbox
+        self.spin_checker_threshold = QDoubleSpinBox()
+        self.spin_checker_threshold.setMinimum(0.000)
+        self.spin_checker_threshold.setMaximum(1.000)
+        self.spin_checker_threshold.setSingleStep(0.001)
+        self.spin_checker_threshold.setDecimals(3)
+        self.spin_checker_threshold.setValue(0.080)
+        self.spin_checker_threshold.setCursor(Qt.PointingHandCursor)
+        form.addRow("Checker Play:", self.spin_checker_threshold)
+
+        # Cube decision threshold spinbox
+        self.spin_cube_threshold = QDoubleSpinBox()
+        self.spin_cube_threshold.setMinimum(0.000)
+        self.spin_cube_threshold.setMaximum(1.000)
+        self.spin_cube_threshold.setSingleStep(0.001)
+        self.spin_cube_threshold.setDecimals(3)
+        self.spin_cube_threshold.setValue(0.080)
+        self.spin_cube_threshold.setCursor(Qt.PointingHandCursor)
+        form.addRow("Cube Decisions:", self.spin_cube_threshold)
 
         return group
 
@@ -126,7 +136,8 @@ class ImportOptionsDialog(QDialog):
 
     def _load_settings(self):
         """Load current settings into widgets, matching by player name."""
-        self.spin_threshold.setValue(self.settings.import_error_threshold)
+        self.spin_checker_threshold.setValue(self.settings.import_checker_error_threshold)
+        self.spin_cube_threshold.setValue(self.settings.import_cube_error_threshold)
 
         selected_names = self.settings.import_selected_player_names
         selected_names_lower = [name.lower() for name in selected_names]
@@ -165,7 +176,8 @@ class ImportOptionsDialog(QDialog):
 
     def accept(self):
         """Save settings and emit options."""
-        self.settings.import_error_threshold = self.spin_threshold.value()
+        self.settings.import_checker_error_threshold = self.spin_checker_threshold.value()
+        self.settings.import_cube_error_threshold = self.spin_cube_threshold.value()
 
         selected_names = []
         if self.chk_player_o.isChecked():
@@ -180,22 +192,24 @@ class ImportOptionsDialog(QDialog):
         self.settings.import_include_player_o = self.chk_player_o.isChecked()
 
         self.options_accepted.emit(
-            self.spin_threshold.value(),
+            self.spin_checker_threshold.value(),
+            self.spin_cube_threshold.value(),
             self.chk_player_x.isChecked(),
             self.chk_player_o.isChecked()
         )
 
         super().accept()
 
-    def get_options(self) -> tuple[float, bool, bool]:
+    def get_options(self) -> tuple[float, float, bool, bool]:
         """
         Get the selected import options.
 
         Returns:
-            Tuple of (threshold, include_player_x, include_player_o)
+            Tuple of (checker_threshold, cube_threshold, include_player_x, include_player_o)
         """
         return (
-            self.spin_threshold.value(),
+            self.spin_checker_threshold.value(),
+            self.spin_cube_threshold.value(),
             self.chk_player_x.isChecked(),
             self.chk_player_o.isChecked()
         )

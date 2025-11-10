@@ -38,13 +38,14 @@ class MatchAnalysisWorker(QThread):
     status_message = Signal(str)
     finished = Signal(bool, str, list, int)
 
-    def __init__(self, file_path: str, settings: Settings, threshold: float,
-                 include_player_x: bool, include_player_o: bool,
+    def __init__(self, file_path: str, settings: Settings, checker_threshold: float,
+                 cube_threshold: float, include_player_x: bool, include_player_o: bool,
                  filter_func, max_mcq_options: int):
         super().__init__()
         self.file_path = file_path
         self.settings = settings
-        self.threshold = threshold
+        self.checker_threshold = checker_threshold
+        self.cube_threshold = cube_threshold
         self.include_player_x = include_player_x
         self.include_player_o = include_player_o
         self.filter_func = filter_func
@@ -136,16 +137,17 @@ class MatchAnalysisWorker(QThread):
             logger.info(f"Parsed {total_count} positions from match")
 
             # Filter based on user options
-            self.status_message.emit("Filtering positions by error threshold...")
+            self.status_message.emit("Filtering positions by error thresholds...")
 
             decisions = self.filter_func(
                 all_decisions,
-                self.threshold,
+                self.checker_threshold,
+                self.cube_threshold,
                 self.include_player_x,
                 self.include_player_o
             )
 
-            logger.info(f"Filtered to {len(decisions)} positions (threshold: {self.threshold})")
+            logger.info(f"Filtered to {len(decisions)} positions (checker: {self.checker_threshold}, cube: {self.cube_threshold})")
 
             # Cleanup temp files
             self.status_message.emit("Cleaning up temporary files...")
@@ -1029,7 +1031,8 @@ class MainWindow(QMainWindow):
     def _filter_decisions_by_import_options(
         self,
         decisions: list[Decision],
-        threshold: float,
+        checker_threshold: float,
+        cube_threshold: float,
         include_player_x: bool,
         include_player_o: bool
     ) -> list[Decision]:
@@ -1038,7 +1041,8 @@ class MainWindow(QMainWindow):
 
         Args:
             decisions: All parsed decisions
-            threshold: Error threshold (positive value, e.g., 0.080)
+            checker_threshold: Error threshold for checker play (positive value, e.g., 0.080)
+            cube_threshold: Error threshold for cube decisions (positive value, e.g., 0.080)
             include_player_x: Include Player.X mistakes
             include_player_o: Include Player.O mistakes
 
@@ -1075,11 +1079,11 @@ class MainWindow(QMainWindow):
                 doubler_error = attr['doubler_error']
                 responder_error = attr['responder_error']
 
-                logger.info(f"DEBUG: Cube decision - doubler={doubler}, doubler_error={doubler_error}, responder={responder}, responder_error={responder_error}, threshold={threshold}")
+                logger.info(f"DEBUG: Cube decision - doubler={doubler}, doubler_error={doubler_error}, responder={responder}, responder_error={responder_error}, cube_threshold={cube_threshold}")
 
                 # Determine which player(s) made errors above threshold
-                doubler_made_error = doubler_error is not None and abs(doubler_error) >= threshold
-                responder_made_error = responder_error is not None and abs(responder_error) >= threshold
+                doubler_made_error = doubler_error is not None and abs(doubler_error) >= cube_threshold
+                responder_made_error = responder_error is not None and abs(responder_error) >= cube_threshold
 
                 logger.info(f"DEBUG: doubler_made_error={doubler_made_error}, responder_made_error={responder_made_error}")
 
@@ -1121,7 +1125,7 @@ class MainWindow(QMainWindow):
                     error_magnitude = played_move.error
 
                 # Only include if error is at or above threshold
-                if error_magnitude < threshold:
+                if error_magnitude < checker_threshold:
                     continue
 
                 # Check player filter - error belongs to the player on roll
@@ -1200,7 +1204,7 @@ class MainWindow(QMainWindow):
             return None, None
 
         # Get filter options
-        threshold, include_player_x, include_player_o = import_dialog.get_options()
+        checker_threshold, cube_threshold, include_player_x, include_player_o = import_dialog.get_options()
 
         # Create progress dialog with spinner
         progress = QProgressDialog(
@@ -1222,7 +1226,8 @@ class MainWindow(QMainWindow):
         self._analysis_worker = MatchAnalysisWorker(
             file_path=file_path,
             settings=self.settings,
-            threshold=threshold,
+            checker_threshold=checker_threshold,
+            cube_threshold=cube_threshold,
             include_player_x=include_player_x,
             include_player_o=include_player_o,
             filter_func=self._filter_decisions_by_import_options,
@@ -1432,7 +1437,7 @@ class MainWindow(QMainWindow):
                 )
                 if import_dialog.exec():
                     # User accepted - get options
-                    threshold, include_player_x, include_player_o = import_dialog.get_options()
+                    checker_threshold, cube_threshold, include_player_x, include_player_o = import_dialog.get_options()
 
                     # Parse all decisions
                     all_decisions = XGBinaryParser.parse_file(file_path)
@@ -1441,7 +1446,8 @@ class MainWindow(QMainWindow):
                     # Filter based on user options
                     decisions = self._filter_decisions_by_import_options(
                         all_decisions,
-                        threshold,
+                        checker_threshold,
+                        cube_threshold,
                         include_player_x,
                         include_player_o
                     )
