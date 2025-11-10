@@ -71,9 +71,10 @@ class UpdateDialog(QDialog):
         published = self.release_info.get('published_at', '')
         if published:
             try:
-                # Parse ISO date
+                # Parse ISO date (UTC) and convert to local time
                 pub_date = datetime.fromisoformat(published.replace('Z', '+00:00'))
-                date_str = pub_date.strftime('%B %d, %Y')
+                local_date = pub_date.astimezone()  # Convert to local timezone
+                date_str = local_date.strftime('%B %d, %Y')
                 date_label = QLabel(f"Released: {date_str}")
                 date_label.setStyleSheet("color: #6c7086; font-size: 11px;")
                 layout.addWidget(date_label)
@@ -89,7 +90,7 @@ class UpdateDialog(QDialog):
         # Release notes text
         notes_text = QTextEdit()
         notes_text.setReadOnly(True)
-        notes_text.setPlainText(
+        notes_text.setMarkdown(
             self.release_info.get('release_notes', 'No release notes available.')
         )
         notes_text.setMinimumHeight(150)

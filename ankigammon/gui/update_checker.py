@@ -30,15 +30,18 @@ class VersionChecker:
         """
         self.timeout = timeout
 
-    def check_latest_version(self) -> Optional[Dict]:
-        """Fetch latest release from GitHub API.
+    def check_latest_version(self, current_version: Optional[str] = None) -> Optional[Dict]:
+        """Fetch latest release from GitHub API with changelog since current version.
+
+        Args:
+            current_version: Current app version to generate changelog from (optional)
 
         Returns:
             Dict with release info or None if failed:
             {
                 'version': '1.0.7',
                 'name': 'Version 1.0.7',
-                'release_notes': '...',
+                'release_notes': '...',  # Combined notes from all missed versions
                 'download_url': 'https://...',
                 'published_at': '2024-01-15T10:30:00Z'
             }
@@ -50,29 +53,68 @@ class VersionChecker:
             return None
 
         try:
+            # Fetch all releases to get changelog
+            all_releases_url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/releases"
             response = requests.get(
-                GITHUB_API_URL,
+                all_releases_url,
                 timeout=(self.timeout, self.timeout),
                 headers={'Accept': 'application/vnd.github+json'}
             )
             response.raise_for_status()
 
-            data = response.json()
+            releases = response.json()
 
-            # Skip pre-releases and drafts
-            if data.get('prerelease') or data.get('draft'):
-                logger.info("Skipping pre-release or draft")
+            # Filter out pre-releases and drafts, get stable releases only
+            stable_releases = [
+                r for r in releases
+                if not r.get('prerelease') and not r.get('draft')
+            ]
+
+            if not stable_releases:
+                logger.info("No stable releases found")
                 return None
 
-            tag = data.get('tag_name', '').lstrip('v')
+            # Latest release is first in the list
+            latest = stable_releases[0]
+            latest_version = latest.get('tag_name', '').lstrip('v')
+
+            # If we have current version, get all releases since then
+            combined_notes = latest.get('body', '')
+            if current_version:
+                try:
+                    from packaging.version import Version
+                    missed_releases = []
+
+                    for release in stable_releases:
+                        release_version = release.get('tag_name', '').lstrip('v')
+                        try:
+                            if Version(release_version) > Version(current_version):
+                                missed_releases.append(release)
+                        except Exception:
+                            continue
+
+                    # Combine release notes (newest first)
+                    if len(missed_releases) > 1:
+                        notes_parts = []
+                        for release in missed_releases:
+                            body = release.get('body', '').strip()
+                            if body:
+                                notes_parts.append(body)
+
+                        combined_notes = "\n\n---\n\n".join(notes_parts)
+                        logger.info(f"Combined {len(missed_releases)} release notes")
+                except Exception as e:
+                    logger.warning(f"Failed to combine release notes: {e}")
+                    # Fall back to just latest release notes
+                    combined_notes = latest.get('body', '')
 
             return {
-                'version': tag,
-                'name': data.get('name', tag),
-                'release_notes': data.get('body', ''),
-                'download_url': self._extract_download_url(data),
-                'published_at': data.get('published_at', ''),
-                'html_url': data.get('html_url', GITHUB_RELEASES_URL)
+                'version': latest_version,
+                'name': latest.get('name', latest_version),
+                'release_notes': combined_notes,
+                'download_url': self._extract_download_url(latest),
+                'published_at': latest.get('published_at', ''),
+                'html_url': latest.get('html_url', GITHUB_RELEASES_URL)
             }
         except Exception as e:
             logger.warning(f"Failed to check for updates: {e}")
@@ -214,7 +256,7 @@ class VersionCheckerThread(QThread):
         """Execute version check in background thread."""
         try:
             # Check if we should skip (unless forced)
-            if not self.force_check and not self.cache.should_check(min_hours_between_checks=24):
+            if not self.force_check and not self.cache.should_check(min_hours_between_checks=6):
                 logger.info("Skipping version check (too recent)")
                 cached = self.cache.get_cached_update()
                 if cached:
@@ -224,7 +266,7 @@ class VersionCheckerThread(QThread):
 
             # Fetch from GitHub
             logger.info("Checking for updates...")
-            latest = self.checker.check_latest_version()
+            latest = self.checker.check_latest_version(current_version=self.current_version)
 
             if latest:
                 # Cache the result
