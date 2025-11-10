@@ -36,8 +36,8 @@ class VersionChecker:
         Returns:
             Dict with release info or None if failed:
             {
-                'version': '1.0.6',
-                'name': 'Version 1.0.6',
+                'version': '1.0.7',
+                'name': 'Version 1.0.7',
                 'release_notes': '...',
                 'download_url': 'https://...',
                 'published_at': '2024-01-15T10:30:00Z'

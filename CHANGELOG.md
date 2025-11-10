@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.0.7] - 2025-11-09
+
+### Fixed
+- XGID cube position encoding to correctly handle perspective changes
+- GNUBG parser Double vs Redouble terminology
+
 ## [1.0.6] - 2025-11-09
 
 ### Added
