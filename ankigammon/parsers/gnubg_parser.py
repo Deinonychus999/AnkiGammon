@@ -41,7 +41,8 @@ class GNUBGParser:
         if decision_type == DecisionType.CHECKER_PLAY:
             moves = GNUBGParser._parse_checker_play(gnubg_output)
         else:
-            moves = GNUBGParser._parse_cube_decision(gnubg_output)
+            cube_value = metadata.get('cube_value', 1)
+            moves = GNUBGParser._parse_cube_decision(gnubg_output, cube_value)
 
         if not moves:
             raise ValueError(f"No moves found in gnubg output for {decision_type.value}")
@@ -188,7 +189,7 @@ class GNUBGParser:
         return moves
 
     @staticmethod
-    def _parse_cube_decision(text: str) -> List[Move]:
+    def _parse_cube_decision(text: str, cube_value: int = 1) -> List[Move]:
         """
         Parse cube decision analysis from gnubg output.
 
@@ -278,11 +279,8 @@ class GNUBGParser:
         if best_action_match:
             best_action_text = best_action_match.group(1).strip()
 
-        # Determine if using "double" or "redouble" terminology
-        use_redouble = any('redouble' in data[0].lower() for data in gnubg_moves_data)
-        double_term = "Redouble" if use_redouble else "Double"
+        double_term = "Redouble" if cube_value > 1 else "Double"
 
-        # Generate all 5 cube options with appropriate terminology
         all_options = [
             f"No {double_term}/Take",
             f"{double_term}/Take",
@@ -291,7 +289,6 @@ class GNUBGParser:
             f"Too good/Pass"
         ]
 
-        # Assign equities
         no_double_eq = equity_map.get("No Double", None)
         double_take_eq = equity_map.get("Double/Take", None)
         double_pass_eq = equity_map.get("Double/Pass", None)
@@ -304,15 +301,19 @@ class GNUBGParser:
         if double_pass_eq is not None:
             option_equities[f"{double_term}/Pass"] = double_pass_eq
 
-        # Assign equities for synthetic "Too good" options
         if double_pass_eq is not None:
             option_equities["Too good/Take"] = double_pass_eq
             option_equities["Too good/Pass"] = double_pass_eq
 
-        # Determine best notation from "Proper cube action:" text
         best_notation = GNUBGParser._parse_best_cube_action(best_action_text, double_term)
 
-        # Create Move objects for all 5 options
+        # Map full notation to short XG-style notation for analysis table
+        xg_notation_map = {
+            f"No {double_term}/Take": f"No {double_term.lower()}",
+            f"{double_term}/Take": f"{double_term}/Take",
+            f"{double_term}/Pass": f"{double_term}/Pass",
+        }
+
         for option in all_options:
             equity = option_equities.get(option, 0.0)
             is_from_gnubg = not option.startswith("Too good")
@@ -323,31 +324,31 @@ class GNUBGParser:
                 error=0.0,  # Will calculate below
                 rank=0,  # Will assign below
                 xg_error=None,
-                xg_notation=option if is_from_gnubg else None,
+                xg_notation=xg_notation_map.get(option) if is_from_gnubg else None,
                 xg_rank=None,
                 from_xg_analysis=is_from_gnubg
             ))
 
-        # Sort by equity (highest first) to determine ranking
-        moves.sort(key=lambda m: m.equity, reverse=True)
-
-        # Assign ranks
+        # Preserve canonical order for cube decisions (don't sort by equity)
         if best_notation:
-            rank_counter = 1
             for move in moves:
                 if move.notation == best_notation:
                     move.rank = 1
-                else:
-                    if rank_counter == 1:
-                        rank_counter = 2
-                    move.rank = rank_counter
-                    rank_counter += 1
-        else:
-            # Best wasn't identified, rank purely by equity
-            for i, move in enumerate(moves, 1):
-                move.rank = i
+                    break
 
-        # Calculate errors relative to best move
+            remaining_moves = [m for m in moves if m.rank != 1]
+            remaining_moves.sort(key=lambda m: m.equity, reverse=True)
+
+            for i, move in enumerate(remaining_moves, 2):
+                move.rank = i
+        else:
+            moves_by_equity = sorted(moves, key=lambda m: m.equity, reverse=True)
+            for i, move_sorted in enumerate(moves_by_equity, 1):
+                for move in moves:
+                    if move.notation == move_sorted.notation:
+                        move.rank = i
+                        break
+
         if moves:
             best_move = next((m for m in moves if m.rank == 1), moves[0])
             for move in moves:
