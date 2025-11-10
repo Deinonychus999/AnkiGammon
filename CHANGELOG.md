@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.9] - 2025-11-10
+
+### Improved
+- Import dialog now supports separate error thresholds for checker play and cube decisions
+
+### Fixed
+- Windows executable no longer spawns multiple instances during score matrix generation
+
 ## [1.0.8] - 2025-11-09
 
 ### Improved
