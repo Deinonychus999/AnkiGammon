@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.10] - 2025-11-10
+
+### Added
+- Tips & Shortcuts dialog in Help menu to improve feature discoverability
+
+### Improved
+- Disabled system beep sounds in message dialogs for better user experience
+
 ## [1.0.9] - 2025-11-10
 
 ### Improved
