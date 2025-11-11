@@ -194,7 +194,8 @@ class PendingListWidget(QListWidget):
             self,
             title,
             message,
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            default_button=QMessageBox.StandardButton.Yes
         )
 
         if reply == QMessageBox.StandardButton.Yes:

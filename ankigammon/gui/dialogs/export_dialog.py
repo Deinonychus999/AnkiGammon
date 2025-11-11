@@ -354,6 +354,9 @@ class ExportWorker(QThread):
 class ExportDialog(QDialog):
     """Dialog for exporting positions to Anki."""
 
+    # Signal emitted when export completes successfully
+    export_succeeded = Signal()
+
     def __init__(
         self,
         decisions: List[Decision],
@@ -590,5 +593,7 @@ class ExportDialog(QDialog):
 
         if success:
             self.btn_export.setEnabled(False)
+            # Emit signal to notify main window of successful export
+            self.export_succeeded.emit()
         else:
             self.btn_export.setEnabled(True)  # Allow retry

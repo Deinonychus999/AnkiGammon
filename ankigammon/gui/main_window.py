@@ -255,7 +255,7 @@ class MainWindow(QMainWindow):
                 icon_b64 = base64.b64encode(icon_bytes).decode('utf-8')
                 icon_data_url = f"data:image/png;base64,{icon_b64}"
 
-        welcome_html = f"""
+        self.welcome_html = f"""
         <!DOCTYPE html>
         <html>
         <head>
@@ -308,7 +308,7 @@ class MainWindow(QMainWindow):
         </body>
         </html>
         """
-        self.preview.setHtml(welcome_html)
+        self.preview.setHtml(self.welcome_html)
         layout.addWidget(self.preview, stretch=2)
 
         # Status bar
@@ -664,80 +664,7 @@ class MainWindow(QMainWindow):
             self.btn_export.setEnabled(False)
             self.list_header_row.hide()
             # Show welcome screen
-            welcome_html = """
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <style>
-                        body {
-                            margin: 0;
-                            padding: 0;
-                            display: flex;
-                            flex-direction: column;
-                            justify-content: center;
-                            align-items: center;
-                            min-height: 100vh;
-                            background: linear-gradient(135deg, #1e1e2e 0%, #181825 100%);
-                            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                            color: #cdd6f4;
-                        }
-                        .welcome {
-                            text-align: center;
-                            padding: 40px;
-                        }
-                        h1 {
-                            color: #f5e0dc;
-                            font-size: 32px;
-                            margin-bottom: 16px;
-                            font-weight: 700;
-                        }
-                        p {
-                            color: #a6adc8;
-                            font-size: 16px;
-                            margin: 8px 0;
-                        }
-                        .icon {
-                            margin-bottom: 24px;
-                            opacity: 0.6;
-                        }
-                    </style>
-                </head>
-                <body>
-                    <div class="welcome">
-                        <div class="icon">
-                            <svg width="140" height="90" viewBox="-5 0 90 45" xmlns="http://www.w3.org/2000/svg">
-                                <!-- First die -->
-                                <g transform="translate(0, 10)">
-                                    <rect x="2" y="2" width="32" height="32" rx="4"
-                                          fill="#f5e0dc" stroke="#45475a" stroke-width="1.5"
-                                          transform="rotate(-15 18 18)"/>
-                                    <!-- Pips for 5 -->
-                                    <circle cx="10" cy="10" r="2.5" fill="#1e1e2e" transform="rotate(-15 18 18)"/>
-                                    <circle cx="26" cy="10" r="2.5" fill="#1e1e2e" transform="rotate(-15 18 18)"/>
-                                    <circle cx="18" cy="18" r="2.5" fill="#1e1e2e" transform="rotate(-15 18 18)"/>
-                                    <circle cx="10" cy="26" r="2.5" fill="#1e1e2e" transform="rotate(-15 18 18)"/>
-                                    <circle cx="26" cy="26" r="2.5" fill="#1e1e2e" transform="rotate(-15 18 18)"/>
-                                </g>
-
-                                <!-- Second die -->
-                                <g transform="translate(36, 0)">
-                                    <rect x="2" y="2" width="32" height="32" rx="4"
-                                          fill="#f5e0dc" stroke="#45475a" stroke-width="1.5"
-                                          transform="rotate(12 18 18)"/>
-                                    <!-- Pips for 3 -->
-                                    <circle cx="10" cy="10" r="2.5" fill="#1e1e2e" transform="rotate(12 18 18)"/>
-                                    <circle cx="18" cy="18" r="2.5" fill="#1e1e2e" transform="rotate(12 18 18)"/>
-                                    <circle cx="26" cy="26" r="2.5" fill="#1e1e2e" transform="rotate(12 18 18)"/>
-                                </g>
-                            </svg>
-                        </div>
-                        <h1>No Position Loaded</h1>
-                        <p>Add positions to get started</p>
-                    </div>
-                </body>
-                </html>
-                """
-            self.preview.setHtml(welcome_html)
+            self.preview.setHtml(self.welcome_html)
             self.preview.update()  # Force repaint to avoid black screen issue
 
     @Slot()
@@ -763,80 +690,7 @@ class MainWindow(QMainWindow):
             self.list_header_row.hide()
 
             # Show welcome screen
-            welcome_html = """
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <style>
-                        body {
-                            margin: 0;
-                            padding: 0;
-                            display: flex;
-                            flex-direction: column;
-                            justify-content: center;
-                            align-items: center;
-                            min-height: 100vh;
-                            background: linear-gradient(135deg, #1e1e2e 0%, #181825 100%);
-                            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                            color: #cdd6f4;
-                        }
-                        .welcome {
-                            text-align: center;
-                            padding: 40px;
-                        }
-                        h1 {
-                            color: #f5e0dc;
-                            font-size: 32px;
-                            margin-bottom: 16px;
-                            font-weight: 700;
-                        }
-                        p {
-                            color: #a6adc8;
-                            font-size: 16px;
-                            margin: 8px 0;
-                        }
-                        .icon {
-                            margin-bottom: 24px;
-                            opacity: 0.6;
-                        }
-                    </style>
-                </head>
-                <body>
-                    <div class="welcome">
-                        <div class="icon">
-                            <svg width="140" height="90" viewBox="-5 0 90 45" xmlns="http://www.w3.org/2000/svg">
-                                <!-- First die -->
-                                <g transform="translate(0, 10)">
-                                    <rect x="2" y="2" width="32" height="32" rx="4"
-                                          fill="#f5e0dc" stroke="#45475a" stroke-width="1.5"
-                                          transform="rotate(-15 18 18)"/>
-                                    <!-- Pips for 5 -->
-                                    <circle cx="10" cy="10" r="2.5" fill="#1e1e2e" transform="rotate(-15 18 18)"/>
-                                    <circle cx="26" cy="10" r="2.5" fill="#1e1e2e" transform="rotate(-15 18 18)"/>
-                                    <circle cx="18" cy="18" r="2.5" fill="#1e1e2e" transform="rotate(-15 18 18)"/>
-                                    <circle cx="10" cy="26" r="2.5" fill="#1e1e2e" transform="rotate(-15 18 18)"/>
-                                    <circle cx="26" cy="26" r="2.5" fill="#1e1e2e" transform="rotate(-15 18 18)"/>
-                                </g>
-
-                                <!-- Second die -->
-                                <g transform="translate(36, 0)">
-                                    <rect x="2" y="2" width="32" height="32" rx="4"
-                                          fill="#f5e0dc" stroke="#45475a" stroke-width="1.5"
-                                          transform="rotate(12 18 18)"/>
-                                    <!-- Pips for 3 -->
-                                    <circle cx="10" cy="10" r="2.5" fill="#1e1e2e" transform="rotate(12 18 18)"/>
-                                    <circle cx="18" cy="18" r="2.5" fill="#1e1e2e" transform="rotate(12 18 18)"/>
-                                    <circle cx="26" cy="26" r="2.5" fill="#1e1e2e" transform="rotate(12 18 18)"/>
-                                </g>
-                            </svg>
-                        </div>
-                        <h1>No Position Loaded</h1>
-                        <p>Add positions to get started</p>
-                    </div>
-                </body>
-                </html>
-                """
-            self.preview.setHtml(welcome_html)
+            self.preview.setHtml(self.welcome_html)
             self.preview.update()  # Force repaint to avoid black screen issue
 
     @Slot(list)
@@ -971,7 +825,24 @@ class MainWindow(QMainWindow):
             return
 
         dialog = ExportDialog(self.current_decisions, self.settings, self)
+        dialog.export_succeeded.connect(self.on_export_succeeded)
         dialog.exec()
+
+    @Slot()
+    def on_export_succeeded(self):
+        """Handle successful export by clearing the positions list."""
+        if not self.current_decisions:
+            return
+
+        # Clear all decisions
+        self.current_decisions.clear()
+        self.position_list.set_decisions(self.current_decisions)
+        self.btn_export.setEnabled(False)
+        self.list_header_row.hide()
+
+        # Show welcome screen
+        self.preview.setHtml(self.welcome_html)
+        self.preview.update()  # Force repaint to avoid black screen issue
 
     @Slot(str)
     def change_color_scheme(self, scheme: str):
