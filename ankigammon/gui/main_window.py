@@ -119,7 +119,15 @@ class MatchAnalysisWorker(QThread):
             # Detect if source was SGF file (need to swap scores)
             is_sgf_source = self.file_path.endswith('.sgf')
 
-            all_decisions = parse_gnubg_match_files(exported_files, is_sgf_source=is_sgf_source)
+            # Extract original filename for source description
+            original_filename = Path(self.file_path).name
+
+            all_decisions = parse_gnubg_match_files(
+                exported_files,
+                is_sgf_source=is_sgf_source,
+                ply_level=self.settings.gnubg_analysis_ply,
+                source_filename=original_filename
+            )
             total_count = len(all_decisions)
 
             # Check for cancellation after parsing

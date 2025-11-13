@@ -61,13 +61,15 @@ class GNUBGMatchParser:
         return player1, player2
 
     @staticmethod
-    def parse_match_files(file_paths: List[str], is_sgf_source: bool = False) -> List[Decision]:
+    def parse_match_files(file_paths: List[str], is_sgf_source: bool = False, ply_level: Optional[int] = None, source_filename: Optional[str] = None) -> List[Decision]:
         """
         Parse multiple gnubg match export files into Decision objects.
 
         Args:
             file_paths: List of paths to text files (one per game)
             is_sgf_source: True if original source was SGF file (scores need swapping)
+            ply_level: Optional ply level used for analysis (for source description)
+            source_filename: Optional original source filename (for display purposes)
 
         Returns:
             List of Decision objects for all positions with analysis
@@ -83,7 +85,7 @@ class GNUBGMatchParser:
         logger.info(f"\n=== Parsing {len(file_paths)} game files ===")
         for i, file_path in enumerate(file_paths, 1):
             logger.info(f"\nGame {i}: {Path(file_path).name}")
-            decisions = GNUBGMatchParser.parse_file(file_path, is_sgf_source=is_sgf_source)
+            decisions = GNUBGMatchParser.parse_file(file_path, is_sgf_source=is_sgf_source, ply_level=ply_level, source_filename=source_filename)
             logger.info(f"  Parsed {len(decisions)} decisions")
 
             # Show cube decisions for debugging
@@ -102,13 +104,15 @@ class GNUBGMatchParser:
         return all_decisions
 
     @staticmethod
-    def parse_file(file_path: str, is_sgf_source: bool = False) -> List[Decision]:
+    def parse_file(file_path: str, is_sgf_source: bool = False, ply_level: Optional[int] = None, source_filename: Optional[str] = None) -> List[Decision]:
         """
         Parse single gnubg match export file.
 
         Args:
             file_path: Path to text file
             is_sgf_source: True if original source was SGF file (scores need swapping)
+            ply_level: Optional ply level used for analysis (for source description)
+            source_filename: Optional original source filename (for display purposes)
 
         Returns:
             List of Decision objects
@@ -122,6 +126,15 @@ class GNUBGMatchParser:
         # Extract match metadata
         metadata = GNUBGMatchParser._parse_match_metadata(content)
         metadata['is_sgf_source'] = is_sgf_source
+
+        # Add source description based on file type
+        # Use source_filename if provided, otherwise fall back to file_path name
+        filename = source_filename if source_filename else Path(file_path).name
+        ply_suffix = f" ({ply_level}-ply)" if ply_level is not None else ""
+        if is_sgf_source:
+            metadata['source_description'] = f"GnuBG analysis{ply_suffix} from SGF file '{filename}'"
+        else:
+            metadata['source_description'] = f"GnuBG analysis{ply_suffix} from match file '{filename}'"
 
         # Parse all positions in the file
         decisions = GNUBGMatchParser._parse_positions(content, metadata)
@@ -557,7 +570,8 @@ class GNUBGMatchParser:
             player_backgammon_pct=no_double_probs[2] * 100 if no_double_probs else None,
             opponent_win_pct=no_double_probs[3] * 100 if no_double_probs else None,
             opponent_gammon_pct=no_double_probs[4] * 100 if no_double_probs else None,
-            opponent_backgammon_pct=no_double_probs[5] * 100 if no_double_probs else None
+            opponent_backgammon_pct=no_double_probs[5] * 100 if no_double_probs else None,
+            source_description=metadata.get('source_description')
         )
 
         return decision
@@ -887,7 +901,8 @@ class GNUBGMatchParser:
             player_backgammon_pct=no_double_probs[2] * 100 if no_double_probs else None,
             opponent_win_pct=no_double_probs[3] * 100 if no_double_probs else None,
             opponent_gammon_pct=no_double_probs[4] * 100 if no_double_probs else None,
-            opponent_backgammon_pct=no_double_probs[5] * 100 if no_double_probs else None
+            opponent_backgammon_pct=no_double_probs[5] * 100 if no_double_probs else None,
+            source_description=metadata.get('source_description')
         )
 
         return decision
@@ -1073,22 +1088,25 @@ class GNUBGMatchParser:
             cube_owner=pos_metadata.get('cube_owner', CubeState.CENTERED),
             crawford=pos_metadata.get('crawford', False),
             xgid=xgid,
-            move_number=move_number
+            move_number=move_number,
+            source_description=metadata.get('source_description')
         )
 
         return decision
 
 
 # Helper function for easy import
-def parse_gnubg_match_files(file_paths: List[str], is_sgf_source: bool = False) -> List[Decision]:
+def parse_gnubg_match_files(file_paths: List[str], is_sgf_source: bool = False, ply_level: Optional[int] = None, source_filename: Optional[str] = None) -> List[Decision]:
     """
     Parse gnubg match export files into Decision objects.
 
     Args:
         file_paths: List of paths to exported text files
         is_sgf_source: True if original source was SGF file (scores need swapping)
+        ply_level: Optional ply level used for analysis (for source description)
+        source_filename: Optional original source filename (for display purposes)
 
     Returns:
         List of Decision objects
     """
-    return GNUBGMatchParser.parse_match_files(file_paths, is_sgf_source=is_sgf_source)
+    return GNUBGMatchParser.parse_match_files(file_paths, is_sgf_source=is_sgf_source, ply_level=ply_level, source_filename=source_filename)

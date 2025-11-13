@@ -105,6 +105,13 @@ class AnalysisWorker(QThread):
                 analyzed_decision.game_number = decision.game_number
                 analyzed_decision.move_number = decision.move_number
                 analyzed_decision.position_image_path = decision.position_image_path
+                analyzed_decision.original_position_format = decision.original_position_format
+
+                # Set source description for GnuBG-analyzed positions
+                ply_level = self.settings.gnubg_analysis_ply
+                ply_text = f" ({ply_level}-ply)" if ply_level is not None else ""
+                format_name = decision.original_position_format or "XGID"
+                analyzed_decision.source_description = f"Analyzed with GnuBG{ply_text} from {format_name}"
 
                 analyzed_decisions[pos_idx] = analyzed_decision
 

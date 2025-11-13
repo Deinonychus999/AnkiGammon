@@ -141,7 +141,7 @@ class XGBinaryParser:
                         elif isinstance(record, xgstruct.MoveEntry):
                             try:
                                 decision = XGBinaryParser._parse_move_entry(
-                                    record, match_length, score_x, score_o, crawford
+                                    record, match_length, score_x, score_o, crawford, path.name
                                 )
                                 if decision:
                                     decisions.append(decision)
@@ -151,7 +151,7 @@ class XGBinaryParser:
                         elif isinstance(record, xgstruct.CubeEntry):
                             try:
                                 decision = XGBinaryParser._parse_cube_entry(
-                                    record, match_length, score_x, score_o, crawford
+                                    record, match_length, score_x, score_o, crawford, path.name
                                 )
                                 if decision:
                                     decisions.append(decision)
@@ -253,7 +253,8 @@ class XGBinaryParser:
         match_length: int,
         score_x: int,
         score_o: int,
-        crawford: bool
+        crawford: bool,
+        filename: str
     ) -> Optional[Decision]:
         """
         Convert MoveEntry to Decision object.
@@ -264,6 +265,7 @@ class XGBinaryParser:
             score_x: Player X score
             score_o: Player O score
             crawford: Crawford game flag
+            filename: Source filename
 
         Returns:
             Decision object or None if invalid
@@ -441,7 +443,8 @@ class XGBinaryParser:
             decision_type=DecisionType.CHECKER_PLAY,
             candidate_moves=moves,
             xg_error_move=xg_err_move,  # XG's authoritative error value
-            xgid=xgid
+            xgid=xgid,
+            source_description=f"XG file '{filename}'"
         )
 
         return decision
@@ -452,7 +455,8 @@ class XGBinaryParser:
         match_length: int,
         score_x: int,
         score_o: int,
-        crawford: bool
+        crawford: bool,
+        filename: str
     ) -> Optional[Decision]:
         """
         Convert CubeEntry to Decision object.
@@ -483,6 +487,7 @@ class XGBinaryParser:
             score_x: Player X score
             score_o: Player O score
             crawford: Crawford game flag
+            filename: Source filename
 
         Returns:
             Decision object with 5 cube options, or None if unanalyzed
@@ -872,7 +877,8 @@ class XGBinaryParser:
             player_backgammon_pct=decision_player_backgammon_pct,
             opponent_win_pct=decision_opponent_win_pct,
             opponent_gammon_pct=decision_opponent_gammon_pct,
-            opponent_backgammon_pct=decision_opponent_backgammon_pct
+            opponent_backgammon_pct=decision_opponent_backgammon_pct,
+            source_description=f"XG file '{filename}'"
         )
 
         return decision

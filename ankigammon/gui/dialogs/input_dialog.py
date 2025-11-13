@@ -584,7 +584,7 @@ class InputDialog(QDialog):
             if len(parts) >= 2 and len(parts[0]) == 14 and len(parts[1]) == 12:
                 try:
                     position, metadata = parse_gnuid(position_id)
-                    return self._create_decision_from_metadata(position, metadata)
+                    return self._create_decision_from_metadata(position, metadata, original_format="GNUID")
                 except:
                     pass
 
@@ -592,13 +592,13 @@ class InputDialog(QDialog):
         if ':' in position_id:
             try:
                 position, metadata = parse_ogid(position_id)
-                return self._create_decision_from_metadata(position, metadata)
+                return self._create_decision_from_metadata(position, metadata, original_format="OGID")
             except:
                 pass
 
         return None
 
-    def _create_decision_from_metadata(self, position: Position, metadata: dict) -> Decision:
+    def _create_decision_from_metadata(self, position: Position, metadata: dict, original_format: str = "XGID") -> Decision:
         """Create a Decision object from position and metadata."""
         from ankigammon.utils.xgid import encode_xgid
 
@@ -639,7 +639,8 @@ class InputDialog(QDialog):
             cube_value=metadata.get('cube_value', 1),
             cube_owner=metadata.get('cube_owner', CubeState.CENTERED),
             decision_type=DecisionType.CUBE_ACTION if not metadata.get('dice') else DecisionType.CHECKER_PLAY,
-            candidate_moves=[]  # Will be populated by GnuBG analysis
+            candidate_moves=[],  # Will be populated by GnuBG analysis
+            original_position_format=original_format
         )
 
     @Slot()

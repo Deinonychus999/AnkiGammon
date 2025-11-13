@@ -148,6 +148,7 @@ class XGTextParser:
             opponent_win_pct=winning_chances.get('opponent_win_pct'),
             opponent_gammon_pct=winning_chances.get('opponent_gammon_pct'),
             opponent_backgammon_pct=winning_chances.get('opponent_backgammon_pct'),
+            source_description="XG text analysis",
         )
 
         return decision

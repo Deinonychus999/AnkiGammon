@@ -1228,19 +1228,17 @@ class CardGenerator:
 
     def _generate_source_info(self, decision: Decision) -> str:
         """Generate source information HTML."""
-        parts = []
-        if decision.xgid:
-            parts.append(f"<code>{decision.xgid}</code>")
-        if decision.source_file:
-            parts.append(f"Source: {decision.source_file}")
+        if not decision.xgid and not decision.source_description:
+            return ""
 
-        if parts:
-            return f"""
+        xgid_html = f"<code>{decision.xgid}</code>" if decision.xgid else ""
+        source_html = f'<span style="display: block; margin-top: 1em;">{decision.source_description}</span>' if decision.source_description else ""
+
+        return f"""
 <div class="source-info">
-    <p>{'<br>'.join(parts)}</p>
+    <p>{xgid_html}{source_html}</p>
 </div>
 """
-        return ""
 
     def _generate_tags(self, decision: Decision) -> List[str]:
         """Generate tags for the card."""

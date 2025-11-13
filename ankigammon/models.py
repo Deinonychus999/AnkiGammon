@@ -255,6 +255,8 @@ class Decision:
 
     # Source metadata
     source_file: Optional[str] = None
+    source_description: Optional[str] = None  # Human-readable source description (e.g., "Analyzed with GnuBG from XGID")
+    original_position_format: Optional[str] = None  # Original format entered (XGID, GNUID, or OGID)
     game_number: Optional[int] = None
     move_number: Optional[int] = None
 
