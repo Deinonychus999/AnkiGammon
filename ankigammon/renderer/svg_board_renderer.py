@@ -171,7 +171,7 @@ class SVGBoardRenderer:
         }}
         .pip-count {{
             font-family: Arial, sans-serif;
-            font-size: 12px;
+            font-size: 16px;
             fill: {self.color_scheme.text};
         }}
         .die {{
@@ -659,8 +659,8 @@ class SVGBoardRenderer:
         o_pips = self._calculate_pip_count(position, Player.O)
 
         bearoff_text_x = board_x + self.playing_width + 15
-        x_bearoff_top = board_y + 10 + 15
-        o_bearoff_top = board_y + self.board_height / 2 + 70 + 15
+        x_bearoff_top = board_y + 10 + 21
+        o_bearoff_top = board_y + self.board_height / 2 + 70 + 21
 
         if flipped:
             return f'''
