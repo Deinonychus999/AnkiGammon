@@ -122,13 +122,21 @@ class Import(object):
                 segment_file, seg_filename = archiveobj.getarchivefile(filerec)
 
                 # Create a file segment object to passback to the caller
-                xg_filetype = Import.Segment.XG_FILEMAP[filerec.name]
+                try:
+                    xg_filetype = Import.Segment.XG_FILEMAP[filerec.name]
+                except KeyError:
+                    # Skip unknown archive files (e.g., temp.xgr2, temp.xgr3, future extensions)
+                    # These are typically overflow rollout files or unsupported features
+                    segment_file.close()
+                    _os.unlink(seg_filename)
+                    continue
+
                 xg_filesegment = Import.Segment(type=xg_filetype,
                                                 delete=False)
                 xg_filesegment.filename = seg_filename
                 xg_filesegment.fd = segment_file
 
-                # If we are looking at the game info file then check 
+                # If we are looking at the game info file then check
                 # the magic number to ensure it is valid
                 if xg_filetype == Import.Segment.XG_GAMEFILE:
                     segment_file.seek(Import.Segment.XG_GAMEHDR_LEN)
