@@ -33,7 +33,16 @@ a = Analysis(
         'PySide6.QtWebEngineCore',
         # ankigammon core
         'ankigammon.parsers.xg_text_parser',
+        'ankigammon.parsers.xg_binary_parser',
+        'ankigammon.parsers.sgf_parser',
         'ankigammon.parsers.gnubg_parser',
+        'ankigammon.parsers.gnubg_match_parser',
+        # xgdatatools (third-party for XG binary parsing)
+        'ankigammon.thirdparty.xgdatatools',
+        'ankigammon.thirdparty.xgdatatools.xgimport',
+        'ankigammon.thirdparty.xgdatatools.xgstruct',
+        'ankigammon.thirdparty.xgdatatools.xgzarc',
+        'ankigammon.thirdparty.xgdatatools.xgutils',
         'ankigammon.renderer.svg_board_renderer',
         'ankigammon.renderer.color_schemes',
         'ankigammon.renderer.animation_controller',
@@ -65,6 +74,8 @@ a = Analysis(
         # External dependencies
         'genanki',
         'requests',
+        'striprtf',
+        'striprtf.striprtf',
         'bs4',
         'lxml',
         'qtawesome',
