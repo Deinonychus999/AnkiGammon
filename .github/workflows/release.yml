@@ -210,11 +210,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Get version without v prefix
+        id: version
+        run: echo "number=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
       - name: Extract changelog for this version
         uses: mindsers/changelog-reader-action@v2
         id: changelog
         with:
-          version: ${{ github.ref_name }}
+          version: ${{ steps.version.outputs.number }}
 
       - name: Download Windows artifact
         uses: actions/download-artifact@v4
