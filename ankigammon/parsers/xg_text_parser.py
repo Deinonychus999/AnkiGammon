@@ -107,6 +107,9 @@ class XGTextParser:
         # Parse global winning chances (for cube decisions)
         winning_chances = XGTextParser._parse_winning_chances(analysis_section)
 
+        # Parse comments/notes from the analysis section
+        comment = XGTextParser._parse_comment(analysis_section)
+
         # Determine decision type from metadata or dice presence
         if 'decision_type' in metadata:
             decision_type = metadata['decision_type']
@@ -149,6 +152,7 @@ class XGTextParser:
             opponent_gammon_pct=winning_chances.get('opponent_gammon_pct'),
             opponent_backgammon_pct=winning_chances.get('opponent_backgammon_pct'),
             source_description="XG text analysis",
+            note=comment,
         )
 
         return decision
@@ -190,6 +194,68 @@ class XGTextParser:
             chances['opponent_backgammon_pct'] = float(opponent_match.group(3))
 
         return chances
+
+    @staticmethod
+    def _parse_comment(text: str) -> Optional[str]:
+        """
+        Parse comments/notes from the analysis section.
+
+        Comments typically appear after the rollout analysis and include:
+        - Move statistics in bracket notation (e.g., "[21] 24/18 13/11")
+        - Expert commentary sections
+        - Everything up to the next position or end of file
+
+        Returns the comment text or None if no comment found.
+        """
+        # Comments start with move statistics in bracket notation like "[21] 24/18 13/11"
+        # This is the most reliable marker for the start of comments
+        comment_start_pattern = re.compile(r'^\s*\[\s*\d+\]', re.MULTILINE)
+        comment_start_match = comment_start_pattern.search(text)
+
+        if comment_start_match:
+            # Found move statistics - this is where comments begin
+            comment_text = text[comment_start_match.start():].strip()
+        else:
+            # No move statistics found, try alternative markers
+            # Look for end of rollout metadata or "Best Cube action:"
+            last_metadata_pos = 0
+
+            for pattern in [
+                r'^\s*Duration:.*$',
+                r'^\s*Confidence:.*$',
+                r'^\s*Search interval:.*$',
+                r'^\s*Moves:.*cube decisions:.*$',
+                r'^\s*\d+\s+Games rolled.*$',
+                r'^\s*¹.*$',  # Footnote markers
+                r'^\s*².*$',
+                r'^\s*Best Cube action:.*$',  # For cube decisions
+            ]:
+                matches = list(re.finditer(pattern, text, re.MULTILINE | re.IGNORECASE))
+                if matches:
+                    last_match_pos = matches[-1].end()
+                    if last_match_pos > last_metadata_pos:
+                        last_metadata_pos = last_match_pos
+
+            if last_metadata_pos > 0:
+                comment_text = text[last_metadata_pos:].strip()
+            else:
+                # No comments found
+                return None
+
+        # Remove the eXtreme Gammon version line at the end if present
+        # Pattern: "eXtreme Gammon Version: X.XX, MET: ..."
+        comment_text = re.sub(
+            r'\s*eXtreme Gammon Version:.*$',
+            '',
+            comment_text,
+            flags=re.MULTILINE | re.IGNORECASE
+        ).strip()
+
+        # Return None if comment is empty or too short to be meaningful
+        if not comment_text or len(comment_text) < 10:
+            return None
+
+        return comment_text
 
     @staticmethod
     def _parse_move_winning_chances(move_text: str) -> dict:

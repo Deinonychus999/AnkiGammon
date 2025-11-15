@@ -1218,6 +1218,8 @@ class CardGenerator:
 
         # Escape HTML characters and preserve line breaks
         escaped_note = html.escape(decision.note)
+        # Convert newlines to <br> tags for proper HTML display
+        escaped_note = escaped_note.replace('\n', '<br>')
 
         return f"""
 <div class="note-section">
