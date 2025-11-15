@@ -28,6 +28,7 @@ dependencies = [
     # Core dependencies
     "genanki>=0.13.0",
     "requests>=2.31.0",
+    "striprtf>=0.0.26",
     # GUI dependencies
     "PySide6>=6.6.0",
     "PySide6-Addons>=6.6.0",

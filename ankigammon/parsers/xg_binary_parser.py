@@ -112,8 +112,113 @@ class XGBinaryParser:
             score_x = 0
             score_o = 0
             crawford = False
+            game_number = None  # Track current game number
+            comments = []  # Store comments from temp.xgc
 
-            # Process file segments
+            # First pass: extract comments from temp.xgc if present
+            for segment in xg_import.getfilesegment():
+                if segment.type == xgimport.Import.Segment.XG_COMMENT:
+                    logger.info("Found temp.xgc comment file, extracting comments...")
+                    segment.fd.seek(0)
+                    comment_text = segment.fd.read().decode('utf-8', errors='ignore')
+
+                    # Replace XG's special line ending encoding (#1#2) with CRLF (#13#10)
+                    comment_text = comment_text.replace('\x01\x02', '\r\n')
+
+                    # Each comment is a complete RTF document
+                    # Find all RTF document starts
+                    rtf_starts = []
+                    pos = 0
+                    search_str = '{' + chr(92) + 'rtf1'  # '{\\rtf1'
+                    while True:
+                        idx = comment_text.find(search_str, pos)
+                        if idx == -1:
+                            break
+                        rtf_starts.append(idx)
+                        pos = idx + 1
+
+                    # Extract each complete RTF document
+                    comments = []
+                    for i, start in enumerate(rtf_starts):
+                        # Find matching closing brace
+                        depth = 0
+                        pos = start
+                        while pos < len(comment_text):
+                            if comment_text[pos] == '{':
+                                depth += 1
+                            elif comment_text[pos] == '}':
+                                depth -= 1
+                                if depth == 0:
+                                    end = pos + 1
+                                    break
+                            pos += 1
+                        else:
+                            end = len(comment_text)
+
+                        comments.append(comment_text[start:end])
+
+                    logger.info(f"Extracted {len(comments)} RTF comment documents from temp.xgc")
+                    break
+
+            # Second pass: scan for large comment index gaps (gap > 2 indicates corruption)
+            comment_index_map = None
+            if comments:
+                comment_indices = []
+                file_version_scan = -1
+
+                for segment in xg_import.getfilesegment():
+                    if segment.type == xgimport.Import.Segment.XG_GAMEFILE:
+                        segment.fd.seek(0)
+
+                        while True:
+                            record = xgstruct.GameFileRecord(version=file_version_scan).fromstream(segment.fd)
+                            if record is None:
+                                break
+
+                            if isinstance(record, xgstruct.HeaderMatchEntry):
+                                file_version_scan = record.Version
+
+                            elif isinstance(record, xgstruct.MoveEntry):
+                                if record.CommentMove >= 0:
+                                    comment_indices.append(record.CommentMove)
+
+                            elif isinstance(record, xgstruct.CubeEntry):
+                                if record.CommentCube >= 0:
+                                    comment_indices.append(record.CommentCube)
+
+                # Detect corruption: gaps > 2 (small gaps <=2 are normal for comment edit history)
+                # Build cumulative offset for indices after large gaps
+                comment_index_map = {}
+                cumulative_offset = 0
+
+                if len(comment_indices) > 1:
+                    for i in range(1, len(comment_indices)):
+                        jump = comment_indices[i] - comment_indices[i-1]
+                        prev_idx = comment_indices[i-1]
+
+                        # Detect gaps >= 2, but treat gaps at the very beginning (index 0 or 1) as edit history
+                        is_beginning_gap = (prev_idx <= 1 and jump == 2)
+
+                        if jump >= 2 and not is_beginning_gap:
+                            gap_size = jump - 1  # e.g., 14→17 has a gap of 2 indices (15, 16)
+                            cumulative_offset += gap_size
+                            logger.warning(
+                                f"Comment index gap detected: {comment_indices[i-1]} -> {comment_indices[i]} "
+                                f"(gap: +{jump}, skipping {gap_size} indices)"
+                            )
+
+                        # Apply cumulative offset to this index and all subsequent ones
+                        if cumulative_offset > 0:
+                            original_idx = comment_indices[i]
+                            corrected_idx = original_idx - cumulative_offset
+                            comment_index_map[original_idx] = corrected_idx
+
+                if comment_index_map:
+                    logger.warning(
+                        f"Comment index corruption detected! Correcting {len(comment_index_map)} indices."
+                    )
+
+            # Third pass: process game file segments
             for segment in xg_import.getfilesegment():
                 if segment.type == xgimport.Import.Segment.XG_GAMEFILE:
                     # Parse game file segment
@@ -136,12 +241,13 @@ class XGBinaryParser:
                             score_x = record.Score1
                             score_o = record.Score2
                             crawford = bool(record.CrawfordApply)
-                            logger.debug(f"Game header: score={score_x}-{score_o}, crawford={crawford}")
+                            game_number = record.GameNumber
+                            logger.debug(f"Game {game_number}: score={score_x}-{score_o}, crawford={crawford}")
 
                         elif isinstance(record, xgstruct.MoveEntry):
                             try:
                                 decision = XGBinaryParser._parse_move_entry(
-                                    record, match_length, score_x, score_o, crawford, path.name
+                                    record, match_length, score_x, score_o, crawford, path.name, comments, comment_index_map, game_number
                                 )
                                 if decision:
                                     decisions.append(decision)
@@ -151,7 +257,7 @@ class XGBinaryParser:
                         elif isinstance(record, xgstruct.CubeEntry):
                             try:
                                 decision = XGBinaryParser._parse_cube_entry(
-                                    record, match_length, score_x, score_o, crawford, path.name
+                                    record, match_length, score_x, score_o, crawford, path.name, comments, comment_index_map, game_number
                                 )
                                 if decision:
                                     decisions.append(decision)
@@ -254,7 +360,10 @@ class XGBinaryParser:
         score_x: int,
         score_o: int,
         crawford: bool,
-        filename: str
+        filename: str,
+        comments: List[str] = None,
+        comment_index_map: dict = None,
+        game_number: int = None
     ) -> Optional[Decision]:
         """
         Convert MoveEntry to Decision object.
@@ -266,6 +375,9 @@ class XGBinaryParser:
             score_o: Player O score
             crawford: Crawford game flag
             filename: Source filename
+            comments: List of comment strings from temp.xgc (optional)
+            comment_index_map: Mapping for corrupted indices (optional)
+            game_number: Game number in the match (optional)
 
         Returns:
             Decision object or None if invalid
@@ -429,6 +541,11 @@ class XGBinaryParser:
             crawford_jacoby=crawford_jacoby
         )
 
+        # Extract comment from temp.xgc if available
+        note = XGBinaryParser._find_matching_comment(comments, move_entry.CommentMove, dice, comment_index_map)
+        if note:
+            logger.debug(f"Found comment for move entry: {note[:50]}...")
+
         # Create Decision
         decision = Decision(
             position=position,
@@ -444,7 +561,9 @@ class XGBinaryParser:
             candidate_moves=moves,
             xg_error_move=xg_err_move,  # XG's authoritative error value
             xgid=xgid,
-            source_description=f"XG file '{filename}'"
+            source_description=f"XG file '{filename}'",
+            game_number=game_number,
+            note=note
         )
 
         return decision
@@ -456,7 +575,10 @@ class XGBinaryParser:
         score_x: int,
         score_o: int,
         crawford: bool,
-        filename: str
+        filename: str,
+        comments: List[str] = None,
+        comment_index_map: dict = None,
+        game_number: int = None
     ) -> Optional[Decision]:
         """
         Convert CubeEntry to Decision object.
@@ -856,6 +978,11 @@ class XGBinaryParser:
             crawford_jacoby=crawford_jacoby
         )
 
+        # Extract comment from temp.xgc if available
+        note = XGBinaryParser._find_matching_comment(comments, cube_entry.CommentCube, None, comment_index_map)
+        if note:
+            logger.debug(f"Found comment for cube entry: {note[:50]}...")
+
         # Create Decision
         decision = Decision(
             position=position,
@@ -878,7 +1005,9 @@ class XGBinaryParser:
             opponent_win_pct=decision_opponent_win_pct,
             opponent_gammon_pct=decision_opponent_gammon_pct,
             opponent_backgammon_pct=decision_opponent_backgammon_pct,
-            source_description=f"XG file '{filename}'"
+            source_description=f"XG file '{filename}'",
+            game_number=game_number,
+            note=note
         )
 
         return decision
@@ -908,6 +1037,158 @@ class XGBinaryParser:
         parts.sort(reverse=True)
 
         return " ".join(parts)
+
+    @staticmethod
+    def _clean_rtf_comment(rtf_text: str) -> Optional[str]:
+        """
+        Convert RTF-formatted comment text to plain text.
+
+        XG stores comments in temp.xgc using RTF format with control codes.
+        This method strips RTF formatting and extracts plain text content.
+
+        Args:
+            rtf_text: RTF-formatted comment string
+
+        Returns:
+            Plain text comment or None if empty
+        """
+        if not rtf_text:
+            return None
+
+        from striprtf.striprtf import rtf_to_text
+        import re
+
+        # Convert RTF to plain text using striprtf library
+        text = rtf_to_text(rtf_text)
+
+        # Clean up whitespace
+        text = text.strip()
+
+        # Strip whitespace from each line
+        lines = [line.strip() for line in text.split('\n')]
+        text = '\n'.join(lines)
+
+        # Collapse multiple consecutive newlines to at most 2 (1 blank line)
+        text = re.sub(r'\n{3,}', '\n\n', text)
+
+        return text if text else None
+
+    @staticmethod
+    def _find_matching_comment(
+        comments: List[str],
+        assigned_comment_idx: int,
+        dice: Optional[Tuple[int, int]],
+        comment_index_map: dict = None,
+        search_window: int = 5
+    ) -> Optional[str]:
+        """
+        Get the comment for a move using the assigned index or corruption mapping.
+
+        Args:
+            comments: List of all RTF comment documents
+            assigned_comment_idx: The CommentMove/CommentCube index from the entry
+            dice: Unused (kept for backwards compatibility)
+            comment_index_map: Optional mapping for correcting corrupted indices
+            search_window: Unused (kept for backwards compatibility)
+
+        Returns:
+            Cleaned comment text, or None if no comment found
+        """
+        if not comments or assigned_comment_idx < 0:
+            return None
+
+        # If we have a corruption mapping, use it
+        if comment_index_map is not None and assigned_comment_idx in comment_index_map:
+            corrected_idx = comment_index_map[assigned_comment_idx]
+            if corrected_idx < len(comments):
+                return XGBinaryParser._clean_rtf_comment(comments[corrected_idx])
+            return None
+
+        # Otherwise use direct index lookup
+        if assigned_comment_idx < len(comments):
+            return XGBinaryParser._clean_rtf_comment(comments[assigned_comment_idx])
+
+        return None
+
+    @staticmethod
+    def _comment_matches_dice(move_text: str, dice: Tuple[int, int]) -> bool:
+        """
+        Check if a move notation text matches the given dice roll.
+
+        Args:
+            move_text: Move notation like "24/23 6/2" or "bar/23* 8/4*"
+            dice: Dice tuple like (4, 1)
+
+        Returns:
+            True if the move could be made with these dice
+        """
+        # Extract from/to values from moves like "24/23", "bar/22", "b/22", "6/off"
+        import re
+        # Pattern to match moves: number/number, bar/number, b/number, number/off
+        # Match "bar", "b", or digits before the slash
+        pattern = r'(bar|b|\d+)/(off|\d+\*?)'
+        matches = re.findall(pattern, move_text.lower())
+
+        if not matches:
+            return False
+
+        # Extract all pips moved
+        pips_moved = []
+        for from_point, to_point in matches:
+            try:
+                if from_point == 'bar' or from_point == 'b':
+                    from_val = 25  # Bar is conceptually at 25 for this calculation
+                else:
+                    from_val = int(from_point)
+
+                if 'off' in to_point:
+                    continue  # Skip bearing off for now
+                else:
+                    to_val = int(to_point.rstrip('*'))
+
+                pips = abs(from_val - to_val)
+                pips_moved.append(pips)
+            except (ValueError, AttributeError):
+                continue
+
+        if not pips_moved:
+            return False
+
+        d1, d2 = sorted(dice)
+
+        # Check if the pips moved can be explained by the dice
+        # For doubles (e.g., 6-6), we can use the die value multiple times
+        if d1 == d2:
+            # Doubles - all pips should be multiples or equal to the die value
+            # or combinations thereof (e.g., for 3-3: valid pips are 3, 6, 9, 12)
+            valid_pips = {d1 * i for i in range(1, 5)}  # 1x, 2x, 3x, 4x the die
+            return all(p in valid_pips for p in pips_moved)
+        else:
+            # Non-doubles - we have exactly 2 dice to use
+            # Check if pips match common patterns:
+            # 1. Exact match: pips are {d1, d2} in any order
+            # 2. Combined move: pips contain d1+d2
+            # 3. Partial: one die used alone
+
+            pips_set = set(pips_moved)
+
+            # Most common case: two separate moves using the two dice
+            if pips_set == {d1, d2}:
+                return True
+
+            # Single move combining both dice
+            if pips_set == {d1 + d2}:
+                return True
+
+            # One die used, other not (partial move)
+            if pips_set == {d1} or pips_set == {d2}:
+                return True
+
+            # Combined move plus one die separately (e.g., "20/15 13/12" for 5-1)
+            if pips_set == {d1 + d2, d1} or pips_set == {d1 + d2, d2}:
+                return True
+
+            return False
 
     @staticmethod
     def _convert_move_notation(
