@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.1.0] - 2025-11-15
+
+### Added
+- Comments and notes from XG text files or pasted XG analyzed position text are now automatically imported
+- Cards now display source information (position format, analysis depth, and source file)
+
+### Improved
+- Pip counts now display in larger, more readable font on board diagrams
+- Position list automatically clears after successful export to keep workspace tidy
+
+### Fixed
+- XG binary file imports no longer fail when temporary rollout files are present
+- XG text exports from European locale systems now import correctly (comma decimal separators)
+
 ## [1.0.10] - 2025-11-10
 
 ### Added
