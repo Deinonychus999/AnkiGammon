@@ -19,6 +19,22 @@ class XGTextParser:
     """Parse XG text export format."""
 
     @staticmethod
+    def _normalize_decimal(value: str) -> float:
+        """
+        Normalize decimal separator and convert to float.
+
+        XG text exports may use either period (.) or comma (,) as decimal separator
+        depending on locale settings. This function handles both formats.
+
+        Args:
+            value: String representation of a number (e.g., "0.123" or "0,123")
+
+        Returns:
+            Float value
+        """
+        return float(value.replace(',', '.'))
+
+    @staticmethod
     def parse_file(file_path: str) -> List[Decision]:
         """
         Parse an XG text export file.
@@ -172,26 +188,27 @@ class XGTextParser:
         chances = {}
 
         # Parse player winning chances
+        # Note: XG exports may use comma or period as decimal separator depending on locale
         player_match = re.search(
-            r'Player Winning Chances:\s*(\d+\.?\d*)%\s*\(G:(\d+\.?\d*)%\s*B:(\d+\.?\d*)%\)',
+            r'Player Winning Chances:\s*(\d+[.,]?\d*)%\s*\(G:(\d+[.,]?\d*)%\s*B:(\d+[.,]?\d*)%\)',
             text,
             re.IGNORECASE
         )
         if player_match:
-            chances['player_win_pct'] = float(player_match.group(1))
-            chances['player_gammon_pct'] = float(player_match.group(2))
-            chances['player_backgammon_pct'] = float(player_match.group(3))
+            chances['player_win_pct'] = XGTextParser._normalize_decimal(player_match.group(1))
+            chances['player_gammon_pct'] = XGTextParser._normalize_decimal(player_match.group(2))
+            chances['player_backgammon_pct'] = XGTextParser._normalize_decimal(player_match.group(3))
 
         # Parse opponent winning chances
         opponent_match = re.search(
-            r'Opponent Winning Chances:\s*(\d+\.?\d*)%\s*\(G:(\d+\.?\d*)%\s*B:(\d+\.?\d*)%\)',
+            r'Opponent Winning Chances:\s*(\d+[.,]?\d*)%\s*\(G:(\d+[.,]?\d*)%\s*B:(\d+[.,]?\d*)%\)',
             text,
             re.IGNORECASE
         )
         if opponent_match:
-            chances['opponent_win_pct'] = float(opponent_match.group(1))
-            chances['opponent_gammon_pct'] = float(opponent_match.group(2))
-            chances['opponent_backgammon_pct'] = float(opponent_match.group(3))
+            chances['opponent_win_pct'] = XGTextParser._normalize_decimal(opponent_match.group(1))
+            chances['opponent_gammon_pct'] = XGTextParser._normalize_decimal(opponent_match.group(2))
+            chances['opponent_backgammon_pct'] = XGTextParser._normalize_decimal(opponent_match.group(3))
 
         return chances
 
@@ -272,26 +289,27 @@ class XGTextParser:
         chances = {}
 
         # Parse player chances
+        # Note: XG exports may use comma or period as decimal separator depending on locale
         player_match = re.search(
-            r'Player:\s*(\d+\.?\d*)%\s*\(G:(\d+\.?\d*)%\s*B:(\d+\.?\d*)%\)',
+            r'Player:\s*(\d+[.,]?\d*)%\s*\(G:(\d+[.,]?\d*)%\s*B:(\d+[.,]?\d*)%\)',
             move_text,
             re.IGNORECASE
         )
         if player_match:
-            chances['player_win_pct'] = float(player_match.group(1))
-            chances['player_gammon_pct'] = float(player_match.group(2))
-            chances['player_backgammon_pct'] = float(player_match.group(3))
+            chances['player_win_pct'] = XGTextParser._normalize_decimal(player_match.group(1))
+            chances['player_gammon_pct'] = XGTextParser._normalize_decimal(player_match.group(2))
+            chances['player_backgammon_pct'] = XGTextParser._normalize_decimal(player_match.group(3))
 
         # Parse opponent chances
         opponent_match = re.search(
-            r'Opponent:\s*(\d+\.?\d*)%\s*\(G:(\d+\.?\d*)%\s*B:(\d+\.?\d*)%\)',
+            r'Opponent:\s*(\d+[.,]?\d*)%\s*\(G:(\d+[.,]?\d*)%\s*B:(\d+[.,]?\d*)%\)',
             move_text,
             re.IGNORECASE
         )
         if opponent_match:
-            chances['opponent_win_pct'] = float(opponent_match.group(1))
-            chances['opponent_gammon_pct'] = float(opponent_match.group(2))
-            chances['opponent_backgammon_pct'] = float(opponent_match.group(3))
+            chances['opponent_win_pct'] = XGTextParser._normalize_decimal(opponent_match.group(1))
+            chances['opponent_gammon_pct'] = XGTextParser._normalize_decimal(opponent_match.group(2))
+            chances['opponent_backgammon_pct'] = XGTextParser._normalize_decimal(opponent_match.group(3))
 
         return chances
 
@@ -444,8 +462,9 @@ class XGTextParser:
 
         # Find all move entries
         # Pattern: rank. [engine] notation eq:[equity] [(error)]
+        # Note: XG exports may use comma or period as decimal separator depending on locale
         move_pattern = re.compile(
-            r'^\s*(\d+)\.\s+(?:[\w\s+-]+?)\s+(.*?)\s+eq:\s*([+-]?\d+\.\d+)(?:\s*\(([+-]\d+\.\d+)\))?',
+            r'^\s*(\d+)\.\s+(?:[\w\s+-]+?)\s+(.*?)\s+eq:\s*([+-]?\d+[.,]\d+)(?:\s*\(([+-]\d+[.,]\d+)\))?',
             re.MULTILINE | re.IGNORECASE
         )
 
@@ -456,12 +475,12 @@ class XGTextParser:
         for i, match in enumerate(move_matches):
             rank = int(match.group(1))
             notation = match.group(2).strip()
-            equity = float(match.group(3))
+            equity = XGTextParser._normalize_decimal(match.group(3))
             error_str = match.group(4)
 
             # Parse error if present
             if error_str:
-                xg_error = float(error_str)
+                xg_error = XGTextParser._normalize_decimal(error_str)
                 error = abs(xg_error)
             else:
                 xg_error = 0.0
@@ -520,15 +539,16 @@ class XGTextParser:
 
         # Try simpler pattern without engine name
         # "1. 11/8 11/5   eq:+0.589"
+        # Note: XG exports may use comma or period as decimal separator depending on locale
         pattern = re.compile(
-            r'^\s*(\d+)\.\s+(.*?)\s+eq:\s*([+-]?\d+\.\d+)',
+            r'^\s*(\d+)\.\s+(.*?)\s+eq:\s*([+-]?\d+[.,]\d+)',
             re.MULTILINE | re.IGNORECASE
         )
 
         for match in pattern.finditer(text):
             rank = int(match.group(1))
             notation = match.group(2).strip()
-            equity = float(match.group(3))
+            equity = XGTextParser._normalize_decimal(match.group(3))
 
             notation = XGTextParser._clean_move_notation(notation)
 
@@ -573,8 +593,9 @@ class XGTextParser:
         # "       No redouble:     +0.172"
         # "       Redouble/Take:   -0.361 (-0.533)"
         # "       Redouble/Pass:   +1.000 (+0.828)"
+        # Note: XG exports may use comma or period as decimal separator depending on locale
         pattern = re.compile(
-            r'^\s*(No (?:redouble|double)|(?:Re)?[Dd]ouble/(?:Take|Pass|Drop)):\s*([+-]?\d+\.\d+)(?:\s*\(([+-]\d+\.\d+)\))?',
+            r'^\s*(No (?:redouble|double)|(?:Re)?[Dd]ouble/(?:Take|Pass|Drop)):\s*([+-]?\d+[.,]\d+)(?:\s*\(([+-]\d+[.,]\d+)\))?',
             re.MULTILINE | re.IGNORECASE
         )
 
@@ -582,10 +603,10 @@ class XGTextParser:
         xg_moves_data = []
         for i, match in enumerate(pattern.finditer(text), 1):
             notation = match.group(1).strip()
-            equity = float(match.group(2))
+            equity = XGTextParser._normalize_decimal(match.group(2))
             error_str = match.group(3)
 
-            xg_error = float(error_str) if error_str else 0.0
+            xg_error = XGTextParser._normalize_decimal(error_str) if error_str else 0.0
 
             # Normalize notation
             normalized = XGTextParser._clean_move_notation(notation)
