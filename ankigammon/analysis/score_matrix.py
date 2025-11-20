@@ -112,10 +112,16 @@ def generate_score_matrix(
     gnubg_path: str,
     ply_level: int = 3,
     progress_callback: Optional[callable] = None,
-    use_parallel: bool = True
+    use_parallel: bool = True,
+    cube_value: int = 1,
+    cube_owner: Optional['CubeState'] = None
 ) -> List[List[ScoreMatrixCell]]:
     """
-    Generate a score matrix for all score combinations in a match.
+    Generate a score matrix for all RELEVANT score combinations in a match.
+
+    The matrix only includes scores where the cube decision matters. For example,
+    if the cube is at 2 and doubling would make it 4, the matrix starts at 4-away
+    (since at 3-away or closer, the cube at 2 is already dead and can't be doubled).
 
     Args:
         xgid: XGID position string (cube decision)
@@ -124,18 +130,23 @@ def generate_score_matrix(
         ply_level: Analysis depth in plies
         progress_callback: Optional callback(message: str) for progress updates
         use_parallel: Use parallel analysis (default: True, ~5-9x faster)
+        cube_value: Current cube value before doubling (default: 1)
+        cube_owner: Current cube owner (default: extracted from XGID)
 
     Returns:
         2D list of ScoreMatrixCell objects, indexed as [row][col]
-        where row = player_away - 2, col = opponent_away - 2
+        where row = player_away - min_away, col = opponent_away - min_away
 
-        For a 7-point match:
+        For a 7-point match with cube at 1 (initial double to 2):
         - Returns 6x6 matrix (2a through 7a)
-        - matrix[0][0] = 2a-2a
-        - matrix[5][5] = 7a-7a
+        - matrix[0][0] = 2a-2a, matrix[5][5] = 7a-7a
+
+        For a 7-point match with cube at 2 (redouble to 4):
+        - Returns 4x4 matrix (4a through 7a)
+        - matrix[0][0] = 4a-4a, matrix[3][3] = 7a-7a
 
     Raises:
-        ValueError: If match_length < 2
+        ValueError: If match_length < 2 or next_cube_value > match_length
         FileNotFoundError: If gnubg_path doesn't exist
     """
     if match_length < 2:
@@ -153,9 +164,32 @@ def generate_score_matrix(
     position, metadata = parse_xgid(xgid)
     on_roll = metadata.get('on_roll')
 
-    # Matrix size is (match_length - 1) x (match_length - 1)
-    # For 7-point match: 6x6 (scores from 2a to 7a)
-    matrix_size = match_length - 1
+    # If cube_owner not provided, extract from XGID
+    if cube_owner is None:
+        cube_owner = metadata.get('cube_owner', CubeState.CENTERED)
+
+    # Validate cube_value is a power of 2
+    if cube_value < 1 or (cube_value & (cube_value - 1)) != 0:
+        raise ValueError(f"Cube value must be a power of 2, got {cube_value}")
+
+    # Calculate minimum away score where cube is still live
+    # Cube is DEAD when cube_value >= away_score
+    # Therefore, minimum valid away score is cube_value + 1
+    min_away = cube_value + 1
+
+    # Check if matrix is possible
+    if min_away > match_length:
+        raise ValueError(
+            f"Cannot generate score matrix: Minimum away score ({min_away}) "
+            f"exceeds match length ({match_length}). "
+            f"At cube={cube_value}, cube is dead at all scores in this match."
+        )
+
+    # Matrix size based on valid score range
+    # For cube=1, 7pt match: 2a-7a (6x6)
+    # For cube=2, 7pt match: 3a-7a (5x5)
+    # For cube=4, 7pt match: 5a-7a (3x3)
+    matrix_size = match_length - min_away + 1
 
     # Calculate total cells for progress
     total_cells = matrix_size * matrix_size
@@ -164,8 +198,8 @@ def generate_score_matrix(
     position_ids = []
     coord_list = []  # [(player_away, opponent_away), ...]
 
-    for player_away in range(2, match_length + 1):
-        for opponent_away in range(2, match_length + 1):
+    for player_away in range(min_away, match_length + 1):
+        for opponent_away in range(min_away, match_length + 1):
             # Calculate actual scores from "away" values
             score_on_roll = match_length - player_away
             score_opponent = match_length - opponent_away
@@ -178,11 +212,11 @@ def generate_score_matrix(
                 score_x = score_on_roll
                 score_o = score_opponent
 
-            # IMPORTANT: Score matrix always uses INITIAL DOUBLE (cube=1, centered)
+            # Use actual cube state (supports both initial double and redoubles)
             modified_xgid = encode_xgid(
                 position=position,
-                cube_value=1,
-                cube_owner=CubeState.CENTERED,
+                cube_value=cube_value,
+                cube_owner=cube_owner,
                 dice=None,
                 on_roll=on_roll,
                 score_x=score_x,
@@ -226,9 +260,9 @@ def generate_score_matrix(
     matrix = []
     result_idx = 0
 
-    for player_away in range(2, match_length + 1):
+    for player_away in range(min_away, match_length + 1):
         row = []
-        for opponent_away in range(2, match_length + 1):
+        for opponent_away in range(min_away, match_length + 1):
             # Get analysis result
             output, decision_type = analysis_results[result_idx]
             result_idx += 1
@@ -292,7 +326,9 @@ def format_matrix_as_html(
     matrix: List[List[ScoreMatrixCell]],
     current_player_away: Optional[int] = None,
     current_opponent_away: Optional[int] = None,
-    ply_level: Optional[int] = None
+    ply_level: Optional[int] = None,
+    cube_value: int = 1,
+    cube_owner: Optional['CubeState'] = None
 ) -> str:
     """
     Format score matrix as HTML table.
@@ -302,6 +338,8 @@ def format_matrix_as_html(
         current_player_away: Highlight this cell (player's score away)
         current_opponent_away: Highlight this cell (opponent's score away)
         ply_level: Analysis depth in plies (for display in title)
+        cube_value: Current cube value (for title generation)
+        cube_owner: Current cube owner (for title generation)
 
     Returns:
         HTML string with styled table
@@ -311,11 +349,22 @@ def format_matrix_as_html(
 
     matrix_size = len(matrix)
 
+    # Import CubeState for comparison
+    from ankigammon.models import CubeState
+
+    # Calculate min_away from first cell (all cells start at same minimum)
+    min_away = matrix[0][0].player_away if matrix and matrix[0] else cube_value + 1
+
     # Start table
     html = '<div class="score-matrix">\n'
 
-    # Build title with optional ply level indicator
-    title = 'Score Matrix for Initial Double'
+    # Build title based on cube state
+    if cube_owner == CubeState.CENTERED or cube_owner is None:
+        title = 'Score Matrix for Initial Double'
+    else:
+        next_cube = cube_value * 2
+        title = f'Score Matrix for Redouble to {next_cube}'
+
     if ply_level is not None:
         title += f' <span class="ply-indicator">({ply_level}-ply)</span>'
     html += f'<h3>{title}</h3>\n'
@@ -325,17 +374,17 @@ def format_matrix_as_html(
     # Header row
     html += '<tr><th></th>'
     for col in range(matrix_size):
-        away = col + 2
+        away = col + min_away
         html += f'<th>{away}a</th>'
     html += '</tr>\n'
 
     # Data rows
     for row_idx, row in enumerate(matrix):
-        player_away = row_idx + 2
+        player_away = row_idx + min_away
         html += f'<tr><th>{player_away}a</th>'
 
         for col_idx, cell in enumerate(row):
-            opponent_away = col_idx + 2
+            opponent_away = col_idx + min_away
 
             # Determine if this is the current cell
             is_current = (

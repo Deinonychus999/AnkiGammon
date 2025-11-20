@@ -1195,14 +1195,18 @@ class CardGenerator:
                 match_length=decision.match_length,
                 gnubg_path=self.settings.gnubg_path,
                 ply_level=self.settings.gnubg_analysis_ply,
-                progress_callback=self.progress_callback
+                progress_callback=self.progress_callback,
+                cube_value=decision.cube_value,
+                cube_owner=decision.cube_owner
             )
 
             matrix_html = format_matrix_as_html(
                 matrix=matrix,
                 current_player_away=current_player_away,
                 current_opponent_away=current_opponent_away,
-                ply_level=self.settings.gnubg_analysis_ply
+                ply_level=self.settings.gnubg_analysis_ply,
+                cube_value=decision.cube_value,
+                cube_owner=decision.cube_owner
             )
 
             return matrix_html
