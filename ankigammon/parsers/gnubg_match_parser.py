@@ -47,13 +47,13 @@ class GNUBGMatchParser:
                 # Format 2: Score line (plain text match files)
                 if player1 == "Player 1" or player2 == "Player 2":
                     score_match = re.search(
-                        r'^\s*([A-Za-z0-9_]+)\s*:\s*\d+\s+([A-Za-z0-9_]+)\s*:\s*\d+',
+                        r'^\s*([A-Za-z0-9_ ]+?)\s*:\s*\d+\s+([A-Za-z0-9_ ]+?)\s*:\s*\d+',
                         header,
                         re.MULTILINE
                     )
                     if score_match:
-                        player1 = score_match.group(1)
-                        player2 = score_match.group(2)
+                        player1 = score_match.group(1).strip()
+                        player2 = score_match.group(2).strip()
 
         except Exception:
             pass
@@ -181,12 +181,12 @@ class GNUBGMatchParser:
 
         # Parse score line
         score_match = re.search(
-            r'The score.*?is:\s*(\w+)\s+(\d+),\s*(\w+)\s+(\d+)\s*\(match to (\d+) point',
+            r'The score.*?is:\s*(.+?)\s+(\d+),\s*(.+?)\s+(\d+).*?\(match to (\d+) point',
             text
         )
         if score_match:
-            metadata['player_o_name'] = score_match.group(1)
-            metadata['player_x_name'] = score_match.group(3)
+            metadata['player_o_name'] = score_match.group(1).strip()
+            metadata['player_x_name'] = score_match.group(3).strip()
             metadata['match_length'] = int(score_match.group(5))
 
         return metadata
@@ -212,7 +212,7 @@ class GNUBGMatchParser:
 
             # Look for move number header with dice roll
             # Format: "Move number 1:  Deinonychus to play 64"
-            move_match = re.match(r'Move number (\d+):\s+(\w+) to play (\d)(\d)', line)
+            move_match = re.match(r'Move number (\d+):\s+(.+?) to play (\d)(\d)', line)
             if move_match:
                 try:
                     # Parse checker play decision
@@ -237,7 +237,7 @@ class GNUBGMatchParser:
             # Also look for cube-only moves (no dice roll)
             # Format: "Move number 24:  De_Luci on roll, cube decision?"
             # Format: "Move number 25:  De_Luci doubles to 2"
-            cube_only_match = re.match(r'Move number (\d+):\s+(\w+)(?:\s+on roll,\s+cube decision\?|\s+doubles)', line)
+            cube_only_match = re.match(r'Move number (\d+):\s+(.+?)(?:\s+on roll,\s+cube decision\?|\s+doubles)', line)
             if cube_only_match:
                 try:
                     cube_decision = GNUBGMatchParser._parse_cube_decision_standalone(
@@ -273,12 +273,12 @@ class GNUBGMatchParser:
         """
         # Extract move number and player
         move_line = lines[start_idx]
-        move_match = re.match(r'Move number (\d+):\s+(\w+) to play (\d)(\d)', move_line)
+        move_match = re.match(r'Move number (\d+):\s+(.+?) to play (\d)(\d)', move_line)
         if not move_match:
             return None
 
         move_number = int(move_match.group(1))
-        player_name = move_match.group(2)
+        player_name = move_match.group(2).strip()
         dice1 = int(move_match.group(3))
         dice2 = int(move_match.group(4))
 
@@ -405,12 +405,12 @@ class GNUBGMatchParser:
             line = lines[start_idx + offset]
 
             # Check for doubling action
-            double_match = re.search(r'\*\s+\w+\s+doubles', line)
+            double_match = re.search(r'\*\s+.+?\s+doubles', line)
             if double_match:
                 doubled = True
 
             # Check for response action
-            response_match = re.search(r'\*\s+\w+\s+(accepts|passes|rejects)', line)
+            response_match = re.search(r'\*\s+.+?\s+(accepts|passes|rejects)', line)
             if response_match:
                 action = response_match.group(1)
                 cube_action_taken = "passes" if action == "rejects" else action
@@ -603,12 +603,12 @@ class GNUBGMatchParser:
 
         # Extract move number and player name
         # Handles both formats: "on roll, cube decision?" and "doubles to 2"
-        move_match = re.match(r'Move number (\d+):\s+(\w+)', move_line)
+        move_match = re.match(r'Move number (\d+):\s+(.+?)(?:\s+on roll|\s+doubles)', move_line)
         if not move_match:
             return None
 
         move_number = int(move_match.group(1))
-        player_name = move_match.group(2)
+        player_name = move_match.group(2).strip()
 
         # Determine which player
         on_roll = Player.O if player_name == metadata['player_o_name'] else Player.X
@@ -733,12 +733,12 @@ class GNUBGMatchParser:
             line = lines[start_idx + offset]
 
             # Check for doubling action
-            double_match = re.search(r'\*\s+\w+\s+doubles', line)
+            double_match = re.search(r'\*\s+.+?\s+doubles', line)
             if double_match:
                 doubled = True
 
             # Check for response action
-            response_match = re.search(r'\*\s+\w+\s+(accepts|passes|rejects)', line)
+            response_match = re.search(r'\*\s+.+?\s+(accepts|passes|rejects)', line)
             if response_match:
                 action = response_match.group(1)
                 cube_action_taken = "passes" if action == "rejects" else action
@@ -926,12 +926,12 @@ class GNUBGMatchParser:
         """
         # Extract move number and player
         move_line = lines[start_idx]
-        move_match = re.match(r'Move number (\d+):\s+(\w+) to play (\d)(\d)', move_line)
+        move_match = re.match(r'Move number (\d+):\s+(.+?) to play (\d)(\d)', move_line)
         if not move_match:
             return None
 
         move_number = int(move_match.group(1))
-        player_name = move_match.group(2)
+        player_name = move_match.group(2).strip()
         dice1 = int(move_match.group(3))
         dice2 = int(move_match.group(4))
 
@@ -990,7 +990,7 @@ class GNUBGMatchParser:
                 break
             line = lines[start_idx + offset]
             if line.strip().startswith('*') and 'moves' in line:
-                move_match = re.search(r'\* \w+ moves (.+)', line)
+                move_match = re.search(r'\*\s+.+?\s+moves\s+(.+)', line)
                 if move_match:
                     move_played = move_match.group(1).strip()
                 break
