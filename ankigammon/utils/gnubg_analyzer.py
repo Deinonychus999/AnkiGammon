@@ -212,7 +212,7 @@ class GNUBGAnalyzer:
                 kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
 
             self._current_process = subprocess.Popen(
-                [self.gnubg_path, "-t", "-c", command_file],
+                [self.gnubg_path, "-t", "-q", "-c", command_file],
                 **kwargs
             )
 
@@ -242,7 +242,7 @@ class GNUBGAnalyzer:
             if returncode != 0:
                 raise subprocess.CalledProcessError(
                     returncode,
-                    [self.gnubg_path, "-t", "-c", command_file],
+                    [self.gnubg_path, "-t", "-q", "-c", command_file],
                     output=stdout,
                     stderr=stderr
                 )
@@ -416,7 +416,7 @@ class GNUBGAnalyzer:
         Raises:
             subprocess.CalledProcessError: If gnubg execution fails
         """
-        cmd = [self.gnubg_path, "-t", "-c", command_file]
+        cmd = [self.gnubg_path, "-t", "-q", "-c", command_file]
 
         kwargs = {
             'capture_output': True,
