@@ -217,18 +217,9 @@ class GNUBGAnalyzer:
             )
 
             try:
-                stdout, stderr = self._current_process.communicate(timeout=600)
-                returncode = self._current_process.returncode
-            except subprocess.TimeoutExpired:
-                self._current_process.kill()
+                # No timeout - user can cancel through GUI if needed
                 stdout, stderr = self._current_process.communicate()
-                self._current_process = None
-                raise subprocess.CalledProcessError(
-                    -1,
-                    [self.gnubg_path, "-t", "-c", command_file],
-                    output="Process timed out after 10 minutes",
-                    stderr=""
-                )
+                returncode = self._current_process.returncode
             finally:
                 self._current_process = None
 
