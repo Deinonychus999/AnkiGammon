@@ -143,7 +143,7 @@ def generate_score_matrix(
 
     from ankigammon.utils.gnubg_analyzer import GNUBGAnalyzer
     from ankigammon.utils.xgid import parse_xgid, encode_xgid
-    from ankigammon.models import Player
+    from ankigammon.models import Player, CubeState
     from ankigammon.parsers.gnubg_parser import GNUBGParser
 
     # Initialize analyzer
@@ -182,7 +182,7 @@ def generate_score_matrix(
             modified_xgid = encode_xgid(
                 position=position,
                 cube_value=1,
-                cube_owner=None,
+                cube_owner=CubeState.CENTERED,
                 dice=None,
                 on_roll=on_roll,
                 score_x=score_x,
