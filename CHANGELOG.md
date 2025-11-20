@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.1.1] - 2025-11-20
+
+### Added
+- Score matrix now supports redouble positions in match play
+
+### Improved
+- GNU Backgammon can now analyze longer matches at high ply levels without timing out
+- GNU Backgammon no longer plays sounds during analysis
+
+### Fixed
+- Score matrix now uses correct cube ownership, matching the main analysis equity values
+- Player names with spaces now import correctly from match files
+
 ## [1.1.0] - 2025-11-15
 
 ### Added
