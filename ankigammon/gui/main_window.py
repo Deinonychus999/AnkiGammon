@@ -890,7 +890,7 @@ class MainWindow(QMainWindow):
             <p>Built with PySide6 and Qt.</p>
 
             <h3>Special Thanks</h3>
-            <p>OilSpillDuckling<br>Eran & OpenGammon<br>Orad & Backgammon101</p>
+            <p>OilSpillDuckling<br>Eran & OpenGammon<br>Orad & Backgammon101<br>HerJe</p>
 
             <p><a href="https://github.com/Deinonychus999/AnkiGammon">GitHub Repository</a> | <a href="https://ko-fi.com/ankigammon">Donate</a></p>
             """
