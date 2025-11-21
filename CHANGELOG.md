@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.1.2] - 2025-11-21
+
+### Fixed
+- GNU Backgammon analysis now works correctly for users with European locale settings (comma decimal separators)
+
 ## [1.1.1] - 2025-11-20
 
 ### Added
