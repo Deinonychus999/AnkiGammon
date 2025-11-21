@@ -271,28 +271,41 @@ class GNUBGAnalyzer:
 
                 raise RuntimeError(error_msg)
 
+            # Save debug file to user-accessible location BEFORE any error checks
+            debug_path = None
+            if exported_files:
+                import shutil
+                try:
+                    debug_dir = Path.home() / ".ankigammon"
+                    debug_dir.mkdir(parents=True, exist_ok=True)
+                    debug_path = debug_dir / "debug_gnubg_output.txt"
+                    shutil.copy2(exported_files[0], debug_path)
+                    logger.info(f"Copied first export file to {debug_path}")
+                except Exception as e:
+                    logger.warning(f"Failed to copy debug file: {e}")
+                    debug_path = None
+
             if exported_files:
                 with open(exported_files[0], 'r', encoding='utf-8') as f:
                     content = f.read(5000)
-                    has_analysis = bool(re.search(r'Rolled \d\d \([+-]?\d+\.\d+\):', content))
+                    has_analysis = bool(re.search(r'Rolled \d\d \([+-]?\d+[.,]\d+\):', content))
                     if not has_analysis:
                         logger.warning("GnuBG exported files but no analysis found")
                         logger.warning(f"Expected to find 'Rolled XX (±error):' pattern")
                         logger.warning(f"First file preview:\n{content[:800]}")
-                        raise RuntimeError(
+                        error_msg = (
                             "GnuBG exported the match but did not include analysis.\n"
                             "The 'analyse match' command may have failed.\n\n"
-                            f"Check logs for GnuBG output."
                         )
+                        if debug_path and debug_path.exists():
+                            error_msg += f"Debug file saved to:\n{debug_path}\n\n"
+                            error_msg += "Please share this file for troubleshooting."
+                        else:
+                            error_msg += "Check logs for GnuBG output."
+                        raise RuntimeError(error_msg)
 
             if progress_callback:
                 progress_callback(f"Analysis complete. {len(exported_files)} game(s) exported.")
-
-            if exported_files:
-                import shutil
-                debug_path = Path(__file__).parent.parent.parent / "debug_gnubg_output.txt"
-                shutil.copy2(exported_files[0], debug_path)
-                logger.info(f"Copied first export file to {debug_path}")
 
             return exported_files
 
