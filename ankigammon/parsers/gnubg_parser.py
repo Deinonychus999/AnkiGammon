@@ -15,6 +15,11 @@ class GNUBGParser:
     """Parse GNU Backgammon analysis output."""
 
     @staticmethod
+    def _parse_locale_float(s: str) -> float:
+        """Parse a float string that may use comma or period as decimal separator."""
+        return float(s.replace(',', '.'))
+
+    @staticmethod
     def parse_analysis(
         gnubg_output: str,
         xgid: str,
@@ -98,18 +103,18 @@ class GNUBGParser:
         moves = []
         lines = text.split('\n')
 
-        # Pattern for gnubg move lines
+        # Pattern for gnubg move lines (supports European locale with comma decimal separator)
         # Matches: "    1. Cubeful 4-ply    21/16 21/15                  Eq.:  -0.411"
         #          "    2. Cubeful 4-ply    9/4 9/3                      Eq.:  -0.437 ( -0.025)"
         move_pattern = re.compile(
-            r'^\s*(\d+)\.\s+(?:Cubeful\s+\d+-ply\s+)?(.*?)\s+Eq\.?:\s*([+-]?\d+\.\d+)(?:\s*\(\s*([+-]?\d+\.\d+)\))?',
+            r'^\s*(\d+)\.\s+(?:Cubeful\s+\d+-ply\s+)?(.*?)\s+Eq\.?:\s*([+-]?\d+[.,]\d+)(?:\s*\(\s*([+-]?\d+[.,]\d+)\))?',
             re.IGNORECASE
         )
 
-        # Pattern for probability line
-        # Matches: "       0.266 0.021 0.001 - 0.734 0.048 0.001"
+        # Pattern for probability line (supports European locale with comma decimal separator)
+        # Matches: "       0.266 0.021 0.001 - 0.734 0.048 0.001" or "       0,266 0,021 0,001 - 0,734 0,048 0,001"
         prob_pattern = re.compile(
-            r'^\s*(\d\.\d+)\s+(\d\.\d+)\s+(\d\.\d+)\s*-\s*(\d\.\d+)\s+(\d\.\d+)\s+(\d\.\d+)'
+            r'^\s*(\d[.,]\d+)\s+(\d[.,]\d+)\s+(\d[.,]\d+)\s*-\s*(\d[.,]\d+)\s+(\d[.,]\d+)\s+(\d[.,]\d+)'
         )
 
         for i, line in enumerate(lines):
@@ -117,10 +122,10 @@ class GNUBGParser:
             if match:
                 rank = int(match.group(1))
                 notation = match.group(2).strip()
-                equity = float(match.group(3))
+                equity = GNUBGParser._parse_locale_float(match.group(3))
                 error_str = match.group(4)
 
-                error = float(error_str) if error_str else 0.0
+                error = GNUBGParser._parse_locale_float(error_str) if error_str else 0.0
                 abs_error = abs(error)
 
                 # Look for probability line on next line
@@ -134,12 +139,12 @@ class GNUBGParser:
                 if i + 1 < len(lines):
                     prob_match = prob_pattern.match(lines[i + 1])
                     if prob_match:
-                        player_win = float(prob_match.group(1)) * 100
-                        player_gammon = float(prob_match.group(2)) * 100
-                        player_backgammon = float(prob_match.group(3)) * 100
-                        opponent_win = float(prob_match.group(4)) * 100
-                        opponent_gammon = float(prob_match.group(5)) * 100
-                        opponent_backgammon = float(prob_match.group(6)) * 100
+                        player_win = GNUBGParser._parse_locale_float(prob_match.group(1)) * 100
+                        player_gammon = GNUBGParser._parse_locale_float(prob_match.group(2)) * 100
+                        player_backgammon = GNUBGParser._parse_locale_float(prob_match.group(3)) * 100
+                        opponent_win = GNUBGParser._parse_locale_float(prob_match.group(4)) * 100
+                        opponent_gammon = GNUBGParser._parse_locale_float(prob_match.group(5)) * 100
+                        opponent_backgammon = GNUBGParser._parse_locale_float(prob_match.group(6)) * 100
 
                 moves.append(Move(
                     notation=notation,
@@ -160,14 +165,14 @@ class GNUBGParser:
 
         # If no moves found, try alternative pattern
         if not moves:
-            # Try simpler pattern without rank numbers
+            # Try simpler pattern without rank numbers (supports European locale)
             alt_pattern = re.compile(
-                r'^\s*([0-9/\s*bar]+?)\s+Eq:\s*([+-]?\d+\.\d+)',
+                r'^\s*([0-9/\s*bar]+?)\s+Eq:\s*([+-]?\d+[.,]\d+)',
                 re.MULTILINE
             )
             for i, match in enumerate(alt_pattern.finditer(text), 1):
                 notation = match.group(1).strip()
-                equity = float(match.group(2))
+                equity = GNUBGParser._parse_locale_float(match.group(2))
 
                 moves.append(Move(
                     notation=notation,
@@ -238,13 +243,13 @@ class GNUBGParser:
         if 'Cubeful equities' not in text and 'cubeful equities' not in text:
             return moves
 
-        # Parse the 3 equity values from gnubg
+        # Parse the 3 equity values from gnubg (supports European locale with comma)
         # Pattern to match cube decision lines:
-        # "1. No double           +0.172"
+        # "1. No double           +0.172" or "1. No double           +0,172"
         # "2. Double, take        -0.361  (-0.533)"
         # "3. Double, pass        +1.000  (+0.828)"
         pattern = re.compile(
-            r'^\s*\d+\.\s*(No (?:re)?double|(?:Re)?[Dd]ouble,?\s*(?:take|pass|drop))\s*([+-]?\d+\.\d+)(?:\s*\(([+-]\d+\.\d+)\))?',
+            r'^\s*\d+\.\s*(No (?:re)?double|(?:Re)?[Dd]ouble,?\s*(?:take|pass|drop))\s*([+-]?\d+[.,]\d+)(?:\s*\(([+-]\d+[.,]\d+)\))?',
             re.MULTILINE | re.IGNORECASE
         )
 
@@ -252,10 +257,10 @@ class GNUBGParser:
         gnubg_moves_data = []  # List of (normalized_notation, equity, gnubg_error)
         for match in pattern.finditer(text):
             notation = match.group(1).strip()
-            equity = float(match.group(2))
+            equity = GNUBGParser._parse_locale_float(match.group(2))
             error_str = match.group(3)
 
-            gnubg_error = float(error_str) if error_str else 0.0
+            gnubg_error = GNUBGParser._parse_locale_float(error_str) if error_str else 0.0
 
             normalized = notation.replace(', ', '/').replace(',', '/')
             normalized = GNUBGParser._normalize_cube_notation(normalized)
@@ -442,28 +447,28 @@ class GNUBGParser:
         """
         chances = {}
 
-        # Try pattern 1: "Win: 52.3%  G: 14.2%  B: 0.8%"
+        # Try pattern 1: "Win: 52.3%  G: 14.2%  B: 0.8%" or "Win: 52,3%  G: 14,2%  B: 0,8%" (European locale)
         win_pattern = re.search(
-            r'Win:\s*(\d+\.?\d*)%.*?G:\s*(\d+\.?\d*)%.*?B:\s*(\d+\.?\d*)%',
+            r'Win:\s*(\d+[.,]?\d*)%.*?G:\s*(\d+[.,]?\d*)%.*?B:\s*(\d+[.,]?\d*)%',
             text,
             re.IGNORECASE
         )
         if win_pattern:
-            chances['player_win_pct'] = float(win_pattern.group(1))
-            chances['player_gammon_pct'] = float(win_pattern.group(2))
-            chances['player_backgammon_pct'] = float(win_pattern.group(3))
+            chances['player_win_pct'] = GNUBGParser._parse_locale_float(win_pattern.group(1))
+            chances['player_gammon_pct'] = GNUBGParser._parse_locale_float(win_pattern.group(2))
+            chances['player_backgammon_pct'] = GNUBGParser._parse_locale_float(win_pattern.group(3))
 
-        # Try pattern 2: Decimal probabilities "0.523 0.142 0.008 - 0.477 0.124 0.006"
+        # Try pattern 2: Decimal probabilities "0.523 0.142 0.008 - 0.477 0.124 0.006" (supports European locale)
         prob_pattern = re.search(
-            r'(\d\.\d+)\s+(\d\.\d+)\s+(\d\.\d+)\s*-\s*(\d\.\d+)\s+(\d\.\d+)\s+(\d\.\d+)',
+            r'(\d[.,]\d+)\s+(\d[.,]\d+)\s+(\d[.,]\d+)\s*-\s*(\d[.,]\d+)\s+(\d[.,]\d+)\s+(\d[.,]\d+)',
             text
         )
         if prob_pattern:
-            chances['player_win_pct'] = float(prob_pattern.group(1)) * 100
-            chances['player_gammon_pct'] = float(prob_pattern.group(2)) * 100
-            chances['player_backgammon_pct'] = float(prob_pattern.group(3)) * 100
-            chances['opponent_win_pct'] = float(prob_pattern.group(4)) * 100
-            chances['opponent_gammon_pct'] = float(prob_pattern.group(5)) * 100
-            chances['opponent_backgammon_pct'] = float(prob_pattern.group(6)) * 100
+            chances['player_win_pct'] = GNUBGParser._parse_locale_float(prob_pattern.group(1)) * 100
+            chances['player_gammon_pct'] = GNUBGParser._parse_locale_float(prob_pattern.group(2)) * 100
+            chances['player_backgammon_pct'] = GNUBGParser._parse_locale_float(prob_pattern.group(3)) * 100
+            chances['opponent_win_pct'] = GNUBGParser._parse_locale_float(prob_pattern.group(4)) * 100
+            chances['opponent_gammon_pct'] = GNUBGParser._parse_locale_float(prob_pattern.group(5)) * 100
+            chances['opponent_backgammon_pct'] = GNUBGParser._parse_locale_float(prob_pattern.group(6)) * 100
 
         return chances

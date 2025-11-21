@@ -15,6 +15,16 @@ from ankigammon.utils.gnuid import parse_gnuid
 class GNUBGMatchParser:
     """Parse GNU Backgammon 'export match text' output."""
 
+    # Regex pattern for decimal numbers that works with both . and , separators
+    # Used throughout the parser to handle European locales
+    DECIMAL_PATTERN = r'\d+[.,]\d+'
+    SIGNED_DECIMAL_PATTERN = r'[+-]?\d+[.,]\d+'
+
+    @staticmethod
+    def _parse_locale_float(s: str) -> float:
+        """Parse a float string that may use comma or period as decimal separator."""
+        return float(s.replace(',', '.'))
+
     @staticmethod
     def extract_player_names_from_mat(mat_file_path: str) -> Tuple[str, str]:
         """
@@ -354,11 +364,11 @@ class GNUBGMatchParser:
                 if cube_section_idx + offset + 1 < len(lines):
                     prob_line = lines[cube_section_idx + offset + 1]
                     prob_match = re.match(
-                        r'\s*(0\.\d+)\s+(0\.\d+)\s+(0\.\d+)\s+-\s+(0\.\d+)\s+(0\.\d+)\s+(0\.\d+)',
+                        r'\s*(0[.,]\d+)\s+(0[.,]\d+)\s+(0[.,]\d+)\s+-\s+(0[.,]\d+)\s+(0[.,]\d+)\s+(0[.,]\d+)',
                         prob_line
                     )
                     if prob_match:
-                        no_double_probs = tuple(float(p) for p in prob_match.groups())
+                        no_double_probs = tuple(GNUBGMatchParser._parse_locale_float(p) for p in prob_match.groups())
                 break
 
         # Parse cube equities from "Cubeful equities:" section
@@ -371,11 +381,11 @@ class GNUBGMatchParser:
             line = lines[start_idx + offset]
 
             # Parse equity lines
-            # Format: "1. No double            -0.014"
-            equity_match = re.match(r'\s*\d+\.\s+(.+?)\s+([+-]?\d+\.\d+)', line)
+            # Format: "1. No double            -0.014" or "1. No double            -0,014" (European locale)
+            equity_match = re.match(r'\s*\d+\.\s+(.+?)\s+([+-]?\d+[.,]\d+)', line)
             if equity_match:
                 action = equity_match.group(1).strip()
-                equity = float(equity_match.group(2))
+                equity = GNUBGMatchParser._parse_locale_float(equity_match.group(2))
                 equities[action] = equity
 
             # Parse proper cube action
@@ -416,10 +426,10 @@ class GNUBGMatchParser:
                 cube_action_taken = "passes" if action == "rejects" else action
 
             # Look for cube error messages
-            cube_alert_match = re.search(r'Alert: (wrong take|bad double|wrong double|missed double|wrong pass)\s+\(\s*([+-]?\d+\.\d+)\s*\)', line, re.IGNORECASE)
+            cube_alert_match = re.search(r'Alert: (wrong take|bad double|wrong double|missed double|wrong pass)\s+\(\s*([+-]?\d+[.,]\d+)\s*\)', line, re.IGNORECASE)
             if cube_alert_match:
                 error_type = cube_alert_match.group(1).lower()
-                error_value = abs(float(cube_alert_match.group(2)))
+                error_value = abs(GNUBGMatchParser._parse_locale_float(cube_alert_match.group(2)))
 
                 if "take" in error_type or "pass" in error_type:
                     take_error = error_value
@@ -682,11 +692,11 @@ class GNUBGMatchParser:
                 if cube_section_idx + offset + 1 < len(lines):
                     prob_line = lines[cube_section_idx + offset + 1]
                     prob_match = re.match(
-                        r'\s*(0\.\d+)\s+(0\.\d+)\s+(0\.\d+)\s+-\s+(0\.\d+)\s+(0\.\d+)\s+(0\.\d+)',
+                        r'\s*(0[.,]\d+)\s+(0[.,]\d+)\s+(0[.,]\d+)\s+-\s+(0[.,]\d+)\s+(0[.,]\d+)\s+(0[.,]\d+)',
                         prob_line
                     )
                     if prob_match:
-                        no_double_probs = tuple(float(p) for p in prob_match.groups())
+                        no_double_probs = tuple(GNUBGMatchParser._parse_locale_float(p) for p in prob_match.groups())
                 break
 
         # Parse cube equities from "Cubeful equities:" section
@@ -699,11 +709,11 @@ class GNUBGMatchParser:
             line = lines[start_idx + offset]
 
             # Parse equity lines
-            # Format: "1. No double            -0.014"
-            equity_match = re.match(r'\s*\d+\.\s+(.+?)\s+([+-]?\d+\.\d+)', line)
+            # Format: "1. No double            -0.014" or "1. No double            -0,014" (European locale)
+            equity_match = re.match(r'\s*\d+\.\s+(.+?)\s+([+-]?\d+[.,]\d+)', line)
             if equity_match:
                 action = equity_match.group(1).strip()
-                equity = float(equity_match.group(2))
+                equity = GNUBGMatchParser._parse_locale_float(equity_match.group(2))
                 equities[action] = equity
 
             # Parse proper cube action
@@ -744,10 +754,10 @@ class GNUBGMatchParser:
                 cube_action_taken = "passes" if action == "rejects" else action
 
             # Look for cube error messages
-            cube_alert_match = re.search(r'Alert: (wrong take|bad double|wrong double|missed double|wrong pass)\s+\(\s*([+-]?\d+\.\d+)\s*\)', line, re.IGNORECASE)
+            cube_alert_match = re.search(r'Alert: (wrong take|bad double|wrong double|missed double|wrong pass)\s+\(\s*([+-]?\d+[.,]\d+)\s*\)', line, re.IGNORECASE)
             if cube_alert_match:
                 error_type = cube_alert_match.group(1).lower()
-                error_value = abs(float(cube_alert_match.group(2)))
+                error_value = abs(GNUBGMatchParser._parse_locale_float(cube_alert_match.group(2)))
 
                 if "take" in error_type or "pass" in error_type:
                     take_error = error_value
@@ -996,15 +1006,15 @@ class GNUBGMatchParser:
                 break
 
         # Find the error value
-        # Format: "Rolled 64 (+0.031):"
+        # Format: "Rolled 64 (+0.031):" or "Rolled 64 (+0,031):" (European locale)
         error = None
         for offset in range(1, 50):
             if start_idx + offset >= len(lines):
                 break
             line = lines[start_idx + offset]
-            error_match = re.match(r'Rolled \d\d \(([+-]?\d+\.\d+)\):', line)
+            error_match = re.match(r'Rolled \d\d \(([+-]?\d+[.,]\d+)\):', line)
             if error_match:
-                error = abs(float(error_match.group(1)))  # Take absolute value
+                error = abs(GNUBGMatchParser._parse_locale_float(error_match.group(1)))  # Take absolute value
                 break
 
         # If no error found, this position wasn't analyzed (skip it)
@@ -1022,29 +1032,29 @@ class GNUBGMatchParser:
             if line.startswith('Move number'):
                 break
 
-            # Parse move line
+            # Parse move line (supports both . and , as decimal separators for European locales)
             move_match = re.match(
-                r'\s*\*?\s*(\d+)\.\s+Cubeful\s+\d+-ply\s+(.+?)\s+Eq\.:\s+([+-]?\d+\.\d+)(?:\s+\(\s*([+-]?\d+\.\d+)\s*\))?',
+                r'\s*\*?\s*(\d+)\.\s+Cubeful\s+\d+-ply\s+(.+?)\s+Eq\.:\s+([+-]?\d+[.,]\d+)(?:\s+\(\s*([+-]?\d+[.,]\d+)\s*\))?',
                 line
             )
             if move_match:
                 rank = int(move_match.group(1))
                 notation = move_match.group(2).strip()
-                equity = float(move_match.group(3))
-                move_error = float(move_match.group(4)) if move_match.group(4) else 0.0
+                equity = GNUBGMatchParser._parse_locale_float(move_match.group(3))
+                move_error = GNUBGMatchParser._parse_locale_float(move_match.group(4)) if move_match.group(4) else 0.0
 
                 was_played = (move_played and notation == move_played)
 
-                # Parse probabilities from next line
+                # Parse probabilities from next line (supports European locale with comma)
                 probs = None
                 if start_idx + offset + 1 < len(lines):
                     prob_line = lines[start_idx + offset + 1]
                     prob_match = re.match(
-                        r'\s*(0\.\d+)\s+(0\.\d+)\s+(0\.\d+)\s+-\s+(0\.\d+)\s+(0\.\d+)\s+(0\.\d+)',
+                        r'\s*(0[.,]\d+)\s+(0[.,]\d+)\s+(0[.,]\d+)\s+-\s+(0[.,]\d+)\s+(0[.,]\d+)\s+(0[.,]\d+)',
                         prob_line
                     )
                     if prob_match:
-                        probs = tuple(float(p) for p in prob_match.groups())
+                        probs = tuple(GNUBGMatchParser._parse_locale_float(p) for p in prob_match.groups())
 
                 # Create Move object
                 move = Move(
