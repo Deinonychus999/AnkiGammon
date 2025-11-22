@@ -210,6 +210,8 @@ class MainWindow(QMainWindow):
         self._gnubg_check_shown = False  # Track if we've shown GnuBG config dialog in current import batch
         self._import_queue = []  # Queue for sequential file imports
         self._import_in_progress = False  # Track if an import is currently being processed
+        self._batch_import_results = []  # Accumulate results from batch imports (for combined success message)
+        self._in_batch_import = False  # Flag to track if we're currently in a batch import of .xgp files
         self._version_checker_thread = None  # Version checker thread
 
         # Enable drag and drop
@@ -341,11 +343,11 @@ class MainWindow(QMainWindow):
         btn_row_layout.setSpacing(8)
 
         # Import File button (equal primary) - full-sized with text + icon
-        self.btn_import_file = QPushButton("  Import File...")
+        self.btn_import_file = QPushButton("  Import Files...")
         self.btn_import_file.setIcon(qta.icon('fa6s.file-import', color='#1e1e2e'))
         self.btn_import_file.setIconSize(QSize(18, 18))
         self.btn_import_file.clicked.connect(self.on_import_file_clicked)
-        self.btn_import_file.setToolTip("Import .xg, .mat, .txt, or .sgf file")
+        self.btn_import_file.setToolTip("Import .xg, .xgp, .mat, .txt, or .sgf files (supports multi-select)")
         self.btn_import_file.setCursor(Qt.PointingHandCursor)
         btn_row_layout.addWidget(self.btn_import_file, stretch=1)
 
@@ -499,7 +501,7 @@ class MainWindow(QMainWindow):
         act_add_positions.triggered.connect(self.on_add_positions_clicked)
         file_menu.addAction(act_add_positions)
 
-        act_import_file = QAction("&Import File...", self)
+        act_import_file = QAction("&Import Files...", self)
         act_import_file.setShortcut("Ctrl+O")
         act_import_file.triggered.connect(self.on_import_file_clicked)
         file_menu.addAction(act_import_file)
@@ -1190,22 +1192,28 @@ class MainWindow(QMainWindow):
         """Handle import file menu action."""
         from PySide6.QtWidgets import QFileDialog
 
-        # Show file dialog
-        file_path, _ = QFileDialog.getOpenFileName(
+        # Show file dialog (allow multiple file selection)
+        file_paths, _ = QFileDialog.getOpenFileNames(
             self,
-            "Import Backgammon File",
+            "Import Backgammon File(s)",
             "",
-            "All Supported Files (*.xg *.mat *.txt *.sgf);;XG Binary (*.xg);;Match Files (*.mat *.txt *.sgf);;All Files (*)"
+            "All Supported Files (*.xg *.xgp *.mat *.txt *.sgf);;XG Files (*.xg *.xgp);;Match Files (*.mat *.txt *.sgf);;All Files (*)"
         )
 
-        if not file_path:
+        if not file_paths:
             return
 
-        # Reset GnuBG check flag for this import
+        # Reset GnuBG check flag for this batch of imports
         self._gnubg_check_shown = False
 
+        # Track if this is a batch import (multiple .xgp files)
+        xgp_files = [f for f in file_paths if f.lower().endswith('.xgp')]
+        if len(xgp_files) > 1:
+            # Set flag to accumulate results for .xgp files
+            self._in_batch_import = True
+
         # Add to import queue and start processing
-        self._import_queue.append(file_path)
+        self._import_queue.extend(file_paths)
         self._process_import_queue()
 
     def dragEnterEvent(self, event):
@@ -1251,6 +1259,12 @@ class MainWindow(QMainWindow):
         # Add files to import queue
         self._import_queue.extend(file_paths)
 
+        # Track if this is a batch import (multiple .xgp files)
+        xgp_files = [f for f in file_paths if f.lower().endswith('.xgp')]
+        if len(xgp_files) > 1:
+            # Set flag to accumulate results for .xgp files
+            self._in_batch_import = True
+
         # Start processing the queue
         self._process_import_queue()
 
@@ -1267,8 +1281,13 @@ class MainWindow(QMainWindow):
 
     def _process_import_queue(self):
         """Process files from the import queue sequentially."""
-        # If already processing or queue is empty, do nothing
-        if self._import_in_progress or not self._import_queue:
+        # If already processing, do nothing
+        if self._import_in_progress:
+            return
+
+        # If queue is empty, show accumulated batch results and return
+        if not self._import_queue:
+            self._show_batch_import_results()
             return
 
         # Mark as in progress
@@ -1289,6 +1308,31 @@ class MainWindow(QMainWindow):
                 QTimer.singleShot(100, self._process_import_queue)
 
         QTimer.singleShot(0, process_file)
+
+    def _show_batch_import_results(self):
+        """Show combined success message for batch imports."""
+        if not self._batch_import_results:
+            # Reset batch flag even if no results
+            self._in_batch_import = False
+            return
+
+        # Calculate total positions imported
+        total_positions = sum(self._batch_import_results)
+        file_count = len(self._batch_import_results)
+
+        # Build message - simple summary without listing files
+        message = f"Imported {total_positions} position(s) from {file_count} file(s)"
+
+        # Show the dialog
+        silent_messagebox.information(
+            self,
+            "Import Successful",
+            message
+        )
+
+        # Clear accumulated results and reset batch flag
+        self._batch_import_results.clear()
+        self._in_batch_import = False
 
     def _import_file(self, file_path: str):
         """
@@ -1318,37 +1362,47 @@ class MainWindow(QMainWindow):
             total_count = 0  # Track total before filtering (for XG binary)
 
             if result.format == InputFormat.XG_BINARY:
-                # Extract player names from XG file
-                player1_name, player2_name = XGBinaryParser.extract_player_names(file_path)
+                # Check if this is a position file (.xgp) or match file (.xg)
+                is_position_file = file_path.lower().endswith('.xgp')
 
-                # Show import options dialog for XG binary files
-                import_dialog = ImportOptionsDialog(
-                    self.settings,
-                    player1_name=player1_name,
-                    player2_name=player2_name,
-                    parent=self
-                )
-                if import_dialog.exec():
-                    # User accepted - get options
-                    checker_threshold, cube_threshold, include_player_x, include_player_o = import_dialog.get_options()
-
-                    # Parse all decisions
-                    all_decisions = XGBinaryParser.parse_file(file_path)
-                    total_count = len(all_decisions)
-
-                    # Filter based on user options
-                    decisions = self._filter_decisions_by_import_options(
-                        all_decisions,
-                        checker_threshold,
-                        cube_threshold,
-                        include_player_x,
-                        include_player_o
-                    )
-
-                    logger.info(f"Filtered {len(decisions)} positions from {total_count} total")
+                if is_position_file:
+                    # Position files contain a single position - import directly without filtering
+                    decisions = XGBinaryParser.parse_file(file_path)
+                    total_count = len(decisions)
+                    logger.info(f"Imported {len(decisions)} position(s) from .xgp file")
                 else:
-                    # User cancelled
-                    return
+                    # Match files may contain many positions - show import options dialog
+                    # Extract player names from XG file
+                    player1_name, player2_name = XGBinaryParser.extract_player_names(file_path)
+
+                    # Show import options dialog for XG match files
+                    import_dialog = ImportOptionsDialog(
+                        self.settings,
+                        player1_name=player1_name,
+                        player2_name=player2_name,
+                        parent=self
+                    )
+                    if import_dialog.exec():
+                        # User accepted - get options
+                        checker_threshold, cube_threshold, include_player_x, include_player_o = import_dialog.get_options()
+
+                        # Parse all decisions
+                        all_decisions = XGBinaryParser.parse_file(file_path)
+                        total_count = len(all_decisions)
+
+                        # Filter based on user options
+                        decisions = self._filter_decisions_by_import_options(
+                            all_decisions,
+                            checker_threshold,
+                            cube_threshold,
+                            include_player_x,
+                            include_player_o
+                        )
+
+                        logger.info(f"Filtered {len(decisions)} positions from {total_count} total")
+                    else:
+                        # User cancelled
+                        return
 
             elif result.format == InputFormat.MATCH_FILE or result.format == InputFormat.SGF_FILE:
                 # Import match file with analysis
@@ -1361,7 +1415,7 @@ class MainWindow(QMainWindow):
                 silent_messagebox.warning(
                     self,
                     "Unknown Format",
-                    f"Could not detect file format.\n\nSupported formats:\n- XG binary files (.xg)\n- Match files (.mat, .sgf)\n\n{result.details}"
+                    f"Could not detect file format.\n\nSupported formats:\n- XG files (.xg, .xgp)\n- Match files (.mat, .sgf)\n\n{result.details}"
                 )
                 return
 
@@ -1371,23 +1425,30 @@ class MainWindow(QMainWindow):
             self.btn_export.setEnabled(True)
             self.list_header_row.show()
 
-            # Show success message
+            # Show success message (or accumulate for batch)
             from pathlib import Path
             filename = Path(file_path).name
 
-            # Show filtering info
-            filtered_count = len(decisions)
-            message = f"Imported {filtered_count} position(s) from {filename}"
-            if total_count > filtered_count:
-                message += f"\n(filtered from {total_count} total positions)"
+            # Determine if this was a position file (.xgp) import
+            is_position_file = file_path.lower().endswith('.xgp')
 
-            silent_messagebox.information(
-                self,
-                "Import Successful",
-                message
-            )
+            if self._in_batch_import and is_position_file:
+                # Accumulate results for position file batch imports
+                self._batch_import_results.append(len(decisions))
+                logger.info(f"Accumulated import result: {len(decisions)} positions from {file_path}")
+            else:
+                # Show immediate success message for single imports or .xg match files
+                filtered_count = len(decisions)
+                message = f"Imported {filtered_count} position(s) from {filename}"
+                if total_count > filtered_count:
+                    message += f"\n(filtered from {total_count} total positions)"
 
-            logger.info(f"Successfully imported {len(decisions)} positions from {file_path}")
+                silent_messagebox.information(
+                    self,
+                    "Import Successful",
+                    message
+                )
+                logger.info(f"Successfully imported {len(decisions)} positions from {file_path}")
 
         except FileNotFoundError:
             silent_messagebox.critical(

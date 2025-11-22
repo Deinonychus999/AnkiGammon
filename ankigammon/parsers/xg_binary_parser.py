@@ -232,7 +232,8 @@ class XGBinaryParser:
                         # Process different record types
                         if isinstance(record, xgstruct.HeaderMatchEntry):
                             file_version = record.Version
-                            match_length = record.MatchLength
+                            # XG uses 99999 for unlimited/money games, normalize to 0
+                            match_length = 0 if record.MatchLength == 99999 else record.MatchLength
                             logger.debug(f"Match header: version={file_version}, match_length={match_length}")
 
                         elif isinstance(record, xgstruct.HeaderGameEntry):
@@ -546,6 +547,9 @@ class XGBinaryParser:
         if note:
             logger.debug(f"Found comment for move entry: {note[:50]}...")
 
+        # Determine format based on file extension
+        file_format = "XGP" if filename.lower().endswith('.xgp') else "XG"
+
         # Create Decision
         decision = Decision(
             position=position,
@@ -562,6 +566,7 @@ class XGBinaryParser:
             xg_error_move=xg_err_move,  # XG's authoritative error value
             xgid=xgid,
             source_description=f"XG file '{filename}'",
+            original_position_format=file_format,
             game_number=game_number,
             note=note
         )
@@ -983,6 +988,9 @@ class XGBinaryParser:
         if note:
             logger.debug(f"Found comment for cube entry: {note[:50]}...")
 
+        # Determine format based on file extension
+        file_format = "XGP" if filename.lower().endswith('.xgp') else "XG"
+
         # Create Decision
         decision = Decision(
             position=position,
@@ -1006,6 +1014,7 @@ class XGBinaryParser:
             opponent_gammon_pct=decision_opponent_gammon_pct,
             opponent_backgammon_pct=decision_opponent_backgammon_pct,
             source_description=f"XG file '{filename}'",
+            original_position_format=file_format,
             game_number=game_number,
             note=note
         )
