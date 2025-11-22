@@ -226,20 +226,30 @@ class ExportWorker(QThread):
                 self.progress.emit(overall_progress)
                 self.status_message.emit(f"Position {i+1}/{total}: {message}")
 
-            # Create card generator with progress callback
+            # Cancellation callback
+            def cancellation_callback():
+                return self._cancelled
+
+            # Create card generator with progress and cancellation callbacks
             output_dir = Path.home() / '.ankigammon' / 'cards'
             card_gen = CardGenerator(
                 output_dir=output_dir,
                 show_options=self.settings.show_options,
                 interactive_moves=self.settings.interactive_moves,
                 renderer=renderer,
-                progress_callback=progress_callback
+                progress_callback=progress_callback,
+                cancellation_callback=cancellation_callback
             )
 
             self.progress.emit(base_progress)
 
             # Generate card with progress tracking
-            card_data = card_gen.generate_card(decision)
+            try:
+                card_data = card_gen.generate_card(decision)
+            except InterruptedError as e:
+                # Cancellation during card generation (e.g., score matrix)
+                self.finished.emit(False, "Export cancelled by user")
+                return
 
             # Add to Anki
             self.status_message.emit(f"Position {i+1}/{total}: Adding to Anki...")
@@ -320,19 +330,29 @@ class ExportWorker(QThread):
                     self.progress.emit(overall_progress)
                     self.status_message.emit(f"Position {i+1}/{total}: {message}")
 
-                # Create card generator with progress callback
+                # Cancellation callback
+                def apkg_cancellation_callback():
+                    return self._cancelled
+
+                # Create card generator with progress and cancellation callbacks
                 card_gen = CardGenerator(
                     output_dir=output_dir,
                     show_options=self.settings.show_options,
                     interactive_moves=self.settings.interactive_moves,
                     renderer=renderer,
-                    progress_callback=apkg_progress_callback
+                    progress_callback=apkg_progress_callback,
+                    cancellation_callback=apkg_cancellation_callback
                 )
 
                 self.progress.emit(base_progress)
 
                 # Generate card
-                card_data = card_gen.generate_card(decision, card_id=f"card_{i}")
+                try:
+                    card_data = card_gen.generate_card(decision, card_id=f"card_{i}")
+                except InterruptedError as e:
+                    # Cancellation during card generation (e.g., score matrix)
+                    self.finished.emit(False, "Export cancelled by user")
+                    return
 
                 # Create note
                 note = genanki.Note(
@@ -419,7 +439,7 @@ class ExportDialog(QDialog):
         self.btn_export = QPushButton("Export")
         self.btn_export.setCursor(Qt.PointingHandCursor)
         self.btn_export.clicked.connect(self.start_export)
-        self.btn_close = QPushButton("Close")
+        self.btn_close = QPushButton("Cancel")
         self.btn_close.setCursor(Qt.PointingHandCursor)
         self.btn_close.clicked.connect(self.close_dialog)
 

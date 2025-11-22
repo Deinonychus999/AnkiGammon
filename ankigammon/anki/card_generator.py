@@ -30,7 +30,8 @@ class CardGenerator:
         interactive_moves: bool = False,
         renderer: Optional[SVGBoardRenderer] = None,
         animation_controller: Optional[AnimationController] = None,
-        progress_callback: Optional[callable] = None
+        progress_callback: Optional[callable] = None,
+        cancellation_callback: Optional[callable] = None
     ):
         """
         Initialize the card generator.
@@ -42,6 +43,7 @@ class CardGenerator:
             renderer: SVG board renderer instance (creates default if None)
             animation_controller: Animation controller instance (creates default if None)
             progress_callback: Optional callback(message: str) for progress updates
+            cancellation_callback: Optional callback() that returns True if cancelled
         """
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -52,6 +54,7 @@ class CardGenerator:
         self.animation_controller = animation_controller or AnimationController()
         self.settings = get_settings()
         self.progress_callback = progress_callback
+        self.cancellation_callback = cancellation_callback
 
     def generate_card(self, decision: Decision, card_id: Optional[str] = None) -> Dict[str, any]:
         """
@@ -1196,6 +1199,7 @@ class CardGenerator:
                 gnubg_path=self.settings.gnubg_path,
                 ply_level=self.settings.gnubg_analysis_ply,
                 progress_callback=self.progress_callback,
+                cancellation_callback=self.cancellation_callback,
                 cube_value=decision.cube_value,
                 cube_owner=decision.cube_owner
             )

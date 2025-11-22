@@ -112,6 +112,7 @@ def generate_score_matrix(
     gnubg_path: str,
     ply_level: int = 3,
     progress_callback: Optional[callable] = None,
+    cancellation_callback: Optional[callable] = None,
     use_parallel: bool = True,
     cube_value: int = 1,
     cube_owner: Optional['CubeState'] = None
@@ -129,6 +130,7 @@ def generate_score_matrix(
         gnubg_path: Path to gnubg-cli.exe
         ply_level: Analysis depth in plies
         progress_callback: Optional callback(message: str) for progress updates
+        cancellation_callback: Optional callback() that returns True if cancelled
         use_parallel: Use parallel analysis (default: True, ~5-9x faster)
         cube_value: Current cube value before doubling (default: 1)
         cube_owner: Current cube owner (default: extracted from XGID)
@@ -233,6 +235,10 @@ def generate_score_matrix(
     if use_parallel and len(position_ids) > 2:
         # Parallel analysis with progress tracking
         def parallel_progress_callback(completed: int, total: int):
+            # Check for cancellation
+            if cancellation_callback and cancellation_callback():
+                raise InterruptedError("Score matrix generation cancelled by user")
+
             if progress_callback:
                 # Get current coordinates for display
                 if completed > 0 and completed <= len(coord_list):
@@ -243,12 +249,17 @@ def generate_score_matrix(
 
         analysis_results = analyzer.analyze_positions_parallel(
             position_ids,
-            progress_callback=parallel_progress_callback
+            progress_callback=parallel_progress_callback,
+            cancellation_callback=cancellation_callback
         )
     else:
         # Sequential analysis (fallback for small matrices or if disabled)
         analysis_results = []
         for idx, pos_id in enumerate(position_ids):
+            # Check for cancellation
+            if cancellation_callback and cancellation_callback():
+                raise InterruptedError("Score matrix generation cancelled by user")
+
             if progress_callback:
                 p_away, o_away = coord_list[idx]
                 progress_callback(

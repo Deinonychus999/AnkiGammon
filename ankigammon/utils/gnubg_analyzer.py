@@ -78,7 +78,8 @@ class GNUBGAnalyzer:
         self,
         position_ids: List[str],
         max_workers: Optional[int] = None,
-        progress_callback: Optional[Callable[[int, int], None]] = None
+        progress_callback: Optional[Callable[[int, int], None]] = None,
+        cancellation_callback: Optional[Callable[[], bool]] = None
     ) -> List[Tuple[str, DecisionType]]:
         """
         Analyze multiple positions in parallel.
@@ -87,6 +88,7 @@ class GNUBGAnalyzer:
             position_ids: List of position identifiers (XGID or GNUID format)
             max_workers: Maximum number of parallel workers (default: min(cpu_count, 8))
             progress_callback: Optional callback for progress updates: callback(completed, total)
+            cancellation_callback: Optional callback that returns True if cancelled
 
         Returns:
             List of tuples (gnubg_output_text, decision_type) in same order as position_ids
@@ -94,6 +96,7 @@ class GNUBGAnalyzer:
         Raises:
             ValueError: If any position_id format is invalid
             subprocess.CalledProcessError: If any gnubg execution fails
+            InterruptedError: If cancellation is requested
         """
         if not position_ids:
             return []
@@ -104,6 +107,10 @@ class GNUBGAnalyzer:
         if len(position_ids) <= 2:
             results = []
             for i, pos_id in enumerate(position_ids):
+                # Check for cancellation before each position
+                if cancellation_callback and cancellation_callback():
+                    raise InterruptedError("Analysis cancelled by user")
+
                 result = self.analyze_position(pos_id)
                 results.append(result)
                 if progress_callback:
@@ -114,13 +121,28 @@ class GNUBGAnalyzer:
         results = [None] * len(position_ids)
         completed = 0
 
-        with ProcessPoolExecutor(max_workers=max_workers) as executor:
+        executor = ProcessPoolExecutor(max_workers=max_workers)
+        try:
             future_to_idx = {
                 executor.submit(_analyze_position_worker, *args): idx
                 for idx, args in enumerate(args_list)
             }
 
             for future in as_completed(future_to_idx):
+                # Check for cancellation
+                if cancellation_callback and cancellation_callback():
+                    # Cancel all pending futures
+                    for f in future_to_idx.keys():
+                        f.cancel()
+                    # Shutdown executor without waiting
+                    # Note: cancel_futures parameter added in Python 3.9
+                    try:
+                        executor.shutdown(wait=False, cancel_futures=True)
+                    except TypeError:
+                        # Python 3.8 doesn't support cancel_futures parameter
+                        executor.shutdown(wait=False)
+                    raise InterruptedError("Analysis cancelled by user")
+
                 idx = future_to_idx[future]
                 try:
                     results[idx] = future.result()
@@ -129,6 +151,8 @@ class GNUBGAnalyzer:
                         progress_callback(completed, len(position_ids))
                 except Exception as e:
                     raise RuntimeError(f"Failed to analyze position {idx} ({position_ids[idx]}): {e}") from e
+        finally:
+            executor.shutdown(wait=False)
 
         return results
 
