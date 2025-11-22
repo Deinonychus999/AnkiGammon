@@ -166,6 +166,8 @@ class GNUBGAnalyzer:
         Analyze entire match file using gnubg and export to text files.
 
         Supports both .mat (Jellyfish) and .sgf (Smart Game Format) files.
+        Also handles SGF position files (single position setups) by analyzing
+        the position instead of a match sequence.
 
         Args:
             mat_file_path: Path to match file (.mat or .sgf)
@@ -173,7 +175,7 @@ class GNUBGAnalyzer:
             progress_callback: Optional callback(status_message) for progress updates
 
         Returns:
-            List of paths to exported text files (one per game)
+            List of paths to exported text files (one per game/position)
             Caller is responsible for cleaning up these temp files after parsing.
 
         Raises:
@@ -185,13 +187,20 @@ class GNUBGAnalyzer:
         if not mat_path.exists():
             raise FileNotFoundError(f"Match file not found: {mat_file_path}")
 
+        # Check if this is an SGF position file (vs a match file)
+        is_position_file = False
+        if mat_path.suffix.lower() == '.sgf':
+            from ankigammon.parsers.sgf_parser import is_sgf_position_file
+            is_position_file = is_sgf_position_file(mat_file_path)
+
         temp_dir = Path(tempfile.mkdtemp(prefix="gnubg_match_"))
         output_base = temp_dir / "analyzed_match.txt"
 
         if progress_callback:
             progress_callback("Preparing analysis...")
 
-        mat_path_str = str(mat_path)
+        # Use absolute paths for GnuBG
+        mat_path_str = str(mat_path.absolute())
         output_path_str = str(output_base)
 
         if ' ' in mat_path_str:
@@ -211,10 +220,23 @@ class GNUBGAnalyzer:
             f"set analysis chequerplay evaluation plies {self.analysis_ply}",
             f"set analysis cubedecision evaluation plies {self.analysis_ply}",
             f"set export moves number {max_moves}",
-            import_cmd,
-            "analyse match",
-            f"export match text {output_path_str}",
         ]
+
+        # For position files, set evaluation settings for hint command
+        if is_position_file:
+            commands.append(f"set evaluation chequerplay plies {self.analysis_ply}")
+            commands.append(f"set evaluation cubedecision plies {self.analysis_ply}")
+
+        commands.append(import_cmd)
+
+        # For position files, analyze the current position using hint
+        if is_position_file:
+            # Use hint to analyze the position
+            commands.append("hint")
+        else:
+            commands.append("analyse match")
+
+        commands.append(f"export match text {output_path_str}")
 
         command_file = self._create_command_file_from_list(commands)
 
@@ -312,10 +334,12 @@ class GNUBGAnalyzer:
             if exported_files:
                 with open(exported_files[0], 'r', encoding='utf-8') as f:
                     content = f.read(5000)
-                    has_analysis = bool(re.search(r'Rolled \d\d \([+-]?\d+[.,]\d+\):', content))
+                    # Check for analysis - either with error annotation or without (perfect moves)
+                    # Patterns: "Rolled XX (±error):" or just "Rolled XX:"
+                    has_analysis = bool(re.search(r'Rolled \d\d(?:\s*\([+-]?\d+[.,]\d+\))?:', content))
                     if not has_analysis:
                         logger.warning("GnuBG exported files but no analysis found")
-                        logger.warning(f"Expected to find 'Rolled XX (±error):' pattern")
+                        logger.warning(f"Expected to find 'Rolled XX:' pattern")
                         logger.warning(f"First file preview:\n{content[:800]}")
                         error_msg = (
                             "GnuBG exported the match but did not include analysis.\n"

@@ -1006,18 +1006,25 @@ class GNUBGMatchParser:
                 break
 
         # Find the error value
-        # Format: "Rolled 64 (+0.031):" or "Rolled 64 (+0,031):" (European locale)
+        # Format: "Rolled 64 (+0.031):" (with error) or "Rolled 64:" (perfect move, no error)
+        # European locale uses comma: "Rolled 64 (+0,031):"
         error = None
         for offset in range(1, 50):
             if start_idx + offset >= len(lines):
                 break
             line = lines[start_idx + offset]
+            # Check for error annotation first
             error_match = re.match(r'Rolled \d\d \(([+-]?\d+[.,]\d+)\):', line)
             if error_match:
                 error = abs(GNUBGMatchParser._parse_locale_float(error_match.group(1)))  # Take absolute value
                 break
+            # Check for "Rolled XX:" without error (perfect move)
+            perfect_match = re.match(r'Rolled \d\d:', line)
+            if perfect_match:
+                error = 0.0  # Perfect move
+                break
 
-        # If no error found, this position wasn't analyzed (skip it)
+        # If no "Rolled" line found, this position wasn't analyzed (skip it)
         if error is None:
             return None
 

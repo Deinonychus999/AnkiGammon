@@ -288,3 +288,47 @@ def extract_player_names_from_sgf(sgf_file_path: str) -> Tuple[str, str]:
         )
     except Exception:
         return ('Player 1', 'Player 2')
+
+
+def is_sgf_position_file(sgf_file_path: str) -> bool:
+    """Detect if SGF file is a position file vs a match file.
+
+    Position files contain a board setup but no actual move sequence.
+    They typically have:
+    - MI[game:0] (game number 0)
+    - Position setup nodes (AE, AW, AB)
+    - Dice indication (DI) but no actual moves (B[...] or W[...] with move notation)
+
+    Args:
+        sgf_file_path: Path to .sgf file
+
+    Returns:
+        True if this is a position file, False if it's a match/game file
+    """
+    try:
+        with open(sgf_file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+
+        # Parse the file
+        data = SGFParser.parse_sgf_file(sgf_file_path)
+
+        if not data.get('games'):
+            return True  # No games = position file
+
+        # Check first game for actual moves
+        first_game = data['games'][0]
+        moves = first_game.get('moves', [])
+
+        # Position files may have DI (dice) tags but no actual move nodes
+        # or only cube actions (double/take/drop) but no checker play moves
+        has_checker_moves = any(
+            move.get('dice') and move.get('notation') and
+            move.get('notation') not in ['Doubles => 2', 'Takes', 'Drops']
+            for move in moves
+        )
+
+        return not has_checker_moves
+
+    except Exception:
+        # If we can't parse it, assume it's a match file and let normal error handling deal with it
+        return False

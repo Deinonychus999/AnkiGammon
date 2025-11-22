@@ -12,6 +12,7 @@ from PySide6.QtWebEngineWidgets import QWebEngineView
 import qtawesome as qta
 import base64
 import subprocess
+import sys
 from typing import List, Tuple
 
 from ankigammon import __version__
@@ -356,7 +357,7 @@ class MainWindow(QMainWindow):
         self.btn_add_positions.setIcon(qta.icon('fa6s.clipboard-list', color='#1e1e2e'))
         self.btn_add_positions.setIconSize(QSize(18, 18))
         self.btn_add_positions.clicked.connect(self.on_add_positions_clicked)
-        self.btn_add_positions.setToolTip("Paste position IDs or full XG analysis")
+        self.btn_add_positions.setToolTip("Add position IDs (XGID/OGID/GNUID) or full XG analysis")
         self.btn_add_positions.setCursor(Qt.PointingHandCursor)
         btn_row_layout.addWidget(self.btn_add_positions, stretch=1)
 
@@ -1405,11 +1406,123 @@ class MainWindow(QMainWindow):
                         return
 
             elif result.format == InputFormat.MATCH_FILE or result.format == InputFormat.SGF_FILE:
-                # Import match file with analysis
-                decisions, total_count = self._import_match_file(file_path)
-                if decisions is None:
-                    # User cancelled or error occurred
-                    return
+                # Check if this is an SGF position file (vs a match file)
+                is_sgf_position = False
+                if result.format == InputFormat.SGF_FILE:
+                    from ankigammon.parsers.sgf_parser import is_sgf_position_file
+                    is_sgf_position = is_sgf_position_file(file_path)
+
+                if is_sgf_position:
+                    # Position files are imported directly without analysis
+                    # Analysis happens later when exporting
+                    from pathlib import Path
+                    from ankigammon.parsers.sgf_parser import SGFParser
+                    from ankigammon.models import Decision, DecisionType, Player
+                    from ankigammon.utils.gnubg_analyzer import GNUBGAnalyzer
+                    import tempfile
+                    import subprocess
+
+                    try:
+                        # Convert SGF to .mat format using GnuBG (just to get the GNUID position)
+                        analyzer = GNUBGAnalyzer(self.settings.gnubg_path, 0)
+                        temp_dir = Path(tempfile.mkdtemp(prefix="sgf_import_"))
+                        mat_path = temp_dir / "position.mat"
+
+                        # Just load and export the position without analysis
+                        gnubg_commands = [
+                            f'load match "{Path(file_path).absolute()}"',
+                            f'export match text "{mat_path.absolute()}"'
+                        ]
+                        cmd_file = analyzer._create_command_file_from_list(gnubg_commands)
+
+                        kwargs = {
+                            'stdout': subprocess.PIPE,
+                            'stderr': subprocess.PIPE,
+                            'text': True,
+                        }
+                        if sys.platform == 'win32':
+                            kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+
+                        gnubg_result = subprocess.run(
+                            [self.settings.gnubg_path, "-t", "-q", "-c", cmd_file],
+                            **kwargs,
+                            timeout=30
+                        )
+
+                        if gnubg_result.returncode != 0:
+                            raise RuntimeError(f"GnuBG failed: {gnubg_result.stderr}")
+
+                        # Parse the exported match file to get position
+                        with open(mat_path, 'r') as f:
+                            mat_content = f.read()
+
+                        # Extract GNUID from the exported file
+                        import re
+                        gnuid_match = re.search(r'Position ID:\s+([A-Za-z0-9+/=]+)', mat_content)
+                        match_id_match = re.search(r'Match ID\s*:\s+([A-Za-z0-9+/=]+)', mat_content)
+
+                        if not gnuid_match:
+                            raise ValueError("Could not extract position from SGF file")
+
+                        from ankigammon.utils.gnuid import parse_gnuid
+                        gnuid_str = gnuid_match.group(1)
+                        if match_id_match:
+                            gnuid_str += ":" + match_id_match.group(1)
+
+                        position, metadata = parse_gnuid(gnuid_str)
+
+                        # Generate XGID for the position
+                        xgid = position.to_xgid(
+                            cube_value=metadata.get('cube_value', 1),
+                            cube_owner=metadata.get('cube_owner'),
+                            dice=metadata.get('dice'),
+                            on_roll=metadata.get('on_roll', Player.X),
+                            score_x=metadata.get('score_x', 0),
+                            score_o=metadata.get('score_o', 0),
+                            match_length=metadata.get('match_length', 0),
+                            crawford_jacoby=1 if metadata.get('crawford', False) else 0
+                        )
+
+                        # Create a decision with no analysis
+                        decision = Decision(
+                            position=position,
+                            on_roll=metadata.get('on_roll', Player.X),
+                            dice=metadata.get('dice'),
+                            decision_type=DecisionType.CHECKER_PLAY if metadata.get('dice') else DecisionType.CUBE_ACTION,
+                            candidate_moves=[],  # No analysis yet
+                            score_x=metadata.get('score_x', 0),
+                            score_o=metadata.get('score_o', 0),
+                            match_length=metadata.get('match_length', 0),
+                            cube_value=metadata.get('cube_value', 1),
+                            cube_owner=metadata.get('cube_owner'),
+                            crawford=metadata.get('crawford', False),
+                            xgid=xgid,
+                            source_description=f"Position from SGF file '{Path(file_path).name}'"
+                        )
+
+                        decisions = [decision]
+                        total_count = 1
+
+                        # Cleanup
+                        import shutil
+                        shutil.rmtree(temp_dir, ignore_errors=True)
+
+                        logger.info(f"Imported 1 position from SGF position file (no analysis)")
+
+                    except Exception as e:
+                        logger.error(f"Failed to import SGF position file: {e}", exc_info=True)
+                        silent_messagebox.critical(
+                            self,
+                            "Import Failed",
+                            f"Failed to import SGF position file:\n\n{str(e)}"
+                        )
+                        return
+                else:
+                    # Import match file with analysis
+                    decisions, total_count = self._import_match_file(file_path)
+                    if decisions is None:
+                        # User cancelled or error occurred
+                        return
 
             else:
                 silent_messagebox.warning(
@@ -1429,8 +1542,11 @@ class MainWindow(QMainWindow):
             from pathlib import Path
             filename = Path(file_path).name
 
-            # Determine if this was a position file (.xgp) import
+            # Determine if this was a position file (.xgp or SGF position file) import
             is_position_file = file_path.lower().endswith('.xgp')
+            if result.format == InputFormat.SGF_FILE:
+                from ankigammon.parsers.sgf_parser import is_sgf_position_file
+                is_position_file = is_position_file or is_sgf_position_file(file_path)
 
             if self._in_batch_import and is_position_file:
                 # Accumulate results for position file batch imports
