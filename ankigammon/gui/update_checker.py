@@ -97,9 +97,11 @@ class VersionChecker:
                     if len(missed_releases) > 1:
                         notes_parts = []
                         for release in missed_releases:
+                            version = release.get('tag_name', '').lstrip('v')
                             body = release.get('body', '').strip()
                             if body:
-                                notes_parts.append(body)
+                                # Add version header to each block
+                                notes_parts.append(f"## Version {version}\n\n{body}")
 
                         combined_notes = "\n\n---\n\n".join(notes_parts)
                         logger.info(f"Combined {len(missed_releases)} release notes")
