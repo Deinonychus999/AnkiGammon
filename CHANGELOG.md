@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.1.3] - 2025-11-22
+
+### Added
+- XGP position files can now be imported (supports multiple files at once)
+- SGF position files (without game records) can now be imported
+
+### Improved
+- Score matrix generation can now be cancelled more reliably during export
+- GNU Backgammon validation runs more quietly in the background
+
+### Fixed
+- Winning chances table now displays correctly for cube decisions at all analysis depths
+
 ## [1.1.2] - 2025-11-21
 
 ### Fixed
