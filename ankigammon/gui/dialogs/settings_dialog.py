@@ -56,7 +56,7 @@ class GnuBGValidationWorker(QThread):
                 os.close(fd)
                 raise
 
-            # Try to run gnubg with -t (text mode) and -c (command file)
+            # Try to run gnubg with -t (text mode), -q (quiet mode), and -c (command file)
             # Suppress console window on Windows; allow extra time for neural network loading
             kwargs = {
                 'capture_output': True,
@@ -67,7 +67,7 @@ class GnuBGValidationWorker(QThread):
                 kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
 
             result = subprocess.run(
-                [str(self.gnubg_path), "-t", "-c", command_file],
+                [str(self.gnubg_path), "-t", "-q", "-c", command_file],
                 **kwargs
             )
 
