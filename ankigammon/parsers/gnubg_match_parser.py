@@ -360,7 +360,8 @@ class GNUBGMatchParser:
                 break
             line = lines[cube_section_idx + offset]
 
-            if '1-ply cubeless equity' in line:
+            # Match any ply level: "0-ply cubeless equity", "1-ply cubeless equity", etc.
+            if re.search(r'\d+-ply cubeless equity', line):
                 if cube_section_idx + offset + 1 < len(lines):
                     prob_line = lines[cube_section_idx + offset + 1]
                     prob_match = re.match(
@@ -688,7 +689,8 @@ class GNUBGMatchParser:
                 break
             line = lines[cube_section_idx + offset]
 
-            if '1-ply cubeless equity' in line:
+            # Match any ply level: "0-ply cubeless equity", "1-ply cubeless equity", etc.
+            if re.search(r'\d+-ply cubeless equity', line):
                 if cube_section_idx + offset + 1 < len(lines):
                     prob_line = lines[cube_section_idx + offset + 1]
                     prob_match = re.match(

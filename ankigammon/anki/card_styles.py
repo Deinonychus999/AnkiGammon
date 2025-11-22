@@ -367,6 +367,7 @@ CARD_CSS = """
     display: flex;
     align-items: center;
     gap: 6px;
+    margin-right: 10px;
 }
 
 .chances-values {
