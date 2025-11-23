@@ -18,6 +18,7 @@ class Settings:
         "deck_name": "My AnkiGammon Deck",
         "show_options": True,
         "interactive_moves": True,
+        "preview_moves_before_submit": False,
         "export_method": "ankiconnect",
         "gnubg_path": None,
         "gnubg_analysis_ply": 3,
@@ -123,6 +124,16 @@ class Settings:
     def interactive_moves(self, value: bool) -> None:
         """Set whether to enable interactive move visualization."""
         self.set("interactive_moves", value)
+
+    @property
+    def preview_moves_before_submit(self) -> bool:
+        """Get whether to preview moves before submitting MCQ answer."""
+        return self._settings.get("preview_moves_before_submit", False)
+
+    @preview_moves_before_submit.setter
+    def preview_moves_before_submit(self, value: bool) -> None:
+        """Set whether to preview moves before submitting MCQ answer."""
+        self.set("preview_moves_before_submit", value)
 
     @property
     def export_method(self) -> str:

@@ -102,35 +102,53 @@ class CardGenerator:
             # Randomize order for checker play
             shuffled_candidates, answer_index = self._shuffle_candidates(candidates)
 
-        # Generate card front
-        if self.show_options:
-            front_html = self._generate_interactive_mcq_front(
-                decision, position_svg, shuffled_candidates
-            )
-        else:
-            front_html = self._generate_simple_front(
-                decision, position_svg
-            )
-
-        # Generate resulting position SVGs
+        # Generate resulting position SVGs (for front card preview or back card interactive moves)
         move_result_svgs = {}
+        move_result_svgs_front = {}
         best_move = decision.get_best_move()
 
-        if not self.interactive_moves:
+        # Preview only makes sense for checker play decisions (not cube actions)
+        preview_enabled = (
+            self.settings.preview_moves_before_submit
+            and self.show_options
+            and decision.decision_type == DecisionType.CHECKER_PLAY
+        )
+
+        if not self.interactive_moves and not preview_enabled:
             # Render only the best move's resulting position
             if best_move:
                 result_svg = self._render_resulting_position_svg(decision, best_move)
             else:
                 result_svg = None
         else:
-            # Render all move results for interactive visualization
+            # Render all move results for interactive visualization and/or preview
             if self.progress_callback:
                 self.progress_callback(f"Rendering board positions...")
-            for candidate in candidates:
-                if candidate:
-                    result_svg_for_move = self._render_resulting_position_svg(decision, candidate)
-                    move_result_svgs[candidate.notation] = result_svg_for_move
+
+            # Use shuffled_candidates for front card (MCQ order), candidates for back card (analysis order)
+            if preview_enabled:
+                for candidate in shuffled_candidates:
+                    if candidate:
+                        result_svg_for_move = self._render_resulting_position_svg(decision, candidate)
+                        move_result_svgs_front[candidate.notation] = result_svg_for_move
+
+            if self.interactive_moves:
+                for candidate in candidates:
+                    if candidate:
+                        result_svg_for_move = self._render_resulting_position_svg(decision, candidate)
+                        move_result_svgs[candidate.notation] = result_svg_for_move
+
             result_svg = None
+
+        # Generate card front
+        if self.show_options:
+            front_html = self._generate_interactive_mcq_front(
+                decision, position_svg, shuffled_candidates, move_result_svgs_front
+            )
+        else:
+            front_html = self._generate_simple_front(
+                decision, position_svg
+            )
 
         # Generate card back
         if self.progress_callback:
@@ -197,11 +215,13 @@ class CardGenerator:
         self,
         decision: Decision,
         position_svg: str,
-        candidates: List[Optional[Move]]
+        candidates: List[Optional[Move]],
+        move_result_svgs: Dict[str, str] = None
     ) -> str:
         """Generate interactive quiz MCQ front with clickable options."""
         metadata = self._get_metadata_html(decision)
         letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J']
+        preview_enabled = self.settings.preview_moves_before_submit and move_result_svgs
 
         # Determine question text based on decision type
         if decision.decision_type == DecisionType.CUBE_ACTION:
@@ -209,19 +229,39 @@ class CardGenerator:
         else:
             question_text = "What is the best move?"
 
-        # Build clickable options
+        # Build clickable options with move notation data
         options_html = []
         for i, candidate in enumerate(candidates):
             if candidate:
                 options_html.append(f"""
-<div class='mcq-option' data-option-letter='{letters[i]}'>
+<div class='mcq-option' data-option-letter='{letters[i]}' data-move-notation='{html.escape(candidate.notation)}'>
     <strong>{letters[i]}.</strong> {candidate.notation}
 </div>
 """)
 
-        html = f"""
+        # Use ID "animated-board" when preview is enabled
+        position_container_id = 'id="animated-board"' if preview_enabled else ''
+
+        # Determine hint text
+        if preview_enabled:
+            hint_text = "Click an option to preview the move, then submit your answer"
+        else:
+            hint_text = "Click an option to see if you're correct"
+
+        # Build submit button HTML (only show when preview enabled)
+        submit_button_html = ""
+        if preview_enabled:
+            submit_button_html = """
+        <div id="mcq-submit-container" style="display: none; margin-top: 15px;">
+            <button id="mcq-submit-btn" class="mcq-submit-button">
+                Submit Answer: <span id="mcq-selected-letter"></span>
+            </button>
+        </div>
+"""
+
+        result_html = f"""
 <div class="card-front interactive-mcq-front">
-    <div class="position-svg">
+    <div class="position-svg" {position_container_id}>
         {position_svg}
     </div>
     <div class="metadata">{metadata}</div>
@@ -230,19 +270,29 @@ class CardGenerator:
         <div class="mcq-options">
             {''.join(options_html)}
         </div>
-        <p class="mcq-hint">Click an option to see if you're correct</p>
+        <p class="mcq-hint">{hint_text}</p>
+        {submit_button_html}
     </div>
 </div>
 
 <script>
-{self._generate_mcq_front_javascript()}
+{self._generate_mcq_front_javascript(decision, candidates, move_result_svgs or {})}
 </script>
 """
-        return html
+        return result_html
 
-    def _generate_mcq_front_javascript(self) -> str:
+    def _generate_mcq_front_javascript(
+        self,
+        decision: Decision,
+        candidates: List[Optional[Move]],
+        move_result_svgs: Dict[str, str]
+    ) -> str:
         """Generate JavaScript for interactive MCQ front side."""
-        return """
+        preview_enabled = self.settings.preview_moves_before_submit and move_result_svgs
+
+        if not preview_enabled:
+            # Original instant-flip behavior
+            return """
 (function() {
     const options = document.querySelectorAll('.mcq-option');
 
@@ -275,6 +325,14 @@ class CardGenerator:
     });
 })();
 """
+
+        # Preview mode - include animation system
+        # Generate animation scripts similar to back card
+        animation_script = self._generate_checker_animation_scripts_for_front(
+            decision, candidates, move_result_svgs
+        )
+
+        return animation_script
 
     def _generate_mcq_back_javascript(self, correct_letter: str) -> str:
         """Generate JavaScript for interactive MCQ back side."""
@@ -610,24 +668,21 @@ class CardGenerator:
 
         return html
 
-    def _generate_checker_animation_scripts(
+    def _generate_move_animation_data(
         self,
         decision: Decision,
-        candidates: List[Optional[Move]],
-        move_result_svgs: Dict[str, str]
-    ) -> str:
+        candidates: List[Optional[Move]]
+    ) -> Dict[str, List[Dict]]:
         """
-        Generate JavaScript for animating checker movements.
+        Generate animation coordinate data for checker movements.
 
         Args:
             decision: The decision with the original position
             candidates: List of candidate moves
-            move_result_svgs: Dictionary mapping move notation to result SVG
 
         Returns:
-            HTML script tags with animation code
+            Dictionary mapping move notation to list of animation data
         """
-        # Calculate coordinates for each checker movement
         move_data = {}
 
         for candidate in candidates:
@@ -685,21 +740,157 @@ class CardGenerator:
 
             move_data[candidate.notation] = move_animations
 
-        move_data_json = json.dumps(move_data)
-        move_result_svgs_json = json.dumps(move_result_svgs)
+        return move_data
 
-        # Prepare animation parameters
-        on_roll_player = 'X' if decision.on_roll == Player.X else 'O'
-        # Ghost checkers use bottom player's color after perspective transform
-        ghost_checker_color = self.renderer.color_scheme.checker_o
-        checker_x_color = self.renderer.color_scheme.checker_x
-        checker_o_color = self.renderer.color_scheme.checker_o
-        checker_border_color = self.renderer.color_scheme.checker_border
-        checker_radius = self.renderer.checker_radius
+    def _generate_animation_javascript(
+        self,
+        move_data_json: str,
+        move_result_svgs_json: str,
+        on_roll_player: str,
+        ghost_checker_color: str,
+        checker_x_color: str,
+        checker_o_color: str,
+        checker_border_color: str,
+        checker_radius: float,
+        mode: str  # 'back' or 'front'
+    ) -> str:
+        """
+        Generate JavaScript animation code for checker movements.
 
-        script = f"""
-<script>
-// Checker movement animation system
+        Args:
+            move_data_json: JSON string of move animation data
+            move_result_svgs_json: JSON string of result SVGs
+            on_roll_player: 'X' or 'O'
+            ghost_checker_color: Color for ghost checkers
+            checker_x_color: Color for X checkers
+            checker_o_color: Color for O checkers
+            checker_border_color: Color for checker borders
+            checker_radius: Radius of checkers
+            mode: 'back' for back card, 'front' for front card
+
+        Returns:
+            JavaScript code string (without <script> tags)
+        """
+        # Mode-specific state variables
+        if mode == 'back':
+            mode_state_vars = "let currentSelectedRow = null;"
+        else:  # front
+            mode_state_vars = """let currentSelectedOption = null;
+    let currentSelectedLetter = null;"""
+
+        # Mode-specific initialize function
+        if mode == 'back':
+            initialize_function = """    // Initialize when DOM is ready
+    function initialize() {
+        // Store the original board state
+        storeOriginalBoard();
+
+        // Set up click handlers for move rows
+        const moveRows = document.querySelectorAll('.move-row');
+
+        // Initialize - highlight best move row
+        const bestMoveRow = document.querySelector('.move-row.best-move');
+        if (bestMoveRow) {
+            bestMoveRow.classList.add('selected');
+            currentSelectedRow = bestMoveRow;
+
+            // Automatically trigger animation for best move
+            const bestMoveNotation = bestMoveRow.dataset.moveNotation;
+            if (bestMoveNotation) {
+                // Small delay to ensure DOM is fully ready
+                setTimeout(() => {
+                    animateMove(bestMoveNotation);
+                }, 100);
+            }
+        }
+
+        moveRows.forEach(row => {
+            row.addEventListener('click', function() {
+                const moveNotation = this.dataset.moveNotation;
+
+                if (!moveNotation) return;
+
+                // Update selection highlighting
+                moveRows.forEach(r => r.classList.remove('selected'));
+                this.classList.add('selected');
+                currentSelectedRow = this;
+
+                // Trigger animation
+                animateMove(moveNotation);
+            });
+        });
+    }"""
+        else:  # front
+            initialize_function = """    // Initialize when DOM is ready
+    function initialize() {
+        // Store the original board state
+        storeOriginalBoard();
+
+        // Set up click handlers for MCQ options
+        const options = document.querySelectorAll('.mcq-option');
+        const submitContainer = document.getElementById('mcq-submit-container');
+        const submitBtn = document.getElementById('mcq-submit-btn');
+        const selectedLetterSpan = document.getElementById('mcq-selected-letter');
+
+        options.forEach(option => {
+            option.addEventListener('click', function() {
+                const moveNotation = this.dataset.moveNotation;
+                const letter = this.dataset.optionLetter;
+
+                if (!moveNotation) return;
+
+                // Update selection highlighting
+                options.forEach(opt => opt.classList.remove('selected'));
+                this.classList.add('selected');
+                currentSelectedOption = this;
+                currentSelectedLetter = letter;
+
+                // Show submit button with selected letter
+                if (submitContainer && selectedLetterSpan) {
+                    selectedLetterSpan.textContent = letter;
+                    submitContainer.style.display = 'block';
+                }
+
+                // Trigger animation
+                animateMove(moveNotation);
+            });
+        });
+
+        // Submit button handler
+        if (submitBtn) {
+            submitBtn.addEventListener('click', function() {
+                if (!currentSelectedLetter) return;
+
+                // Store selection in sessionStorage
+                try {
+                    sessionStorage.setItem('ankigammon-mcq-choice', currentSelectedLetter);
+                } catch (e) {
+                    window.location.hash = 'choice-' + currentSelectedLetter;
+                }
+
+                // Visual feedback
+                if (currentSelectedOption) {
+                    currentSelectedOption.classList.add('selected-flash');
+                }
+
+                // Trigger Anki flip to back side
+                setTimeout(function() {
+                    if (typeof pycmd !== 'undefined') {
+                        pycmd('ans');  // Anki desktop
+                    } else if (typeof AnkiDroidJS !== 'undefined') {
+                        AnkiDroidJS.ankiShowAnswer();  // AnkiDroid
+                    } else {
+                        const event = new KeyboardEvent('keydown', { keyCode: 32 });
+                        document.dispatchEvent(event);
+                    }
+                }, 200);
+            });
+        }
+    }"""
+
+        comment = "Checker movement animation system for MCQ front card" if mode == 'front' else "Checker movement animation system"
+
+        return f"""// {comment}
 (function() {{
     const ANIMATION_DURATION = 200; // milliseconds
     const moveData = {move_data_json};
@@ -712,7 +903,7 @@ class CardGenerator:
     const checkerRadius = {checker_radius};
     let isAnimating = false;
     let cancelCurrentAnimation = false;
-    let currentSelectedRow = null;
+    {mode_state_vars}
     let originalBoardHTML = null;
 
     // Store original board HTML for reset
@@ -801,8 +992,8 @@ class CardGenerator:
 
         // Get checker color to determine text color (inverse)
         const isX = targetChecker.classList.contains('checker-x');
-        const textColor = isX ? '{self.renderer.color_scheme.checker_o}' : '{self.renderer.color_scheme.checker_x}';
-        const fontSize = {self.renderer.checker_radius} * 1.2;
+        const textColor = isX ? checkerOColor : checkerXColor;
+        const fontSize = checkerRadius * 1.2;
 
         if (countText) {{
             // Update existing text
@@ -1058,46 +1249,7 @@ class CardGenerator:
         isAnimating = false;
     }}
 
-    // Initialize when DOM is ready
-    function initialize() {{
-        // Store the original board state
-        storeOriginalBoard();
-
-        // Set up click handlers for move rows
-        const moveRows = document.querySelectorAll('.move-row');
-
-        // Initialize - highlight best move row
-        const bestMoveRow = document.querySelector('.move-row.best-move');
-        if (bestMoveRow) {{
-            bestMoveRow.classList.add('selected');
-            currentSelectedRow = bestMoveRow;
-
-            // Automatically trigger animation for best move
-            const bestMoveNotation = bestMoveRow.dataset.moveNotation;
-            if (bestMoveNotation) {{
-                // Small delay to ensure DOM is fully ready
-                setTimeout(() => {{
-                    animateMove(bestMoveNotation);
-                }}, 100);
-            }}
-        }}
-
-        moveRows.forEach(row => {{
-            row.addEventListener('click', function() {{
-                const moveNotation = this.dataset.moveNotation;
-
-                if (!moveNotation) return;
-
-                // Update selection highlighting
-                moveRows.forEach(r => r.classList.remove('selected'));
-                this.classList.add('selected');
-                currentSelectedRow = this;
-
-                // Trigger animation
-                animateMove(moveNotation);
-            }});
-        }});
-    }}
+{initialize_function}
 
     // Run initialization
     if (document.readyState === 'loading') {{
@@ -1106,10 +1258,97 @@ class CardGenerator:
         initialize();
     }}
 }})();
-</script>
 """
 
-        return script
+    def _generate_checker_animation_scripts(
+        self,
+        decision: Decision,
+        candidates: List[Optional[Move]],
+        move_result_svgs: Dict[str, str]
+    ) -> str:
+        """
+        Generate JavaScript for animating checker movements on back card.
+
+        Args:
+            decision: The decision with the original position
+            candidates: List of candidate moves
+            move_result_svgs: Dictionary mapping move notation to result SVG
+
+        Returns:
+            HTML script tags with animation code
+        """
+        # Calculate coordinates for each checker movement
+        move_data = self._generate_move_animation_data(decision, candidates)
+
+        move_data_json = json.dumps(move_data)
+        move_result_svgs_json = json.dumps(move_result_svgs)
+
+        # Prepare animation parameters
+        on_roll_player = 'X' if decision.on_roll == Player.X else 'O'
+        ghost_checker_color = self.renderer.color_scheme.checker_o
+        checker_x_color = self.renderer.color_scheme.checker_x
+        checker_o_color = self.renderer.color_scheme.checker_o
+        checker_border_color = self.renderer.color_scheme.checker_border
+        checker_radius = self.renderer.checker_radius
+
+        # Generate JavaScript using shared method
+        javascript = self._generate_animation_javascript(
+            move_data_json=move_data_json,
+            move_result_svgs_json=move_result_svgs_json,
+            on_roll_player=on_roll_player,
+            ghost_checker_color=ghost_checker_color,
+            checker_x_color=checker_x_color,
+            checker_o_color=checker_o_color,
+            checker_border_color=checker_border_color,
+            checker_radius=checker_radius,
+            mode='back'
+        )
+
+        return f"\n<script>\n{javascript}\n</script>\n"
+
+    def _generate_checker_animation_scripts_for_front(
+        self,
+        decision: Decision,
+        candidates: List[Optional[Move]],
+        move_result_svgs: Dict[str, str]
+    ) -> str:
+        """
+        Generate JavaScript for animating checker movements on front card.
+
+        Args:
+            decision: The decision with the original position
+            candidates: List of candidate moves
+            move_result_svgs: Dictionary mapping move notation to result SVG
+
+        Returns:
+            JavaScript code (without script tags, for embedding in front HTML)
+        """
+        # Calculate coordinates for each checker movement
+        move_data = self._generate_move_animation_data(decision, candidates)
+
+        move_data_json = json.dumps(move_data)
+        move_result_svgs_json = json.dumps(move_result_svgs)
+
+        # Prepare animation parameters
+        on_roll_player = 'X' if decision.on_roll == Player.X else 'O'
+        ghost_checker_color = self.renderer.color_scheme.checker_o
+        checker_x_color = self.renderer.color_scheme.checker_x
+        checker_o_color = self.renderer.color_scheme.checker_o
+        checker_border_color = self.renderer.color_scheme.checker_border
+        checker_radius = self.renderer.checker_radius
+
+        # Generate JavaScript using shared method
+        return self._generate_animation_javascript(
+            move_data_json=move_data_json,
+            move_result_svgs_json=move_result_svgs_json,
+            on_roll_player=on_roll_player,
+            ghost_checker_color=ghost_checker_color,
+            checker_x_color=checker_x_color,
+            checker_o_color=checker_o_color,
+            checker_border_color=checker_border_color,
+            checker_radius=checker_radius,
+            mode='front'
+        )
 
     def _format_wgb_inline(self, move: Move, decision: Decision) -> str:
         """

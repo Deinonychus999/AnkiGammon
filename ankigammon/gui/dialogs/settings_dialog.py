@@ -10,9 +10,10 @@ from pathlib import Path
 from typing import Optional
 import qtawesome as qta
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QFormLayout,
+    QDialog, QVBoxLayout, QHBoxLayout, QFormLayout, QGridLayout,
     QComboBox, QCheckBox, QLineEdit, QPushButton,
-    QGroupBox, QFileDialog, QLabel, QDialogButtonBox
+    QGroupBox, QFileDialog, QLabel, QDialogButtonBox,
+    QGraphicsOpacityEffect, QFrame
 )
 from PySide6.QtCore import Qt, Signal, QThread
 
@@ -123,6 +124,7 @@ class SettingsDialog(QDialog):
         self.original_settings.deck_name = settings.deck_name
         self.original_settings.show_options = settings.show_options
         self.original_settings.interactive_moves = settings.interactive_moves
+        self.original_settings.preview_moves_before_submit = settings.preview_moves_before_submit
         self.original_settings.export_method = settings.export_method
         self.original_settings.board_orientation = settings.board_orientation
         self.original_settings.gnubg_path = settings.gnubg_path
@@ -144,17 +146,26 @@ class SettingsDialog(QDialog):
         """Initialize the user interface."""
         layout = QVBoxLayout(self)
 
-        # Anki settings group
+        # 2x2 grid layout for settings groups
+        grid = QGridLayout()
+
+        # Row 0, Column 0: Anki Export
         anki_group = self._create_anki_group()
-        layout.addWidget(anki_group)
+        grid.addWidget(anki_group, 0, 0)
 
-        # Card settings group
-        card_group = self._create_card_group()
-        layout.addWidget(card_group)
-
-        # GnuBG settings group
+        # Row 0, Column 1: GnuBG Integration
         gnubg_group = self._create_gnubg_group()
-        layout.addWidget(gnubg_group)
+        grid.addWidget(gnubg_group, 0, 1)
+
+        # Row 1, Column 0: Board Appearance
+        board_group = self._create_board_group()
+        grid.addWidget(board_group, 1, 0)
+
+        # Row 1, Column 1: Study Options
+        study_group = self._create_study_group()
+        grid.addWidget(study_group, 1, 1)
+
+        layout.addLayout(grid)
 
         # Dialog buttons
         button_box = QDialogButtonBox(
@@ -186,52 +197,94 @@ class SettingsDialog(QDialog):
 
         return group
 
-    def _create_card_group(self) -> QGroupBox:
-        """Create card settings group."""
-        group = QGroupBox("Card Appearance")
+    def _create_board_group(self) -> QGroupBox:
+        """Create board appearance settings group."""
+        group = QGroupBox("Board Appearance")
         form = QFormLayout(group)
+        form.setVerticalSpacing(8)
 
-        # Board theme
+        # Theme
         self.cmb_color_scheme = QComboBox()
         self.cmb_color_scheme.addItems(list_schemes())
         self.cmb_color_scheme.setCursor(Qt.PointingHandCursor)
-        form.addRow("Board Theme:", self.cmb_color_scheme)
+        self.cmb_color_scheme.setToolTip("Visual color scheme for the backgammon board")
+        form.addRow("Theme:", self.cmb_color_scheme)
 
-        # Board orientation
+        # Orientation
         self.cmb_board_orientation = QComboBox()
         self.cmb_board_orientation.addItem("Counter-clockwise", "counter-clockwise")
         self.cmb_board_orientation.addItem("Clockwise", "clockwise")
         self.cmb_board_orientation.setCursor(Qt.PointingHandCursor)
-        form.addRow("Board Orientation:", self.cmb_board_orientation)
+        self.cmb_board_orientation.setToolTip(
+            "Direction of point numbering:\n"
+            "• Counter-clockwise: Standard (points 1-24 from bottom-right)\n"
+            "• Clockwise: Alternative (points 1-24 from bottom-left)"
+        )
+        form.addRow("Orientation:", self.cmb_board_orientation)
 
-        # Show options with max options dropdown on same line
-        show_options_layout = QHBoxLayout()
-        self.chk_show_options = QCheckBox("Show multiple choice options on card front")
+        return group
+
+    def _create_study_group(self) -> QGroupBox:
+        """Create study options group."""
+        group = QGroupBox("Study Options")
+        form = QFormLayout(group)
+        form.setVerticalSpacing(8)
+
+        # Multiple Choice Mode (parent)
+        self.chk_show_options = QCheckBox("Show answer choices")
         self.chk_show_options.setCursor(Qt.PointingHandCursor)
-        show_options_layout.addWidget(self.chk_show_options)
+        self.chk_show_options.setStyleSheet("font-size: 14px;")
+        self.chk_show_options.setToolTip(
+            "Display answer choices on the card front as a multiple-choice question.\n"
+            "If unchecked, only the position is shown (self-reveal mode)."
+        )
+        form.addRow(self.chk_show_options)
 
-        # Push max options to the right
-        show_options_layout.addStretch()
+        # Preview moves (child, indented)
+        preview_layout = QHBoxLayout()
+        preview_layout.addSpacing(20)  # Indent to show hierarchy
+        self.chk_preview_moves = QCheckBox("Preview before answering")
+        self.chk_preview_moves.setCursor(Qt.PointingHandCursor)
+        self.chk_preview_moves.setStyleSheet("font-size: 14px;")
+        self.chk_preview_moves.setToolTip(
+            "When enabled, clicking an answer choice shows the resulting position\n"
+            "and adds a Submit button. Without this, clicking an option instantly reveals the answer."
+        )
+        preview_layout.addWidget(self.chk_preview_moves)
+        preview_layout.addStretch()
+        form.addRow(preview_layout)
 
-        # Max options dropdown (on same line, right-aligned)
-        self.lbl_max_options = QLabel("Max Options:")
-        show_options_layout.addWidget(self.lbl_max_options)
-
+        # Maximum choices (child, indented)
+        max_choices_layout = QHBoxLayout()
+        max_choices_layout.addSpacing(20)  # Indent to show hierarchy
+        self.lbl_max_options = QLabel("Max choices:")
+        max_choices_layout.addWidget(self.lbl_max_options)
+        max_choices_layout.addSpacing(8)  # Space between label and dropdown
         self.cmb_max_mcq_options = QComboBox()
         self.cmb_max_mcq_options.addItems([str(i) for i in range(2, 11)])
         self.cmb_max_mcq_options.setCursor(Qt.PointingHandCursor)
         self.cmb_max_mcq_options.setMaximumWidth(80)
-        show_options_layout.addWidget(self.cmb_max_mcq_options)
+        self.cmb_max_mcq_options.setToolTip(
+            "Maximum number of answer choices to display (2-10).\n"
+            "Fewer moves may be shown if there aren't enough alternatives."
+        )
+        max_choices_layout.addWidget(self.cmb_max_mcq_options)
+        max_choices_layout.addStretch()
+        form.addRow(max_choices_layout)
 
-        form.addRow(show_options_layout)
-
-        # Connect checkbox to enable/disable dropdown
-        self.chk_show_options.toggled.connect(self._on_show_options_toggled)
-
-        # Interactive moves
-        self.chk_interactive_moves = QCheckBox("Enable interactive move visualization")
+        # Interactive move visualization (independent, works on all card types)
+        self.chk_interactive_moves = QCheckBox("Interactive moves in analysis")
         self.chk_interactive_moves.setCursor(Qt.PointingHandCursor)
+        self.chk_interactive_moves.setStyleSheet("font-size: 14px;")
+        self.chk_interactive_moves.setToolTip(
+            "Click on alternative moves in the analysis table to see the resulting position.\n"
+            "Works on the back of both multiple-choice and self-reveal cards."
+        )
         form.addRow(self.chk_interactive_moves)
+
+        # Connect checkbox to enable/disable sub-options
+        self.chk_show_options.toggled.connect(self._on_show_options_toggled)
+        self.chk_show_options.toggled.connect(self._on_show_options_toggled_preview)
 
         return group
 
@@ -243,6 +296,7 @@ class SettingsDialog(QDialog):
         # GnuBG path
         path_layout = QHBoxLayout()
         self.txt_gnubg_path = QLineEdit()
+        self.txt_gnubg_path.setToolTip("Path to the GnuBG executable (gnubg-cli.exe on Windows)")
         btn_browse = QPushButton("Browse...")
         btn_browse.setCursor(Qt.PointingHandCursor)
         btn_browse.clicked.connect(self._browse_gnubg)
@@ -254,12 +308,24 @@ class SettingsDialog(QDialog):
         self.cmb_gnubg_ply = QComboBox()
         self.cmb_gnubg_ply.addItems(["0", "1", "2", "3", "4"])
         self.cmb_gnubg_ply.setCursor(Qt.PointingHandCursor)
+        self.cmb_gnubg_ply.setMaximumWidth(60)  # Small dropdown for single digits
+        self.cmb_gnubg_ply.setToolTip(
+            "Analysis depth (moves ahead to evaluate):\n"
+            "• 0-ply: Instant evaluation (least accurate)\n"
+            "• 2-ply: Balanced (recommended, ~10 seconds per position)\n"
+            "• 4-ply: Most thorough (very slow, ~1+ minute per position)"
+        )
         form.addRow("Analysis Depth (ply):", self.cmb_gnubg_ply)
 
         # Score matrix generation
         matrix_layout = QHBoxLayout()
         self.chk_generate_score_matrix = QCheckBox("Generate score matrix for cube decisions")
         self.chk_generate_score_matrix.setCursor(Qt.PointingHandCursor)
+        self.chk_generate_score_matrix.setStyleSheet("font-size: 14px;")
+        self.chk_generate_score_matrix.setToolTip(
+            "Generates a detailed table showing winning chances at different match scores.\n"
+            "This is very time-consuming and can significantly slow down analysis."
+        )
         matrix_layout.addWidget(self.chk_generate_score_matrix)
         matrix_warning = QLabel("(time-consuming)")
         matrix_warning.setStyleSheet("font-size: 11px; color: #a6adc8; margin-left: 8px;")
@@ -296,12 +362,14 @@ class SettingsDialog(QDialog):
 
         self.chk_show_options.setChecked(self.settings.show_options)
         self.chk_interactive_moves.setChecked(self.settings.interactive_moves)
+        self.chk_preview_moves.setChecked(self.settings.preview_moves_before_submit)
 
         # Max MCQ options dropdown (index is value minus 2)
         self.cmb_max_mcq_options.setCurrentIndex(self.settings.max_mcq_options - 2)
 
         # Initialize max options enabled state based on show options checkbox
         self._on_show_options_toggled(self.settings.show_options)
+        self._on_show_options_toggled_preview(self.settings.show_options)
 
         # GnuBG
         if self.settings.gnubg_path:
@@ -378,8 +446,32 @@ class SettingsDialog(QDialog):
         # Add visual feedback for disabled state
         if checked:
             self.lbl_max_options.setStyleSheet("")
+            self.cmb_max_mcq_options.setStyleSheet("")
         else:
             self.lbl_max_options.setStyleSheet("color: #6c7086;")
+            self.cmb_max_mcq_options.setStyleSheet("color: #6c7086;")
+
+    def _on_show_options_toggled_preview(self, checked: bool):
+        """Enable/disable preview checkbox based on show options checkbox."""
+        self.chk_preview_moves.setEnabled(checked)
+
+        # Add visual feedback for disabled state - gray out text and indicator
+        if checked:
+            self.chk_preview_moves.setStyleSheet("")
+        else:
+            # Gray out text and change checkbox indicator color to gray
+            self.chk_preview_moves.setStyleSheet("""
+                QCheckBox {
+                    color: #6c7086;
+                }
+                QCheckBox::indicator:checked:disabled {
+                    background-color: #6c7086;
+                    border-color: #6c7086;
+                }
+                QCheckBox::indicator:unchecked:disabled {
+                    border-color: #6c7086;
+                }
+            """)
 
     def accept(self):
         """Save settings and close dialog."""
@@ -392,6 +484,7 @@ class SettingsDialog(QDialog):
         self.settings.board_orientation = self.cmb_board_orientation.currentData()
         self.settings.show_options = self.chk_show_options.isChecked()
         self.settings.interactive_moves = self.chk_interactive_moves.isChecked()
+        self.settings.preview_moves_before_submit = self.chk_preview_moves.isChecked()
         self.settings.max_mcq_options = self.cmb_max_mcq_options.currentIndex() + 2
         self.settings.gnubg_path = self.txt_gnubg_path.text() or None
         self.settings.gnubg_analysis_ply = self.cmb_gnubg_ply.currentIndex()

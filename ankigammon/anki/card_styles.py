@@ -641,6 +641,12 @@ button.toggle-btn:active {
     border-width: 3px;
 }
 
+.mcq-option.selected {
+    background-color: rgba(100, 150, 255, 0.2);
+    border-color: #4da6ff;
+    border-width: 3px;
+}
+
 /* Hint text below options */
 .mcq-hint {
     margin-top: 20px;
@@ -648,6 +654,45 @@ button.toggle-btn:active {
     color: #999;
     font-style: italic;
     text-align: center;
+}
+
+/* Submit button for preview mode */
+button.mcq-submit-button,
+button.mcq-submit-button:link,
+button.mcq-submit-button:visited {
+    background: #4da6ff;
+    color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    padding: 12px 24px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    text-decoration: none;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    width: 100%;
+    max-width: 300px;
+}
+
+button.mcq-submit-button:hover {
+    background: #3d8fcc;
+    color: #ffffff;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    transform: translateY(-2px);
+}
+
+button.mcq-submit-button:active {
+    background: #2d7fbc;
+    color: #ffffff;
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+#mcq-submit-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
 
 /* Back Side: Feedback Messages */
