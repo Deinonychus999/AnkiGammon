@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.1.4] - 2025-11-23
+
+### Added
+- Move preview option in settings to view checker movements before submitting answers on flashcards
+
 ## [1.1.3] - 2025-11-22
 
 ### Added
@@ -8,7 +13,7 @@
 
 ### Improved
 - Score matrix generation can now be cancelled more reliably during export
-- GNU Backgammon validation runs more quietly in the background
+- GNU Backgammon validation in the settings dialog doesn't make sound anymore
 
 ### Fixed
 - Winning chances table now displays correctly for cube decisions at all analysis depths
