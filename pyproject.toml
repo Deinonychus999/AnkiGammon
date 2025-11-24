@@ -33,6 +33,8 @@ dependencies = [
     "PySide6>=6.6.0",
     "PySide6-Addons>=6.6.0",
     "qtawesome>=1.3.0",
+    # Python < 3.9 compatibility
+    'backports.zoneinfo; python_version < "3.9"',
 ]
 
 [project.urls]

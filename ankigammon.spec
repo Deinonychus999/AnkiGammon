@@ -76,8 +76,6 @@ a = Analysis(
         'requests',
         'striprtf',
         'striprtf.striprtf',
-        'bs4',
-        'lxml',
         'qtawesome',
     ],
     hookspath=[],
