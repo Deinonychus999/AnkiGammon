@@ -5,6 +5,7 @@ import json
 
 from ankigammon.models import Position, Player, CubeState, Move
 from ankigammon.renderer.color_schemes import ColorScheme, CLASSIC
+from ankigammon.settings import get_settings
 
 
 class SVGBoardRenderer:
@@ -33,6 +34,7 @@ class SVGBoardRenderer:
         self.point_height_ratio = point_height_ratio
         self.color_scheme = color_scheme
         self.orientation = orientation
+        self.settings = get_settings()
 
         # Calculate board dimensions
         self.internal_width = 900
@@ -122,7 +124,8 @@ class SVGBoardRenderer:
         svg_parts.append(self._draw_cube(cube_value, cube_owner, board_x, board_y, flipped))
 
         # Draw pip counts
-        svg_parts.append(self._draw_pip_counts(position, board_x, board_y, flipped))
+        if self.settings.show_pip_count:
+            svg_parts.append(self._draw_pip_counts(position, board_x, board_y, flipped))
 
         # Draw scores (for match play only)
         if match_length > 0:

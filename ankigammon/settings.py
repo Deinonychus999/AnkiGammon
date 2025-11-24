@@ -17,6 +17,7 @@ class Settings:
         "default_color_scheme": "classic",
         "deck_name": "My AnkiGammon Deck",
         "show_options": True,
+        "show_pip_count": True,
         "interactive_moves": True,
         "preview_moves_before_submit": False,
         "export_method": "ankiconnect",
@@ -114,6 +115,16 @@ class Settings:
     def show_options(self, value: bool) -> None:
         """Set whether to show options on cards."""
         self.set("show_options", value)
+
+    @property
+    def show_pip_count(self) -> bool:
+        """Get whether to show pip counts on cards."""
+        return self._settings.get("show_pip_count", True)
+
+    @show_pip_count.setter
+    def show_pip_count(self, value: bool) -> None:
+        """Set whether to show pip counts on cards."""
+        self.set("show_pip_count", value)
 
     @property
     def interactive_moves(self) -> bool:

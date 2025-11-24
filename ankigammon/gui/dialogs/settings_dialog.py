@@ -123,6 +123,7 @@ class SettingsDialog(QDialog):
         self.original_settings.color_scheme = settings.color_scheme
         self.original_settings.deck_name = settings.deck_name
         self.original_settings.show_options = settings.show_options
+        self.original_settings.show_pip_count = settings.show_pip_count
         self.original_settings.interactive_moves = settings.interactive_moves
         self.original_settings.preview_moves_before_submit = settings.preview_moves_before_submit
         self.original_settings.export_method = settings.export_method
@@ -221,6 +222,16 @@ class SettingsDialog(QDialog):
             "• Clockwise: Alternative (points 1-24 from bottom-left)"
         )
         form.addRow("Orientation:", self.cmb_board_orientation)
+
+        # Pip count display
+        self.chk_show_pip_count = QCheckBox("Show pip count")
+        self.chk_show_pip_count.setCursor(Qt.PointingHandCursor)
+        self.chk_show_pip_count.setStyleSheet("font-size: 14px;")
+        self.chk_show_pip_count.setToolTip(
+            "Display pip counts on the board showing the total distance\n"
+            "each player needs to bear off all their checkers."
+        )
+        form.addRow(self.chk_show_pip_count)
 
         return group
 
@@ -361,6 +372,7 @@ class SettingsDialog(QDialog):
         self.cmb_board_orientation.setCurrentIndex(orientation_index)
 
         self.chk_show_options.setChecked(self.settings.show_options)
+        self.chk_show_pip_count.setChecked(self.settings.show_pip_count)
         self.chk_interactive_moves.setChecked(self.settings.interactive_moves)
         self.chk_preview_moves.setChecked(self.settings.preview_moves_before_submit)
 
@@ -483,6 +495,7 @@ class SettingsDialog(QDialog):
         self.settings.color_scheme = self.cmb_color_scheme.currentText()
         self.settings.board_orientation = self.cmb_board_orientation.currentData()
         self.settings.show_options = self.chk_show_options.isChecked()
+        self.settings.show_pip_count = self.chk_show_pip_count.isChecked()
         self.settings.interactive_moves = self.chk_interactive_moves.isChecked()
         self.settings.preview_moves_before_submit = self.chk_preview_moves.isChecked()
         self.settings.max_mcq_options = self.cmb_max_mcq_options.currentIndex() + 2
