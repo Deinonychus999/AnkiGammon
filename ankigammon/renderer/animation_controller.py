@@ -25,7 +25,8 @@ class AnimationController:
         self,
         board_width: int = 900,
         board_height: int = 600,
-        point_height_ratio: float = 0.45
+        point_height_ratio: float = 0.45,
+        orientation: str = "counter-clockwise"
     ):
         """
         Initialize the animation controller.
@@ -34,10 +35,12 @@ class AnimationController:
             board_width: SVG viewBox width (must match renderer)
             board_height: SVG viewBox height (must match renderer)
             point_height_ratio: Height of points as ratio of board height
+            orientation: Board orientation ("clockwise" or "counter-clockwise")
         """
         self.board_width = board_width
         self.board_height = board_height
         self.point_height_ratio = point_height_ratio
+        self.orientation = orientation
 
         # Board dimensions matching SVGBoardRenderer
         self.margin = 20
@@ -57,7 +60,11 @@ class AnimationController:
 
         self.checker_radius = min(self.point_width * 0.45, 25)
 
-        self.board_x = self.margin + self.cube_area_width
+        # Board position depends on orientation - swap cube and bearoff positions
+        if self.orientation == "clockwise":
+            self.board_x = self.margin + self.bearoff_area_width
+        else:
+            self.board_x = self.margin + self.cube_area_width
         self.board_y = self.margin
 
     def get_point_coordinates(self, point_num: int, checker_index: int = 0, player: Optional[Player] = None) -> Tuple[float, float]:
@@ -88,7 +95,13 @@ class AnimationController:
 
         # Handle bear-off
         if point_num == -1:
-            bearoff_x = self.board_x + self.playing_width + 50
+            # Bear-off position depends on orientation
+            if self.orientation == "clockwise":
+                # Bear-off on left side
+                bearoff_x = self.margin + 50
+            else:
+                # Bear-off on right side
+                bearoff_x = self.board_x + self.playing_width + 50
             checker_height = 50
 
             if player == Player.X:
@@ -114,27 +127,67 @@ class AnimationController:
 
         return (cx, y)
 
+    def _get_visual_point_index(self, point_num: int) -> int:
+        """
+        Map point number to visual position index based on orientation.
+
+        Counter-clockwise:
+          Top: 13-18 (left), 19-24 (right)
+          Bottom: 12-7 (left), 6-1 (right)
+
+        Clockwise (horizontally mirrored):
+          Top: 24-19 (left), 18-13 (right)
+          Bottom: 1-6 (left), 7-12 (right)
+
+        Args:
+            point_num: Point number (1-24)
+
+        Returns:
+            Visual index for rendering (0-23)
+        """
+        if self.orientation == "clockwise":
+            # Horizontal mirror transformation
+            if point_num <= 12:
+                return 12 - point_num
+            else:
+                return 36 - point_num
+        else:
+            # Standard counter-clockwise layout
+            return point_num - 1
+
     def _get_point_position(self, point_idx: int) -> Tuple[float, float, bool]:
         """
         Get the x, y position and orientation of a point.
 
+        Args:
+            point_idx: Point number (1-24)
+
         Returns:
             (x, y_base, is_top) where is_top indicates if point extends from top
         """
-        if point_idx <= 6:
-            x = self.board_x + self.half_width + self.bar_width + (6 - point_idx) * self.point_width
+        if point_idx < 1 or point_idx > 24:
+            raise ValueError(f"Invalid point index: {point_idx}")
+
+        visual_idx = self._get_visual_point_index(point_idx)
+
+        if visual_idx < 6:
+            # Bottom right quadrant (visual positions 0-5)
+            x = self.board_x + self.half_width + self.bar_width + (5 - visual_idx) * self.point_width
             y_base = self.board_y + self.board_height_inner
             is_top = False
-        elif point_idx <= 12:
-            x = self.board_x + (12 - point_idx) * self.point_width
+        elif visual_idx < 12:
+            # Bottom left quadrant (visual positions 6-11)
+            x = self.board_x + (11 - visual_idx) * self.point_width
             y_base = self.board_y + self.board_height_inner
             is_top = False
-        elif point_idx <= 18:
-            x = self.board_x + (point_idx - 13) * self.point_width
+        elif visual_idx < 18:
+            # Top left quadrant (visual positions 12-17)
+            x = self.board_x + (visual_idx - 12) * self.point_width
             y_base = self.board_y
             is_top = True
         else:
-            x = self.board_x + self.half_width + self.bar_width + (point_idx - 19) * self.point_width
+            # Top right quadrant (visual positions 18-23)
+            x = self.board_x + self.half_width + self.bar_width + (visual_idx - 18) * self.point_width
             y_base = self.board_y
             is_top = True
 

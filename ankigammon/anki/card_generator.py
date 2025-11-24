@@ -50,9 +50,18 @@ class CardGenerator:
 
         self.show_options = show_options
         self.interactive_moves = interactive_moves
-        self.renderer = renderer or SVGBoardRenderer()
-        self.animation_controller = animation_controller or AnimationController()
         self.settings = get_settings()
+
+        # Create default renderer and animation controller with settings if not provided
+        from ankigammon.renderer.color_schemes import get_scheme
+        self.renderer = renderer or SVGBoardRenderer(
+            color_scheme=get_scheme(self.settings.color_scheme),
+            orientation=self.settings.board_orientation
+        )
+        self.animation_controller = animation_controller or AnimationController(
+            orientation=self.settings.board_orientation
+        )
+
         self.progress_callback = progress_callback
         self.cancellation_callback = cancellation_callback
 

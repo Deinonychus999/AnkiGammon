@@ -93,8 +93,11 @@ class SVGBoardRenderer:
         # Add styles
         svg_parts.append(self._generate_styles())
 
-        # Board coordinates
-        board_x = self.margin + self.cube_area_width
+        # Board coordinates - swap cube and bearoff positions for clockwise orientation
+        if self.orientation == "clockwise":
+            board_x = self.margin + self.bearoff_area_width
+        else:
+            board_x = self.margin + self.cube_area_width
         board_y = self.margin
 
         # Draw full background (covers entire SVG viewBox)
@@ -471,7 +474,13 @@ class SVGBoardRenderer:
         """Draw bear-off trays with stacked checker representations."""
         svg_parts = ['<g class="bearoff">']
 
-        bearoff_x = board_x + self.playing_width + 10
+        # Position bear-off area based on orientation
+        if self.orientation == "clockwise":
+            # Bear-off on left side
+            bearoff_x = self.margin + 10
+        else:
+            # Bear-off on right side
+            bearoff_x = board_x + self.playing_width + 10
         bearoff_width = self.bearoff_area_width - 20
 
         checker_width = 10
@@ -627,7 +636,14 @@ class SVGBoardRenderer:
         """Draw the doubling cube."""
         cube_size = 50
 
-        cube_area_center = (self.margin + self.cube_area_width) / 2
+        # Position cube area based on orientation
+        if self.orientation == "clockwise":
+            # Cube on right side
+            cube_area_start = board_x + self.playing_width
+            cube_area_center = cube_area_start + self.cube_area_width / 2
+        else:
+            # Cube on left side
+            cube_area_center = (self.margin + self.cube_area_width) / 2
 
         # Position based on cube owner
         if cube_owner == CubeState.CENTERED:
@@ -661,7 +677,13 @@ class SVGBoardRenderer:
         x_pips = self._calculate_pip_count(position, Player.X)
         o_pips = self._calculate_pip_count(position, Player.O)
 
-        bearoff_text_x = board_x + self.playing_width + 15
+        # Position pip counts based on orientation
+        if self.orientation == "clockwise":
+            # Pip counts on left side
+            bearoff_text_x = self.margin + 15
+        else:
+            # Pip counts on right side
+            bearoff_text_x = board_x + self.playing_width + 15
         x_bearoff_top = board_y + 10 + 21
         o_bearoff_top = board_y + self.board_height / 2 + 70 + 21
 
@@ -693,7 +715,13 @@ class SVGBoardRenderer:
         if match_length == 0:
             return ""
 
-        bearoff_x = board_x + self.playing_width + 10
+        # Position scores based on orientation
+        if self.orientation == "clockwise":
+            # Scores on left side
+            bearoff_x = self.margin + 10
+        else:
+            # Scores on right side
+            bearoff_x = board_x + self.playing_width + 10
         bearoff_width = self.bearoff_area_width - 20
         center_x = bearoff_x + bearoff_width / 2
         center_y = board_y + self.board_height / 2
