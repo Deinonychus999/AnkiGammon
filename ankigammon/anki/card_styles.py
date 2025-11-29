@@ -396,13 +396,7 @@ CARD_CSS = """
     margin: 20px 0;
 }
 
-/* Stack analysis sections vertically in landscape mode for better fit */
 @media screen and (orientation: landscape) and (max-height: 600px) {
-    .analysis-container {
-        flex-direction: column;
-        gap: 10px;
-        margin: 10px 0;
-    }
 
     .note-section {
         margin: 10px 0;
@@ -1095,6 +1089,203 @@ button.animate-btn:disabled {
 @media screen and (orientation: landscape) and (max-height: 450px) {
     .score-matrix {
         display: none;
+    }
+}
+
+/* ===================================================================
+   MOBILE PORTRAIT RESPONSIVE STYLES
+   =================================================================== */
+
+/* Mobile screens */
+@media screen and (max-width: 615px) {
+    .card {
+        padding: 10px;
+        max-width: 100%;
+    }
+
+    /* Stack analysis and winning chances vertically */
+    .analysis-container {
+        flex-direction: column;
+        gap: 15px;
+        align-items: center;
+    }
+
+    /* Make tables responsive with horizontal scroll */
+    .analysis,
+    .analysis-section {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .moves-table {
+        min-width: 280px;
+        font-size: 14px;
+    }
+
+    .moves-table th,
+    .moves-table td {
+        padding: 8px 6px;
+    }
+
+    .move-notation {
+        font-size: 14px;
+    }
+
+    .move-wgb-inline {
+        font-size: 11px;
+    }
+
+    .wgb-detail {
+        font-size: 10px;
+    }
+
+    /* Winning chances responsive */
+    .winning-chances {
+        padding: 12px;
+        margin: 10px 0;
+    }
+
+    .chances-detail {
+        font-size: 11px;
+    }
+
+    /* Answer section */
+    .answer {
+        padding: 12px;
+        margin: 15px 0;
+    }
+
+    .answer h3 {
+        font-size: 16px;
+    }
+
+    .best-move-notation {
+        font-size: 16px;
+    }
+
+    /* Metadata */
+    .metadata {
+        font-size: 13px;
+        padding: 8px;
+    }
+
+    /* Analysis title */
+    .analysis h4,
+    .analysis-section h4,
+    .chances-section h4 {
+        font-size: 16px;
+    }
+
+    /* Score matrix */
+    .score-matrix {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .score-matrix-table {
+        font-size: 11px;
+    }
+
+    .score-matrix-table th,
+    .score-matrix-table td {
+        padding: 5px 4px;
+        min-width: 55px;
+    }
+
+    /* Source info */
+    .source-info {
+        font-size: 11px;
+        padding: 8px;
+    }
+
+    .source-info code {
+        font-size: 10px;
+        word-break: break-all;
+    }
+
+    /* MCQ feedback */
+    .mcq-feedback-container {
+        padding: 12px;
+    }
+
+    .feedback-icon {
+        font-size: 32px;
+    }
+
+    .feedback-text {
+        font-size: 14px;
+    }
+
+    .feedback-separator {
+        display: block;
+        margin: 4px 0;
+    }
+
+    /* Note section */
+    .note-section {
+        padding: 10px;
+    }
+
+    .note-section h4 {
+        font-size: 14px;
+    }
+
+    .note-content {
+        font-size: 13px;
+    }
+}
+
+/* Small mobile screens (portrait) */
+@media screen and (max-width: 380px) {
+    .card {
+        padding: 8px;
+    }
+
+    .moves-table {
+        font-size: 12px;
+    }
+
+    .moves-table th,
+    .moves-table td {
+        padding: 6px 4px;
+    }
+
+    .move-notation {
+        font-size: 13px;
+    }
+
+    .winning-chances {
+        padding: 10px;
+    }
+
+    .chances-values strong {
+        font-size: 14px;
+    }
+
+    .chances-detail {
+        font-size: 10px;
+    }
+
+    .answer h3 {
+        font-size: 15px;
+    }
+
+    .best-move-notation {
+        font-size: 15px;
+    }
+
+    .score-matrix-table th,
+    .score-matrix-table td {
+        padding: 4px 3px;
+        min-width: 45px;
+    }
+
+    .score-matrix-table .action {
+        font-size: 11px;
+    }
+
+    .score-matrix-table .errors {
+        font-size: 9px;
     }
 }
 """
