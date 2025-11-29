@@ -60,7 +60,8 @@ class ApkgExporter:
         color_scheme: str = "classic",
         interactive_moves: bool = False,
         orientation: str = "counter-clockwise",
-        progress_callback: callable = None
+        progress_callback: callable = None,
+        use_subdecks: bool = False
     ) -> str:
         """
         Export decisions to an APKG file.
@@ -73,12 +74,14 @@ class ApkgExporter:
             interactive_moves: Enable interactive move visualization
             orientation: Board orientation
             progress_callback: Optional callback for progress updates
+            use_subdecks: Whether to organize into subdecks by decision type
 
         Returns:
             Path to generated APKG file
         """
         from ankigammon.renderer.color_schemes import get_scheme
         from ankigammon.renderer.svg_board_renderer import SVGBoardRenderer
+        from ankigammon.anki.deck_utils import group_decisions_by_deck
 
         scheme = get_scheme(color_scheme)
         renderer = SVGBoardRenderer(color_scheme=scheme, orientation=orientation)
@@ -91,21 +94,38 @@ class ApkgExporter:
             progress_callback=progress_callback
         )
 
-        for i, decision in enumerate(decisions):
-            if progress_callback:
-                progress_callback(f"Position {i+1}/{len(decisions)}: Starting...")
-            card_data = card_gen.generate_card(decision, card_id=f"card_{i}")
+        # Group decisions by deck
+        decisions_by_deck = group_decisions_by_deck(decisions, self.deck_name, use_subdecks)
 
-            note = genanki.Note(
-                model=self.model,
-                fields=[card_data['front'], card_data['back']],
-                tags=card_data['tags']
-            )
+        # Create deck objects for each group
+        decks_dict = {}
+        for deck_name in decisions_by_deck.keys():
+            deck_id = random.randrange(1 << 30, 1 << 31)
+            decks_dict[deck_name] = genanki.Deck(deck_id, deck_name)
 
-            self.deck.add_note(note)
+        # Generate cards and add to appropriate decks
+        card_index = 0
+        for deck_name, deck_decisions in decisions_by_deck.items():
+            deck = decks_dict[deck_name]
 
+            for decision in deck_decisions:
+                if progress_callback:
+                    progress_callback(f"Position {card_index+1}/{len(decisions)}: Starting...")
+
+                card_data = card_gen.generate_card(decision, card_id=f"card_{card_index}")
+
+                note = genanki.Note(
+                    model=self.model,
+                    fields=[card_data['front'], card_data['back']],
+                    tags=card_data['tags']
+                )
+
+                deck.add_note(note)
+                card_index += 1
+
+        # Package all decks into single APKG file
         output_path = self.output_dir / output_file
-        package = genanki.Package(self.deck)
+        package = genanki.Package(list(decks_dict.values()))
         package.write_to_file(str(output_path))
 
         return str(output_path)

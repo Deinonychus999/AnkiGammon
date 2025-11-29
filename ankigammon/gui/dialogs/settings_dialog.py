@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QFormLayout, QGridLayout,
     QComboBox, QCheckBox, QLineEdit, QPushButton,
     QGroupBox, QFileDialog, QLabel, QDialogButtonBox,
-    QGraphicsOpacityEffect, QFrame
+    QGraphicsOpacityEffect, QFrame, QMessageBox
 )
 from PySide6.QtCore import Qt, Signal, QThread
 
@@ -122,6 +122,7 @@ class SettingsDialog(QDialog):
         self.original_settings = Settings()
         self.original_settings.color_scheme = settings.color_scheme
         self.original_settings.deck_name = settings.deck_name
+        self.original_settings.use_subdecks_by_type = settings.use_subdecks_by_type
         self.original_settings.show_options = settings.show_options
         self.original_settings.show_pip_count = settings.show_pip_count
         self.original_settings.interactive_moves = settings.interactive_moves
@@ -195,6 +196,12 @@ class SettingsDialog(QDialog):
         self.cmb_export_method.addItems(["AnkiConnect", "APKG File"])
         self.cmb_export_method.setCursor(Qt.PointingHandCursor)
         form.addRow("Default Export Method:", self.cmb_export_method)
+
+        # Subdeck organization
+        self.chk_use_subdecks = QCheckBox("Split checker and cube decisions into subdecks")
+        self.chk_use_subdecks.setCursor(Qt.PointingHandCursor)
+        self.chk_use_subdecks.stateChanged.connect(self._on_subdeck_toggled)
+        form.addRow(self.chk_use_subdecks)
 
         return group
 
@@ -357,9 +364,22 @@ class SettingsDialog(QDialog):
 
         return group
 
+    def _on_subdeck_toggled(self, _state):
+        """Show info when enabling subdecks for the first time."""
+        is_checked = self.chk_use_subdecks.isChecked()
+        if is_checked and not self.original_settings.use_subdecks_by_type:
+            QMessageBox.information(
+                self,
+                "Subdeck Organization",
+                "New exports will use subdecks.\n\n"
+                "Existing cards won't move automatically. "
+                "Use Anki's Browser to reorganize if needed."
+            )
+
     def _load_settings(self):
         """Load current settings into widgets."""
         self.txt_deck_name.setText(self.settings.deck_name)
+        self.chk_use_subdecks.setChecked(self.settings.use_subdecks_by_type)
 
         # Export method
         method_index = 0 if self.settings.export_method == "ankiconnect" else 1
@@ -492,6 +512,7 @@ class SettingsDialog(QDialog):
         """Save settings and close dialog."""
         # Update settings object
         self.settings.deck_name = self.txt_deck_name.text()
+        self.settings.use_subdecks_by_type = self.chk_use_subdecks.isChecked()
         self.settings.export_method = (
             "ankiconnect" if self.cmb_export_method.currentIndex() == 0 else "apkg"
         )

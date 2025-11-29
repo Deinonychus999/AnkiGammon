@@ -16,6 +16,7 @@ class Settings:
     DEFAULT_SETTINGS = {
         "default_color_scheme": "classic",
         "deck_name": "My AnkiGammon Deck",
+        "use_subdecks_by_type": False,
         "show_options": True,
         "show_pip_count": True,
         "interactive_moves": True,
@@ -105,6 +106,16 @@ class Settings:
     def deck_name(self, value: str) -> None:
         """Set the default deck name."""
         self.set("deck_name", value)
+
+    @property
+    def use_subdecks_by_type(self) -> bool:
+        """Get whether to organize cards into subdecks by decision type."""
+        return self._settings.get("use_subdecks_by_type", False)
+
+    @use_subdecks_by_type.setter
+    def use_subdecks_by_type(self, value: bool) -> None:
+        """Set whether to organize cards into subdecks by decision type."""
+        self.set("use_subdecks_by_type", value)
 
     @property
     def show_options(self) -> bool:

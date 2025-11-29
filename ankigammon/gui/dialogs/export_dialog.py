@@ -174,11 +174,20 @@ class ExportWorker(QThread):
             self.finished.emit(False, "Could not connect to Anki. Is Anki running with AnkiConnect installed?")
             return
 
-        # Create model and deck if needed
-        self.status_message.emit("Setting up Anki deck...")
+        # Create model and decks if needed
+        self.status_message.emit("Setting up Anki deck(s)...")
         try:
+            from ankigammon.anki.deck_utils import get_deck_name_for_decision, get_required_deck_names
+
             client.create_model()
-            client.create_deck()
+
+            # Create all needed decks upfront
+            for deck_name in get_required_deck_names(
+                self.decisions,
+                self.settings.deck_name,
+                self.settings.use_subdecks_by_type
+            ):
+                client.create_deck(deck_name)
         except Exception as e:
             self.finished.emit(False, f"Failed to setup Anki deck: {str(e)}")
             return
@@ -255,10 +264,17 @@ class ExportWorker(QThread):
             self.status_message.emit(f"Position {i+1}/{total}: Adding to Anki...")
             self.progress.emit(base_progress + (0.95 * position_progress_range))
             try:
+                # Determine the appropriate deck name for this decision
+                deck_name = get_deck_name_for_decision(
+                    self.settings.deck_name,
+                    decision,
+                    self.settings.use_subdecks_by_type
+                )
                 client.add_note(
                     front=card_data['front'],
                     back=card_data['back'],
-                    tags=card_data.get('tags', [])
+                    tags=card_data.get('tags', []),
+                    deck_name=deck_name
                 )
             except Exception as e:
                 self.finished.emit(False, f"Failed to add card {i+1}: {str(e)}")
@@ -279,7 +295,7 @@ class ExportWorker(QThread):
             return
 
         try:
-            # Use existing APKG exporter
+            # Use existing APKG exporter for model creation
             output_dir = Path.home() / '.ankigammon' / 'cards'
             exporter = ApkgExporter(
                 output_dir=output_dir,
@@ -290,7 +306,9 @@ class ExportWorker(QThread):
             from ankigammon.renderer.color_schemes import get_scheme
             from ankigammon.renderer.svg_board_renderer import SVGBoardRenderer
             from ankigammon.anki.card_generator import CardGenerator
+            from ankigammon.anki.deck_utils import group_decisions_by_deck
             import genanki
+            import random
 
             scheme = get_scheme(self.settings.color_scheme)
             renderer = SVGBoardRenderer(
@@ -298,78 +316,99 @@ class ExportWorker(QThread):
                 orientation=self.settings.board_orientation
             )
 
-            # Generate cards
+            # Group decisions by deck
+            decisions_by_deck = group_decisions_by_deck(
+                self.decisions,
+                self.settings.deck_name,
+                self.settings.use_subdecks_by_type
+            )
+
+            # Create deck objects for each group
+            decks_dict = {}
+            for deck_name in decisions_by_deck.keys():
+                deck_id = random.randrange(1 << 30, 1 << 31)
+                decks_dict[deck_name] = genanki.Deck(deck_id, deck_name)
+
+            # Generate cards and add to appropriate decks
             total = len(self.decisions)
-            for i, decision in enumerate(self.decisions):
-                # Check for cancellation
-                if self._cancelled:
-                    self.finished.emit(False, "Export cancelled by user")
-                    return
+            card_index = 0
 
-                # Calculate base progress for this position
-                base_progress = i / total
-                position_progress_range = 1.0 / total
+            for deck_name, deck_decisions in decisions_by_deck.items():
+                deck = decks_dict[deck_name]
 
-                # Calculate sub-steps for progress tracking
-                has_score_matrix = (
-                    decision.decision_type.name == 'CUBE_ACTION' and
-                    decision.match_length > 0 and
-                    self.settings.get('generate_score_matrix', False) and
-                    self.settings.is_gnubg_available()
-                )
-                matrix_steps = (decision.match_length - 1) ** 2 if has_score_matrix else 0
-                total_substeps = 2 + matrix_steps  # render + matrix + generate card
+                for decision in deck_decisions:
+                    # Check for cancellation
+                    if self._cancelled:
+                        self.finished.emit(False, "Export cancelled by user")
+                        return
 
-                current_substep = [0]
+                    # Calculate base progress for this position
+                    base_progress = card_index / total
+                    position_progress_range = 1.0 / total
 
-                # Progress callback for sub-steps
-                def apkg_progress_callback(message: str):
-                    current_substep[0] += 1
-                    substep_progress = min(current_substep[0] / total_substeps, 0.95)
-                    overall_progress = base_progress + (substep_progress * position_progress_range)
-                    self.progress.emit(overall_progress)
-                    self.status_message.emit(f"Position {i+1}/{total}: {message}")
+                    # Calculate sub-steps for progress tracking
+                    has_score_matrix = (
+                        decision.decision_type.name == 'CUBE_ACTION' and
+                        decision.match_length > 0 and
+                        self.settings.get('generate_score_matrix', False) and
+                        self.settings.is_gnubg_available()
+                    )
+                    matrix_steps = (decision.match_length - 1) ** 2 if has_score_matrix else 0
+                    total_substeps = 2 + matrix_steps  # render + matrix + generate card
 
-                # Cancellation callback
-                def apkg_cancellation_callback():
-                    return self._cancelled
+                    current_substep = [0]
+                    current_card_index = card_index  # Capture for closure
 
-                # Create card generator with progress and cancellation callbacks
-                card_gen = CardGenerator(
-                    output_dir=output_dir,
-                    show_options=self.settings.show_options,
-                    interactive_moves=self.settings.interactive_moves,
-                    renderer=renderer,
-                    progress_callback=apkg_progress_callback,
-                    cancellation_callback=apkg_cancellation_callback
-                )
+                    # Progress callback for sub-steps (with captured index)
+                    def make_progress_callback(idx):
+                        def apkg_progress_callback(message: str):
+                            current_substep[0] += 1
+                            substep_progress = min(current_substep[0] / total_substeps, 0.95)
+                            overall_progress = base_progress + (substep_progress * position_progress_range)
+                            self.progress.emit(overall_progress)
+                            self.status_message.emit(f"Position {idx+1}/{total}: {message}")
+                        return apkg_progress_callback
 
-                self.progress.emit(base_progress)
+                    # Cancellation callback
+                    def apkg_cancellation_callback():
+                        return self._cancelled
 
-                # Generate card
-                try:
-                    card_data = card_gen.generate_card(decision, card_id=f"card_{i}")
-                except InterruptedError as e:
-                    # Cancellation during card generation (e.g., score matrix)
-                    self.finished.emit(False, "Export cancelled by user")
-                    return
+                    # Create card generator with progress and cancellation callbacks
+                    card_gen = CardGenerator(
+                        output_dir=output_dir,
+                        show_options=self.settings.show_options,
+                        interactive_moves=self.settings.interactive_moves,
+                        renderer=renderer,
+                        progress_callback=make_progress_callback(current_card_index),
+                        cancellation_callback=apkg_cancellation_callback
+                    )
 
-                # Create note
-                note = genanki.Note(
-                    model=exporter.model,
-                    fields=[card_data['front'], card_data['back']],
-                    tags=card_data['tags']
-                )
+                    self.progress.emit(base_progress)
 
-                # Add to deck
-                exporter.deck.add_note(note)
+                    # Generate card
+                    try:
+                        card_data = card_gen.generate_card(decision, card_id=f"card_{card_index}")
+                    except InterruptedError:
+                        self.finished.emit(False, "Export cancelled by user")
+                        return
 
-                # Update progress after card added
-                self.progress.emit((i + 1) / total)
+                    # Create note
+                    note = genanki.Note(
+                        model=exporter.model,
+                        fields=[card_data['front'], card_data['back']],
+                        tags=card_data['tags']
+                    )
 
-            # Write APKG file
+                    # Add to appropriate deck
+                    deck.add_note(note)
+
+                    # Update progress after card added
+                    card_index += 1
+                    self.progress.emit(card_index / total)
+
+            # Write APKG file with all decks
             self.status_message.emit("Writing APKG file...")
-            package = genanki.Package(exporter.deck)
+            package = genanki.Package(list(decks_dict.values()))
             package.write_to_file(str(self.output_path))
 
             self.progress.emit(1.0)

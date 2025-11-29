@@ -86,9 +86,16 @@ class AnkiConnect:
         except Exception:
             return False
 
-    def create_deck(self) -> None:
-        """Create the target deck if it doesn't exist."""
-        self.invoke('createDeck', deck=self.deck_name)
+    def create_deck(self, deck_name: str = None) -> None:
+        """
+        Create a deck if it doesn't exist.
+
+        Args:
+            deck_name: Deck name to create. If None, uses self.deck_name.
+        """
+        if deck_name is None:
+            deck_name = self.deck_name
+        self.invoke('createDeck', deck=deck_name)
 
     def create_model(self) -> None:
         """Create the XG Backgammon note type if it doesn't exist."""
@@ -116,7 +123,8 @@ class AnkiConnect:
         self,
         front: str,
         back: str,
-        tags: List[str]
+        tags: List[str],
+        deck_name: str = None
     ) -> int:
         """
         Add a note to Anki.
@@ -125,12 +133,16 @@ class AnkiConnect:
             front: Front HTML with embedded SVG
             back: Back HTML with embedded SVG
             tags: List of tags
+            deck_name: Target deck name. If None, uses self.deck_name.
 
         Returns:
             Note ID
         """
+        if deck_name is None:
+            deck_name = self.deck_name
+
         note = {
-            'deckName': self.deck_name,
+            'deckName': deck_name,
             'modelName': MODEL_NAME,
             'fields': {
                 'Front': front,
@@ -151,7 +163,8 @@ class AnkiConnect:
         show_options: bool = False,
         color_scheme: str = "classic",
         interactive_moves: bool = False,
-        orientation: str = "counter-clockwise"
+        orientation: str = "counter-clockwise",
+        use_subdecks: bool = False
     ) -> Dict[str, Any]:
         """
         Export decisions directly to Anki via Anki-Connect.
@@ -163,6 +176,7 @@ class AnkiConnect:
             color_scheme: Board color scheme name
             interactive_moves: Enable interactive move visualization
             orientation: Board orientation
+            use_subdecks: Whether to organize into subdecks by decision type
 
         Returns:
             Dictionary with export statistics
@@ -171,10 +185,14 @@ class AnkiConnect:
             raise Exception("Cannot connect to Anki-Connect")
 
         self.create_model()
-        self.create_deck()
 
         from ankigammon.renderer.color_schemes import get_scheme
         from ankigammon.renderer.svg_board_renderer import SVGBoardRenderer
+        from ankigammon.anki.deck_utils import get_deck_name_for_decision, get_required_deck_names
+
+        # Create all needed decks upfront
+        for deck_name in get_required_deck_names(decisions, self.deck_name, use_subdecks):
+            self.create_deck(deck_name)
 
         scheme = get_scheme(color_scheme)
         renderer = SVGBoardRenderer(color_scheme=scheme, orientation=orientation)
@@ -192,12 +210,16 @@ class AnkiConnect:
 
         for i, decision in enumerate(decisions):
             try:
+                # Get the appropriate deck name for this decision
+                deck_name = get_deck_name_for_decision(self.deck_name, decision, use_subdecks)
+
                 card_data = card_gen.generate_card(decision, card_id=f"card_{i}")
 
                 note_id = self.add_note(
                     front=card_data['front'],
                     back=card_data['back'],
-                    tags=card_data['tags']
+                    tags=card_data['tags'],
+                    deck_name=deck_name
                 )
 
                 if note_id:
