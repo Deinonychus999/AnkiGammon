@@ -330,14 +330,12 @@ class CardGenerator:
             this.classList.add('selected-flash');
 
             // Trigger Anki flip to back side
+            // Note: AnkiWeb and AnkiMobile have no JS API - users must manually flip
             setTimeout(function() {
                 if (typeof pycmd !== 'undefined') {
                     pycmd('ans');  // Anki desktop
-                } else if (typeof AnkiDroidJS !== 'undefined') {
-                    AnkiDroidJS.ankiShowAnswer();  // AnkiDroid
-                } else {
-                    const event = new KeyboardEvent('keydown', { keyCode: 32 });
-                    document.dispatchEvent(event);
+                } else if (typeof showAnswer === 'function') {
+                    showAnswer();  // AnkiDroid (signal-based function from card.js)
                 }
             }, 200);
         });
@@ -893,14 +891,12 @@ class CardGenerator:
                 }
 
                 // Trigger Anki flip to back side
+                // Note: AnkiWeb and AnkiMobile have no JS API - users must manually flip
                 setTimeout(function() {
                     if (typeof pycmd !== 'undefined') {
                         pycmd('ans');  // Anki desktop
-                    } else if (typeof AnkiDroidJS !== 'undefined') {
-                        AnkiDroidJS.ankiShowAnswer();  // AnkiDroid
-                    } else {
-                        const event = new KeyboardEvent('keydown', { keyCode: 32 });
-                        document.dispatchEvent(event);
+                    } else if (typeof showAnswer === 'function') {
+                        showAnswer();  // AnkiDroid (signal-based function from card.js)
                     }
                 }, 200);
             });
