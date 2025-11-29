@@ -84,6 +84,16 @@ class CardGenerator:
         if card_id is None:
             card_id = self._generate_id()
 
+        # Randomize board orientation per card if "random" is selected
+        if self.settings.board_orientation == "random":
+            orientation = random.choice(["clockwise", "counter-clockwise"])
+            from ankigammon.renderer.color_schemes import get_scheme
+            self.renderer = SVGBoardRenderer(
+                color_scheme=get_scheme(self.settings.color_scheme),
+                orientation=orientation
+            )
+            self.animation_controller = AnimationController(orientation=orientation)
+
         # Ensure decision has candidate moves
         if not decision.candidate_moves:
             raise ValueError(

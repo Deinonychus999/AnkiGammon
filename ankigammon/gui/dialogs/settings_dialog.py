@@ -215,11 +215,13 @@ class SettingsDialog(QDialog):
         self.cmb_board_orientation = QComboBox()
         self.cmb_board_orientation.addItem("Counter-clockwise", "counter-clockwise")
         self.cmb_board_orientation.addItem("Clockwise", "clockwise")
+        self.cmb_board_orientation.addItem("Random", "random")
         self.cmb_board_orientation.setCursor(Qt.PointingHandCursor)
         self.cmb_board_orientation.setToolTip(
             "Direction of point numbering:\n"
-            "• Counter-clockwise: Standard (points 1-24 from bottom-right)\n"
-            "• Clockwise: Alternative (points 1-24 from bottom-left)"
+            "• Counter-clockwise (bear-off on the right)\n"
+            "• Clockwise (bear-off on the left)\n"
+            "• Random: Randomly varies per card (trains both perspectives)"
         )
         form.addRow("Orientation:", self.cmb_board_orientation)
 
@@ -368,7 +370,8 @@ class SettingsDialog(QDialog):
         self.cmb_color_scheme.setCurrentIndex(scheme_index)
 
         # Board orientation
-        orientation_index = 0 if self.settings.board_orientation == "counter-clockwise" else 1
+        orientation_map = {"counter-clockwise": 0, "clockwise": 1, "random": 2}
+        orientation_index = orientation_map.get(self.settings.board_orientation, 0)
         self.cmb_board_orientation.setCurrentIndex(orientation_index)
 
         self.chk_show_options.setChecked(self.settings.show_options)

@@ -193,9 +193,9 @@ class Settings:
 
     @board_orientation.setter
     def board_orientation(self, value: str) -> None:
-        """Set the board orientation (clockwise or counter-clockwise)."""
-        if value not in ["clockwise", "counter-clockwise"]:
-            raise ValueError("board_orientation must be 'clockwise' or 'counter-clockwise'")
+        """Set the board orientation (clockwise, counter-clockwise, or random)."""
+        if value not in ["clockwise", "counter-clockwise", "random"]:
+            raise ValueError("board_orientation must be 'clockwise', 'counter-clockwise', or 'random'")
         self.set("board_orientation", value)
 
     @property
