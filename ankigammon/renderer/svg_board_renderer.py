@@ -113,7 +113,8 @@ class SVGBoardRenderer:
         svg_parts.append(self._draw_points(board_x, board_y))
 
         # Draw checkers
-        flipped = False
+        # When X is on roll, the board is flipped (X at bottom, O at top)
+        flipped = (on_roll == Player.X)
         svg_parts.append(self._draw_checkers(position, board_x, board_y, flipped, move_data))
 
         # Draw bear-off trays
@@ -131,8 +132,15 @@ class SVGBoardRenderer:
             svg_parts.append(self._draw_pip_counts(position, board_x, board_y, flipped))
 
         # Draw scores (for match play only)
+        # When X is on roll, position is flipped so X is at bottom, O at top
+        # Swap score display to match visual player positions
         if match_length > 0:
-            svg_parts.append(self._draw_scores(score_x, score_o, match_length, board_x, board_y, flipped))
+            if on_roll == Player.X:
+                # X at bottom, O at top -> show O's score at top, X's at bottom
+                svg_parts.append(self._draw_scores(score_o, score_x, match_length, board_x, board_y, flipped))
+            else:
+                # O at bottom, X at top -> show X's score at top, O's at bottom
+                svg_parts.append(self._draw_scores(score_x, score_o, match_length, board_x, board_y, flipped))
 
         # Close SVG
         svg_parts.append('</svg>')
@@ -704,14 +712,19 @@ class SVGBoardRenderer:
 
     def _draw_scores(
         self,
-        score_x: int,
-        score_o: int,
+        top_score: int,
+        bottom_score: int,
         match_length: int,
         board_x: float,
         board_y: float,
         flipped: bool
     ) -> str:
-        """Draw match scores on the board (only for match play)."""
+        """Draw match scores on the board (only for match play).
+
+        Args:
+            top_score: Score of the player visually at top of board
+            bottom_score: Score of the player visually at bottom of board
+        """
         if match_length == 0:
             return ""
 
@@ -734,7 +747,7 @@ class SVGBoardRenderer:
 
         return f'''
 <g class="match-scores">
-    <!-- Top box: O player score -->
+    <!-- Top box: Score of player at top of board -->
     <rect x="{center_x - box_width/2}" y="{start_y}"
           width="{box_width}" height="{box_height}"
           fill="{self.color_scheme.point_dark}"
@@ -742,7 +755,7 @@ class SVGBoardRenderer:
           stroke-width="2"/>
     <text x="{center_x}" y="{start_y + box_height/2 + 8}"
           text-anchor="middle" font-family="Arial, sans-serif"
-          font-size="22px" font-weight="bold" fill="{self.color_scheme.text}">{score_o}</text>
+          font-size="22px" font-weight="bold" fill="{self.color_scheme.text}">{top_score}</text>
 
     <!-- Middle box: Match length -->
     <rect x="{center_x - box_width/2}" y="{start_y + box_height + box_spacing}"
@@ -754,7 +767,7 @@ class SVGBoardRenderer:
           text-anchor="middle" font-family="Arial, sans-serif"
           font-size="16px" font-weight="bold" fill="{self.color_scheme.text}">{match_length}pt</text>
 
-    <!-- Bottom box: X player score -->
+    <!-- Bottom box: Score of player at bottom of board -->
     <rect x="{center_x - box_width/2}" y="{start_y + 2*box_height + 2*box_spacing}"
           width="{box_width}" height="{box_height}"
           fill="{self.color_scheme.point_dark}"
@@ -762,7 +775,7 @@ class SVGBoardRenderer:
           stroke-width="2"/>
     <text x="{center_x}" y="{start_y + 2*box_height + 2*box_spacing + box_height/2 + 8}"
           text-anchor="middle" font-family="Arial, sans-serif"
-          font-size="22px" font-weight="bold" fill="{self.color_scheme.text}">{score_x}</text>
+          font-size="22px" font-weight="bold" fill="{self.color_scheme.text}">{bottom_score}</text>
 </g>
 '''
 

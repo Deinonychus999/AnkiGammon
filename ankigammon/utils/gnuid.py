@@ -306,14 +306,14 @@ def _decode_match_id(match_id: str) -> Dict:
     cube_log = _extract_bits(bits, 0, 4)
     metadata['cube_value'] = 2 ** cube_log if cube_log < 15 else 1
 
-    # Bits 4-5: Cube owner
+    # Bits 4-5: Cube owner (0 = player 0/bottom/O, 1 = player 1/top/X, 3 = centered)
     cube_owner_bits = _extract_bits(bits, 4, 2)
     if cube_owner_bits == 3:
         metadata['cube_owner'] = CubeState.CENTERED
     elif cube_owner_bits == 0:
-        metadata['cube_owner'] = CubeState.X_OWNS
+        metadata['cube_owner'] = CubeState.O_OWNS  # player 0 = bottom = O
     else:
-        metadata['cube_owner'] = CubeState.O_OWNS
+        metadata['cube_owner'] = CubeState.X_OWNS  # player 1 = top = X
 
     # Bit 7: Crawford
     metadata['crawford'] = bits[7] == 1
@@ -322,9 +322,9 @@ def _decode_match_id(match_id: str) -> Dict:
     game_state = _extract_bits(bits, 8, 3)
     metadata['game_state'] = game_state
 
-    # Bit 11: Turn
+    # Bit 11: Turn (0 = player 0/O on roll, 1 = player 1/X on roll)
     turn_bit = bits[11]
-    metadata['on_roll'] = Player.O if turn_bit == 1 else Player.X
+    metadata['on_roll'] = Player.O if turn_bit == 0 else Player.X
 
     # Bit 12: Doubled
     metadata['doubled'] = bits[12] == 1
@@ -345,13 +345,13 @@ def _decode_match_id(match_id: str) -> Dict:
     match_length = _extract_bits(bits, 21, 15)
     metadata['match_length'] = match_length
 
-    # Bits 36-50: Player X score
+    # Bits 36-50: Player 0 score (bottom player = O)
     score_0 = _extract_bits(bits, 36, 15)
-    metadata['score_x'] = score_0
+    metadata['score_o'] = score_0
 
-    # Bits 51-65: Player O score
+    # Bits 51-65: Player 1 score (top player = X)
     score_1 = _extract_bits(bits, 51, 15)
-    metadata['score_o'] = score_1
+    metadata['score_x'] = score_1
 
     return metadata
 
@@ -526,13 +526,13 @@ def _encode_match_id(
         cube_log += 1
     _set_bits(bits, 0, 4, cube_log)
 
-    # Bits 4-5: Cube owner
+    # Bits 4-5: Cube owner (0 = player 0/bottom/O, 1 = player 1/top/X, 3 = centered)
     if cube_owner == CubeState.CENTERED:
         cube_owner_val = 3
-    elif cube_owner == CubeState.X_OWNS:
-        cube_owner_val = 0
+    elif cube_owner == CubeState.O_OWNS:
+        cube_owner_val = 0  # player 0 = bottom = O
     else:
-        cube_owner_val = 1
+        cube_owner_val = 1  # player 1 = top = X
     _set_bits(bits, 4, 2, cube_owner_val)
 
     # Bit 7: Crawford
@@ -541,8 +541,8 @@ def _encode_match_id(
     # Bits 8-10: Game state
     _set_bits(bits, 8, 3, 1)
 
-    # Bit 11: Turn
-    bits[11] = 1 if on_roll == Player.O else 0
+    # Bit 11: Turn (0 = player 0/O on roll, 1 = player 1/X on roll)
+    bits[11] = 0 if on_roll == Player.O else 1
 
     # Bits 15-17: Die 0
     # Bits 18-20: Die 1
@@ -553,11 +553,11 @@ def _encode_match_id(
     # Bits 21-35: Match length
     _set_bits(bits, 21, 15, match_length)
 
-    # Bits 36-50: Player X score
-    _set_bits(bits, 36, 15, score_x)
+    # Bits 36-50: Player 0 score (bottom player = O)
+    _set_bits(bits, 36, 15, score_o)
 
-    # Bits 51-65: Player O score
-    _set_bits(bits, 51, 15, score_o)
+    # Bits 51-65: Player 1 score (top player = X)
+    _set_bits(bits, 51, 15, score_x)
 
     # Pack into bytes
     match_bytes = bytearray(9)

@@ -86,13 +86,13 @@ def parse_xgid(xgid: str) -> Tuple[Position, dict]:
     cube_value = 2 ** cube_value_log if cube_value_log >= 0 else 1
     metadata['cube_value'] = cube_value
 
-    # Cube owner is perspective-dependent (flipped when X is on roll)
+    # Cube owner: 1 = O owns, -1 = X owns, 0 = centered (absolute, not perspective-dependent)
     if cube_position == 0:
         cube_state = CubeState.CENTERED
     elif cube_position == -1:
-        cube_state = CubeState.X_OWNS if turn == 1 else CubeState.O_OWNS
+        cube_state = CubeState.X_OWNS
     else:  # cube_position == 1
-        cube_state = CubeState.O_OWNS if turn == 1 else CubeState.X_OWNS
+        cube_state = CubeState.O_OWNS
     metadata['cube_owner'] = cube_state
 
     # Turn: 1 = BOTTOM player (O), -1 = TOP player (X)
@@ -114,8 +114,7 @@ def parse_xgid(xgid: str) -> Tuple[Position, dict]:
         if 1 <= d1 <= 6 and 1 <= d2 <= 6:
             metadata['dice'] = (d1, d2)
 
-    # Score: in XGID, field 5 is bottom player, field 6 is top player
-    # We map bottom=O, top=X
+    # Score: in XGID, field 5 is O's score, field 6 is X's score (absolute, not perspective-dependent)
     metadata['score_o'] = score_bottom
     metadata['score_x'] = score_top
 
@@ -266,13 +265,13 @@ def encode_xgid(
         temp_cube //= 2
         cube_value_log += 1
 
-    # Cube position is perspective-dependent (flipped when X is on roll)
+    # Cube position: 1 = O owns, -1 = X owns, 0 = centered (absolute, not perspective-dependent)
     if cube_owner == CubeState.CENTERED:
         cube_position = 0
-    elif turn == 1:
-        cube_position = -1 if cube_owner == CubeState.X_OWNS else 1
-    else:
-        cube_position = 1 if cube_owner == CubeState.X_OWNS else -1
+    elif cube_owner == CubeState.X_OWNS:
+        cube_position = -1
+    else:  # O_OWNS
+        cube_position = 1
 
     # Dice
     if dice:
@@ -287,11 +286,16 @@ def encode_xgid(
         temp //= 2
         max_cube_log += 1
 
+    # Score fields are absolute (not perspective-dependent)
+    # Field 5 = O's score, Field 6 = X's score
+    score_field5 = score_o
+    score_field6 = score_x
+
     # Build XGID
     xgid = (
         f"XGID={pos_str}:"
         f"{cube_value_log}:{cube_position}:{turn}:{dice_str}:"
-        f"{score_o}:{score_x}:"
+        f"{score_field5}:{score_field6}:"
         f"{crawford_jacoby}:{match_length}:{max_cube_log}"
     )
 

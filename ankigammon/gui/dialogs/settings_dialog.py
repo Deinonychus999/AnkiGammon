@@ -222,7 +222,7 @@ class SettingsDialog(QDialog):
         self.cmb_board_orientation = QComboBox()
         self.cmb_board_orientation.addItem("Counter-clockwise", "counter-clockwise")
         self.cmb_board_orientation.addItem("Clockwise", "clockwise")
-        self.cmb_board_orientation.addItem("Random", "random")
+        self.cmb_board_orientation.addItem("Random (at export)", "random")
         self.cmb_board_orientation.setCursor(Qt.PointingHandCursor)
         self.cmb_board_orientation.setToolTip(
             "Direction of point numbering:\n"

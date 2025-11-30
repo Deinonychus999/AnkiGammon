@@ -237,10 +237,11 @@ class XGBinaryParser:
                             logger.debug(f"Match header: version={file_version}, match_length={match_length}")
 
                         elif isinstance(record, xgstruct.HeaderGameEntry):
-                            # XG binary stores scores from Player 1's perspective
-                            # Scores are swapped during position flip when Player 2 is on roll
-                            score_x = record.Score1
-                            score_o = record.Score2
+                            # XG binary: Player 1 = O (bottom), Player 2 = X (top)
+                            # Score1 = Player 1's score = O's score
+                            # Score2 = Player 2's score = X's score
+                            score_o = record.Score1
+                            score_x = record.Score2
                             crawford = bool(record.CrawfordApply)
                             game_number = record.GameNumber
                             logger.debug(f"Game {game_number}: score={score_x}-{score_o}, crawford={crawford}")
@@ -406,8 +407,6 @@ class XGBinaryParser:
                 flipped_points[i] = -position.points[25 - i]
             position.points = flipped_points
             position.x_off, position.o_off = position.o_off, position.x_off
-            # Swap scores to match flipped perspective
-            score_x, score_o = score_o, score_x
 
         # Get dice
         dice = tuple(move_entry.Dice) if move_entry.Dice else None
@@ -426,13 +425,6 @@ class XGBinaryParser:
                 cube_owner = CubeState.O_OWNS  # XG Player 1 owns
             else:
                 cube_owner = CubeState.X_OWNS  # XG Player 2 owns
-
-        # Swap cube owner if position was flipped
-        if on_roll == Player.X:
-            if cube_owner == CubeState.X_OWNS:
-                cube_owner = CubeState.O_OWNS
-            elif cube_owner == CubeState.O_OWNS:
-                cube_owner = CubeState.X_OWNS
 
         # Parse candidate moves from analysis
         moves = []
@@ -647,6 +639,9 @@ class XGBinaryParser:
 
         # Parse cube decisions from Doubled analysis
         moves = []
+        eval_no_double = None  # Initialize for use later in win percentage calculation
+        is_analyzed = False  # Track if position has analysis data
+
         if hasattr(cube_entry, 'Doubled') and cube_entry.Doubled:
             doubled = cube_entry.Doubled
 
@@ -654,116 +649,120 @@ class XGBinaryParser:
             # FlagDouble -100 or -1000 indicates unanalyzed position
             flag_double = doubled.get('FlagDouble', -100)
             if flag_double in (-100, -1000):
-                logger.debug("Skipping unanalyzed cube decision (FlagDouble=%d)", flag_double)
-                return None
+                logger.debug("Creating decision for unanalyzed cube position (FlagDouble=%d)", flag_double)
+                # Don't return None - create Decision with empty moves for unanalyzed positions
+                # This allows the position to be analyzed later (e.g., in GnuBG)
+            else:
+                is_analyzed = True
 
-            # Extract equities
-            eq_no_double = doubled.get('equB', 0.0)
-            eq_double_take = doubled.get('equDouble', 0.0)
-            eq_double_drop = doubled.get('equDrop', -1.0)
+            # Only extract equities and create moves if analyzed
+            if is_analyzed:
+                eq_no_double = doubled.get('equB', 0.0)
+                eq_double_take = doubled.get('equDouble', 0.0)
+                eq_double_drop = doubled.get('equDrop', -1.0)
 
-            # Validate that we have actual analysis data
-            # If all equities are zero and position is empty, skip this decision
-            if (eq_no_double == 0.0 and eq_double_take == 0.0 and
-                abs(eq_double_drop - (-1.0)) < 0.001):
-                # Check if position has any checkers
-                pos = doubled.get('Pos', None)
-                if pos and all(v == 0 for v in pos):
-                    logger.debug("Skipping cube decision with no analysis data")
-                    return None
+                # Validate that we have actual analysis data
+                # If all equities are zero and position is empty, skip this decision
+                if (eq_no_double == 0.0 and eq_double_take == 0.0 and
+                    abs(eq_double_drop - (-1.0)) < 0.001):
+                    # Check if position has any checkers
+                    pos = doubled.get('Pos', None)
+                    if pos and all(v == 0 for v in pos):
+                        logger.debug("Skipping cube decision with no analysis data")
+                        return None
 
-            # Extract winning chances
-            eval_no_double = doubled.get('Eval', None)
-            eval_double = doubled.get('EvalDouble', None)
+                # Extract winning chances
+                eval_no_double = doubled.get('Eval', None)
+                eval_double = doubled.get('EvalDouble', None)
 
-            # Create 5 cube options (similar to XGTextParser)
-            cube_options = []
+                # Create 5 cube options (similar to XGTextParser)
+                cube_options = []
 
-            # 1. No double
-            if eval_no_double:
+                # 1. No double
+                if eval_no_double:
+                    cube_options.append({
+                        'notation': 'No Double/Take',
+                        'equity': eq_no_double,
+                        'xg_notation': 'No double',
+                        'from_xg': True,
+                        'eval': eval_no_double
+                    })
+
+                # 2. Double/Take
+                if eval_double:
+                    cube_options.append({
+                        'notation': 'Double/Take',
+                        'equity': eq_double_take,
+                        'xg_notation': 'Double/Take',
+                        'from_xg': True,
+                        'eval': eval_double
+                    })
+
+                # 3. Double/Pass
                 cube_options.append({
-                    'notation': 'No Double/Take',
-                    'equity': eq_no_double,
-                    'xg_notation': 'No double',
+                    'notation': 'Double/Pass',
+                    'equity': eq_double_drop,
+                    'xg_notation': 'Double/Pass',
                     'from_xg': True,
-                    'eval': eval_no_double
+                    'eval': None
                 })
 
-            # 2. Double/Take
-            if eval_double:
+                # 4 & 5. Too good options (synthetic)
                 cube_options.append({
-                    'notation': 'Double/Take',
-                    'equity': eq_double_take,
-                    'xg_notation': 'Double/Take',
-                    'from_xg': True,
-                    'eval': eval_double
+                    'notation': 'Too good/Take',
+                    'equity': eq_double_drop,
+                    'xg_notation': None,
+                    'from_xg': False,
+                    'eval': None
                 })
 
-            # 3. Double/Pass
-            cube_options.append({
-                'notation': 'Double/Pass',
-                'equity': eq_double_drop,
-                'xg_notation': 'Double/Pass',
-                'from_xg': True,
-                'eval': None
-            })
+                cube_options.append({
+                    'notation': 'Too good/Pass',
+                    'equity': eq_double_drop,
+                    'xg_notation': None,
+                    'from_xg': False,
+                    'eval': None
+                })
 
-            # 4 & 5. Too good options (synthetic)
-            cube_options.append({
-                'notation': 'Too good/Take',
-                'equity': eq_double_drop,
-                'xg_notation': None,
-                'from_xg': False,
-                'eval': None
-            })
+                # Create Move objects
+                for i, opt in enumerate(cube_options):
+                    eval_data = opt.get('eval')
 
-            cube_options.append({
-                'notation': 'Too good/Pass',
-                'equity': eq_double_drop,
-                'xg_notation': None,
-                'from_xg': False,
-                'eval': None
-            })
+                    # Extract winning chances if available
+                    player_win_pct = None
+                    player_gammon_pct = None
+                    player_backgammon_pct = None
+                    opponent_win_pct = None
+                    opponent_gammon_pct = None
+                    opponent_backgammon_pct = None
 
-            # Create Move objects
-            for i, opt in enumerate(cube_options):
-                eval_data = opt.get('eval')
+                    if eval_data and len(eval_data) >= 7:
+                        # Same format as MoveEntry: [Lose_BG, Lose_G, Lose_S, Win_S, Win_G, Win_BG, Equity]
+                        # Cumulative probabilities where Lose_S and Win_S are totals
+                        opponent_win_pct = eval_data[2] * 100  # Total opponent wins (Lose_S)
+                        opponent_gammon_pct = eval_data[1] * 100  # Opp gammon+BG (Lose_G)
+                        opponent_backgammon_pct = eval_data[0] * 100  # Opp BG only (Lose_BG)
+                        player_win_pct = eval_data[3] * 100  # Total player wins (Win_S)
+                        player_gammon_pct = eval_data[4] * 100  # Player gammon+BG (Win_G)
+                        player_backgammon_pct = eval_data[5] * 100  # Player BG only (Win_BG)
 
-                # Extract winning chances if available
-                player_win_pct = None
-                player_gammon_pct = None
-                player_backgammon_pct = None
-                opponent_win_pct = None
-                opponent_gammon_pct = None
-                opponent_backgammon_pct = None
-
-                if eval_data and len(eval_data) >= 7:
-                    # Same format as MoveEntry: [Lose_BG, Lose_G, Lose_S, Win_S, Win_G, Win_BG, Equity]
-                    # Cumulative probabilities where Lose_S and Win_S are totals
-                    opponent_win_pct = eval_data[2] * 100  # Total opponent wins (Lose_S)
-                    opponent_gammon_pct = eval_data[1] * 100  # Opp gammon+BG (Lose_G)
-                    opponent_backgammon_pct = eval_data[0] * 100  # Opp BG only (Lose_BG)
-                    player_win_pct = eval_data[3] * 100  # Total player wins (Win_S)
-                    player_gammon_pct = eval_data[4] * 100  # Player gammon+BG (Win_G)
-                    player_backgammon_pct = eval_data[5] * 100  # Player BG only (Win_BG)
-
-                move = Move(
-                    notation=opt['notation'],
-                    equity=opt['equity'],
-                    error=0.0,
-                    rank=0,  # Will be assigned later
-                    xg_rank=i + 1 if opt['from_xg'] else None,
-                    xg_error=None,
-                    xg_notation=opt['xg_notation'],
-                    from_xg_analysis=opt['from_xg'],
-                    player_win_pct=player_win_pct,
-                    player_gammon_pct=player_gammon_pct,
-                    player_backgammon_pct=player_backgammon_pct,
-                    opponent_win_pct=opponent_win_pct,
-                    opponent_gammon_pct=opponent_gammon_pct,
-                    opponent_backgammon_pct=opponent_backgammon_pct
-                )
-                moves.append(move)
+                    move = Move(
+                        notation=opt['notation'],
+                        equity=opt['equity'],
+                        error=0.0,
+                        rank=0,  # Will be assigned later
+                        xg_rank=i + 1 if opt['from_xg'] else None,
+                        xg_error=None,
+                        xg_notation=opt['xg_notation'],
+                        from_xg_analysis=opt['from_xg'],
+                        player_win_pct=player_win_pct,
+                        player_gammon_pct=player_gammon_pct,
+                        player_backgammon_pct=player_backgammon_pct,
+                        opponent_win_pct=opponent_win_pct,
+                        opponent_gammon_pct=opponent_gammon_pct,
+                        opponent_backgammon_pct=opponent_backgammon_pct
+                    )
+                    moves.append(move)
 
         # Mark which cube action was actually played
         # Double: 0=no double, 1=doubled
@@ -962,13 +961,6 @@ class XGBinaryParser:
             position.points = flipped_points
             # Swap borne-off counts
             position.x_off, position.o_off = position.o_off, position.x_off
-            # Swap scores to match flipped perspective
-            score_x, score_o = score_o, score_x
-            # Swap cube owner to match flipped perspective
-            if cube_owner == CubeState.X_OWNS:
-                cube_owner = CubeState.O_OWNS
-            elif cube_owner == CubeState.O_OWNS:
-                cube_owner = CubeState.X_OWNS
 
         # Generate XGID for the position
         crawford_jacoby = 1 if crawford else 0

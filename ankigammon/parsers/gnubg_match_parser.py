@@ -152,25 +152,9 @@ class GNUBGMatchParser:
         return decisions
 
     @staticmethod
-    def _get_scores_from_metadata(pos_metadata: Dict, is_sgf_source: bool) -> Tuple[int, int]:
-        """
-        Extract scores from GNUID metadata, swapping for SGF sources.
-
-        Args:
-            pos_metadata: Metadata dict from GNUID parsing
-            is_sgf_source: True if original source was SGF file
-
-        Returns:
-            Tuple of (score_x, score_o) correctly mapped for the source type
-        """
-        score_x = pos_metadata.get('score_x', 0)
-        score_o = pos_metadata.get('score_o', 0)
-
-        # Swap scores for SGF sources due to different player encodings
-        if is_sgf_source:
-            score_x, score_o = score_o, score_x
-
-        return score_x, score_o
+    def _get_scores_from_metadata(pos_metadata: Dict) -> Tuple[int, int]:
+        """Extract scores from GNUID metadata."""
+        return pos_metadata.get('score_x', 0), pos_metadata.get('score_o', 0)
 
     @staticmethod
     def _parse_match_metadata(text: str) -> Dict:
@@ -336,10 +320,7 @@ class GNUBGMatchParser:
         except:
             return None
 
-        # Get scores (swap if SGF source)
-        score_x, score_o = GNUBGMatchParser._get_scores_from_metadata(
-            pos_metadata, metadata.get('is_sgf_source', False)
-        )
+        score_x, score_o = GNUBGMatchParser._get_scores_from_metadata(pos_metadata)
 
         # Generate XGID for score matrix support
         xgid = position.to_xgid(
@@ -554,10 +535,7 @@ class GNUBGMatchParser:
         }
         candidate_moves.sort(key=lambda m: order_map.get(m.notation, 99))
 
-        # Get scores (swap if SGF source)
-        score_x, score_o = GNUBGMatchParser._get_scores_from_metadata(
-            pos_metadata, metadata.get('is_sgf_source', False)
-        )
+        score_x, score_o = GNUBGMatchParser._get_scores_from_metadata(pos_metadata)
 
         # Create Decision object
         decision = Decision(
@@ -665,10 +643,7 @@ class GNUBGMatchParser:
         except:
             return None
 
-        # Get scores (swap if SGF source)
-        score_x, score_o = GNUBGMatchParser._get_scores_from_metadata(
-            pos_metadata, metadata.get('is_sgf_source', False)
-        )
+        score_x, score_o = GNUBGMatchParser._get_scores_from_metadata(pos_metadata)
 
         # Generate XGID for score matrix support
         xgid = position.to_xgid(
@@ -886,10 +861,7 @@ class GNUBGMatchParser:
         }
         candidate_moves.sort(key=lambda m: order_map.get(m.notation, 99))
 
-        # Get scores (swap if SGF source)
-        score_x, score_o = GNUBGMatchParser._get_scores_from_metadata(
-            pos_metadata, metadata.get('is_sgf_source', False)
-        )
+        score_x, score_o = GNUBGMatchParser._get_scores_from_metadata(pos_metadata)
 
         # Create Decision object
         decision = Decision(
@@ -977,10 +949,7 @@ class GNUBGMatchParser:
         except:
             return None
 
-        # Get scores (swap if SGF source)
-        score_x, score_o = GNUBGMatchParser._get_scores_from_metadata(
-            pos_metadata, metadata.get('is_sgf_source', False)
-        )
+        score_x, score_o = GNUBGMatchParser._get_scores_from_metadata(pos_metadata)
 
         # Generate XGID for score matrix support
         xgid = position.to_xgid(
@@ -1088,10 +1057,7 @@ class GNUBGMatchParser:
         if not candidate_moves:
             return None
 
-        # Get scores (swap if SGF source)
-        score_x, score_o = GNUBGMatchParser._get_scores_from_metadata(
-            pos_metadata, metadata.get('is_sgf_source', False)
-        )
+        score_x, score_o = GNUBGMatchParser._get_scores_from_metadata(pos_metadata)
 
         # Create Decision object
         decision = Decision(

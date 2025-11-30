@@ -263,6 +263,12 @@ class Decision:
     # User annotations
     note: Optional[str] = None  # User's note or explanation for this position
 
+    def __post_init__(self):
+        """Post-initialization processing."""
+        # Sort dice so larger value is first (e.g., (3, 6) -> (6, 3))
+        if self.dice is not None:
+            self.dice = tuple(sorted(self.dice, reverse=True))
+
     def get_best_move(self) -> Optional[Move]:
         """Get the best move (rank 1)."""
         for move in self.candidate_moves:
