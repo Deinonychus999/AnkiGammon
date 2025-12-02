@@ -131,6 +131,6 @@ if sys.platform == 'darwin':
         info_plist={
             'NSHighResolutionCapable': 'True',
             'LSBackgroundOnly': 'False',
-            'CFBundleShortVersionString': '1.1.4',
+            'CFBundleShortVersionString': '1.1.5',
         },
     )

@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.1.5] - 2025-12-02
+
+### Added
+- Option to split checker and cube decisions into separate subdecks
+- Random board orientation option
+- Option to toggle pip count display on cards
+
+### Fixed
+- Score and cube owner display now correct across all position formats
+- AnkiDroid cards now auto-flip correctly after answering
+- Clockwise board orientation now positions cube and bearoff correctly
+- Linux AppImage missing dependency
+- Unanalyzed XGP files can now be imported
+
+### Improved
+- Flashcard layout on mobile devices
+
 ## [1.1.4] - 2025-11-23
 
 ### Added
