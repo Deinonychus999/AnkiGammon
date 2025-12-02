@@ -610,23 +610,119 @@ button.toggle-btn:active {
    INTERACTIVE MCQ STYLES
    =================================================================== */
 
+/* MCQ Layout - Default: stacked (options below board) */
+.mcq-layout {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+.mcq-board-section {
+    width: 100%;
+}
+
+.mcq-board-section .position-svg {
+    display: block;
+}
+
+.mcq-board-section .position-svg svg {
+    max-width: 100%;
+    height: auto;
+    margin: 0 auto;
+    display: block;
+}
+
+.mcq-options-section {
+    width: 100%;
+    max-width: 500px;
+}
+
+/* 2-column grid for options to handle up to 10 choices */
+.mcq-options {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+}
+
+.mcq-options-section .metadata {
+    margin: 0 0 8px 0;
+}
+
+.mcq-options-section .question h3 {
+    font-size: 16px;
+    margin: 0 0 8px 0;
+}
+
+/* Landscape mode: side-by-side layout to maximize limited vertical space */
+@media screen and (orientation: landscape) and (max-height: 600px) {
+    .interactive-mcq-front {
+        display: flex;
+        justify-content: center;
+    }
+
+    .mcq-layout {
+        display: inline-flex;  /* Shrink to fit content */
+        flex-direction: row;
+        align-items: center;
+        gap: 20px;
+    }
+
+    .mcq-board-section {
+        flex: 0 0 auto;
+        width: auto;
+    }
+
+    .mcq-board-section .position-svg svg {
+        height: 80vh;
+        width: auto;
+    }
+
+    .mcq-options-section {
+        flex: 0 0 auto;
+        width: auto;
+        min-width: 220px;
+        max-width: 320px;
+    }
+
+    .mcq-options-section .question h3 {
+        font-size: 14px;
+        margin: 0 0 6px 0;
+    }
+
+    .mcq-options-section .metadata {
+        font-size: 12px;
+        margin: 0 0 6px 0;
+        padding: 6px;
+    }
+
+    .mcq-option {
+        padding: 6px 8px;
+        font-size: 13px;
+    }
+
+    .mcq-hint {
+        font-size: 11px;
+        margin-top: 8px;
+    }
+}
+
 /* Front Side: Clickable Options */
 .mcq-option {
     cursor: pointer;
-    padding: 12px 16px;
-    margin: 10px 0;
+    padding: 8px 10px;
     background-color: var(--canvas-elevated);
     border: 2px solid var(--border);
     border-radius: 6px;
-    font-size: 16px;
-    transition: all 0.2s ease;
+    font-size: 14px;
+    transition: all 0.15s ease;
     user-select: none;  /* Prevent text selection on click */
+    text-align: left;
 }
 
 .mcq-option:hover {
     background-color: rgba(100, 150, 255, 0.1);
     border-color: #4da6ff;
-    transform: translateX(4px);
 }
 
 .mcq-option.selected-flash {
@@ -643,8 +739,8 @@ button.toggle-btn:active {
 
 /* Hint text below options */
 .mcq-hint {
-    margin-top: 20px;
-    font-size: 13px;
+    margin-top: 12px;
+    font-size: 12px;
     color: #999;
     font-style: italic;
     text-align: center;

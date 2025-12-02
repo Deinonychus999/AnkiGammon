@@ -280,17 +280,23 @@ class CardGenerator:
 
         result_html = f"""
 <div class="card-front interactive-mcq-front">
-    <div class="position-svg" {position_container_id}>
-        {position_svg}
-    </div>
-    <div class="metadata">{metadata}</div>
-    <div class="question">
-        <h3>{question_text}</h3>
-        <div class="mcq-options">
-            {''.join(options_html)}
+    <div class="mcq-layout">
+        <div class="mcq-board-section">
+            <div class="position-svg" {position_container_id}>
+                {position_svg}
+            </div>
         </div>
-        <p class="mcq-hint">{hint_text}</p>
-        {submit_button_html}
+        <div class="mcq-options-section">
+            <div class="metadata">{metadata}</div>
+            <div class="question">
+                <h3>{question_text}</h3>
+                <div class="mcq-options">
+                    {''.join(options_html)}
+                </div>
+                <p class="mcq-hint">{hint_text}</p>
+                {submit_button_html}
+            </div>
+        </div>
     </div>
 </div>
 
