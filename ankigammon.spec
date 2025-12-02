@@ -96,6 +96,15 @@ a = Analysis(
     noarchive=False,
 )
 
+# On Linux, exclude bundled libstdc++ to use system version
+# This fixes compatibility issues with system GPU drivers on newer distros
+# (e.g., Fedora 41 with Wayland and Intel graphics)
+if sys.platform == 'linux':
+    a.binaries = [
+        (name, path, typ) for name, path, typ in a.binaries
+        if not name.startswith('libstdc++')
+    ]
+
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
 exe = EXE(

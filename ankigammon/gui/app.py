@@ -141,12 +141,12 @@ def main():
 
     set_windows_app_id()
 
-    # Enable High DPI scaling
+    # High DPI scaling configuration
+    # Note: AA_EnableHighDpiScaling and AA_UseHighDpiPixmaps are deprecated in Qt6
+    # (enabled by default), so we only set the rounding policy
     QApplication.setHighDpiScaleFactorRoundingPolicy(
         Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
     )
-    QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
-    QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
 
     app = QApplication(sys.argv)
     app.setApplicationName("AnkiGammon")
