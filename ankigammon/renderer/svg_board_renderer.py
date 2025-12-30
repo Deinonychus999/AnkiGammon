@@ -197,15 +197,15 @@ class SVGBoardRenderer:
             fill: #000000;
         }}
         .cube {{
-            fill: #FFD700;
-            stroke: #000000;
+            fill: {self.color_scheme.cube_fill};
+            stroke: {self.color_scheme.cube_text};
             stroke-width: 2;
         }}
         .cube-text {{
             font-family: Arial, sans-serif;
             font-size: 32px;
             font-weight: bold;
-            fill: #000000;
+            fill: {self.color_scheme.cube_text};
             text-anchor: middle;
             dominant-baseline: middle;
         }}

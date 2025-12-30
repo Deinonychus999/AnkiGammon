@@ -19,6 +19,8 @@ class ColorScheme:
     text: str         # Text color
     bearoff: str      # Bear-off tray background
     dice_color: str   # Dice color (usually matches pale checker)
+    cube_fill: str = "#FFD700"    # Cube background (default gold)
+    cube_text: str = "#000000"    # Cube text color (default black)
 
 
 # Available color schemes
@@ -112,6 +114,23 @@ MIDNIGHT = ColorScheme(
     dice_color="#E6E6FA"      # Lavender (matches pale checker)
 )
 
+MONOCHROME = ColorScheme(
+    name="Monochrome",
+    board_light="#FFFFFF",    # White
+    board_dark="#000000",     # Black
+    point_light="#FFFFFF",    # White
+    point_dark="#B0B0B0",     # Light gray
+    checker_x="#000000",      # Black
+    checker_o="#FFFFFF",      # White
+    checker_border="#000000", # Black
+    bar="#FFFFFF",            # White
+    text="#000000",           # Black
+    bearoff="#FFFFFF",        # White
+    dice_color="#FFFFFF",     # White (matches pale checker)
+    cube_fill="#FFFFFF",      # White
+    cube_text="#000000"       # Black
+)
+
 
 # Dictionary of all available schemes
 SCHEMES: Dict[str, ColorScheme] = {
@@ -121,6 +140,7 @@ SCHEMES: Dict[str, ColorScheme] = {
     "desert": DESERT,
     "sunset": SUNSET,
     "midnight": MIDNIGHT,
+    "monochrome": MONOCHROME,
 }
 
 
