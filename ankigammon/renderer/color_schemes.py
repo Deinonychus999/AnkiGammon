@@ -19,8 +19,35 @@ class ColorScheme:
     text: str         # Text color
     bearoff: str      # Bear-off tray background
     dice_color: str   # Dice color (usually matches pale checker)
+    dice_pip_color: str = "#000000"  # Dice pip color (contrasts with dice_color)
     cube_fill: str = "#FFD700"    # Cube background (default gold)
     cube_text: str = "#000000"    # Cube text color (default black)
+
+    def with_swapped_checkers(self) -> "ColorScheme":
+        """
+        Return a new ColorScheme with X and O checker colors swapped.
+
+        By default, O (bottom player) uses the lighter color. This method
+        swaps checker_x and checker_o so X uses the lighter color instead.
+        The dice color and pip color are also swapped to match.
+        """
+        return ColorScheme(
+            name=self.name,
+            board_light=self.board_light,
+            board_dark=self.board_dark,
+            point_light=self.point_light,
+            point_dark=self.point_dark,
+            checker_x=self.checker_o,  # Swap
+            checker_o=self.checker_x,  # Swap
+            checker_border=self.checker_border,
+            bar=self.bar,
+            text=self.text,
+            bearoff=self.bearoff,
+            dice_color=self.checker_x,  # Use original dark checker as new dice color
+            dice_pip_color=self.dice_color,  # Use original light dice color for pips
+            cube_fill=self.cube_fill,
+            cube_text=self.cube_text,
+        )
 
 
 # Available color schemes

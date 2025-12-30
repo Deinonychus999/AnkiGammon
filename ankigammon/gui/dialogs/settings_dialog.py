@@ -121,6 +121,7 @@ class SettingsDialog(QDialog):
         self.settings = settings
         self.original_settings = Settings()
         self.original_settings.color_scheme = settings.color_scheme
+        self.original_settings.swap_checker_colors = settings.swap_checker_colors
         self.original_settings.deck_name = settings.deck_name
         self.original_settings.use_subdecks_by_type = settings.use_subdecks_by_type
         self.original_settings.show_options = settings.show_options
@@ -241,6 +242,16 @@ class SettingsDialog(QDialog):
             "each player needs to bear off all their checkers."
         )
         form.addRow(self.chk_show_pip_count)
+
+        # Swap checker colors
+        self.chk_swap_checker_colors = QCheckBox("Swap checker colors")
+        self.chk_swap_checker_colors.setCursor(Qt.PointingHandCursor)
+        self.chk_swap_checker_colors.setStyleSheet("font-size: 14px;")
+        self.chk_swap_checker_colors.setToolTip(
+            "Swap the checker colors so the dark/colored checkers\n"
+            "are on roll instead of white/light checkers."
+        )
+        form.addRow(self.chk_swap_checker_colors)
 
         return group
 
@@ -396,6 +407,7 @@ class SettingsDialog(QDialog):
 
         self.chk_show_options.setChecked(self.settings.show_options)
         self.chk_show_pip_count.setChecked(self.settings.show_pip_count)
+        self.chk_swap_checker_colors.setChecked(self.settings.swap_checker_colors)
         self.chk_interactive_moves.setChecked(self.settings.interactive_moves)
         self.chk_preview_moves.setChecked(self.settings.preview_moves_before_submit)
 
@@ -517,6 +529,7 @@ class SettingsDialog(QDialog):
             "ankiconnect" if self.cmb_export_method.currentIndex() == 0 else "apkg"
         )
         self.settings.color_scheme = self.cmb_color_scheme.currentText()
+        self.settings.swap_checker_colors = self.chk_swap_checker_colors.isChecked()
         self.settings.board_orientation = self.cmb_board_orientation.currentData()
         self.settings.show_options = self.chk_show_options.isChecked()
         self.settings.show_pip_count = self.chk_show_pip_count.isChecked()

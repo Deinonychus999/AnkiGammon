@@ -15,6 +15,7 @@ class Settings:
 
     DEFAULT_SETTINGS = {
         "default_color_scheme": "classic",
+        "swap_checker_colors": False,
         "deck_name": "My AnkiGammon Deck",
         "use_subdecks_by_type": False,
         "show_options": True,
@@ -96,6 +97,16 @@ class Settings:
     def color_scheme(self, value: str) -> None:
         """Set the default color scheme."""
         self.set("default_color_scheme", value)
+
+    @property
+    def swap_checker_colors(self) -> bool:
+        """Get whether to swap checker colors (X uses light, O uses dark)."""
+        return self._settings.get("swap_checker_colors", False)
+
+    @swap_checker_colors.setter
+    def swap_checker_colors(self, value: bool) -> None:
+        """Set whether to swap checker colors."""
+        self.set("swap_checker_colors", value)
 
     @property
     def deck_name(self) -> str:

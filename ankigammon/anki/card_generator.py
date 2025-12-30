@@ -54,8 +54,11 @@ class CardGenerator:
 
         # Create default renderer and animation controller with settings if not provided
         from ankigammon.renderer.color_schemes import get_scheme
+        scheme = get_scheme(self.settings.color_scheme)
+        if self.settings.swap_checker_colors:
+            scheme = scheme.with_swapped_checkers()
         self.renderer = renderer or SVGBoardRenderer(
-            color_scheme=get_scheme(self.settings.color_scheme),
+            color_scheme=scheme,
             orientation=self.settings.board_orientation
         )
         self.animation_controller = animation_controller or AnimationController(
@@ -88,8 +91,11 @@ class CardGenerator:
         if self.settings.board_orientation == "random":
             orientation = random.choice(["clockwise", "counter-clockwise"])
             from ankigammon.renderer.color_schemes import get_scheme
+            scheme = get_scheme(self.settings.color_scheme)
+            if self.settings.swap_checker_colors:
+                scheme = scheme.with_swapped_checkers()
             self.renderer = SVGBoardRenderer(
-                color_scheme=get_scheme(self.settings.color_scheme),
+                color_scheme=scheme,
                 orientation=orientation
             )
             self.animation_controller = AnimationController(orientation=orientation)

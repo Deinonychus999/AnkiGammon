@@ -190,11 +190,11 @@ class SVGBoardRenderer:
         }}
         .die {{
             fill: {self.color_scheme.dice_color};
-            stroke: #000000;
+            stroke: {self.color_scheme.dice_pip_color};
             stroke-width: 2;
         }}
         .die-pip {{
-            fill: #000000;
+            fill: {self.color_scheme.dice_pip_color};
         }}
         .cube {{
             fill: {self.color_scheme.cube_fill};

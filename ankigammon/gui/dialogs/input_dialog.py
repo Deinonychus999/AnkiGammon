@@ -233,8 +233,11 @@ class InputDialog(QDialog):
         super().__init__(parent)
         self.settings = settings
         self.pending_decisions: List[Decision] = []
+        scheme = get_scheme(settings.color_scheme)
+        if settings.swap_checker_colors:
+            scheme = scheme.with_swapped_checkers()
         self.renderer = SVGBoardRenderer(
-            color_scheme=get_scheme(settings.color_scheme),
+            color_scheme=scheme,
             orientation=settings.board_orientation
         )
 

@@ -197,6 +197,8 @@ class ExportWorker(QThread):
 
         # Create renderer with color scheme and orientation
         color_scheme = SCHEMES.get(self.settings.color_scheme, SCHEMES['classic'])
+        if self.settings.swap_checker_colors:
+            color_scheme = color_scheme.with_swapped_checkers()
         renderer = SVGBoardRenderer(
             color_scheme=color_scheme,
             orientation=self.settings.board_orientation
@@ -311,6 +313,8 @@ class ExportWorker(QThread):
             import random
 
             scheme = get_scheme(self.settings.color_scheme)
+            if self.settings.swap_checker_colors:
+                scheme = scheme.with_swapped_checkers()
             renderer = SVGBoardRenderer(
                 color_scheme=scheme,
                 orientation=self.settings.board_orientation

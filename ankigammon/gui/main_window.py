@@ -203,8 +203,11 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.settings = settings
         self.current_decisions = []
+        scheme = get_scheme(settings.color_scheme)
+        if settings.swap_checker_colors:
+            scheme = scheme.with_swapped_checkers()
         self.renderer = SVGBoardRenderer(
-            color_scheme=get_scheme(settings.color_scheme),
+            color_scheme=scheme,
             orientation=settings.board_orientation
         )
         self.color_scheme_actions = {}  # Store references to color scheme menu actions
@@ -544,6 +547,14 @@ class MainWindow(QMainWindow):
             board_theme_menu.addAction(act_scheme)
             self.color_scheme_actions[scheme] = act_scheme  # Store reference
 
+        # Add separator and swap checker colors option
+        board_theme_menu.addSeparator()
+        self.act_swap_checkers = QAction("Swap Checker Colors", self)
+        self.act_swap_checkers.setCheckable(True)
+        self.act_swap_checkers.setChecked(self.settings.swap_checker_colors)
+        self.act_swap_checkers.triggered.connect(self.toggle_swap_checker_colors)
+        board_theme_menu.addAction(self.act_swap_checkers)
+
         # Help menu
         help_menu = menubar.addMenu("&Help")
 
@@ -806,14 +817,20 @@ class MainWindow(QMainWindow):
     def on_settings_changed(self, settings: Settings):
         """Handle settings changes."""
         # Update renderer with new color scheme and orientation
+        scheme = get_scheme(settings.color_scheme)
+        if settings.swap_checker_colors:
+            scheme = scheme.with_swapped_checkers()
         self.renderer = SVGBoardRenderer(
-            color_scheme=get_scheme(settings.color_scheme),
+            color_scheme=scheme,
             orientation=settings.board_orientation
         )
 
         # Update menu checkmarks if color scheme changed
         for scheme_name, action in self.color_scheme_actions.items():
             action.setChecked(scheme_name == settings.color_scheme)
+
+        # Update swap checkers checkbox
+        self.act_swap_checkers.setChecked(settings.swap_checker_colors)
 
         # Update deck name label
         self._update_deck_label()
@@ -864,6 +881,12 @@ class MainWindow(QMainWindow):
         for scheme_name, action in self.color_scheme_actions.items():
             action.setChecked(scheme_name == scheme)
 
+        self.on_settings_changed(self.settings)
+
+    @Slot(bool)
+    def toggle_swap_checker_colors(self, checked: bool):
+        """Toggle the swap checker colors setting."""
+        self.settings.swap_checker_colors = checked
         self.on_settings_changed(self.settings)
 
     @Slot()

@@ -8,6 +8,7 @@ from typing import List
 from ankigammon.models import Decision
 from ankigammon.anki.card_generator import CardGenerator
 from ankigammon.anki.card_styles import MODEL_NAME, CARD_CSS
+from ankigammon.settings import get_settings
 
 
 class ApkgExporter:
@@ -84,6 +85,8 @@ class ApkgExporter:
         from ankigammon.anki.deck_utils import group_decisions_by_deck
 
         scheme = get_scheme(color_scheme)
+        if get_settings().swap_checker_colors:
+            scheme = scheme.with_swapped_checkers()
         renderer = SVGBoardRenderer(color_scheme=scheme, orientation=orientation)
 
         card_gen = CardGenerator(
