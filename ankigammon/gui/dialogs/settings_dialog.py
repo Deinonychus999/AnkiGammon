@@ -204,6 +204,15 @@ class SettingsDialog(QDialog):
         self.chk_use_subdecks.stateChanged.connect(self._on_subdeck_toggled)
         form.addRow(self.chk_use_subdecks)
 
+        # Clear positions after export
+        self.chk_clear_after_export = QCheckBox("Clear position list after export")
+        self.chk_clear_after_export.setCursor(Qt.PointingHandCursor)
+        self.chk_clear_after_export.setToolTip(
+            "When enabled, the position list is cleared after a successful export.\n"
+            "Disable this to keep positions for re-export or further review."
+        )
+        form.addRow(self.chk_clear_after_export)
+
         return group
 
     def _create_board_group(self) -> QGroupBox:
@@ -391,6 +400,7 @@ class SettingsDialog(QDialog):
         """Load current settings into widgets."""
         self.txt_deck_name.setText(self.settings.deck_name)
         self.chk_use_subdecks.setChecked(self.settings.use_subdecks_by_type)
+        self.chk_clear_after_export.setChecked(self.settings.clear_positions_after_export)
 
         # Export method
         method_index = 0 if self.settings.export_method == "ankiconnect" else 1
@@ -525,6 +535,7 @@ class SettingsDialog(QDialog):
         # Update settings object
         self.settings.deck_name = self.txt_deck_name.text()
         self.settings.use_subdecks_by_type = self.chk_use_subdecks.isChecked()
+        self.settings.clear_positions_after_export = self.chk_clear_after_export.isChecked()
         self.settings.export_method = (
             "ankiconnect" if self.cmb_export_method.currentIndex() == 0 else "apkg"
         )

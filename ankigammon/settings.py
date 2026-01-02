@@ -18,6 +18,7 @@ class Settings:
         "swap_checker_colors": False,
         "deck_name": "My AnkiGammon Deck",
         "use_subdecks_by_type": False,
+        "clear_positions_after_export": True,
         "show_options": True,
         "show_pip_count": True,
         "interactive_moves": True,
@@ -127,6 +128,16 @@ class Settings:
     def use_subdecks_by_type(self, value: bool) -> None:
         """Set whether to organize cards into subdecks by decision type."""
         self.set("use_subdecks_by_type", value)
+
+    @property
+    def clear_positions_after_export(self) -> bool:
+        """Get whether to clear the position list after successful export."""
+        return self._settings.get("clear_positions_after_export", True)
+
+    @clear_positions_after_export.setter
+    def clear_positions_after_export(self, value: bool) -> None:
+        """Set whether to clear the position list after successful export."""
+        self.set("clear_positions_after_export", value)
 
     @property
     def show_options(self) -> bool:

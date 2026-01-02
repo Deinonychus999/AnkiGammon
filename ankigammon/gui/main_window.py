@@ -858,8 +858,11 @@ class MainWindow(QMainWindow):
 
     @Slot()
     def on_export_succeeded(self):
-        """Handle successful export by clearing the positions list."""
+        """Handle successful export by optionally clearing the positions list."""
         if not self.current_decisions:
+            return
+
+        if not self.settings.clear_positions_after_export:
             return
 
         # Clear all decisions
