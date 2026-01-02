@@ -217,6 +217,7 @@ class GNUBGAnalyzer:
         commands = [
             "set automatic game off",
             "set automatic roll off",
+            "set output matchpc off",  # Use equity instead of MWC for analysis
             f"set analysis chequerplay evaluation plies {self.analysis_ply}",
             f"set analysis cubedecision evaluation plies {self.analysis_ply}",
             f"set export moves number {max_moves}",
