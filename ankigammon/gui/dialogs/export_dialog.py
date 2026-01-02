@@ -662,7 +662,8 @@ class ExportDialog(QDialog):
         self.log_text.append(f"\n{'SUCCESS' if success else 'FAILED'}: {message}")
 
         if success:
-            self.btn_export.setEnabled(False)
+            self.btn_export.hide()
+            self.btn_close.setText("Done")
             # Emit signal to notify main window of successful export
             self.export_succeeded.emit()
         else:
