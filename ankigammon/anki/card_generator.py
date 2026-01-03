@@ -511,6 +511,9 @@ class CardGenerator:
 
             error_str = f"{display_error:+.3f}" if display_error != 0 else "0.000"
 
+            # Add played indicator if this move was played
+            played_indicator = ' <span class="played-indicator">← Played</span>' if move.was_played else ""
+
             # Prepare W/G/B data attributes
             wgb_attrs = ""
             if move.player_win_pct is not None:
@@ -541,7 +544,7 @@ class CardGenerator:
                 table_rows.append(f"""
 <tr class="{row_class}" {row_attrs}>
     <td>
-        <div class="move-notation">{display_notation}</div>{wgb_inline_html}
+        <div class="move-notation">{display_notation}{played_indicator}</div>{wgb_inline_html}
     </td>
     <td>{move.equity:.3f}</td>
     <td>{error_str}</td>
@@ -551,7 +554,7 @@ class CardGenerator:
 <tr class="{row_class}" {row_attrs}>
     <td>{display_rank}</td>
     <td>
-        <div class="move-notation">{display_notation}</div>{wgb_inline_html}
+        <div class="move-notation">{display_notation}{played_indicator}</div>{wgb_inline_html}
     </td>
     <td>{move.equity:.3f}</td>
     <td>{error_str}</td>

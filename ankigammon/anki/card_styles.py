@@ -325,6 +325,13 @@ CARD_CSS = """
     white-space: pre-wrap;
 }
 
+/* Played Move Indicator */
+.played-indicator {
+    color: #ff9800;
+    font-weight: bold;
+    margin-left: 6px;
+}
+
 /* Winning Chances Display */
 .winning-chances {
     margin: 20px auto;
