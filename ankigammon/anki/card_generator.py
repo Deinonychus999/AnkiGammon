@@ -1387,9 +1387,9 @@ class CardGenerator:
         if move.player_win_pct is None:
             return ""
 
-        # Get checker colors from the renderer's color scheme
-        player_color = self.renderer.color_scheme.checker_x if decision.on_roll == Player.X else self.renderer.color_scheme.checker_o
-        opponent_color = self.renderer.color_scheme.checker_o if decision.on_roll == Player.X else self.renderer.color_scheme.checker_x
+        # On-roll player is always at bottom after perspective transform
+        player_color = self.renderer.color_scheme.checker_o
+        opponent_color = self.renderer.color_scheme.checker_x
 
         wgb_html = f'''
         <div class="move-wgb-inline">
@@ -1410,9 +1410,9 @@ class CardGenerator:
         Shows player and opponent winning chances with gammon and backgammon percentages.
         Note: Title is added separately in side-by-side layout.
         """
-        # Get checker colors from the renderer's color scheme
-        player_color = self.renderer.color_scheme.checker_x if decision.on_roll == Player.X else self.renderer.color_scheme.checker_o
-        opponent_color = self.renderer.color_scheme.checker_o if decision.on_roll == Player.X else self.renderer.color_scheme.checker_x
+        # On-roll player is always at bottom after perspective transform
+        player_color = self.renderer.color_scheme.checker_o
+        opponent_color = self.renderer.color_scheme.checker_x
 
         html = f'''            <div class="winning-chances">
                 <div class="chances-grid">
