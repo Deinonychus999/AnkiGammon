@@ -321,13 +321,19 @@ class GNUBGAnalyzer:
             # Save debug file to user-accessible location BEFORE any error checks
             debug_path = None
             if exported_files:
-                import shutil
                 try:
                     debug_dir = Path.home() / ".ankigammon"
                     debug_dir.mkdir(parents=True, exist_ok=True)
                     debug_path = debug_dir / "debug_gnubg_output.txt"
-                    shutil.copy2(exported_files[0], debug_path)
-                    logger.info(f"Copied first export file to {debug_path}")
+                    with open(debug_path, 'w', encoding='utf-8') as out_f:
+                        for i, export_file in enumerate(exported_files, 1):
+                            out_f.write(f"{'='*60}\n")
+                            out_f.write(f"GAME {i} - {Path(export_file).name}\n")
+                            out_f.write(f"{'='*60}\n\n")
+                            with open(export_file, 'r', encoding='utf-8') as in_f:
+                                out_f.write(in_f.read())
+                            out_f.write("\n\n")
+                    logger.info(f"Saved {len(exported_files)} game(s) to {debug_path}")
                 except Exception as e:
                     logger.warning(f"Failed to copy debug file: {e}")
                     debug_path = None

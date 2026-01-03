@@ -330,7 +330,7 @@ class SettingsDialog(QDialog):
 
     def _create_gnubg_group(self) -> QGroupBox:
         """Create GnuBG settings group."""
-        group = QGroupBox("GnuBG Integration (Optional)")
+        group = QGroupBox("GnuBG Integration (for non-analyzed positions)")
         form = QFormLayout(group)
 
         # GnuBG path
