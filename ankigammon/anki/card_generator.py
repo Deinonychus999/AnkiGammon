@@ -509,7 +509,7 @@ class CardGenerator:
             display_error = move.xg_error if move.xg_error is not None else move.error
             display_notation = move.xg_notation if move.xg_notation is not None else move.notation
 
-            error_str = f"{display_error:+.3f}" if display_error != 0 else "0.000"
+            error_str = f"{-abs(display_error):+.3f}" if display_error != 0 else "0.000"
 
             # Add played indicator if this move was played
             played_indicator = ' <span class="played-indicator">← Played</span>' if move.was_played else ""
