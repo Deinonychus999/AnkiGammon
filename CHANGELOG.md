@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.1.6] - 2026-01-13
+
+### Added
+- Monochrome color scheme for a clean, minimalist board appearance
+- Option to swap checker colors (play as the other side)
+- Option to keep positions in the list after export
+
+### Fixed
+- Match import now works when GNU Backgammon uses MWC output mode
+- Winning chances circles now display correct colors based on board perspective
+- Linux AppImage compatibility with modern distributions
+
+### Improved
+- Error display now matches XG convention: signed values for cube actions, negative for checker plays
+- Analysis table highlights the move that was actually played
+- Export dialog shows "Done" button after successful export for better workflow
+
 ## [1.1.5] - 2025-12-02
 
 ### Added
