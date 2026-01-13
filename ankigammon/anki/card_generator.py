@@ -503,13 +503,23 @@ class CardGenerator:
                 key=lambda m: abs(m.error) if m.error is not None else 999.0
             )
 
+        # Get best equity for calculating signed errors
+        best_move = decision.get_best_move()
+        best_equity = best_move.equity if best_move else 0.0
+
         for i, move in enumerate(sorted_candidates):
             rank_class = "best-move" if move.rank == 1 else ""
             display_rank = move.xg_rank if move.xg_rank is not None else (i + 1)
             display_error = move.xg_error if move.xg_error is not None else move.error
             display_notation = move.xg_notation if move.xg_notation is not None else move.notation
 
-            error_str = f"{-abs(display_error):+.3f}" if display_error != 0 else "0.000"
+            # For cube decisions, use signed error (equity - best_equity)
+            # For checker plays, always show negative error
+            if is_cube_decision:
+                signed_error = move.equity - best_equity
+                error_str = f"{signed_error:+.3f}" if signed_error != 0 else "0.000"
+            else:
+                error_str = f"{-abs(display_error):+.3f}" if display_error != 0 else "0.000"
 
             # Add played indicator if this move was played
             played_indicator = ' <span class="played-indicator">← Played</span>' if move.was_played else ""
@@ -561,7 +571,6 @@ class CardGenerator:
 </tr>""")
 
         # Generate answer section
-        best_move = decision.get_best_move()
         best_notation = best_move.notation if best_move else "Unknown"
 
         if show_options:
