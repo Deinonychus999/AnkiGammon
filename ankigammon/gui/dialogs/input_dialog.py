@@ -605,7 +605,7 @@ class InputDialog(QDialog):
         """Create a Decision object from position and metadata."""
         from ankigammon.utils.xgid import encode_xgid
 
-        # Determine Crawford status (only applies to match play, not money games)
+        # Determine Crawford status (only applies to match play, not unlimited games)
         match_length = metadata.get('match_length', 0)
         crawford = False
 

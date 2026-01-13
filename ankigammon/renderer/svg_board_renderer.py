@@ -78,7 +78,7 @@ class SVGBoardRenderer:
             move_data: Optional move animation data (for animated cards)
             score_x: X player's current score
             score_o: O player's current score
-            match_length: Match length (0 = money game, > 0 = match play)
+            match_length: Match length (0 = unlimited game, > 0 = match play)
 
         Returns:
             SVG markup string

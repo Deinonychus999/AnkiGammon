@@ -388,7 +388,7 @@ def encode_gnuid(
         on_roll: Player on roll
         score_x: Player X's (player 0) score
         score_o: Player O's (player 1) score
-        match_length: Match length (0 for money)
+        match_length: Match length (0 for unlimited)
         crawford: Crawford game flag
         only_position: If True, only return Position ID (no Match ID)
 

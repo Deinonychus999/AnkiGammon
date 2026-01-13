@@ -135,7 +135,7 @@ class XGTextParser:
             decision_type = DecisionType.CHECKER_PLAY
 
         # Determine Crawford status from multiple sources
-        # The crawford_jacoby field indicates Crawford rule for matches or Jacoby rule for money games
+        # The crawford_jacoby field indicates Crawford rule for matches or Jacoby rule for unlimited games
         match_length = metadata.get('match_length', 0)
         crawford = False
 
@@ -381,7 +381,7 @@ class XGTextParser:
         if crawford_match:
             info['crawford'] = True
 
-        # Check for money game
+        # Check for unlimited game (XG exports "Money Game" for unlimited games)
         if 'money game' in text.lower():
             info['match_length'] = 0
 

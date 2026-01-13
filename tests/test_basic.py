@@ -555,7 +555,7 @@ class TestDecision:
         """Test short display text for different game types."""
         position = Position()
 
-        # Money game - no match length
+        # Unlimited game - no match length
         decision = Decision(
             position=position,
             on_roll=Player.O,
@@ -565,7 +565,7 @@ class TestDecision:
             match_length=0,
             decision_type=DecisionType.CHECKER_PLAY
         )
-        assert decision.get_short_display_text() == "Checker | 63 | Money"
+        assert decision.get_short_display_text() == "Checker | 63 | Unlimited"
 
         # Match game - with match length
         decision = Decision(

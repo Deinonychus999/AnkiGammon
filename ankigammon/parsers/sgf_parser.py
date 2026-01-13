@@ -116,7 +116,7 @@ class SGFParser:
             Dictionary with:
             - player_white: White player name
             - player_black: Black player name
-            - match_length: Match length (0 for money game)
+            - match_length: Match length (0 for unlimited game)
             - games: List of game dictionaries
         """
         with open(file_path, 'r', encoding='utf-8') as f:

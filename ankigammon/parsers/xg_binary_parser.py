@@ -232,7 +232,7 @@ class XGBinaryParser:
                         # Process different record types
                         if isinstance(record, xgstruct.HeaderMatchEntry):
                             file_version = record.Version
-                            # XG uses 99999 for unlimited/money games, normalize to 0
+                            # XG uses 99999 for unlimited games, normalize to 0
                             match_length = 0 if record.MatchLength == 99999 else record.MatchLength
                             logger.debug(f"Match header: version={file_version}, match_length={match_length}")
 
@@ -372,7 +372,7 @@ class XGBinaryParser:
 
         Args:
             move_entry: MoveEntry from xgstruct
-            match_length: Match length (0 for money game)
+            match_length: Match length (0 for unlimited game)
             score_x: Player X score
             score_o: Player O score
             crawford: Crawford game flag
@@ -602,7 +602,7 @@ class XGBinaryParser:
 
         Args:
             cube_entry: CubeEntry from xgstruct
-            match_length: Match length (0 for money game)
+            match_length: Match length (0 for unlimited game)
             score_x: Player X score
             score_o: Player O score
             crawford: Crawford game flag

@@ -229,7 +229,7 @@ class Decision:
     dice: Optional[Tuple[int, int]] = None  # Dice roll (None for cube decisions)
     score_x: int = 0
     score_o: int = 0
-    match_length: int = 0  # Match length (0 for money games)
+    match_length: int = 0  # Match length (0 for unlimited games)
     crawford: bool = False  # Whether this is a Crawford game
     cube_value: int = 1
     cube_owner: CubeState = CubeState.CENTERED
@@ -318,7 +318,7 @@ class Decision:
             if self.crawford:
                 score += " Crawford"
         else:
-            score = "Money"
+            score = "Unlimited"
 
         if self.decision_type == DecisionType.CHECKER_PLAY:
             dice_str = f"{self.dice[0]}{self.dice[1]}" if self.dice else "—"
@@ -356,7 +356,7 @@ class Decision:
                 f"{player_name} | "
                 f"Dice: {dice_str} | "
                 f"Cube: {cube_str} | "
-                f"Money"
+                f"Unlimited"
             )
 
     def __str__(self) -> str:

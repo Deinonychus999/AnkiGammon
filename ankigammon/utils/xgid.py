@@ -33,8 +33,8 @@ Fields:
 
 6. Score 1 (S1): BOTTOM player's score
 7. Score 2 (S2): TOP player's score
-8. Crawford/Jacoby (CJ): Crawford rule (match) or Jacoby rule (money)
-9. Match Length (ML): 0 for money games
+8. Crawford/Jacoby (CJ): Crawford rule (match) or Jacoby rule (unlimited games)
+9. Match Length (ML): 0 for unlimited games
 10. Max Cube (MC): Maximum cube value (2^MC)
 
 Note: In our internal model, we use O for BOTTOM player and X for TOP player.

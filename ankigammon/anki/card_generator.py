@@ -1537,7 +1537,7 @@ class CardGenerator:
         if decision.match_length > 0:
             tags.append(f"match_{decision.match_length}pt")
         else:
-            tags.append("money_game")
+            tags.append("unlimited_game")
 
         if decision.cube_value > 1:
             tags.append(f"cube_{decision.cube_value}")
