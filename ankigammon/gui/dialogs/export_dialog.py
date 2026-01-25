@@ -570,6 +570,15 @@ class ExportDialog(QDialog):
         needs_analysis = [d for d in self.decisions if not d.candidate_moves]
 
         if needs_analysis:
+            # Verify GnuBG is available before attempting analysis
+            if not self.settings.is_gnubg_available():
+                self.status_label.setText(
+                    f"Cannot export: {len(needs_analysis)} position(s) need analysis but GnuBG is not configured.\n"
+                    "Please configure GnuBG in Settings, or import an analyzed file."
+                )
+                self.btn_export.setEnabled(True)
+                return
+
             # Run analysis first
             self.status_label.setText(f"Analyzing {len(needs_analysis)} position(s) with GnuBG...")
             self.analysis_worker = AnalysisWorker(self.decisions, self.settings)
