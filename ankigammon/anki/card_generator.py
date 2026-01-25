@@ -439,17 +439,25 @@ class CardGenerator:
 
         const moveRows = document.querySelectorAll('.moves-table tbody tr');
         moveRows.forEach(row => {{
-            const moveCell = row.cells[1];
-            if (moveCell) {{
-                const moveText = moveCell.textContent.trim();
-                if (moveText === selectedMove) {{
-                    if (selectedLetter === correctLetter) {{
-                        row.classList.add('user-correct');
-                    }} else if (selectedError < CLOSE_THRESHOLD) {{
-                        row.classList.add('user-close');
-                    }} else {{
-                        row.classList.add('user-incorrect');
-                    }}
+            // Check cells[0] for cube decisions (Action | Equity | Error)
+            // or cells[1] for checker plays (Rank | Move | Equity | Error)
+            let moveText = '';
+            if (row.cells[0]) {{
+                const firstCellText = row.cells[0].textContent.trim();
+                // If first cell contains "/" it's a cube action notation
+                if (firstCellText.includes('/')) {{
+                    moveText = firstCellText;
+                }} else if (row.cells[1]) {{
+                    moveText = row.cells[1].textContent.trim();
+                }}
+            }}
+            if (moveText === selectedMove) {{
+                if (selectedLetter === correctLetter) {{
+                    row.classList.add('user-correct');
+                }} else if (selectedError < CLOSE_THRESHOLD) {{
+                    row.classList.add('user-close');
+                }} else {{
+                    row.classList.add('user-incorrect');
                 }}
             }}
         }});
@@ -507,8 +515,22 @@ class CardGenerator:
         best_move = decision.get_best_move()
         best_equity = best_move.equity if best_move else 0.0
 
+        # For "too good" scenarios, use No Double equity as the baseline
+        # (XG convention: errors are relative to the best actual action, which is No Double)
+        # Also track which displayed move should be marked as "best" for highlighting
+        best_displayed_move = None
+        if best_move and best_move.notation.startswith("Too good"):
+            no_double_move = next(
+                (m for m in candidates if m.notation.startswith("No ")), None
+            )
+            if no_double_move:
+                best_equity = no_double_move.equity
+                best_displayed_move = no_double_move
+
         for i, move in enumerate(sorted_candidates):
-            rank_class = "best-move" if move.rank == 1 else ""
+            # For "too good" scenarios, highlight No Double as best; otherwise use rank == 1
+            is_best = (move == best_displayed_move) if best_displayed_move else (move.rank == 1)
+            rank_class = "best-move" if is_best else ""
             display_rank = move.xg_rank if move.xg_rank is not None else (i + 1)
             display_error = move.xg_error if move.xg_error is not None else move.error
             display_notation = move.xg_notation if move.xg_notation is not None else move.notation
@@ -582,7 +604,9 @@ class CardGenerator:
             for i, move in enumerate(shuffled_candidates):
                 if move and i < len(letters):
                     letter_to_move[letters[i]] = move.notation
-                    letter_to_error[letters[i]] = abs(move.error) if move.error is not None else 0.0
+                    # Use corrected error relative to best_equity (adjusted for "too good" scenarios)
+                    corrected_error = abs(move.equity - best_equity) if move.equity is not None else 0.0
+                    letter_to_error[letters[i]] = corrected_error
 
             answer_html = f"""
     <div class="mcq-feedback-container" id="mcq-feedback" style="display: none;">
