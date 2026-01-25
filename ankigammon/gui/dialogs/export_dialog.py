@@ -217,14 +217,21 @@ class ExportWorker(QThread):
             position_progress_range = 1.0 / total  # How much progress this position represents
 
             # Calculate sub-steps for progress tracking: render, score matrix (if applicable), generate card
-            has_score_matrix = (
+            has_cube_score_matrix = (
                 decision.decision_type.name == 'CUBE_ACTION' and
                 decision.match_length > 0 and
                 self.settings.get('generate_score_matrix', False) and
                 self.settings.is_gnubg_available()
             )
-            matrix_steps = (decision.match_length - 1) ** 2 if has_score_matrix else 0
-            total_substeps = 2 + matrix_steps  # render + matrix + generate card
+            has_move_score_matrix = (
+                decision.decision_type.name == 'CHECKER_PLAY' and
+                decision.dice and
+                self.settings.get('generate_move_score_matrix', False) and
+                self.settings.is_gnubg_available()
+            )
+            cube_matrix_steps = (decision.match_length - 1) ** 2 if has_cube_score_matrix else 0
+            move_matrix_steps = 4 if has_move_score_matrix else 0  # 4 score types analyzed
+            total_substeps = 2 + cube_matrix_steps + move_matrix_steps  # render + matrices + generate card
 
             current_substep = [0]  # Mutable counter for nested function
 
@@ -351,14 +358,21 @@ class ExportWorker(QThread):
                     position_progress_range = 1.0 / total
 
                     # Calculate sub-steps for progress tracking
-                    has_score_matrix = (
+                    has_cube_score_matrix = (
                         decision.decision_type.name == 'CUBE_ACTION' and
                         decision.match_length > 0 and
                         self.settings.get('generate_score_matrix', False) and
                         self.settings.is_gnubg_available()
                     )
-                    matrix_steps = (decision.match_length - 1) ** 2 if has_score_matrix else 0
-                    total_substeps = 2 + matrix_steps  # render + matrix + generate card
+                    has_move_score_matrix = (
+                        decision.decision_type.name == 'CHECKER_PLAY' and
+                        decision.dice and
+                        self.settings.get('generate_move_score_matrix', False) and
+                        self.settings.is_gnubg_available()
+                    )
+                    cube_matrix_steps = (decision.match_length - 1) ** 2 if has_cube_score_matrix else 0
+                    move_matrix_steps = 4 if has_move_score_matrix else 0  # 4 score types analyzed
+                    total_substeps = 2 + cube_matrix_steps + move_matrix_steps  # render + matrices + generate card
 
                     current_substep = [0]
                     current_card_index = card_index  # Capture for closure

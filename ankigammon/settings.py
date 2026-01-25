@@ -27,6 +27,7 @@ class Settings:
         "gnubg_path": None,
         "gnubg_analysis_ply": 3,
         "generate_score_matrix": False,
+        "generate_move_score_matrix": False,
         "board_orientation": "counter-clockwise",
         "last_apkg_directory": None,
         "import_checker_error_threshold": 0.080,
@@ -218,6 +219,16 @@ class Settings:
     def generate_score_matrix(self, value: bool) -> None:
         """Set whether to generate score matrix for cube decisions."""
         self.set("generate_score_matrix", value)
+
+    @property
+    def generate_move_score_matrix(self) -> bool:
+        """Get whether to generate move score matrix for checker play decisions."""
+        return self._settings.get("generate_move_score_matrix", False)
+
+    @generate_move_score_matrix.setter
+    def generate_move_score_matrix(self, value: bool) -> None:
+        """Set whether to generate move score matrix for checker play decisions."""
+        self.set("generate_move_score_matrix", value)
 
     @property
     def board_orientation(self) -> str:

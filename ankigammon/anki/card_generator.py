@@ -710,6 +710,13 @@ class CardGenerator:
             if score_matrix_html:
                 score_matrix_html = f"\n{score_matrix_html}"
 
+        # Generate move score matrix for checker play if enabled
+        move_matrix_html = ''
+        if not is_cube_decision and self.settings.generate_move_score_matrix:
+            move_matrix_html = self._generate_move_score_matrix_html(decision)
+            if move_matrix_html:
+                move_matrix_html = f"\n{move_matrix_html}"
+
         # Generate note HTML if note exists
         note_html = self._generate_note_html(decision)
 
@@ -719,7 +726,7 @@ class CardGenerator:
     <div class="metadata">{metadata}</div>
 {answer_html}
 {note_html}
-{analysis_and_chances}{score_matrix_html}
+{analysis_and_chances}{score_matrix_html}{move_matrix_html}
     {self._generate_source_info(decision)}
 </div>
 """
@@ -1601,6 +1608,56 @@ class CardGenerator:
 
         except Exception as e:
             print(f"Warning: Failed to generate score matrix: {e}")
+            return ""
+
+    def _generate_move_score_matrix_html(self, decision: Decision) -> str:
+        """
+        Generate move score matrix HTML for checker play decisions.
+
+        Shows top 3 moves at 4 different score contexts:
+        - Neutral (money)
+        - DMP (double match point)
+        - Gammon-Save (player ahead, needs to save gammons)
+        - Gammon-Go (player behind, wants gammons)
+
+        Args:
+            decision: The checker play decision
+
+        Returns:
+            HTML string with move score matrix, or empty string if unavailable
+        """
+        if not self.settings.is_gnubg_available():
+            return ""
+
+        # Only for checker play decisions
+        if decision.decision_type != DecisionType.CHECKER_PLAY:
+            return ""
+
+        # Skip if no dice (shouldn't happen for checker play)
+        if not decision.dice:
+            return ""
+
+        try:
+            from ankigammon.analysis.move_score_matrix import (
+                generate_move_score_matrix,
+                format_move_matrix_as_html
+            )
+
+            columns = generate_move_score_matrix(
+                xgid=decision.xgid,
+                gnubg_path=self.settings.gnubg_path,
+                ply_level=self.settings.gnubg_analysis_ply,
+                progress_callback=self.progress_callback,
+                cancellation_callback=self.cancellation_callback
+            )
+
+            return format_move_matrix_as_html(
+                columns=columns,
+                ply_level=self.settings.gnubg_analysis_ply
+            )
+
+        except Exception as e:
+            print(f"Warning: Failed to generate move score matrix: {e}")
             return ""
 
     def _generate_note_html(self, decision: Decision) -> str:

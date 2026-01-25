@@ -1230,6 +1230,201 @@ button.animate-btn:disabled {
 }
 
 /* ===================================================================
+   MOVE SCORE MATRIX STYLES
+   Shows top moves at different score contexts (Neutral, DMP, G-Save, G-Go)
+   =================================================================== */
+
+.move-score-matrix {
+    margin: 30px auto 20px;
+    text-align: center;
+}
+
+.move-score-matrix h3 {
+    font-size: 18px;
+    color: var(--text-fg);
+    margin-bottom: 15px;
+}
+
+.move-score-matrix h3 .ply-indicator {
+    font-size: 14px;
+    opacity: 0.6;
+    font-weight: normal;
+}
+
+.move-score-matrix-table {
+    border-collapse: collapse;
+    margin: 0 auto;
+    font-size: 14px;
+    background-color: var(--canvas-elevated);
+    border: 2px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    table-layout: fixed;
+    width: auto;
+}
+
+.move-score-matrix-table thead th {
+    background-color: var(--canvas-elevated);
+    color: var(--text-fg);
+    font-weight: bold;
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    min-width: 110px;
+    max-width: 150px;
+    font-size: 14px;
+}
+
+.move-score-matrix-table td {
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    text-align: center;
+    vertical-align: top;
+    font-size: 13px;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+/* Move notation styling */
+.move-score-matrix-table .move-notation {
+    font-weight: 500;
+    margin-bottom: 3px;
+    font-size: 13px;
+    white-space: nowrap;
+}
+
+/* Equity and error display */
+.move-score-matrix-table .equity-error {
+    font-size: 12px;
+}
+
+.move-score-matrix-table .equity {
+    color: #4caf50;
+}
+
+.move-score-matrix-table .error {
+    color: #888;
+}
+
+.move-score-matrix-table .no-move {
+    color: #666;
+}
+
+/* Best move (rank 1) row styling */
+.move-score-matrix-table tr.rank-1 td {
+    background-color: rgba(76, 175, 80, 0.15);
+}
+
+.move-score-matrix-table tr.rank-1 .move-notation {
+    font-weight: bold;
+}
+
+/* Highlight columns where best move differs from Neutral */
+.move-score-matrix-table td.different-best {
+    background-color: rgba(255, 193, 7, 0.2) !important;
+    border: 2px solid #FFC107 !important;
+}
+
+/* Dark mode adjustments */
+.night_mode .move-score-matrix-table {
+    background-color: var(--canvas-elevated);
+    border-color: var(--border);
+}
+
+.night_mode .move-score-matrix-table thead th {
+    background-color: var(--canvas-elevated);
+    border-color: var(--border);
+}
+
+.night_mode .move-score-matrix-table td {
+    border-color: var(--border);
+}
+
+.night_mode .move-score-matrix-table tr.rank-1 td {
+    background-color: rgba(76, 175, 80, 0.25);
+}
+
+.night_mode .move-score-matrix-table td.different-best {
+    background-color: rgba(255, 193, 7, 0.3) !important;
+}
+
+.night_mode .move-score-matrix-table .error {
+    color: #aaa;
+}
+
+.night_mode .move-score-matrix-table .no-move {
+    color: #888;
+}
+
+/* Move score matrix optimizations for landscape mode */
+@media screen and (orientation: landscape) and (max-height: 600px) {
+    .move-score-matrix {
+        margin: 15px auto 10px;
+    }
+
+    .move-score-matrix h3 {
+        font-size: 14px;
+        margin-bottom: 8px;
+    }
+
+    .move-score-matrix h3 .ply-indicator {
+        font-size: 11px;
+    }
+
+    .move-score-matrix-table {
+        font-size: 10px;
+    }
+
+    .move-score-matrix-table thead th {
+        padding: 6px 8px;
+        min-width: 80px;
+    }
+
+    .move-score-matrix-table td {
+        padding: 4px 6px;
+    }
+
+    .move-score-matrix-table .move-notation {
+        font-size: 10px;
+    }
+
+    .move-score-matrix-table .equity-error {
+        font-size: 9px;
+    }
+}
+
+/* Hide move score matrix on very small landscape screens */
+@media screen and (orientation: landscape) and (max-height: 450px) {
+    .move-score-matrix {
+        display: none;
+    }
+}
+
+/* Mobile responsive - compact move score matrix */
+@media screen and (max-width: 500px) {
+    .move-score-matrix-table thead th {
+        padding: 6px 6px;
+        min-width: 70px;
+        font-size: 11px;
+    }
+
+    .move-score-matrix-table th .score-desc {
+        font-size: 9px;
+    }
+
+    .move-score-matrix-table td {
+        padding: 4px 4px;
+    }
+
+    .move-score-matrix-table .move-notation {
+        font-size: 10px;
+    }
+
+    .move-score-matrix-table .equity-error {
+        font-size: 9px;
+    }
+}
+
+/* ===================================================================
    MOBILE PORTRAIT RESPONSIVE STYLES
    =================================================================== */
 

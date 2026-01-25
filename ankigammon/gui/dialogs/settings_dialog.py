@@ -373,6 +373,23 @@ class SettingsDialog(QDialog):
         matrix_layout.addStretch()
         form.addRow(matrix_layout)
 
+        # Move score matrix generation (checker play)
+        move_matrix_layout = QHBoxLayout()
+        self.chk_generate_move_score_matrix = QCheckBox("Generate move analysis by score for checker play")
+        self.chk_generate_move_score_matrix.setCursor(Qt.PointingHandCursor)
+        self.chk_generate_move_score_matrix.setStyleSheet("font-size: 14px;")
+        self.chk_generate_move_score_matrix.setToolTip(
+            "Generates a table showing top 3 moves at different match scores:\n"
+            "Neutral (money), DMP, Gammon-Save, and Gammon-Go.\n"
+            "This is time-consuming and can significantly slow down analysis."
+        )
+        move_matrix_layout.addWidget(self.chk_generate_move_score_matrix)
+        move_matrix_warning = QLabel("(time-consuming)")
+        move_matrix_warning.setStyleSheet("font-size: 11px; color: #a6adc8; margin-left: 8px;")
+        move_matrix_layout.addWidget(move_matrix_warning)
+        move_matrix_layout.addStretch()
+        form.addRow(move_matrix_layout)
+
         # Status display (icon + text in horizontal layout)
         status_layout = QHBoxLayout()
         self.lbl_gnubg_status_icon = QLabel()
@@ -433,6 +450,7 @@ class SettingsDialog(QDialog):
             self.txt_gnubg_path.setText(self.settings.gnubg_path)
         self.cmb_gnubg_ply.setCurrentIndex(self.settings.gnubg_analysis_ply)
         self.chk_generate_score_matrix.setChecked(self.settings.generate_score_matrix)
+        self.chk_generate_move_score_matrix.setChecked(self.settings.generate_move_score_matrix)
         self._update_gnubg_status()
 
     def _browse_gnubg(self):
@@ -550,6 +568,7 @@ class SettingsDialog(QDialog):
         self.settings.gnubg_path = self.txt_gnubg_path.text() or None
         self.settings.gnubg_analysis_ply = self.cmb_gnubg_ply.currentIndex()
         self.settings.generate_score_matrix = self.chk_generate_score_matrix.isChecked()
+        self.settings.generate_move_score_matrix = self.chk_generate_move_score_matrix.isChecked()
 
         # Emit signal
         self.settings_changed.emit(self.settings)
