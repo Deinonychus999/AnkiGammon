@@ -876,6 +876,10 @@ class CardGenerator:
 
                 if (!moveNotation) return;
 
+                // Reset toggle state and remove icon when selecting a new move
+                showingOriginal = false;
+                removeRevertIcon();
+
                 // Update selection highlighting
                 moveRows.forEach(r => r.classList.remove('selected'));
                 this.classList.add('selected');
@@ -969,6 +973,8 @@ class CardGenerator:
     let cancelCurrentAnimation = false;
     {mode_state_vars}
     let originalBoardHTML = null;
+    let currentResultHTML = null;
+    let showingOriginal = false;
 
     // Store original board HTML for reset
     function storeOriginalBoard() {{
@@ -986,6 +992,76 @@ class CardGenerator:
                 board.innerHTML = originalBoardHTML;
             }}
         }}
+    }}
+
+    // Store current result HTML for toggle
+    function storeCurrentResult() {{
+        const board = document.getElementById('animated-board');
+        if (board) {{
+            currentResultHTML = board.innerHTML;
+        }}
+    }}
+
+    // Remove any existing revert icon
+    function removeRevertIcon() {{
+        const existing = document.querySelector('.revert-icon');
+        if (existing) existing.remove();
+    }}
+
+    // Add revert icon to the selected row
+    function addRevertIconToRow(row) {{
+        removeRevertIcon();
+        if (!row) return;
+
+        const icon = document.createElement('span');
+        icon.className = 'revert-icon';
+        icon.title = 'Show original position';
+        icon.innerHTML = '<svg viewBox="0 0 24 24"><path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/></svg>';
+
+        icon.addEventListener('click', function(e) {{
+            e.stopPropagation();
+            togglePosition();
+        }});
+
+        row.appendChild(icon);
+    }}
+
+    // Update revert icon state
+    function updateRevertIcon(isShowingOriginal) {{
+        const icon = document.querySelector('.revert-icon');
+        if (!icon) return;
+
+        if (isShowingOriginal) {{
+            icon.classList.add('showing-original');
+            icon.title = 'Show position after move';
+        }} else {{
+            icon.classList.remove('showing-original');
+            icon.title = 'Show original position';
+        }}
+    }}
+
+    // Toggle between original and result positions
+    function togglePosition() {{
+        const board = document.getElementById('animated-board');
+        if (!board) return;
+
+        if (showingOriginal) {{
+            // Switch back to result
+            if (currentResultHTML) {{
+                board.innerHTML = currentResultHTML;
+            }}
+            showingOriginal = false;
+        }} else {{
+            // Store current result before switching
+            storeCurrentResult();
+            // Switch to original
+            if (originalBoardHTML) {{
+                board.innerHTML = originalBoardHTML;
+            }}
+            showingOriginal = true;
+        }}
+
+        updateRevertIcon(showingOriginal);
     }}
 
     // Helper to find checkers at a specific point
@@ -1307,6 +1383,11 @@ class CardGenerator:
                 if (finalSvg) {{
                     addMoveArrows(finalSvg, animations);
                 }}
+
+                // Store result for toggle functionality and add revert icon to selected row
+                storeCurrentResult();
+                showingOriginal = false;
+                addRevertIconToRow(currentSelectedRow);
             }}
         }}
 

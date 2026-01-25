@@ -613,6 +613,40 @@ button.toggle-btn:active {
     color: #ffffff;
 }
 
+/* Revert to original position icon (at end of row) */
+.move-row {
+    position: relative;
+}
+
+.revert-icon {
+    position: absolute;
+    right: -36px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    color: #888;
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+.revert-icon:hover {
+    color: #4da6ff;
+}
+
+.revert-icon svg {
+    width: 24px;
+    height: 24px;
+    fill: currentColor;
+}
+
+.revert-icon.showing-original {
+    color: #4da6ff;
+}
+
 /* ===================================================================
    INTERACTIVE MCQ STYLES
    =================================================================== */
