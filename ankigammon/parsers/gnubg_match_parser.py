@@ -424,6 +424,22 @@ class GNUBGMatchParser:
                 if cube_error is not None:
                     break
 
+        # If doubled but response unknown, look ahead to find it in the next move's section
+        # The response (accept/pass) appears in GNUBG's next move entry, not the current one
+        if doubled and cube_action_taken is None:
+            for look_offset in range(cube_section_idx - start_idx + 20, cube_section_idx - start_idx + 60):
+                if start_idx + look_offset >= len(lines):
+                    break
+                look_line = lines[start_idx + look_offset]
+                response_match = re.search(r'\*\s+.+?\s+(accepts|passes|rejects)', look_line)
+                if response_match:
+                    action = response_match.group(1)
+                    cube_action_taken = "passes" if action == "rejects" else action
+                    break
+                # Stop if we hit a dice roll or game end - no response found
+                if look_line.startswith('Rolled') or ' wins ' in look_line:
+                    break
+
         # Only create decision if there was an error (either doubler or responder)
         if (cube_error is None or cube_error == 0.0) and (take_error is None or take_error == 0.0):
             return None
@@ -443,7 +459,7 @@ class GNUBGMatchParser:
         was_dt = doubled and cube_action_taken == "accepts"
         was_dp = doubled and cube_action_taken == "passes"
 
-        # Default: if doubled but response unknown, assume take
+        # If doubled but response still unknown after lookahead, default to take
         if doubled and cube_action_taken is None:
             was_dt = True
 
@@ -599,7 +615,11 @@ class GNUBGMatchParser:
         move_number = int(move_match.group(1))
         player_name = move_match.group(2).strip()
 
-        # Determine which player
+        # Detect if this is a "doubles to X" move (responder's decision)
+        # vs "on roll, cube decision?" (doubler's decision)
+        is_doubles_move = " doubles" in move_line
+
+        # Determine which player is on roll (the player named in the move line)
         on_roll = Player.O if player_name == metadata['player_o_name'] else Player.X
 
         # Look for "Cube analysis" section
@@ -750,9 +770,40 @@ class GNUBGMatchParser:
                 if cube_error is not None:  # But only if we already found the error
                     break
 
+        # For "doubles to X" moves, the double has already happened (move line says "X doubles to Y")
+        if is_doubles_move:
+            doubled = True
+
+        # If doubled but response unknown, look ahead to find it in the next move's section
+        # The response (accept/pass) appears in GNUBG's next move entry, not the current one
+        if doubled and cube_action_taken is None:
+            for look_offset in range(cube_section_idx - start_idx + 20, cube_section_idx - start_idx + 60):
+                if start_idx + look_offset >= len(lines):
+                    break
+                look_line = lines[start_idx + look_offset]
+                response_match = re.search(r'\*\s+.+?\s+(accepts|passes|rejects)', look_line)
+                if response_match:
+                    action = response_match.group(1)
+                    cube_action_taken = "passes" if action == "rejects" else action
+                    break
+                # Stop if we hit a dice roll or game end - no response found
+                if look_line.startswith('Rolled') or ' wins ' in look_line:
+                    break
+
         # Only create decision if there was an error (either doubler or responder)
         if (cube_error is None or cube_error == 0.0) and (take_error is None or take_error == 0.0):
             return None
+
+        # For "doubles to X" moves with a take/pass error, the cube analysis probabilities
+        # are from the RESPONDER's perspective, not the doubler's.
+        # We need to SWAP the probabilities so "Player" shows the doubler's winning chances.
+        # on_roll stays as the doubler (from the move line).
+        if is_doubles_move and take_error is not None and take_error > 0 and no_double_probs:
+            # Swap probabilities: indices 0-2 become 3-5 and vice versa
+            no_double_probs = (
+                no_double_probs[3], no_double_probs[4], no_double_probs[5],
+                no_double_probs[0], no_double_probs[1], no_double_probs[2]
+            )
 
         # Create cube decision moves
         from ankigammon.models import Move
@@ -1043,14 +1094,14 @@ class GNUBGMatchParser:
                     was_played=was_played
                 )
 
-                # Add probabilities if found
+                # Add probabilities if found (multiply by 100 to convert to percentage)
                 if probs:
-                    move.player_win_pct = probs[0]
-                    move.player_gammon_pct = probs[1]
-                    move.player_backgammon_pct = probs[2]
-                    move.opponent_win_pct = probs[3]
-                    move.opponent_gammon_pct = probs[4]
-                    move.opponent_backgammon_pct = probs[5]
+                    move.player_win_pct = probs[0] * 100
+                    move.player_gammon_pct = probs[1] * 100
+                    move.player_backgammon_pct = probs[2] * 100
+                    move.opponent_win_pct = probs[3] * 100
+                    move.opponent_gammon_pct = probs[4] * 100
+                    move.opponent_backgammon_pct = probs[5] * 100
 
                 candidate_moves.append(move)
 
