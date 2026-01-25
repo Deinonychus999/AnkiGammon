@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.1.7] - 2026-01-25
+
+### Fixed
+- GNU Backgammon parser now correctly extracts winning probabilities and identifies played moves in cube decisions
+- Cube action display now handles "too good to double" scenarios correctly
+- Board elements (bearoff trays, bar checkers, pip counts) now flip correctly when changing board perspective
+
+### Changed
+- "Money games" renamed to "unlimited games" for clarity
+
 ## [1.1.6] - 2026-01-13
 
 ### Added
