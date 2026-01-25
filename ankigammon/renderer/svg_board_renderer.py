@@ -415,20 +415,14 @@ class SVGBoardRenderer:
         x_bar_count = max(position.points[0], 0)
         o_bar_count = max(-position.points[25], 0)
 
-        if not flipped:
-            svg_parts.append(
-                self._draw_bar_stack(bar_center_x, x_bar_count, Player.X, True, board_y)
-            )
-            svg_parts.append(
-                self._draw_bar_stack(bar_center_x, o_bar_count, Player.O, False, board_y)
-            )
-        else:
-            svg_parts.append(
-                self._draw_bar_stack(bar_center_x, x_bar_count, Player.X, False, board_y)
-            )
-            svg_parts.append(
-                self._draw_bar_stack(bar_center_x, o_bar_count, Player.O, True, board_y)
-            )
+        # Bar positions are absolute (not perspective-dependent)
+        # X's bar checkers always in bottom half, O's always in top half
+        svg_parts.append(
+            self._draw_bar_stack(bar_center_x, x_bar_count, Player.X, True, board_y)
+        )
+        svg_parts.append(
+            self._draw_bar_stack(bar_center_x, o_bar_count, Player.O, False, board_y)
+        )
 
         return ''.join(svg_parts)
 
@@ -497,8 +491,10 @@ class SVGBoardRenderer:
         checker_spacing_y = 4
         checkers_per_row = 5
 
-        top_player = Player.X if not flipped else Player.O
-        bottom_player = Player.O if not flipped else Player.X
+        # Bearoff tray positions are absolute (not perspective-dependent)
+        # X's bearoff is always at top, O's is always at bottom
+        top_player = Player.X
+        bottom_player = Player.O
 
         def get_off_count(player: Player) -> int:
             if player == Player.X:
@@ -692,21 +688,15 @@ class SVGBoardRenderer:
         else:
             # Pip counts on right side
             bearoff_text_x = board_x + self.playing_width + 15
-        x_bearoff_top = board_y + 10 + 21
-        o_bearoff_top = board_y + self.board_height / 2 + 70 + 21
+        # Pip count positions are absolute (not perspective-dependent)
+        # X's pip count is always at top, O's is always at bottom
+        top_pip_y = board_y + 10 + 21
+        bottom_pip_y = board_y + self.board_height / 2 + 70 + 21
 
-        if flipped:
-            return f'''
+        return f'''
 <g class="pip-counts">
-    <text class="pip-count" x="{bearoff_text_x}" y="{o_bearoff_top}">Pip: {x_pips}</text>
-    <text class="pip-count" x="{bearoff_text_x}" y="{x_bearoff_top}">Pip: {o_pips}</text>
-</g>
-'''
-        else:
-            return f'''
-<g class="pip-counts">
-    <text class="pip-count" x="{bearoff_text_x}" y="{x_bearoff_top}">Pip: {x_pips}</text>
-    <text class="pip-count" x="{bearoff_text_x}" y="{o_bearoff_top}">Pip: {o_pips}</text>
+    <text class="pip-count" x="{bearoff_text_x}" y="{top_pip_y}">Pip: {x_pips}</text>
+    <text class="pip-count" x="{bearoff_text_x}" y="{bottom_pip_y}">Pip: {o_pips}</text>
 </g>
 '''
 
