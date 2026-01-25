@@ -283,7 +283,8 @@ class ExportWorker(QThread):
                     front=card_data['front'],
                     back=card_data['back'],
                     tags=card_data.get('tags', []),
-                    deck_name=deck_name
+                    deck_name=deck_name,
+                    xgid=card_data.get('xgid', '')
                 )
             except Exception as e:
                 self.finished.emit(False, f"Failed to add card {i+1}: {str(e)}")

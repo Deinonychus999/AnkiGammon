@@ -1,14 +1,9 @@
 """Anki-Connect integration for direct note creation in Anki."""
 
-import json
 import requests
-from pathlib import Path
-from typing import List, Dict, Any
+from typing import Any, List
 
-from ankigammon.models import Decision
-from ankigammon.anki.card_generator import CardGenerator
 from ankigammon.anki.card_styles import MODEL_NAME, CARD_CSS
-from ankigammon.settings import get_settings
 
 
 class AnkiConnect:
@@ -104,6 +99,11 @@ class AnkiConnect:
         if MODEL_NAME in model_names:
             # Update styling for existing model
             self.invoke('updateModelStyling', model={'name': MODEL_NAME, 'css': CARD_CSS})
+            # Check if XGID field exists, add it if missing
+            field_names = self.invoke('modelFieldNames', modelName=MODEL_NAME)
+            if 'XGID' not in field_names:
+                # Add XGID field at the beginning (index 0)
+                self.invoke('modelFieldAdd', modelName=MODEL_NAME, fieldName='XGID', index=0)
             return
 
         model = {
@@ -159,87 +159,3 @@ class AnkiConnect:
         }
 
         return self.invoke('addNote', note=note)
-
-    def export_decisions(
-        self,
-        decisions: List[Decision],
-        output_dir: Path,
-        show_options: bool = False,
-        color_scheme: str = "classic",
-        interactive_moves: bool = False,
-        orientation: str = "counter-clockwise",
-        use_subdecks: bool = False
-    ) -> Dict[str, Any]:
-        """
-        Export decisions directly to Anki via Anki-Connect.
-
-        Args:
-            decisions: List of Decision objects
-            output_dir: Directory for configuration
-            show_options: Show multiple choice options
-            color_scheme: Board color scheme name
-            interactive_moves: Enable interactive move visualization
-            orientation: Board orientation
-            use_subdecks: Whether to organize into subdecks by decision type
-
-        Returns:
-            Dictionary with export statistics
-        """
-        if not self.test_connection():
-            raise Exception("Cannot connect to Anki-Connect")
-
-        self.create_model()
-
-        from ankigammon.renderer.color_schemes import get_scheme
-        from ankigammon.renderer.svg_board_renderer import SVGBoardRenderer
-        from ankigammon.anki.deck_utils import get_deck_name_for_decision, get_required_deck_names
-
-        # Create all needed decks upfront
-        for deck_name in get_required_deck_names(decisions, self.deck_name, use_subdecks):
-            self.create_deck(deck_name)
-
-        scheme = get_scheme(color_scheme)
-        if get_settings().swap_checker_colors:
-            scheme = scheme.with_swapped_checkers()
-        renderer = SVGBoardRenderer(color_scheme=scheme, orientation=orientation)
-
-        card_gen = CardGenerator(
-            output_dir=output_dir,
-            show_options=show_options,
-            interactive_moves=interactive_moves,
-            renderer=renderer
-        )
-
-        added = 0
-        skipped = 0
-        errors = []
-
-        for i, decision in enumerate(decisions):
-            try:
-                # Get the appropriate deck name for this decision
-                deck_name = get_deck_name_for_decision(self.deck_name, decision, use_subdecks)
-
-                card_data = card_gen.generate_card(decision, card_id=f"card_{i}")
-
-                note_id = self.add_note(
-                    front=card_data['front'],
-                    back=card_data['back'],
-                    tags=card_data['tags'],
-                    deck_name=deck_name,
-                    xgid=card_data.get('xgid', '')
-                )
-
-                if note_id:
-                    added += 1
-                else:
-                    skipped += 1
-
-            except Exception as e:
-                errors.append(f"Card {i}: {str(e)}")
-
-        return {
-            'added': added,
-            'skipped': skipped,
-            'errors': errors,
-            'total': len(decisions)
-        }

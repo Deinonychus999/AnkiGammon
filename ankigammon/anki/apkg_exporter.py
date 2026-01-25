@@ -51,7 +51,8 @@ class ApkgExporter:
                     'afmt': '{{Back}}',
                 },
             ],
-            css=CARD_CSS
+            css=CARD_CSS,
+            sort_field_index=0  # XGID is the sort field
         )
 
     def export(
