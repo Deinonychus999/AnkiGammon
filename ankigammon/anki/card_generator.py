@@ -190,6 +190,7 @@ class CardGenerator:
             'front': front_html,
             'back': back_html,
             'tags': tags,
+            'xgid': decision.xgid or '',
         }
 
     def _get_metadata_html(self, decision: Decision) -> str:

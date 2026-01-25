@@ -40,6 +40,7 @@ class ApkgExporter:
             self.model_id,
             MODEL_NAME,
             fields=[
+                {'name': 'XGID'},
                 {'name': 'Front'},
                 {'name': 'Back'},
             ],
@@ -119,7 +120,7 @@ class ApkgExporter:
 
                 note = genanki.Note(
                     model=self.model,
-                    fields=[card_data['front'], card_data['back']],
+                    fields=[card_data.get('xgid', ''), card_data['front'], card_data['back']],
                     tags=card_data['tags']
                 )
 

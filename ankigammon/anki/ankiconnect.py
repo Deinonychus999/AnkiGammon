@@ -108,7 +108,7 @@ class AnkiConnect:
 
         model = {
             'modelName': MODEL_NAME,
-            'inOrderFields': ['Front', 'Back'],
+            'inOrderFields': ['XGID', 'Front', 'Back'],
             'css': CARD_CSS,
             'cardTemplates': [
                 {
@@ -125,7 +125,8 @@ class AnkiConnect:
         front: str,
         back: str,
         tags: List[str],
-        deck_name: str = None
+        deck_name: str = None,
+        xgid: str = ''
     ) -> int:
         """
         Add a note to Anki.
@@ -135,6 +136,7 @@ class AnkiConnect:
             back: Back HTML with embedded SVG
             tags: List of tags
             deck_name: Target deck name. If None, uses self.deck_name.
+            xgid: XGID string for the position (used as sort field)
 
         Returns:
             Note ID
@@ -146,6 +148,7 @@ class AnkiConnect:
             'deckName': deck_name,
             'modelName': MODEL_NAME,
             'fields': {
+                'XGID': xgid,
                 'Front': front,
                 'Back': back,
             },
@@ -222,7 +225,8 @@ class AnkiConnect:
                     front=card_data['front'],
                     back=card_data['back'],
                     tags=card_data['tags'],
-                    deck_name=deck_name
+                    deck_name=deck_name,
+                    xgid=card_data.get('xgid', '')
                 )
 
                 if note_id:
