@@ -12,6 +12,7 @@ from PySide6.QtGui import QIcon, QAction, QKeyEvent
 import qtawesome as qta
 
 from ankigammon.models import Decision, DecisionType, Player
+from ankigammon.settings import Settings
 from ankigammon.gui.dialogs.note_dialog import NoteEditDialog
 from ankigammon.gui import silent_messagebox
 
@@ -19,14 +20,15 @@ from ankigammon.gui import silent_messagebox
 class PositionListItem(QListWidgetItem):
     """Custom list item for a decision/position."""
 
-    def __init__(self, decision: Decision, index: int):
+    def __init__(self, decision: Decision, index: int, score_format: str = "absolute"):
         super().__init__()
         self.decision = decision
         self.index = index
+        self.score_format = score_format
 
-        self.setText(f"#{index + 1}: {decision.get_short_display_text()}")
+        self.setText(f"#{index + 1}: {decision.get_short_display_text(score_format)}")
 
-        tooltip = decision.get_metadata_text()
+        tooltip = decision.get_metadata_text(score_format)
         if decision.note:
             tooltip += f"\n\nNote: {decision.note}"
         self.setToolTip(tooltip)
@@ -44,8 +46,9 @@ class PositionListWidget(QListWidget):
     position_selected = Signal(Decision)
     positions_deleted = Signal(list)
 
-    def __init__(self, parent: Optional[QWidget] = None):
+    def __init__(self, settings: Settings, parent: Optional[QWidget] = None):
         super().__init__(parent)
+        self.settings = settings
         self.decisions: List[Decision] = []
 
         self.setVerticalScrollMode(QListWidget.ScrollPerPixel)
@@ -59,8 +62,9 @@ class PositionListWidget(QListWidget):
         self.clear()
         self.decisions = decisions
 
+        score_format = self.settings.score_format
         for i, decision in enumerate(decisions):
-            item = PositionListItem(decision, i)
+            item = PositionListItem(decision, i, score_format)
             self.addItem(item)
 
         if decisions:
@@ -117,7 +121,7 @@ class PositionListWidget(QListWidget):
 
             item.decision.note = new_note.strip() if new_note.strip() else None
 
-            tooltip = item.decision.get_metadata_text()
+            tooltip = item.decision.get_metadata_text(self.settings.score_format)
             if item.decision.note:
                 tooltip += f"\n\nNote: {item.decision.note}"
             item.setToolTip(tooltip)
@@ -131,7 +135,7 @@ class PositionListWidget(QListWidget):
 
         if len(selected_items) == 1:
             item = selected_items[0]
-            message = f"Delete position #{item.index + 1}?\n\n{item.decision.get_short_display_text()}"
+            message = f"Delete position #{item.index + 1}?\n\n{item.decision.get_short_display_text(self.settings.score_format)}"
             title = "Delete Position"
         else:
             message = f"Delete {len(selected_items)} selected position(s)?"

@@ -242,6 +242,18 @@ class SettingsDialog(QDialog):
         )
         form.addRow("Orientation:", self.cmb_board_orientation)
 
+        # Score format
+        self.cmb_score_format = QComboBox()
+        self.cmb_score_format.addItem("Absolute", "absolute")
+        self.cmb_score_format.addItem("Away", "away")
+        self.cmb_score_format.setCursor(Qt.PointingHandCursor)
+        self.cmb_score_format.setToolTip(
+            "How to display match scores:\n"
+            "• Absolute: Current scores\n"
+            "• Away: Points needed to win"
+        )
+        form.addRow("Score Format:", self.cmb_score_format)
+
         # Pip count display
         self.chk_show_pip_count = QCheckBox("Show pip count")
         self.chk_show_pip_count.setCursor(Qt.PointingHandCursor)
@@ -435,6 +447,11 @@ class SettingsDialog(QDialog):
         self.chk_show_options.setChecked(self.settings.show_options)
         self.chk_show_pip_count.setChecked(self.settings.show_pip_count)
         self.chk_swap_checker_colors.setChecked(self.settings.swap_checker_colors)
+
+        # Score format
+        score_format_map = {"absolute": 0, "away": 1}
+        score_format_index = score_format_map.get(self.settings.score_format, 0)
+        self.cmb_score_format.setCurrentIndex(score_format_index)
         self.chk_interactive_moves.setChecked(self.settings.interactive_moves)
         self.chk_preview_moves.setChecked(self.settings.preview_moves_before_submit)
 
@@ -562,6 +579,7 @@ class SettingsDialog(QDialog):
         self.settings.board_orientation = self.cmb_board_orientation.currentData()
         self.settings.show_options = self.chk_show_options.isChecked()
         self.settings.show_pip_count = self.chk_show_pip_count.isChecked()
+        self.settings.score_format = self.cmb_score_format.currentData()
         self.settings.interactive_moves = self.chk_interactive_moves.isChecked()
         self.settings.preview_moves_before_submit = self.chk_preview_moves.isChecked()
         self.settings.max_mcq_options = self.cmb_max_mcq_options.currentIndex() + 2

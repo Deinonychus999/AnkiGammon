@@ -409,7 +409,7 @@ class MainWindow(QMainWindow):
         list_container_layout.addWidget(self.list_header_row)
 
         # Position list widget
-        self.position_list = PositionListWidget()
+        self.position_list = PositionListWidget(self.settings)
         self.position_list.position_selected.connect(self.show_decision)
         self.position_list.positions_deleted.connect(self.on_positions_deleted)
         list_container_layout.addWidget(self.position_list, stretch=1)
@@ -737,6 +737,7 @@ class MainWindow(QMainWindow):
             score_x=decision.score_x,
             score_o=decision.score_o,
             match_length=decision.match_length,
+            score_format=self.settings.score_format,
         )
 
         # Wrap SVG in minimal HTML with dark theme
@@ -834,6 +835,13 @@ class MainWindow(QMainWindow):
 
         # Update deck name label
         self._update_deck_label()
+
+        # Refresh position list with new score format
+        if self.current_decisions:
+            current_row = self.position_list.currentRow()
+            self.position_list.set_decisions(self.current_decisions)
+            if current_row >= 0:
+                self.position_list.setCurrentRow(current_row)
 
         # Refresh current preview if a decision is displayed
         if self.current_decisions:

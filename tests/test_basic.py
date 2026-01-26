@@ -577,7 +577,7 @@ class TestDecision:
             match_length=7,
             decision_type=DecisionType.CHECKER_PLAY
         )
-        assert decision.get_short_display_text() == "Checker | 52 | 3-4 of 7"
+        assert decision.get_short_display_text() == "Checker | 52 | 4-3 of 7"
 
         # Crawford game - with match length and Crawford flag
         decision = Decision(
@@ -590,7 +590,7 @@ class TestDecision:
             crawford=True,
             decision_type=DecisionType.CHECKER_PLAY
         )
-        assert decision.get_short_display_text() == "Checker | 66 | 1-4 of 5 Crawford"
+        assert decision.get_short_display_text() == "Checker | 66 | 4-1 of 5 Crawford"
 
         # Cube decision in Crawford game
         decision = Decision(
@@ -602,7 +602,7 @@ class TestDecision:
             crawford=True,
             decision_type=DecisionType.CUBE_ACTION
         )
-        assert decision.get_short_display_text() == "Cube | 6-5 of 7 Crawford"
+        assert decision.get_short_display_text() == "Cube | 5-6 of 7 Crawford"
 
 
 class TestSVGBoardRenderer:

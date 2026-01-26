@@ -199,7 +199,7 @@ class CardGenerator:
 
         Returns HTML with inline colored circle representing the checker color.
         """
-        base_metadata = decision.get_metadata_text()
+        base_metadata = decision.get_metadata_text(score_format=self.settings.score_format)
 
         # On-roll player uses bottom color after perspective transform
         checker_color = self.renderer.color_scheme.checker_o
@@ -1768,6 +1768,7 @@ class CardGenerator:
             score_x=decision.score_x,
             score_o=decision.score_o,
             match_length=decision.match_length,
+            score_format=self.settings.score_format,
         )
 
     def _render_resulting_position_svg(self, decision: Decision, move: Move) -> str:
@@ -1793,6 +1794,7 @@ class CardGenerator:
             score_x=decision.score_x,
             score_o=decision.score_o,
             match_length=decision.match_length,
+            score_format=self.settings.score_format,
         )
 
     def _shuffle_candidates(

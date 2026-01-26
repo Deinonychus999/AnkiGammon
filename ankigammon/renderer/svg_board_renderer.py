@@ -64,6 +64,7 @@ class SVGBoardRenderer:
         score_x: int = 0,
         score_o: int = 0,
         match_length: int = 0,
+        score_format: str = "absolute",
     ) -> str:
         """
         Render a backgammon position as SVG.
@@ -79,6 +80,7 @@ class SVGBoardRenderer:
             score_x: X player's current score
             score_o: O player's current score
             match_length: Match length (0 = unlimited game, > 0 = match play)
+            score_format: "absolute" (current scores) or "away" (points needed to win)
 
         Returns:
             SVG markup string
@@ -137,10 +139,10 @@ class SVGBoardRenderer:
         if match_length > 0:
             if on_roll == Player.X:
                 # X at bottom, O at top -> show O's score at top, X's at bottom
-                svg_parts.append(self._draw_scores(score_o, score_x, match_length, board_x, board_y, flipped))
+                svg_parts.append(self._draw_scores(score_o, score_x, match_length, board_x, board_y, flipped, score_format))
             else:
                 # O at bottom, X at top -> show X's score at top, O's at bottom
-                svg_parts.append(self._draw_scores(score_x, score_o, match_length, board_x, board_y, flipped))
+                svg_parts.append(self._draw_scores(score_x, score_o, match_length, board_x, board_y, flipped, score_format))
 
         # Close SVG
         svg_parts.append('</svg>')
@@ -707,13 +709,16 @@ class SVGBoardRenderer:
         match_length: int,
         board_x: float,
         board_y: float,
-        flipped: bool
+        flipped: bool,
+        score_format: str = "absolute"
     ) -> str:
         """Draw match scores on the board (only for match play).
 
         Args:
             top_score: Score of the player visually at top of board
             bottom_score: Score of the player visually at bottom of board
+            match_length: Match length
+            score_format: "absolute" (show scores + match length) or "away" (show away scores only)
         """
         if match_length == 0:
             return ""
@@ -732,10 +737,44 @@ class SVGBoardRenderer:
         box_width = 60
         box_height = 35
         box_spacing = 5
+
+        # Same layout for both formats - 3 box positions
         total_height = 3 * box_height + 2 * box_spacing
         start_y = center_y - total_height / 2
 
-        return f'''
+        if score_format == "away":
+            # Away format: show "Xa" in top and bottom positions, skip middle
+            top_away = match_length - top_score
+            bottom_away = match_length - bottom_score
+            top_text = f"{top_away}a"
+            bottom_text = f"{bottom_away}a"
+
+            return f'''
+<g class="match-scores">
+    <!-- Top box: Away score of player at top of board -->
+    <rect x="{center_x - box_width/2}" y="{start_y}"
+          width="{box_width}" height="{box_height}"
+          fill="{self.color_scheme.point_dark}"
+          stroke="{self.color_scheme.bearoff}"
+          stroke-width="2"/>
+    <text x="{center_x}" y="{start_y + box_height/2 + 8}"
+          text-anchor="middle" font-family="Arial, sans-serif"
+          font-size="22px" font-weight="bold" fill="{self.color_scheme.text}">{top_text}</text>
+
+    <!-- Bottom box: Away score of player at bottom of board -->
+    <rect x="{center_x - box_width/2}" y="{start_y + 2*box_height + 2*box_spacing}"
+          width="{box_width}" height="{box_height}"
+          fill="{self.color_scheme.point_dark}"
+          stroke="{self.color_scheme.bearoff}"
+          stroke-width="2"/>
+    <text x="{center_x}" y="{start_y + 2*box_height + 2*box_spacing + box_height/2 + 8}"
+          text-anchor="middle" font-family="Arial, sans-serif"
+          font-size="22px" font-weight="bold" fill="{self.color_scheme.text}">{bottom_text}</text>
+</g>
+'''
+        else:
+            # Absolute format: show scores + match length
+            return f'''
 <g class="match-scores">
     <!-- Top box: Score of player at top of board -->
     <rect x="{center_x - box_width/2}" y="{start_y}"

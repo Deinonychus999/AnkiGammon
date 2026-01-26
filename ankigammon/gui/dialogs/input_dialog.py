@@ -38,10 +38,11 @@ from ankigammon.gui.dialogs.note_dialog import NoteEditDialog
 class PendingPositionItem(QListWidgetItem):
     """List item for a pending position."""
 
-    def __init__(self, decision: Decision, needs_analysis: bool = False):
+    def __init__(self, decision: Decision, needs_analysis: bool = False, score_format: str = "absolute"):
         super().__init__()
         self.decision = decision
         self.needs_analysis = needs_analysis
+        self.score_format = score_format
 
         # Set display text
         self._update_display()
@@ -49,7 +50,7 @@ class PendingPositionItem(QListWidgetItem):
     def _update_display(self):
         """Update display text based on decision."""
         # Use consistent display format
-        self.setText(self.decision.get_short_display_text())
+        self.setText(self.decision.get_short_display_text(self.score_format))
 
         # Icon based on analysis status
         if self.needs_analysis:
@@ -58,7 +59,7 @@ class PendingPositionItem(QListWidgetItem):
             self.setIcon(qta.icon('fa6s.circle-check', color='#a6e3a1'))  # Success green
 
         # Tooltip with metadata + analysis status
-        tooltip = self.decision.get_metadata_text()
+        tooltip = self.decision.get_metadata_text(self.score_format)
         if self.needs_analysis:
             tooltip += "\n\nNeeds GnuBG analysis"
         else:
@@ -76,8 +77,9 @@ class PendingListWidget(QListWidget):
 
     items_deleted = Signal(list)  # Emits list of indices of deleted items
 
-    def __init__(self, parent=None):
+    def __init__(self, settings: Settings, parent=None):
         super().__init__(parent)
+        self.settings = settings
 
         # Enable smooth scrolling
         self.setVerticalScrollMode(QListWidget.ScrollPerPixel)
@@ -164,7 +166,7 @@ class PendingListWidget(QListWidget):
             item.decision.note = new_note.strip() if new_note.strip() else None
 
             # Update tooltip to reflect the new note
-            tooltip = item.decision.get_short_display_text()
+            tooltip = item.decision.get_metadata_text(self.settings.score_format)
             if item.needs_analysis:
                 tooltip += "\n\nNeeds GnuBG analysis"
             else:
@@ -183,7 +185,7 @@ class PendingListWidget(QListWidget):
         # Confirm deletion
         if len(selected_items) == 1:
             item = selected_items[0]
-            message = f"Delete pending position?\n\n{item.decision.get_short_display_text()}"
+            message = f"Delete pending position?\n\n{item.decision.get_short_display_text(self.settings.score_format)}"
             title = "Delete Position"
         else:
             message = f"Delete {len(selected_items)} selected pending position(s)?"
@@ -430,7 +432,7 @@ class InputDialog(QDialog):
         splitter.setChildrenCollapsible(False)
 
         # Pending list
-        self.pending_list = PendingListWidget()
+        self.pending_list = PendingListWidget(self.settings)
         self.pending_list.currentItemChanged.connect(self._on_selection_changed)
         self.pending_list.items_deleted.connect(self._on_items_deleted)
         splitter.addWidget(self.pending_list)
@@ -521,7 +523,7 @@ class InputDialog(QDialog):
                 needs_analysis = not bool(decision.candidate_moves)
                 self.pending_decisions.append(decision)
 
-                item = PendingPositionItem(decision, needs_analysis)
+                item = PendingPositionItem(decision, needs_analysis, self.settings.score_format)
                 self.pending_list.addItem(item)
 
             # Update count
@@ -701,6 +703,7 @@ class InputDialog(QDialog):
             score_x=decision.score_x,
             score_o=decision.score_o,
             match_length=decision.match_length,
+            score_format=self.settings.score_format,
         )
 
         html = f"""

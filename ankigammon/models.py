@@ -310,11 +310,20 @@ class Decision:
             'responder': responder
         }
 
-    def get_short_display_text(self) -> str:
-        """Get short display text for list views."""
+    def get_short_display_text(self, score_format: str = "absolute") -> str:
+        """Get short display text for list views.
+
+        Args:
+            score_format: "absolute" or "away"
+        """
         # Build score/game type string
         if self.match_length > 0:
-            score = f"{self.score_x}-{self.score_o} of {self.match_length}"
+            if score_format == "away":
+                x_away = self.match_length - self.score_x
+                o_away = self.match_length - self.score_o
+                score = f"{o_away}a-{x_away}a"
+            else:
+                score = f"{self.score_o}-{self.score_x} of {self.match_length}"
             if self.crawford:
                 score += " Crawford"
         else:
@@ -326,8 +335,14 @@ class Decision:
         else:
             return f"Cube | {score}"
 
-    def get_metadata_text(self) -> str:
-        """Get formatted metadata for card display."""
+    def get_metadata_text(self, score_format: str = "absolute") -> str:
+        """Get formatted metadata for card display.
+
+        Args:
+            score_format: How to display match scores.
+                - "absolute": Show current scores
+                - "away": Show points needed to win
+        """
         dice_str = f"{self.dice[0]}{self.dice[1]}" if self.dice else "N/A"
 
         # Display em dash for centered cube, otherwise show value
@@ -344,10 +359,19 @@ class Decision:
             match_str = f"{self.match_length}pt"
             if self.crawford:
                 match_str += " (Crawford)"
+
+            # Format score based on preference
+            x_away = self.match_length - self.score_x
+            o_away = self.match_length - self.score_o
+            if score_format == "away":
+                score_str = f"{x_away}a-{o_away}a"
+            else:  # "absolute" is the default
+                score_str = f"{self.score_x}-{self.score_o}"
+
             return (
                 f"{player_name} | "
                 f"Dice: {dice_str} | "
-                f"Score: {self.score_x}-{self.score_o} | "
+                f"Score: {score_str} | "
                 f"Cube: {cube_str} | "
                 f"Match: {match_str}"
             )

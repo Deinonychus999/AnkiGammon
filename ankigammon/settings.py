@@ -21,6 +21,7 @@ class Settings:
         "clear_positions_after_export": True,
         "show_options": True,
         "show_pip_count": True,
+        "score_format": "absolute",  # "absolute" or "away"
         "interactive_moves": True,
         "preview_moves_before_submit": False,
         "export_method": "ankiconnect",
@@ -159,6 +160,18 @@ class Settings:
     def show_pip_count(self, value: bool) -> None:
         """Set whether to show pip counts on cards."""
         self.set("show_pip_count", value)
+
+    @property
+    def score_format(self) -> str:
+        """Get score format for match play. Options: 'absolute' or 'away'."""
+        return self._settings.get("score_format", "absolute")
+
+    @score_format.setter
+    def score_format(self, value: str) -> None:
+        """Set score format for match play."""
+        if value not in ("absolute", "away"):
+            value = "absolute"
+        self.set("score_format", value)
 
     @property
     def interactive_moves(self) -> bool:
