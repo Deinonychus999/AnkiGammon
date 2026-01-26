@@ -1682,13 +1682,63 @@ class CardGenerator:
         if not decision.xgid and not decision.source_description:
             return ""
 
-        xgid_html = f"<code>{decision.xgid}</code>" if decision.xgid else ""
+        if decision.xgid:
+            xgid_html = f"""<span class="xgid-container">
+    <code class="xgid-text">{decision.xgid}</code>
+    <button class="xgid-copy-btn" title="Copy XGID">
+        <svg class="copy-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+        </svg>
+        <svg class="check-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none;">
+            <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+    </button>
+</span>"""
+        else:
+            xgid_html = ""
         source_html = f'<span style="display: block; margin-top: 1em;">{decision.source_description}</span>' if decision.source_description else ""
 
         return f"""
 <div class="source-info">
     <p>{xgid_html}{source_html}</p>
 </div>
+<script>
+(function() {{
+    var copyBtn = document.querySelector('.xgid-copy-btn');
+    if (!copyBtn) return;
+
+    copyBtn.addEventListener('click', function() {{
+        var xgidText = this.previousElementSibling.textContent;
+        var btn = this;
+
+        // Fallback copy method using textarea
+        var textarea = document.createElement('textarea');
+        textarea.value = xgidText;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+
+        try {{
+            document.execCommand('copy');
+            // Show success state
+            btn.classList.add('copied');
+            btn.querySelector('.copy-icon').style.display = 'none';
+            btn.querySelector('.check-icon').style.display = 'block';
+            setTimeout(function() {{
+                btn.classList.remove('copied');
+                btn.querySelector('.copy-icon').style.display = 'block';
+                btn.querySelector('.check-icon').style.display = 'none';
+            }}, 1500);
+        }} catch(e) {{
+            console.log('Copy failed:', e);
+        }}
+
+        document.body.removeChild(textarea);
+    }});
+}})();
+</script>
 """
 
     def _generate_tags(self, decision: Decision) -> List[str]:

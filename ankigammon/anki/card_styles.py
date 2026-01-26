@@ -570,6 +570,41 @@ CARD_CSS = """
     font-size: 11px;
 }
 
+/* XGID copy button */
+.xgid-container {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.xgid-text {
+    word-break: break-all;
+}
+
+.xgid-copy-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px;
+    background-color: var(--canvas-inset);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    cursor: pointer;
+    color: var(--text-fg);
+    opacity: 0.7;
+    transition: opacity 0.2s, background-color 0.2s;
+}
+
+.xgid-copy-btn:hover {
+    opacity: 1;
+    background-color: var(--canvas-elevated);
+}
+
+.xgid-copy-btn.copied {
+    color: #22c55e;
+    opacity: 1;
+}
+
 /* Position viewer controls */
 .position-label {
     display: flex;
