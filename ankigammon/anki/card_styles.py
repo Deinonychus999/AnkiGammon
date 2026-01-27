@@ -1353,12 +1353,6 @@ button.animate-btn:disabled {
     font-weight: bold;
 }
 
-/* Highlight columns where best move differs from Neutral */
-.move-score-matrix-table td.different-best {
-    background-color: rgba(255, 193, 7, 0.2) !important;
-    border: 2px solid #FFC107 !important;
-}
-
 /* Dark mode adjustments */
 .night_mode .move-score-matrix-table {
     background-color: var(--canvas-elevated);
@@ -1376,10 +1370,6 @@ button.animate-btn:disabled {
 
 .night_mode .move-score-matrix-table tr.rank-1 td {
     background-color: rgba(76, 175, 80, 0.25);
-}
-
-.night_mode .move-score-matrix-table td.different-best {
-    background-color: rgba(255, 193, 7, 0.3) !important;
 }
 
 .night_mode .move-score-matrix-table .error {

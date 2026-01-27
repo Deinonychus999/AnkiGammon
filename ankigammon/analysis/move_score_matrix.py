@@ -2,7 +2,7 @@
 Move score matrix generation for checker play decisions.
 
 Generates tables showing top moves at different match score contexts:
-- Neutral (Money game)
+- Neutral (0-0 to 7)
 - DMP (Double Match Point: 0-0 to 1)
 - Gammon-Save (2-1 to 3 Crawford - player ahead)
 - Gammon-Go (1-2 to 3 Crawford - player behind)
@@ -30,19 +30,6 @@ class MoveScoreMatrixColumn:
 
     score_type: str           # Short name: "Neutral", "DMP", "G-Save", "G-Go"
     top_moves: List[MoveAtScore]  # Top 3 moves at this score
-
-    @property
-    def best_move_notation(self) -> Optional[str]:
-        """Get the notation of the best move (rank 1)."""
-        for move in self.top_moves:
-            if move.rank == 1:
-                return move.notation
-        return self.top_moves[0].notation if self.top_moves else None
-
-    def has_different_best_move(self, reference_notation: str) -> bool:
-        """Check if best move differs from reference (for highlighting)."""
-        best = self.best_move_notation
-        return best is not None and best != reference_notation
 
 
 # Score configurations for the 4 score types
@@ -82,6 +69,7 @@ def generate_move_score_matrix(
     xgid: str,
     gnubg_path: str,
     ply_level: int = 3,
+    max_moves: int = 3,
     progress_callback: Optional[Callable[[str], None]] = None,
     cancellation_callback: Optional[Callable[[], bool]] = None
 ) -> List[MoveScoreMatrixColumn]:
@@ -130,47 +118,30 @@ def generate_move_score_matrix(
     # Build list of modified XGIDs for each score config
     position_ids = []
     for config in SCORE_CONFIGS:
-        # For Neutral (money game), use match_length=0
-        # For match play scores, adjust scores based on who's on roll
         match_length = config['match_length']
 
-        if match_length == 0:
-            # Money game - scores don't matter
-            modified_xgid = encode_xgid(
-                position=position,
-                cube_value=1,
-                cube_owner=CubeState.CENTERED,
-                dice=dice,
-                on_roll=on_roll,
-                score_x=0,
-                score_o=0,
-                match_length=0,
-                crawford_jacoby=0,  # Jacoby rule for money games
-                max_cube=metadata.get('max_cube', 256)
-            )
+        # Scores are configured relative to player on roll
+        # config assumes O is on roll; if X is on roll, swap scores
+        if on_roll == Player.O:
+            score_x = config['score_x']
+            score_o = config['score_o']
         else:
-            # Match play - scores are configured relative to player on roll
-            # config assumes O is on roll; if X is on roll, swap scores
-            if on_roll == Player.O:
-                score_x = config['score_x']
-                score_o = config['score_o']
-            else:
-                # X is on roll - swap the perspective
-                score_x = config['score_o']
-                score_o = config['score_x']
+            # X is on roll - swap the perspective
+            score_x = config['score_o']
+            score_o = config['score_x']
 
-            modified_xgid = encode_xgid(
-                position=position,
-                cube_value=1,  # Cube at 1 (centered) for these score contexts
-                cube_owner=CubeState.CENTERED,
-                dice=dice,
-                on_roll=on_roll,
-                score_x=score_x,
-                score_o=score_o,
-                match_length=match_length,
-                crawford_jacoby=config['crawford'],
-                max_cube=metadata.get('max_cube', 256)
-            )
+        modified_xgid = encode_xgid(
+            position=position,
+            cube_value=1,  # Cube at 1 (centered) for these score contexts
+            cube_owner=CubeState.CENTERED,
+            dice=dice,
+            on_roll=on_roll,
+            score_x=score_x,
+            score_o=score_o,
+            match_length=match_length,
+            crawford_jacoby=config['crawford'],
+            max_cube=metadata.get('max_cube', 256)
+        )
 
         position_ids.append(modified_xgid)
 
@@ -220,7 +191,7 @@ def generate_move_score_matrix(
             )
 
         # Extract top 3 moves
-        sorted_moves = sorted(moves, key=lambda m: m.rank)[:3]
+        sorted_moves = sorted(moves, key=lambda m: m.rank)[:max_moves]
 
         top_moves = []
         for move in sorted_moves:
@@ -268,9 +239,6 @@ def format_move_matrix_as_html(
     if not columns:
         return ""
 
-    # Get reference best move (from Neutral column) for highlighting differences
-    reference_best = columns[0].best_move_notation if columns else None
-
     # Start table
     html = '<div class="move-score-matrix">\n'
 
@@ -309,10 +277,6 @@ def format_move_matrix_as_html(
         html += f'<tr class="{row_class}">\n'
 
         for col in columns:
-            # Check if this column's best move differs from reference
-            different_best = col.has_different_best_move(reference_best) if reference_best else False
-            cell_class = ' different-best' if different_best and rank == 1 else ''
-
             if rank_idx < len(col.top_moves):
                 move = col.top_moves[rank_idx]
 
@@ -325,13 +289,13 @@ def format_move_matrix_as_html(
                     error_val = -abs(move.error) if move.error != 0 else 0
                     equity_display = f'<span class="error">{error_val:.3f}</span>'
 
-                html += f'<td class="{cell_class.strip()}">'
+                html += '<td>'
                 html += f'<div class="move-notation">{move.notation}</div>'
                 html += f'<div class="equity-error">{equity_display}</div>'
                 html += '</td>\n'
             else:
                 # No move at this rank for this column
-                html += f'<td class="{cell_class.strip()}"><span class="no-move">-</span></td>\n'
+                html += '<td><span class="no-move">-</span></td>\n'
 
         html += '</tr>\n'
 

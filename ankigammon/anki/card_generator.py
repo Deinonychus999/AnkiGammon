@@ -1647,6 +1647,7 @@ class CardGenerator:
                 xgid=decision.xgid,
                 gnubg_path=self.settings.gnubg_path,
                 ply_level=self.settings.gnubg_analysis_ply,
+                max_moves=self.settings.max_mcq_options,
                 progress_callback=self.progress_callback,
                 cancellation_callback=self.cancellation_callback
             )
