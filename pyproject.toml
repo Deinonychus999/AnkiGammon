@@ -47,6 +47,7 @@ Issues = "https://github.com/Deinonychus999/AnkiGammon/issues"
 dev = [
     "pyinstaller>=6.0.0",
     "pytest>=7.0.0",
+    "bump-my-version>=0.28.0",
 ]
 
 [project.gui-scripts]
@@ -60,3 +61,27 @@ include = ["ankigammon*"]
 ankigammon = [
     "gui/resources/*",
 ]
+
+# Version bumping configuration
+# Usage: bump-my-version patch|minor|major
+[tool.bumpversion]
+current_version = "1.1.7"
+commit = true
+tag = true
+tag_name = "v{new_version}"
+message = "Increase version to {new_version}"
+
+[[tool.bumpversion.files]]
+filename = "pyproject.toml"
+search = 'version = "{current_version}"'
+replace = 'version = "{new_version}"'
+
+[[tool.bumpversion.files]]
+filename = "ankigammon/__init__.py"
+search = '__version__ = "{current_version}"'
+replace = '__version__ = "{new_version}"'
+
+[[tool.bumpversion.files]]
+filename = "ankigammon.spec"
+search = "'CFBundleShortVersionString': '{current_version}'"
+replace = "'CFBundleShortVersionString': '{new_version}'"
