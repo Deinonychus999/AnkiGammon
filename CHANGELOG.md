@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.2.0] - 2026-01-26
+
+### Added
+- Move score matrix showing best moves across different match scores
+- XGID copy button on card back for easy position sharing
+- Option to display match scores as "absolute" or "away" format
+- Option to show original position on card back
+- XGID field in Anki notes for position-based sorting and searching
+
+### Improved
+- Clear error message when GNU Backgammon is not configured for export analysis
+
 ## [1.1.7] - 2026-01-25
 
 ### Fixed
