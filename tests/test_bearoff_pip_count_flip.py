@@ -31,6 +31,8 @@ class TestBearoffPipCountFlip:
         who is on roll.
         """
         renderer = SVGBoardRenderer()
+        # Ensure pip counts are shown regardless of user config
+        renderer.settings._settings["show_pip_count"] = True
 
         # Parse both XGIDs
         position_o, meta_o = parse_xgid(self.XGID_O_ON_ROLL)
@@ -78,6 +80,8 @@ class TestBearoffPipCountFlip:
         Verify X's pip count is at top and O's pip count is at bottom.
         """
         renderer = SVGBoardRenderer()
+        # Ensure pip counts are shown regardless of user config
+        renderer.settings._settings["show_pip_count"] = True
 
         # Create a simple position with known pip counts
         position = Position()
