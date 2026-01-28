@@ -323,32 +323,27 @@ class CardGenerator:
         preview_enabled = self.settings.preview_moves_before_submit and move_result_svgs
 
         if not preview_enabled:
-            # Original instant-flip behavior
+            # Simple mode - store choice on body element, try auto-flip
             return """
 (function() {
-    const options = document.querySelectorAll('.mcq-option');
+    var options = document.querySelectorAll('.mcq-option');
 
-    options.forEach(option => {
+    options.forEach(function(option) {
         option.addEventListener('click', function() {
-            const selectedLetter = this.dataset.optionLetter;
+            var selectedLetter = this.dataset.optionLetter;
 
-            // Store selection in sessionStorage
-            try {
-                sessionStorage.setItem('ankigammon-mcq-choice', selectedLetter);
-            } catch (e) {
-                window.location.hash = 'choice-' + selectedLetter;
-            }
+            // Store selection on body element (persists between front/back on all platforms)
+            document.body.dataset.ankigammonChoice = selectedLetter;
 
             // Visual feedback before flip
             this.classList.add('selected-flash');
 
-            // Trigger Anki flip to back side
-            // Note: AnkiWeb and AnkiMobile have no JS API - users must manually flip
+            // Try to auto-flip (works on Desktop/AnkiDroid, not AnkiWeb)
             setTimeout(function() {
                 if (typeof pycmd !== 'undefined') {
-                    pycmd('ans');  // Anki desktop
+                    pycmd('ans');
                 } else if (typeof showAnswer === 'function') {
-                    showAnswer();  // AnkiDroid (signal-based function from card.js)
+                    showAnswer();
                 }
             }, 200);
         });
@@ -369,17 +364,11 @@ class CardGenerator:
         return f"""
 <script>
 (function() {{
-    let selectedLetter = null;
-
-    try {{
-        selectedLetter = sessionStorage.getItem('ankigammon-mcq-choice');
-        sessionStorage.removeItem('ankigammon-mcq-choice');
-    }} catch (e) {{
-        const hash = window.location.hash;
-        if (hash.startsWith('#choice-')) {{
-            selectedLetter = hash.replace('#choice-', '');
-            window.location.hash = '';
-        }}
+    // Read selection from body element (set by front card)
+    var selectedLetter = document.body.dataset.ankigammonChoice || null;
+    // Clear after reading
+    if (selectedLetter) {{
+        document.body.dataset.ankigammonChoice = '';
     }}
 
     const correctLetter = '{correct_letter}';
@@ -938,12 +927,8 @@ class CardGenerator:
             submitBtn.addEventListener('click', function() {
                 if (!currentSelectedLetter) return;
 
-                // Store selection in sessionStorage
-                try {
-                    sessionStorage.setItem('ankigammon-mcq-choice', currentSelectedLetter);
-                } catch (e) {
-                    window.location.hash = 'choice-' + currentSelectedLetter;
-                }
+                // Store selection on body element (persists between front/back on all platforms)
+                document.body.dataset.ankigammonChoice = currentSelectedLetter;
 
                 // Visual feedback
                 if (currentSelectedOption) {
