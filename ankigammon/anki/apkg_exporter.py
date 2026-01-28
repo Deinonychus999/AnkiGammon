@@ -1,7 +1,8 @@
 """Export XG decisions to Anki .apkg file using genanki."""
 
+import hashlib
+
 import genanki
-import random
 from pathlib import Path
 from typing import List
 
@@ -9,6 +10,47 @@ from ankigammon.models import Decision
 from ankigammon.anki.card_generator import CardGenerator
 from ankigammon.anki.card_styles import MODEL_NAME, CARD_CSS
 from ankigammon.settings import get_settings
+
+
+def _deterministic_id(name: str) -> int:
+    """Generate a deterministic ID from a name string.
+
+    Uses SHA256 hash to produce a stable integer in the range [1<<30, 1<<31).
+    The same name always produces the same ID, enabling Anki to recognize
+    the same deck/model across exports.
+
+    Args:
+        name: Identifier string (e.g., "model:XG Backgammon Decision")
+
+    Returns:
+        Deterministic integer ID
+    """
+    h = hashlib.sha256(name.encode('utf-8')).digest()
+    raw = int.from_bytes(h[:4], 'big')
+    return (raw % (1 << 30)) + (1 << 30)
+
+
+class StableNote(genanki.Note):
+    """A genanki.Note subclass that uses only XGID for GUID generation.
+
+    This ensures that reimporting an APKG with the same positions updates
+    existing cards instead of creating duplicates. The XGID field must be
+    the first field (index 0).
+    """
+
+    @property
+    def guid(self):
+        xgid = self.fields[0] if self.fields else ''
+        if xgid:
+            return genanki.guid_for(xgid)
+        # Fall back to default behavior if no XGID
+        return genanki.guid_for(*self.fields)
+
+    @guid.setter
+    def guid(self, val):
+        # Required by parent class __init__, but ignored since we
+        # compute GUID dynamically from the XGID field.
+        pass
 
 
 class ApkgExporter:
@@ -28,8 +70,8 @@ class ApkgExporter:
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.deck_name = deck_name
 
-        self.deck_id = random.randrange(1 << 30, 1 << 31)
-        self.model_id = random.randrange(1 << 30, 1 << 31)
+        self.model_id = _deterministic_id(f"model:{MODEL_NAME}")
+        self.deck_id = _deterministic_id(f"deck:{self.deck_name}")
 
         self.model = self._create_model()
         self.deck = genanki.Deck(self.deck_id, self.deck_name)
@@ -105,7 +147,7 @@ class ApkgExporter:
         # Create deck objects for each group
         decks_dict = {}
         for deck_name in decisions_by_deck.keys():
-            deck_id = random.randrange(1 << 30, 1 << 31)
+            deck_id = _deterministic_id(f"deck:{deck_name}")
             decks_dict[deck_name] = genanki.Deck(deck_id, deck_name)
 
         # Generate cards and add to appropriate decks
@@ -119,7 +161,7 @@ class ApkgExporter:
 
                 card_data = card_gen.generate_card(decision, card_id=f"card_{card_index}")
 
-                note = genanki.Note(
+                note = StableNote(
                     model=self.model,
                     fields=[card_data.get('xgid', ''), card_data['front'], card_data['back']],
                     tags=card_data['tags']

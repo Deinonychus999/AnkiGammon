@@ -517,6 +517,11 @@ class MainWindow(QMainWindow):
         act_export.triggered.connect(self.on_export_clicked)
         file_menu.addAction(act_export)
 
+        act_regenerate = QAction("&Regenerate Cards in Anki...", self)
+        act_regenerate.setShortcut("Ctrl+R")
+        act_regenerate.triggered.connect(self.on_regenerate_clicked)
+        file_menu.addAction(act_regenerate)
+
         file_menu.addSeparator()
 
         act_quit = QAction("&Quit", self)
@@ -862,6 +867,13 @@ class MainWindow(QMainWindow):
 
         dialog = ExportDialog(self.current_decisions, self.settings, self)
         dialog.export_succeeded.connect(self.on_export_succeeded)
+        dialog.exec()
+
+    @Slot()
+    def on_regenerate_clicked(self):
+        """Handle regenerate cards menu action."""
+        from ankigammon.gui.dialogs.regenerate_dialog import RegenerateDialog
+        dialog = RegenerateDialog(self.settings, self)
         dialog.exec()
 
     @Slot()

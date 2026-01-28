@@ -12,7 +12,7 @@ from PySide6.QtCore import Qt, QThread, Signal, Slot
 
 from ankigammon.models import Decision
 from ankigammon.anki.ankiconnect import AnkiConnect
-from ankigammon.anki.apkg_exporter import ApkgExporter
+from ankigammon.anki.apkg_exporter import ApkgExporter, StableNote, _deterministic_id
 from ankigammon.anki.card_generator import CardGenerator
 from ankigammon.renderer.svg_board_renderer import SVGBoardRenderer
 from ankigammon.renderer.color_schemes import SCHEMES
@@ -140,13 +140,15 @@ class ExportWorker(QThread):
         decisions: List[Decision],
         settings: Settings,
         export_method: str,
-        output_path: str = None
+        output_path: str = None,
+        import_mode: str = "add"
     ):
         super().__init__()
         self.decisions = decisions
         self.settings = settings
         self.export_method = export_method
         self.output_path = output_path
+        self.import_mode = import_mode
         self._cancelled = False
 
     def cancel(self):
@@ -279,13 +281,22 @@ class ExportWorker(QThread):
                     decision,
                     self.settings.use_subdecks_by_type
                 )
-                client.add_note(
-                    front=card_data['front'],
-                    back=card_data['back'],
-                    tags=card_data.get('tags', []),
-                    deck_name=deck_name,
-                    xgid=card_data.get('xgid', '')
-                )
+                if self.import_mode == "upsert":
+                    client.upsert_note(
+                        front=card_data['front'],
+                        back=card_data['back'],
+                        tags=card_data.get('tags', []),
+                        deck_name=deck_name,
+                        xgid=card_data.get('xgid', '')
+                    )
+                else:
+                    client.add_note(
+                        front=card_data['front'],
+                        back=card_data['back'],
+                        tags=card_data.get('tags', []),
+                        deck_name=deck_name,
+                        xgid=card_data.get('xgid', '')
+                    )
             except Exception as e:
                 self.finished.emit(False, f"Failed to add card {i+1}: {str(e)}")
                 return
@@ -318,7 +329,6 @@ class ExportWorker(QThread):
             from ankigammon.anki.card_generator import CardGenerator
             from ankigammon.anki.deck_utils import group_decisions_by_deck
             import genanki
-            import random
 
             scheme = get_scheme(self.settings.color_scheme)
             if self.settings.swap_checker_colors:
@@ -338,7 +348,7 @@ class ExportWorker(QThread):
             # Create deck objects for each group
             decks_dict = {}
             for deck_name in decisions_by_deck.keys():
-                deck_id = random.randrange(1 << 30, 1 << 31)
+                deck_id = _deterministic_id(f"deck:{deck_name}")
                 decks_dict[deck_name] = genanki.Deck(deck_id, deck_name)
 
             # Generate cards and add to appropriate decks
@@ -412,9 +422,9 @@ class ExportWorker(QThread):
                         return
 
                     # Create note
-                    note = genanki.Note(
+                    note = StableNote(
                         model=exporter.model,
-                        fields=[card_data['front'], card_data['back']],
+                        fields=[card_data.get('xgid', ''), card_data['front'], card_data['back']],
                         tags=card_data['tags']
                     )
 
@@ -607,12 +617,16 @@ class ExportDialog(QDialog):
 
     def _start_export_worker(self):
         """Start the actual export worker (after analysis if needed)."""
+        # AnkiConnect uses upsert to update existing cards by XGID
+        import_mode = "upsert" if self.settings.export_method == "ankiconnect" else "add"
+
         # Create worker thread
         self.worker = ExportWorker(
             self.decisions,
             self.settings,
             self.settings.export_method,
-            self.output_path
+            self.output_path,
+            import_mode=import_mode
         )
 
         # Connect signals
