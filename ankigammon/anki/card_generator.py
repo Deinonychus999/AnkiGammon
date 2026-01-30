@@ -504,10 +504,13 @@ class CardGenerator:
         # Get best equity for calculating signed errors
         best_move = decision.get_best_move()
         best_equity = best_move.equity if best_move else 0.0
+        # Keep original best equity for MCQ error calculations (before any adjustment)
+        mcq_best_equity = best_equity
 
-        # For "too good" scenarios, use No Double equity as the baseline
+        # For "too good" scenarios, use No Double equity as the baseline for ANALYSIS TABLE
         # (XG convention: errors are relative to the best actual action, which is No Double)
         # Also track which displayed move should be marked as "best" for highlighting
+        # NOTE: This adjustment is ONLY for the analysis table display, NOT for MCQ feedback
         best_displayed_move = None
         if best_move and best_move.notation.startswith("Too good"):
             no_double_move = next(
@@ -594,8 +597,20 @@ class CardGenerator:
             for i, move in enumerate(shuffled_candidates):
                 if move and i < len(letters):
                     letter_to_move[letters[i]] = move.notation
-                    # Use corrected error relative to best_equity (adjusted for "too good" scenarios)
-                    corrected_error = abs(move.equity - best_equity) if move.equity is not None else 0.0
+                    # For cube decisions: Each option represents a distinct strategic concept.
+                    # "Close" based on equity doesn't apply - only the exact correct answer is correct.
+                    # Each cube action has a different equity and meaning (e.g., Double/Pass = 1.000,
+                    # Too good/Pass = No Double equity which is higher when position is "too good").
+                    if is_cube_decision:
+                        # Set error to 0 only for the correct answer, high error for all others
+                        if i == answer_index:
+                            corrected_error = 0.0
+                        else:
+                            # Use a high error to ensure all wrong answers are INCORRECT, not CLOSE
+                            corrected_error = 1.0
+                    else:
+                        # For checker plays, use equity-based error (close moves are similar)
+                        corrected_error = abs(move.equity - mcq_best_equity) if move.equity is not None else 0.0
                     letter_to_error[letters[i]] = corrected_error
 
             answer_html = f"""

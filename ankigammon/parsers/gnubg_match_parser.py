@@ -482,10 +482,12 @@ class GNUBGMatchParser:
             was_played=was_dt and not is_too_good
         ))
 
+        # "Too good" options have No Double equity because you DON'T double
+        # The Take/Pass suffix indicates opponent's hypothetical response if you did
         candidate_moves.append(Move(
             notation="Too Good/Take",
-            equity=dp_equity,
-            error=abs(best_equity - dp_equity),
+            equity=nd_equity,
+            error=abs(best_equity - nd_equity),
             rank=1,
             was_played=was_dt and is_too_good,
             from_xg_analysis=False
@@ -493,8 +495,8 @@ class GNUBGMatchParser:
 
         candidate_moves.append(Move(
             notation="Too Good/Pass",
-            equity=dp_equity,
-            error=abs(best_equity - dp_equity),
+            equity=nd_equity,
+            error=abs(best_equity - nd_equity),
             rank=1,
             was_played=was_dp and is_too_good,
             from_xg_analysis=False
@@ -843,10 +845,12 @@ class GNUBGMatchParser:
             was_played=was_dt and not is_too_good
         ))
 
+        # "Too good" options have No Double equity because you DON'T double
+        # The Take/Pass suffix indicates opponent's hypothetical response if you did
         candidate_moves.append(Move(
             notation="Too Good/Take",
-            equity=dp_equity,
-            error=abs(best_equity - dp_equity),
+            equity=nd_equity,
+            error=abs(best_equity - nd_equity),
             rank=1,
             was_played=was_dt and is_too_good,
             from_xg_analysis=False
@@ -854,8 +858,8 @@ class GNUBGMatchParser:
 
         candidate_moves.append(Move(
             notation="Too Good/Pass",
-            equity=dp_equity,
-            error=abs(best_equity - dp_equity),
+            equity=nd_equity,
+            error=abs(best_equity - nd_equity),
             rank=1,
             was_played=was_dp and is_too_good,
             from_xg_analysis=False

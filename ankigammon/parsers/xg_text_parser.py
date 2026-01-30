@@ -661,10 +661,11 @@ class XGTextParser:
         if double_pass_eq is not None:
             option_equities[f"{double_term}/Pass"] = double_pass_eq
 
-        # Assign equities for synthetic "Too good" options
-        if double_pass_eq is not None:
-            option_equities["Too good/Take"] = double_pass_eq
-            option_equities["Too good/Pass"] = double_pass_eq
+        # "Too good" options have No Double equity because you DON'T double
+        # The Take/Pass suffix indicates opponent's hypothetical response if you did
+        if no_double_eq is not None:
+            option_equities["Too good/Take"] = no_double_eq
+            option_equities["Too good/Pass"] = no_double_eq
 
         # Determine best option from "Best Cube action:" text
         best_notation = None

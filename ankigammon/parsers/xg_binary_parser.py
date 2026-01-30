@@ -708,9 +708,11 @@ class XGBinaryParser:
                 })
 
                 # 4 & 5. Too good options (synthetic)
+                # "Too good" options have No Double equity because you DON'T double
+                # The Take/Pass suffix indicates opponent's hypothetical response if you did
                 cube_options.append({
                     'notation': 'Too good/Take',
-                    'equity': eq_double_drop,
+                    'equity': eq_no_double,
                     'xg_notation': None,
                     'from_xg': False,
                     'eval': None
@@ -718,7 +720,7 @@ class XGBinaryParser:
 
                 cube_options.append({
                     'notation': 'Too good/Pass',
-                    'equity': eq_double_drop,
+                    'equity': eq_no_double,
                     'xg_notation': None,
                     'from_xg': False,
                     'eval': None
