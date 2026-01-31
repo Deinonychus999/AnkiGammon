@@ -7,7 +7,7 @@ A graphical application for converting backgammon positions into Anki flashcards
 ## Features
 
 - **Modern GUI interface** - Easy-to-use graphical application with drag-and-drop support
-- **Multiple input formats** - XGID/OGID/GNUID position IDs, XG binary files (.xg), match files (.mat), SGF files
+- **Multiple input formats** - XGID/OGID/GNUID position IDs, XG binary files (.xg, .xgp), match files (.mat), SGF files
 - **Direct XG export support** - Copy/paste pre-analyzed positions from eXtreme Gammon
 - **File import with filtering** - Drag-and-drop files with error threshold and player selection
 - **GNU Backgammon integration** - Analyze unanalyzed positions automatically
@@ -15,8 +15,10 @@ A graphical application for converting backgammon positions into Anki flashcards
 - **Two export methods**:
   - AnkiConnect: Push directly to Anki (recommended)
   - APKG: Self-contained package for manual import
-- **Customizable appearance** - 6 color schemes, board orientation, configurable MCQ options (2-10)
+- **Customizable appearance** - 7 color schemes, board orientation (including random), configurable MCQ options (2-10)
 - **Position management** - Multi-select, add notes, preview positions before export
+- **Automatic update notifications** - Get notified when new versions are available
+- **Comments extraction** - Automatically imports comments and notes from XG files (.xg, .xgp)
 
 ## Installation
 
@@ -88,7 +90,7 @@ ankigammon  # Launches the GUI
 2. **Add positions** (choose one or more methods):
    - **Paste XG analysis**: Press Ctrl+N, paste pre-analyzed positions from eXtreme Gammon (Ctrl+C)
    - **Paste position IDs**: Press Ctrl+N, paste XGID/OGID/GNUID strings (requires GNU Backgammon for analysis)
-   - **Import files**: Press Ctrl+O or drag-and-drop files (.xg, .mat, .sgf, .txt)
+   - **Import files**: Press Ctrl+O or drag-and-drop files (.xg, .xgp, .mat, .sgf, .txt)
      - For match files: Choose error threshold and which player's mistakes to import
 3. **Configure settings** - Choose color scheme, board orientation, and export method (Ctrl+,)
 4. **Generate cards** - Click "Generate Cards" (Ctrl+E) to create Anki flashcards
@@ -135,7 +137,7 @@ All formats fully support position encoding, cube state, dice, and match metadat
 
 ### File Formats
 
-- **XG Binary files (.xg)** - eXtreme Gammon native format (includes pre-analysis from XG)
+- **XG Binary files (.xg, .xgp)** - eXtreme Gammon match and position files (includes pre-analysis from XG)
 - **Match files (.mat, .txt)** - GNU Backgammon match exports (requires GNU Backgammon for analysis)
 - **SGF files (.sgf)** - Smart Game Format for backgammon (requires GNU Backgammon for analysis)
 
@@ -166,6 +168,13 @@ Generate a package file for manual import:
 - Import into Anki: File → Import → Select the .apkg file
 - Useful for offline card generation
 
+### Regenerating Cards
+
+Both export methods support updating existing cards when you change settings (color scheme, board orientation, etc.):
+- Cards are matched by their XGID position identifier
+- Re-exporting updates the card content while preserving your Anki review history
+- Useful for applying new color schemes or enabling features like move score matrices
+
 ## Card Format
 
 Each position becomes one Anki card:
@@ -178,33 +187,44 @@ Each position becomes one Anki card:
 
 **Back:**
 - Position image and metadata
-- Ranked table of moves with equity and error
-- Correct answer highlighted
-- Source position ID for reference
+- MCQ feedback showing if your answer was correct, close, or incorrect
+- Ranked table of moves with equity, error, and winning chances
+- Interactive move visualization - click any move to see the resulting position
+- Cubeful/cubeless equity toggle
+- Source position ID with copy button for easy sharing
+- Source attribution (analysis source and ply level)
 - Explanation (if added)
 - Score matrix showing optimal cube actions across all match scores (if enabled)
+- Move score matrix showing top moves at different match contexts (if enabled)
 
 ## Customization Options
 
 Open Settings with **Ctrl+,** to configure:
 
 **Appearance:**
-- **Color Schemes**: Choose from 6 built-in themes (Classic, Forest, Ocean, Desert, Sunset, Midnight)
-- **Board Orientation**: Counter-clockwise (default) or Clockwise orientation
-- **Number of MCQ Options**: Configure how many moves to display (2-10, default: 5)
+- **Color Schemes**: Choose from 7 built-in themes (Classic, Forest, Ocean, Desert, Sunset, Midnight, Monochrome)
+- **Board Orientation**: Counter-clockwise (default), Clockwise, or Random (varies per card)
+- **Score Format**: Display match scores as absolute (e.g., "3-2") or away (e.g., "4-away, 5-away")
+- **Show Pip Count**: Toggle pip count display on the board
+- **Swap Checker Colors**: Play as the other side by swapping checker colors
 
 **Card Options:**
-- **Show Move Options**: Toggle text move descriptions on card front
-- **Interactive Moves**: Enable/disable animated move visualization
+- **Show Move Options**: Toggle multiple-choice options on card front
+- **Move Preview**: Preview the resulting position before submitting your answer
+- **Interactive Moves**: Enable/disable animated move visualization on card back
+- **Number of MCQ Options**: Configure how many moves to display (2-10, default: 5)
 
 **Export:**
 - **Deck Name**: Customize your Anki deck name
 - **Export Method**: Choose between AnkiConnect or APKG output
+- **Use Subdecks**: Split checker and cube decisions into separate subdecks
+- **Clear After Export**: Automatically clear the position list after successful export
 
 **Analysis:**
 - **GNU Backgammon Path**: Configure path to `gnubg-cli` executable for automatic position analysis
 - **Analysis Ply**: Set depth (0-4, default: 3)
 - **Score Matrix**: Generate cube decision matrix for all match scores (optional, time-consuming)
+- **Move Score Matrix**: Generate move analysis at different match contexts - Neutral, DMP, Gammon-Save, Gammon-Go (optional, time-consuming)
 
 ## Troubleshooting
 
