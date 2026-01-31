@@ -208,12 +208,31 @@ class Move:
     # Cubeless equity calculated from probabilities: 2*p(w)-1+2*(p(wg)-p(lg))+3*(p(wbg)-p(lbg))
     cubeless_equity: Optional[float] = None
 
-    def calculate_cubeless_equity(self) -> Optional[float]:
+    def calculate_cubeless_equity(
+        self,
+        cumulative: bool = False,
+        match_length: int = 0,
+        player_away: int = 0,
+        opponent_away: int = 0,
+        cube_value: int = 1,
+        crawford: bool = False,
+        post_crawford: bool = False
+    ) -> Optional[float]:
         """
         Calculate cubeless equity from win/gammon/backgammon probabilities.
 
-        Formula from GNU Backgammon documentation:
-        2*p(w) - 1 + 2*(p(wg) - p(lg)) + 3*(p(wbg) - p(lbg))
+        For money games (match_length=0), returns raw equity.
+        For match play, returns normalized equity using Match Equity Table.
+
+        Args:
+            cumulative: If True, use formula for cumulative gammon % (XG format).
+                       If False, use formula for non-cumulative gammon % (GNUBG format).
+            match_length: Match length (0 for unlimited/money games).
+            player_away: Points player needs to win (for match play).
+            opponent_away: Points opponent needs to win (for match play).
+            cube_value: Current cube value.
+            crawford: Whether this is a Crawford game.
+            post_crawford: Whether this is post-Crawford.
 
         Returns:
             Cubeless equity value, or None if probabilities not available.
@@ -221,14 +240,37 @@ class Move:
         if self.player_win_pct is None:
             return None
 
-        # Convert from percentages to decimals
-        p_w = self.player_win_pct / 100
-        p_wg = (self.player_gammon_pct or 0) / 100
-        p_wbg = (self.player_backgammon_pct or 0) / 100
-        p_lg = (self.opponent_gammon_pct or 0) / 100
-        p_lbg = (self.opponent_backgammon_pct or 0) / 100
+        opponent_win = self.opponent_win_pct if self.opponent_win_pct is not None else (100 - self.player_win_pct)
 
-        return 2 * p_w - 1 + 2 * (p_wg - p_lg) + 3 * (p_wbg - p_lbg)
+        # Match play: use MET for normalized equity
+        if match_length > 0 and player_away > 0 and opponent_away > 0:
+            from ankigammon.utils.met import calculate_match_cubeless_equity
+            return calculate_match_cubeless_equity(
+                player_win_pct=self.player_win_pct,
+                player_gammon_pct=self.player_gammon_pct or 0,
+                player_backgammon_pct=self.player_backgammon_pct or 0,
+                opponent_win_pct=opponent_win,
+                opponent_gammon_pct=self.opponent_gammon_pct or 0,
+                opponent_backgammon_pct=self.opponent_backgammon_pct or 0,
+                player_away=player_away,
+                opponent_away=opponent_away,
+                cube_value=cube_value,
+                crawford=crawford,
+                post_crawford=post_crawford,
+                cumulative_gammons=cumulative
+            )
+
+        # Money game: use simple formula
+        from ankigammon.utils.met import calculate_money_cubeless_equity
+        return calculate_money_cubeless_equity(
+            player_win_pct=self.player_win_pct,
+            player_gammon_pct=self.player_gammon_pct or 0,
+            player_backgammon_pct=self.player_backgammon_pct or 0,
+            opponent_win_pct=opponent_win,
+            opponent_gammon_pct=self.opponent_gammon_pct or 0,
+            opponent_backgammon_pct=self.opponent_backgammon_pct or 0,
+            cumulative_gammons=cumulative
+        )
 
     def __str__(self) -> str:
         """Human-readable representation."""
@@ -267,8 +309,10 @@ class Decision:
     take_error: Optional[float] = None  # Responder's error on take/pass decision (-1000 if not analyzed)
 
     # Cubeless equity (for cube decisions) - position value without cube dynamics
-    # Doubled cubeless equity = 2 * cubeless_equity (value after doubling)
-    cubeless_equity: Optional[float] = None
+    # No Double equity is calculated at current cube value
+    # Double equity is calculated at 2x current cube value (different in match play due to MET)
+    cubeless_equity: Optional[float] = None  # No Double cubeless equity
+    double_cubeless_equity: Optional[float] = None  # Double cubeless equity
 
     # XG binary error (for checker play from .xg files)
     xg_error_move: Optional[float] = None  # XG's ErrMove field - authoritative error for filtering

@@ -123,6 +123,9 @@ class XGTextParser:
         # Parse global winning chances (for cube decisions)
         winning_chances = XGTextParser._parse_winning_chances(analysis_section)
 
+        # Parse cubeless equities (for cube decisions)
+        cubeless_equities = XGTextParser._parse_cubeless_equities(analysis_section)
+
         # Parse comments/notes from the analysis section
         comment = XGTextParser._parse_comment(analysis_section)
 
@@ -147,20 +150,45 @@ class XGTextParser:
             elif 'match_modifier' in metadata and metadata['match_modifier'] == 'C':
                 crawford = True
 
+        # Calculate cubeless equity for moves using match context
+        on_roll = metadata.get('on_roll', Player.O)
+        score_x = metadata.get('score_x', 0)
+        score_o = metadata.get('score_o', 0)
+        cube_value = metadata.get('cube_value', 1)
+
+        if on_roll == Player.O:
+            player_away = match_length - score_o if match_length > 0 else 0
+            opponent_away = match_length - score_x if match_length > 0 else 0
+        else:
+            player_away = match_length - score_x if match_length > 0 else 0
+            opponent_away = match_length - score_o if match_length > 0 else 0
+
+        for move in moves:
+            move.cubeless_equity = move.calculate_cubeless_equity(
+                cumulative=True,
+                match_length=match_length,
+                player_away=player_away,
+                opponent_away=opponent_away,
+                cube_value=cube_value,
+                crawford=crawford
+            )
+
         # Create decision
         decision = Decision(
             position=position,
             xgid=position_id,  # Store original position ID (XGID or OGID)
-            on_roll=metadata.get('on_roll', Player.O),
+            on_roll=on_roll,
             dice=metadata.get('dice'),
-            score_x=metadata.get('score_x', 0),
-            score_o=metadata.get('score_o', 0),
-            match_length=metadata.get('match_length', 0),
+            score_x=score_x,
+            score_o=score_o,
+            match_length=match_length,
             crawford=crawford,
-            cube_value=metadata.get('cube_value', 1),
+            cube_value=cube_value,
             cube_owner=metadata.get('cube_owner', CubeState.CENTERED),
             decision_type=decision_type,
             candidate_moves=moves,
+            cubeless_equity=cubeless_equities.get('no_double'),
+            double_cubeless_equity=cubeless_equities.get('double'),
             player_win_pct=winning_chances.get('player_win_pct'),
             player_gammon_pct=winning_chances.get('player_gammon_pct'),
             player_backgammon_pct=winning_chances.get('player_backgammon_pct'),
@@ -211,6 +239,31 @@ class XGTextParser:
             chances['opponent_backgammon_pct'] = XGTextParser._normalize_decimal(opponent_match.group(3))
 
         return chances
+
+    @staticmethod
+    def _parse_cubeless_equities(text: str) -> dict:
+        """
+        Parse cubeless equities from text section.
+
+        Format:
+            Cubeless Equities: No Double=-0.081, Double=-0.166
+
+        Returns dict with keys: no_double, double
+        """
+        equities = {}
+
+        # Parse "Cubeless Equities: No Double=-0.081, Double=-0.166"
+        # Note: XG exports may use comma or period as decimal separator depending on locale
+        cubeless_match = re.search(
+            r'Cubeless Equities:\s*No Double\s*=\s*([+-]?\d+[.,]\d+)\s*,\s*Double\s*=\s*([+-]?\d+[.,]\d+)',
+            text,
+            re.IGNORECASE
+        )
+        if cubeless_match:
+            equities['no_double'] = XGTextParser._normalize_decimal(cubeless_match.group(1))
+            equities['double'] = XGTextParser._normalize_decimal(cubeless_match.group(2))
+
+        return equities
 
     @staticmethod
     def _parse_comment(text: str) -> Optional[str]:
@@ -500,7 +553,7 @@ class XGTextParser:
             move_section = text[start_pos:end_pos]
             winning_chances = XGTextParser._parse_move_winning_chances(move_section)
 
-            moves.append(Move(
+            move = Move(
                 notation=notation,
                 equity=equity,
                 error=error,
@@ -513,7 +566,10 @@ class XGTextParser:
                 opponent_win_pct=winning_chances.get('opponent_win_pct'),
                 opponent_gammon_pct=winning_chances.get('opponent_gammon_pct'),
                 opponent_backgammon_pct=winning_chances.get('opponent_backgammon_pct'),
-            ))
+            )
+            # Note: cubeless_equity will be calculated after Decision is created
+            # when we have access to match context (match_length, scores)
+            moves.append(move)
 
         # If we didn't find moves with the standard pattern, try alternative patterns
         if not moves:

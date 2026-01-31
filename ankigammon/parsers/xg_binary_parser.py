@@ -485,6 +485,21 @@ class XGBinaryParser:
                     opponent_gammon_pct=opponent_gammon_pct,
                     opponent_backgammon_pct=opponent_backgammon_pct
                 )
+                # Calculate cubeless equity with match context
+                if on_roll == Player.O:
+                    player_away = match_length - score_o if match_length > 0 else 0
+                    opponent_away = match_length - score_x if match_length > 0 else 0
+                else:
+                    player_away = match_length - score_x if match_length > 0 else 0
+                    opponent_away = match_length - score_o if match_length > 0 else 0
+                move.cubeless_equity = move.calculate_cubeless_equity(
+                    cumulative=True,
+                    match_length=match_length,
+                    player_away=player_away,
+                    opponent_away=opponent_away,
+                    cube_value=cube_value,
+                    crawford=crawford
+                )
                 moves.append(move)
 
         # Mark which move was actually played
@@ -764,6 +779,21 @@ class XGBinaryParser:
                         opponent_gammon_pct=opponent_gammon_pct,
                         opponent_backgammon_pct=opponent_backgammon_pct
                     )
+                    # Calculate cubeless equity with match context
+                    if active_player == Player.O:
+                        player_away = match_length - score_o if match_length > 0 else 0
+                        opponent_away = match_length - score_x if match_length > 0 else 0
+                    else:
+                        player_away = match_length - score_x if match_length > 0 else 0
+                        opponent_away = match_length - score_o if match_length > 0 else 0
+                    move.cubeless_equity = move.calculate_cubeless_equity(
+                        cumulative=True,
+                        match_length=match_length,
+                        player_away=player_away,
+                        opponent_away=opponent_away,
+                        cube_value=cube_value,
+                        crawford=crawford
+                    )
                     moves.append(move)
 
         # Mark which cube action was actually played
@@ -985,6 +1015,64 @@ class XGBinaryParser:
         # Determine format based on file extension
         file_format = "XGP" if filename.lower().endswith('.xgp') else "XG"
 
+        # Calculate decision-level cubeless equity from No Double probabilities
+        decision_cubeless_equity = None
+        decision_double_cubeless_equity = None
+        if decision_player_win_pct is not None:
+            # Calculate player_away and opponent_away for match play
+            if on_roll == Player.O:
+                player_away = match_length - score_o if match_length > 0 else 0
+                opponent_away = match_length - score_x if match_length > 0 else 0
+            else:
+                player_away = match_length - score_x if match_length > 0 else 0
+                opponent_away = match_length - score_o if match_length > 0 else 0
+
+            if match_length > 0 and player_away > 0 and opponent_away > 0:
+                # Match play: use MET for normalized equity
+                from ankigammon.utils.met import calculate_match_cubeless_equity
+                # No Double equity (current cube value)
+                decision_cubeless_equity = calculate_match_cubeless_equity(
+                    player_win_pct=decision_player_win_pct,
+                    player_gammon_pct=decision_player_gammon_pct or 0,
+                    player_backgammon_pct=decision_player_backgammon_pct or 0,
+                    opponent_win_pct=decision_opponent_win_pct or (100 - decision_player_win_pct),
+                    opponent_gammon_pct=decision_opponent_gammon_pct or 0,
+                    opponent_backgammon_pct=decision_opponent_backgammon_pct or 0,
+                    player_away=player_away,
+                    opponent_away=opponent_away,
+                    cube_value=cube_value,
+                    crawford=crawford,
+                    cumulative_gammons=True
+                )
+                # Double equity (2x cube value)
+                decision_double_cubeless_equity = calculate_match_cubeless_equity(
+                    player_win_pct=decision_player_win_pct,
+                    player_gammon_pct=decision_player_gammon_pct or 0,
+                    player_backgammon_pct=decision_player_backgammon_pct or 0,
+                    opponent_win_pct=decision_opponent_win_pct or (100 - decision_player_win_pct),
+                    opponent_gammon_pct=decision_opponent_gammon_pct or 0,
+                    opponent_backgammon_pct=decision_opponent_backgammon_pct or 0,
+                    player_away=player_away,
+                    opponent_away=opponent_away,
+                    cube_value=cube_value * 2,
+                    crawford=crawford,
+                    cumulative_gammons=True
+                )
+            else:
+                # Money game: use simple formula
+                from ankigammon.utils.met import calculate_money_cubeless_equity
+                decision_cubeless_equity = calculate_money_cubeless_equity(
+                    player_win_pct=decision_player_win_pct,
+                    player_gammon_pct=decision_player_gammon_pct or 0,
+                    player_backgammon_pct=decision_player_backgammon_pct or 0,
+                    opponent_win_pct=decision_opponent_win_pct or (100 - decision_player_win_pct),
+                    opponent_gammon_pct=decision_opponent_gammon_pct or 0,
+                    opponent_backgammon_pct=decision_opponent_backgammon_pct or 0,
+                    cumulative_gammons=True
+                )
+                # Money game: double equity is exactly 2x
+                decision_double_cubeless_equity = decision_cubeless_equity * 2 if decision_cubeless_equity is not None else None
+
         # Create Decision
         decision = Decision(
             position=position,
@@ -1001,6 +1089,8 @@ class XGBinaryParser:
             cube_error=cube_error,
             take_error=take_error,
             xgid=xgid,
+            cubeless_equity=decision_cubeless_equity,
+            double_cubeless_equity=decision_double_cubeless_equity,
             player_win_pct=decision_player_win_pct,
             player_gammon_pct=decision_player_gammon_pct,
             player_backgammon_pct=decision_player_backgammon_pct,

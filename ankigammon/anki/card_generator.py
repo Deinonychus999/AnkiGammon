@@ -1607,7 +1607,8 @@ class CardGenerator:
         # Generate cubeless equity section if available (collapsed by default)
         cubeless_html = ''
         if decision.cubeless_equity is not None:
-            doubled_cubeless = decision.cubeless_equity * 2
+            # Use stored double_cubeless_equity if available, fallback to 2× for money games
+            doubled_cubeless = decision.double_cubeless_equity if decision.double_cubeless_equity is not None else decision.cubeless_equity * 2
             cubeless_html = f'''
                 <details class="cubeless-equity-details">
                     <summary>Cubeless Equity</summary>
