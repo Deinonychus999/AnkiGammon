@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.3.0] - 2026-01-31
+
+### Added
+- Regenerate all existing cards in Anki with current settings (File → Regenerate Cards in Anki)
+- Cubeless equity display for moves and cube decisions
+
+### Fixed
+- "Too good to double" MCQ now marks wrong answers correctly and shows correct equities
+
+### Improved
+- Re-exporting positions no longer creates duplicates; existing cards are updated instead
+- Score matrix row count now respects max MCQ options setting
+
 ## [1.2.0] - 2026-01-26
 
 ### Added
