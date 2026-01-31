@@ -394,6 +394,65 @@ CARD_CSS = """
     color: #999;
 }
 
+/* Cubeless Equity Collapsible Section */
+.cubeless-equity-details {
+    margin-top: 12px;
+    border-top: 1px solid var(--border);
+    padding-top: 8px;
+}
+
+.cubeless-equity-details summary {
+    cursor: pointer;
+    font-size: 13px;
+    color: #888;
+    user-select: none;
+    list-style: none;
+}
+
+.cubeless-equity-details summary::-webkit-details-marker {
+    display: none;
+}
+
+.cubeless-equity-details summary::before {
+    content: "▸ ";
+}
+
+.cubeless-equity-details[open] summary::before {
+    content: "▾ ";
+}
+
+.cubeless-equity-details summary:hover {
+    color: #4da6ff;
+}
+
+.cubeless-equity-content {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 8px;
+    padding-left: 12px;
+}
+
+.equity-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 12px;
+}
+
+.equity-label {
+    font-size: 14px;
+    color: var(--text-fg);
+    font-weight: 500;
+}
+
+.equity-value {
+    font-size: 15px;
+    font-weight: 600;
+    color: #4da6ff;
+    font-family: monospace;
+}
+
 /* Analysis Container - for side-by-side layout */
 .analysis-container {
     display: flex;
@@ -549,6 +608,78 @@ CARD_CSS = """
     color: #999;
     font-size: 11px;
     margin-left: 2px;
+}
+
+/* Equity column toggle - click column to switch between cubeful and cubeless */
+.equity-header,
+.equity-cell {
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease;
+    user-select: none;
+}
+
+.equity-header {
+    min-width: 70px;
+}
+
+.moves-table.equity-hover .equity-header,
+.moves-table.equity-hover .equity-cell {
+    background-color: rgba(77, 166, 255, 0.15) !important;
+}
+
+.equity-header[data-mode="cubeless"],
+.moves-table.showing-cubeless .equity-cell {
+    color: #4da6ff;
+}
+
+/* Modern CSS tooltip using data-tip attribute */
+[data-tip] {
+    position: relative;
+}
+
+[data-tip]::before,
+[data-tip]::after {
+    position: absolute;
+    left: 50%;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+    transform: translateX(-50%) translateY(4px);
+    z-index: 1000;
+}
+
+[data-tip]::before {
+    content: attr(data-tip);
+    bottom: calc(100% + 8px);
+    background: #242424;
+    color: #e0e0e0;
+    font-size: 12px;
+    font-weight: 400;
+    padding: 6px 10px;
+    border-radius: 4px;
+    white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+}
+
+[data-tip]::after {
+    content: "";
+    bottom: calc(100% + 3px);
+    border: 5px solid transparent;
+    border-top-color: #242424;
+}
+
+[data-tip]:hover::before,
+[data-tip]:hover::after {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    [data-tip]::before,
+    [data-tip]::after {
+        transition: opacity 0.1s;
+        transform: translateX(-50%);
+    }
 }
 
 .source-info {

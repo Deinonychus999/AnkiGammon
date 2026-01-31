@@ -205,6 +205,30 @@ class Move:
     opponent_win_pct: Optional[float] = None  # Opponent winning percentage (e.g., 47.32)
     opponent_gammon_pct: Optional[float] = None  # Opponent gammon percentage (e.g., 12.42)
     opponent_backgammon_pct: Optional[float] = None  # Opponent backgammon percentage (e.g., 0.55)
+    # Cubeless equity calculated from probabilities: 2*p(w)-1+2*(p(wg)-p(lg))+3*(p(wbg)-p(lbg))
+    cubeless_equity: Optional[float] = None
+
+    def calculate_cubeless_equity(self) -> Optional[float]:
+        """
+        Calculate cubeless equity from win/gammon/backgammon probabilities.
+
+        Formula from GNU Backgammon documentation:
+        2*p(w) - 1 + 2*(p(wg) - p(lg)) + 3*(p(wbg) - p(lbg))
+
+        Returns:
+            Cubeless equity value, or None if probabilities not available.
+        """
+        if self.player_win_pct is None:
+            return None
+
+        # Convert from percentages to decimals
+        p_w = self.player_win_pct / 100
+        p_wg = (self.player_gammon_pct or 0) / 100
+        p_wbg = (self.player_backgammon_pct or 0) / 100
+        p_lg = (self.opponent_gammon_pct or 0) / 100
+        p_lbg = (self.opponent_backgammon_pct or 0) / 100
+
+        return 2 * p_w - 1 + 2 * (p_wg - p_lg) + 3 * (p_wbg - p_lbg)
 
     def __str__(self) -> str:
         """Human-readable representation."""
@@ -241,6 +265,10 @@ class Decision:
     # Cube decision errors (only for CUBE_ACTION decisions)
     cube_error: Optional[float] = None  # Doubler's error on double/no double decision (-1000 if not analyzed)
     take_error: Optional[float] = None  # Responder's error on take/pass decision (-1000 if not analyzed)
+
+    # Cubeless equity (for cube decisions) - position value without cube dynamics
+    # Doubled cubeless equity = 2 * cubeless_equity (value after doubling)
+    cubeless_equity: Optional[float] = None
 
     # XG binary error (for checker play from .xg files)
     xg_error_move: Optional[float] = None  # XG's ErrMove field - authoritative error for filtering

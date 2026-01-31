@@ -334,15 +334,20 @@ class GNUBGMatchParser:
             crawford_jacoby=1 if pos_metadata.get('crawford', False) else 0
         )
 
-        # Extract winning chances from "Cube analysis" section
+        # Extract cubeless equity and winning chances from "Cube analysis" section
+        # Format: "1-ply cubeless equity -0.008 (Money: -0.008)"
         no_double_probs = None
+        cubeless_equity = None
         for offset in range(1, 10):
             if cube_section_idx + offset >= len(lines):
                 break
             line = lines[cube_section_idx + offset]
 
             # Match any ply level: "0-ply cubeless equity", "1-ply cubeless equity", etc.
-            if re.search(r'\d+-ply cubeless equity', line):
+            # Extract the cubeless equity value from the line
+            cubeless_match = re.search(r'\d+-ply cubeless equity\s+([+-]?\d+[.,]\d+)', line)
+            if cubeless_match:
+                cubeless_equity = GNUBGMatchParser._parse_locale_float(cubeless_match.group(1))
                 if cube_section_idx + offset + 1 < len(lines):
                     prob_line = lines[cube_section_idx + offset + 1]
                     prob_match = re.match(
@@ -572,6 +577,7 @@ class GNUBGMatchParser:
             move_number=move_number,
             cube_error=cube_error,
             take_error=take_error,
+            cubeless_equity=cubeless_equity,
             player_win_pct=no_double_probs[0] * 100 if no_double_probs else None,
             player_gammon_pct=no_double_probs[1] * 100 if no_double_probs else None,
             player_backgammon_pct=no_double_probs[2] * 100 if no_double_probs else None,
@@ -679,15 +685,20 @@ class GNUBGMatchParser:
             crawford_jacoby=1 if pos_metadata.get('crawford', False) else 0
         )
 
-        # Extract winning chances from "Cube analysis" section
+        # Extract cubeless equity and winning chances from "Cube analysis" section
+        # Format: "1-ply cubeless equity -0.008 (Money: -0.008)"
         no_double_probs = None
+        cubeless_equity = None
         for offset in range(1, 10):
             if cube_section_idx + offset >= len(lines):
                 break
             line = lines[cube_section_idx + offset]
 
             # Match any ply level: "0-ply cubeless equity", "1-ply cubeless equity", etc.
-            if re.search(r'\d+-ply cubeless equity', line):
+            # Extract the cubeless equity value from the line
+            cubeless_match = re.search(r'\d+-ply cubeless equity\s+([+-]?\d+[.,]\d+)', line)
+            if cubeless_match:
+                cubeless_equity = GNUBGMatchParser._parse_locale_float(cubeless_match.group(1))
                 if cube_section_idx + offset + 1 < len(lines):
                     prob_line = lines[cube_section_idx + offset + 1]
                     prob_match = re.match(
@@ -935,6 +946,7 @@ class GNUBGMatchParser:
             move_number=move_number,
             cube_error=cube_error,
             take_error=take_error,
+            cubeless_equity=cubeless_equity,
             player_win_pct=no_double_probs[0] * 100 if no_double_probs else None,
             player_gammon_pct=no_double_probs[1] * 100 if no_double_probs else None,
             player_backgammon_pct=no_double_probs[2] * 100 if no_double_probs else None,
@@ -1106,6 +1118,8 @@ class GNUBGMatchParser:
                     move.opponent_win_pct = probs[3] * 100
                     move.opponent_gammon_pct = probs[4] * 100
                     move.opponent_backgammon_pct = probs[5] * 100
+                    # Calculate cubeless equity from probabilities
+                    move.cubeless_equity = move.calculate_cubeless_equity()
 
                 candidate_moves.append(move)
 

@@ -564,6 +564,12 @@ class CardGenerator:
             else:
                 wgb_inline_html = ""
 
+            # Format equity cell with data attributes for column toggle
+            if move.cubeless_equity is not None:
+                equity_cell = f'<td class="equity-cell" data-cubeful="{move.equity:.3f}" data-cubeless="{move.cubeless_equity:.3f}">{move.equity:.3f}</td>'
+            else:
+                equity_cell = f'<td>{move.equity:.3f}</td>'
+
             # Cube decisions omit rank column
             if is_cube_decision:
                 table_rows.append(f"""
@@ -571,7 +577,7 @@ class CardGenerator:
     <td>
         <div class="move-notation">{display_notation}{played_indicator}</div>{wgb_inline_html}
     </td>
-    <td>{move.equity:.3f}</td>
+    {equity_cell}
     <td>{error_str}</td>
 </tr>""")
             else:
@@ -581,7 +587,7 @@ class CardGenerator:
     <td>
         <div class="move-notation">{display_notation}{played_indicator}</div>{wgb_inline_html}
     </td>
-    <td>{move.equity:.3f}</td>
+    {equity_cell}
     <td>{error_str}</td>
 </tr>""")
 
@@ -661,20 +667,24 @@ class CardGenerator:
         if is_cube_decision and decision.player_win_pct is not None:
             winning_chances_html = self._generate_winning_chances_html(decision)
 
+        # Check if any moves have cubeless equity for toggle functionality
+        has_cubeless = any(m and m.cubeless_equity is not None for m in sorted_candidates)
+        equity_header = '<th class="equity-header" data-mode="cubeful">Equity</th>' if has_cubeless else '<th>Equity</th>'
+
         # Prepare table headers based on decision type
         if is_cube_decision:
-            table_headers = """
+            table_headers = f"""
                     <tr>
                         <th>Action</th>
-                        <th>Equity</th>
+                        {equity_header}
                         <th>Error</th>
                     </tr>"""
         else:
-            table_headers = """
+            table_headers = f"""
                     <tr>
                         <th>Rank</th>
                         <th>Move</th>
-                        <th>Equity</th>
+                        {equity_header}
                         <th>Error</th>
                     </tr>"""
 
@@ -742,6 +752,11 @@ class CardGenerator:
             # Generate animation scripts
             animation_scripts = self._generate_checker_animation_scripts(decision, candidates, move_result_svgs or {})
             html += animation_scripts
+
+        # Add equity toggle script if any moves have cubeless equity
+        has_cubeless = any(m and m.cubeless_equity is not None for m in candidates)
+        if has_cubeless:
+            html += self._generate_equity_toggle_script()
 
         return html
 
@@ -1022,7 +1037,7 @@ class CardGenerator:
 
         const icon = document.createElement('span');
         icon.className = 'revert-icon';
-        icon.title = 'Show original position';
+        icon.dataset.tip = 'Show original position';
         icon.innerHTML = '<svg viewBox="0 0 24 24"><path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/></svg>';
 
         icon.addEventListener('click', function(e) {{
@@ -1040,10 +1055,10 @@ class CardGenerator:
 
         if (isShowingOriginal) {{
             icon.classList.add('showing-original');
-            icon.title = 'Show position after move';
+            icon.dataset.tip = 'Show position after move';
         }} else {{
             icon.classList.remove('showing-original');
-            icon.title = 'Show original position';
+            icon.dataset.tip = 'Show original position';
         }}
     }}
 
@@ -1502,6 +1517,55 @@ class CardGenerator:
             mode='front'
         )
 
+    def _generate_equity_toggle_script(self) -> str:
+        """Generate JavaScript for equity column toggle functionality."""
+        return """
+<script>
+(function() {
+    var header = document.querySelector('.equity-header');
+    var table = document.querySelector('.moves-table');
+    if (!header || !table) return;
+
+    var cells = document.querySelectorAll('.equity-cell');
+
+    function toggleEquity() {
+        var mode = header.dataset.mode;
+        if (mode === 'cubeful') {
+            header.textContent = 'Cubeless';
+            header.dataset.mode = 'cubeless';
+            table.classList.add('showing-cubeless');
+            cells.forEach(function(cell) {
+                cell.textContent = cell.dataset.cubeless;
+            });
+        } else {
+            header.textContent = 'Equity';
+            header.dataset.mode = 'cubeful';
+            table.classList.remove('showing-cubeless');
+            cells.forEach(function(cell) {
+                cell.textContent = cell.dataset.cubeful;
+            });
+        }
+    }
+
+    function addHover() { table.classList.add('equity-hover'); }
+    function removeHover() { table.classList.remove('equity-hover'); }
+
+    header.addEventListener('click', toggleEquity);
+    header.addEventListener('mouseenter', addHover);
+    header.addEventListener('mouseleave', removeHover);
+
+    cells.forEach(function(cell) {
+        cell.addEventListener('click', function(e) {
+            e.stopPropagation();
+            toggleEquity();
+        });
+        cell.addEventListener('mouseenter', addHover);
+        cell.addEventListener('mouseleave', removeHover);
+    });
+})();
+</script>
+"""
+
     def _format_wgb_inline(self, move: Move, decision: Decision) -> str:
         """
         Generate inline HTML for W/G/B percentages to display within move table cell.
@@ -1533,11 +1597,31 @@ class CardGenerator:
         Generate HTML for winning chances display (W/G/B percentages).
 
         Shows player and opponent winning chances with gammon and backgammon percentages.
+        Also shows cubeless equity and doubled cubeless equity if available.
         Note: Title is added separately in side-by-side layout.
         """
         # On-roll player is always at bottom after perspective transform
         player_color = self.renderer.color_scheme.checker_o
         opponent_color = self.renderer.color_scheme.checker_x
+
+        # Generate cubeless equity section if available (collapsed by default)
+        cubeless_html = ''
+        if decision.cubeless_equity is not None:
+            doubled_cubeless = decision.cubeless_equity * 2
+            cubeless_html = f'''
+                <details class="cubeless-equity-details">
+                    <summary>Cubeless Equity</summary>
+                    <div class="cubeless-equity-content">
+                        <div class="equity-row">
+                            <span class="equity-label">Cubeless:</span>
+                            <span class="equity-value">{decision.cubeless_equity:+.3f}</span>
+                        </div>
+                        <div class="equity-row">
+                            <span class="equity-label">Doubled:</span>
+                            <span class="equity-value">{doubled_cubeless:+.3f}</span>
+                        </div>
+                    </div>
+                </details>'''
 
         html = f'''            <div class="winning-chances">
                 <div class="chances-grid">
@@ -1555,7 +1639,7 @@ class CardGenerator:
                             <span class="chances-detail">(G: {decision.opponent_gammon_pct:.2f}% B: {decision.opponent_backgammon_pct:.2f}%)</span>
                         </span>
                     </div>
-                </div>
+                </div>{cubeless_html}
             </div>
 '''
         return html
@@ -1686,7 +1770,7 @@ class CardGenerator:
         if decision.xgid:
             xgid_html = f"""<span class="xgid-container">
     <code class="xgid-text">{decision.xgid}</code>
-    <button class="xgid-copy-btn" title="Copy XGID">
+    <button class="xgid-copy-btn" data-tip="Copy XGID">
         <svg class="copy-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
             <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>

@@ -70,7 +70,7 @@ class GNUBGParser:
             cube_owner=metadata.get('cube_owner'),
         )
 
-        # Add winning chances to decision if found
+        # Add winning chances and cubeless equity to decision if found
         if winning_chances:
             decision.player_win_pct = winning_chances.get('player_win_pct')
             decision.player_gammon_pct = winning_chances.get('player_gammon_pct')
@@ -78,6 +78,7 @@ class GNUBGParser:
             decision.opponent_win_pct = winning_chances.get('opponent_win_pct')
             decision.opponent_gammon_pct = winning_chances.get('opponent_gammon_pct')
             decision.opponent_backgammon_pct = winning_chances.get('opponent_backgammon_pct')
+            decision.cubeless_equity = winning_chances.get('cubeless_equity')
 
         return decision
 
@@ -145,6 +146,12 @@ class GNUBGParser:
                         opponent_win = GNUBGParser._parse_locale_float(prob_match.group(4)) * 100
                         opponent_gammon = GNUBGParser._parse_locale_float(prob_match.group(5)) * 100
                         opponent_backgammon = GNUBGParser._parse_locale_float(prob_match.group(6)) * 100
+                        # Calculate cubeless equity: 2*p(w)-1+2*(p(wg)-p(lg))+3*(p(wbg)-p(lbg))
+                        cubeless_eq = (
+                            2 * player_win / 100 - 1 +
+                            2 * (player_gammon - opponent_gammon) / 100 +
+                            3 * (player_backgammon - opponent_backgammon) / 100
+                        )
 
                 moves.append(Move(
                     notation=notation,
@@ -160,7 +167,8 @@ class GNUBGParser:
                     player_backgammon_pct=player_backgammon,
                     opponent_win_pct=opponent_win,
                     opponent_gammon_pct=opponent_gammon,
-                    opponent_backgammon_pct=opponent_backgammon
+                    opponent_backgammon_pct=opponent_backgammon,
+                    cubeless_equity=cubeless_eq if player_win is not None else None
                 ))
 
         # If no moves found, try alternative pattern
@@ -432,22 +440,33 @@ class GNUBGParser:
     @staticmethod
     def _parse_winning_chances(text: str) -> dict:
         """
-        Extract W/G/B percentages from gnubg output.
+        Extract W/G/B percentages and cubeless equity from gnubg output.
 
         Looks for patterns like:
             Cubeless equity: +0.172
             Win: 52.3%  G: 14.2%  B: 0.8%
 
         or:
+            1-ply cubeless equity -0.008 (Money: -0.008)
             0.523 0.142 0.008 - 0.477 0.124 0.006
 
         Args:
             text: gnubg output text
 
         Returns:
-            Dictionary with winning chance percentages (or empty dict)
+            Dictionary with winning chance percentages and cubeless equity (or empty dict)
         """
         chances = {}
+
+        # Extract cubeless equity from patterns like:
+        # "Cubeless equity: +0.172" or "1-ply cubeless equity -0.008 (Money: -0.008)"
+        cubeless_pattern = re.search(
+            r'(?:Cubeless equity:|cubeless equity)\s*([+-]?\d+[.,]\d+)',
+            text,
+            re.IGNORECASE
+        )
+        if cubeless_pattern:
+            chances['cubeless_equity'] = GNUBGParser._parse_locale_float(cubeless_pattern.group(1))
 
         # Try pattern 1: "Win: 52.3%  G: 14.2%  B: 0.8%" or "Win: 52,3%  G: 14,2%  B: 0,8%" (European locale)
         win_pattern = re.search(
