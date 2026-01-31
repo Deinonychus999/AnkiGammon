@@ -1586,7 +1586,7 @@ class CardGenerator:
                 <span style="color: {player_color};">●</span> P: <strong>{move.player_win_pct:.1f}%</strong> <span class="wgb-detail">(G:{move.player_gammon_pct:.1f}% B:{move.player_backgammon_pct:.1f}%)</span>
             </div>
             <div class="wgb-line">
-                <span style="color: {opponent_color};">○</span> O: <strong>{move.opponent_win_pct:.1f}%</strong> <span class="wgb-detail">(G:{move.opponent_gammon_pct:.1f}% B:{move.opponent_backgammon_pct:.1f}%)</span>
+                <span style="color: {opponent_color};">●</span> O: <strong>{move.opponent_win_pct:.1f}%</strong> <span class="wgb-detail">(G:{move.opponent_gammon_pct:.1f}% B:{move.opponent_backgammon_pct:.1f}%)</span>
             </div>
         </div>'''
 
