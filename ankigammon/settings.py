@@ -36,7 +36,7 @@ class Settings:
         "import_include_player_x": True,
         "import_include_player_o": True,
         "import_selected_player_names": [],
-        "max_mcq_options": 5,
+        "max_moves": 5,
         "check_for_updates": True,
         "last_update_check": None,
         "snooze_update_until": None,
@@ -68,6 +68,9 @@ class Settings:
                 # Merge with defaults to ensure new settings have default values
                 settings = self.DEFAULT_SETTINGS.copy()
                 settings.update(loaded)
+                # Migrate old setting name to new name
+                if "max_mcq_options" in settings and "max_moves" not in loaded:
+                    settings["max_moves"] = settings.pop("max_mcq_options")
                 return settings
         except (json.JSONDecodeError, IOError):
             # Use defaults if file is corrupted or unreadable
@@ -335,16 +338,16 @@ class Settings:
         self.set("import_selected_player_names", validated)
 
     @property
-    def max_mcq_options(self) -> int:
-        """Get the maximum number of MCQ options to display."""
-        return self._settings.get("max_mcq_options", 5)
+    def max_moves(self) -> int:
+        """Get the maximum number of moves to display on cards."""
+        return self._settings.get("max_moves", 5)
 
-    @max_mcq_options.setter
-    def max_mcq_options(self, value: int) -> None:
-        """Set the maximum number of MCQ options to display."""
+    @max_moves.setter
+    def max_moves(self, value: int) -> None:
+        """Set the maximum number of moves to display on cards."""
         if value < 2 or value > 10:
-            raise ValueError("max_mcq_options must be between 2 and 10")
-        self.set("max_mcq_options", value)
+            raise ValueError("max_moves must be between 2 and 10")
+        self.set("max_moves", value)
 
     @property
     def check_for_updates(self) -> bool:

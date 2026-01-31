@@ -42,7 +42,7 @@ class MatchAnalysisWorker(QThread):
 
     def __init__(self, file_path: str, settings: Settings, checker_threshold: float,
                  cube_threshold: float, include_player_x: bool, include_player_o: bool,
-                 filter_func, max_mcq_options: int):
+                 filter_func, max_moves: int):
         super().__init__()
         self.file_path = file_path
         self.settings = settings
@@ -51,7 +51,7 @@ class MatchAnalysisWorker(QThread):
         self.include_player_x = include_player_x
         self.include_player_o = include_player_o
         self.filter_func = filter_func
-        self.max_mcq_options = max_mcq_options
+        self.max_moves = max_moves
         self._cancelled = False
         self._analyzer = None
 
@@ -95,7 +95,7 @@ class MatchAnalysisWorker(QThread):
 
             exported_files = self._analyzer.analyze_match_file(
                 self.file_path,
-                max_moves=self.max_mcq_options,
+                max_moves=self.max_moves,
                 progress_callback=progress_callback
             )
 
@@ -949,7 +949,7 @@ class MainWindow(QMainWindow):
         """
         Ensure the played move is in the top N candidates for MCQ display.
 
-        If the played move is not in the top N analyzed moves (where N is max_mcq_options),
+        If the played move is not in the top N analyzed moves (where N is max_moves),
         insert it at position N-1 (last slot) to ensure it appears as an option.
 
         Args:
@@ -957,7 +957,7 @@ class MainWindow(QMainWindow):
             played_move: The move that was actually played
         """
         # Get the number of MCQ options from settings
-        max_options = self.settings.max_mcq_options
+        max_options = self.settings.max_moves
 
         # Check if played move is already in the top N candidates
         top_n = decision.candidate_moves[:max_options]
@@ -1173,7 +1173,7 @@ class MainWindow(QMainWindow):
             include_player_x=include_player_x,
             include_player_o=include_player_o,
             filter_func=self._filter_decisions_by_import_options,
-            max_mcq_options=self.settings.max_mcq_options
+            max_moves=self.settings.max_moves
         )
 
         # Connect signals

@@ -133,7 +133,7 @@ class SettingsDialog(QDialog):
         self.original_settings.gnubg_path = settings.gnubg_path
         self.original_settings.gnubg_analysis_ply = settings.gnubg_analysis_ply
         self.original_settings.generate_score_matrix = settings.generate_score_matrix
-        self.original_settings.max_mcq_options = settings.max_mcq_options
+        self.original_settings.max_moves = settings.max_moves
 
         # Validation worker
         self.validation_worker: Optional[GnuBGValidationWorker] = None
@@ -306,23 +306,23 @@ class SettingsDialog(QDialog):
         preview_layout.addStretch()
         form.addRow(preview_layout)
 
-        # Maximum choices (child, indented)
-        max_choices_layout = QHBoxLayout()
-        max_choices_layout.addSpacing(20)  # Indent to show hierarchy
-        self.lbl_max_options = QLabel("Max choices:")
-        max_choices_layout.addWidget(self.lbl_max_options)
-        max_choices_layout.addSpacing(8)  # Space between label and dropdown
-        self.cmb_max_mcq_options = QComboBox()
-        self.cmb_max_mcq_options.addItems([str(i) for i in range(2, 11)])
-        self.cmb_max_mcq_options.setCursor(Qt.PointingHandCursor)
-        self.cmb_max_mcq_options.setMaximumWidth(80)
-        self.cmb_max_mcq_options.setToolTip(
-            "Maximum number of answer choices to display (2-10).\n"
+        # Maximum moves to display on cards
+        max_moves_layout = QHBoxLayout()
+        self.lbl_max_moves = QLabel("Max moves:")
+        max_moves_layout.addWidget(self.lbl_max_moves)
+        max_moves_layout.addSpacing(8)  # Space between label and dropdown
+        self.cmb_max_moves = QComboBox()
+        self.cmb_max_moves.addItems([str(i) for i in range(2, 11)])
+        self.cmb_max_moves.setCursor(Qt.PointingHandCursor)
+        self.cmb_max_moves.setMaximumWidth(80)
+        self.cmb_max_moves.setToolTip(
+            "Maximum number of moves to display on cards (2-10).\n"
+            "Applies to MCQ choices and back card analysis.\n"
             "Fewer moves may be shown if there aren't enough alternatives."
         )
-        max_choices_layout.addWidget(self.cmb_max_mcq_options)
-        max_choices_layout.addStretch()
-        form.addRow(max_choices_layout)
+        max_moves_layout.addWidget(self.cmb_max_moves)
+        max_moves_layout.addStretch()
+        form.addRow(max_moves_layout)
 
         # Interactive move visualization (independent, works on all card types)
         self.chk_interactive_moves = QCheckBox("Interactive moves in analysis")
@@ -334,8 +334,7 @@ class SettingsDialog(QDialog):
         )
         form.addRow(self.chk_interactive_moves)
 
-        # Connect checkbox to enable/disable sub-options
-        self.chk_show_options.toggled.connect(self._on_show_options_toggled)
+        # Connect checkbox to enable/disable preview sub-option
         self.chk_show_options.toggled.connect(self._on_show_options_toggled_preview)
 
         return group
@@ -455,11 +454,10 @@ class SettingsDialog(QDialog):
         self.chk_interactive_moves.setChecked(self.settings.interactive_moves)
         self.chk_preview_moves.setChecked(self.settings.preview_moves_before_submit)
 
-        # Max MCQ options dropdown (index is value minus 2)
-        self.cmb_max_mcq_options.setCurrentIndex(self.settings.max_mcq_options - 2)
+        # Max moves dropdown (index is value minus 2)
+        self.cmb_max_moves.setCurrentIndex(self.settings.max_moves - 2)
 
-        # Initialize max options enabled state based on show options checkbox
-        self._on_show_options_toggled(self.settings.show_options)
+        # Initialize preview enabled state based on show options checkbox
         self._on_show_options_toggled_preview(self.settings.show_options)
 
         # GnuBG
@@ -530,19 +528,6 @@ class SettingsDialog(QDialog):
         self.lbl_gnubg_status_text.setText(status_text)
         self.lbl_gnubg_status_text.setStyleSheet("")
 
-    def _on_show_options_toggled(self, checked: bool):
-        """Enable/disable max options dropdown based on show options checkbox."""
-        self.lbl_max_options.setEnabled(checked)
-        self.cmb_max_mcq_options.setEnabled(checked)
-
-        # Add visual feedback for disabled state
-        if checked:
-            self.lbl_max_options.setStyleSheet("")
-            self.cmb_max_mcq_options.setStyleSheet("")
-        else:
-            self.lbl_max_options.setStyleSheet("color: #6c7086;")
-            self.cmb_max_mcq_options.setStyleSheet("color: #6c7086;")
-
     def _on_show_options_toggled_preview(self, checked: bool):
         """Enable/disable preview checkbox based on show options checkbox."""
         self.chk_preview_moves.setEnabled(checked)
@@ -582,7 +567,7 @@ class SettingsDialog(QDialog):
         self.settings.score_format = self.cmb_score_format.currentData()
         self.settings.interactive_moves = self.chk_interactive_moves.isChecked()
         self.settings.preview_moves_before_submit = self.chk_preview_moves.isChecked()
-        self.settings.max_mcq_options = self.cmb_max_mcq_options.currentIndex() + 2
+        self.settings.max_moves = self.cmb_max_moves.currentIndex() + 2
         self.settings.gnubg_path = self.txt_gnubg_path.text() or None
         self.settings.gnubg_analysis_ply = self.cmb_gnubg_ply.currentIndex()
         self.settings.generate_score_matrix = self.chk_generate_score_matrix.isChecked()

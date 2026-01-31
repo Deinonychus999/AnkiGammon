@@ -12,7 +12,7 @@ class TestPlayedMoveInjection:
     def setup_method(self):
         """Set up test fixtures."""
         self.settings = Settings()
-        self.settings.max_mcq_options = 5  # Default to 5 for these tests
+        self.settings.max_moves = 5  # Default to 5 for these tests
 
     def test_played_move_already_in_top_5(self):
         """Test that nothing happens if played move is already in top N."""
@@ -46,7 +46,7 @@ class TestPlayedMoveInjection:
 
             def _ensure_played_move_in_candidates(self, decision, played_move):
                 # Copy the implementation with configurable max_options
-                max_options = self.settings.max_mcq_options
+                max_options = self.settings.max_moves
                 top_n = decision.candidate_moves[:max_options]
                 if played_move in top_n:
                     return
@@ -93,7 +93,7 @@ class TestPlayedMoveInjection:
 
             def _ensure_played_move_in_candidates(self, decision, played_move):
                 # Copy the implementation with configurable max_options
-                max_options = self.settings.max_mcq_options
+                max_options = self.settings.max_moves
                 top_n = decision.candidate_moves[:max_options]
                 if played_move in top_n:
                     return
@@ -103,8 +103,8 @@ class TestPlayedMoveInjection:
         mock = MainWindowMock(self.settings)
         mock._ensure_played_move_in_candidates(decision, played_move)
 
-        # Verify: played move should now be at position 4 (5th slot, with max_mcq_options=5)
-        max_options = self.settings.max_mcq_options
+        # Verify: played move should now be at position 4 (5th slot, with max_moves=5)
+        max_options = self.settings.max_moves
         assert decision.candidate_moves[max_options - 1] == played_move
         assert decision.candidate_moves[max_options - 1].was_played is True
         assert decision.candidate_moves[max_options - 1].notation == "24/21 24/18"
@@ -145,7 +145,7 @@ class TestPlayedMoveInjection:
 
             def _ensure_played_move_in_candidates(self, decision, played_move):
                 # Copy the implementation with configurable max_options
-                max_options = self.settings.max_mcq_options
+                max_options = self.settings.max_moves
                 top_n = decision.candidate_moves[:max_options]
                 if played_move in top_n:
                     return
@@ -156,7 +156,7 @@ class TestPlayedMoveInjection:
         mock._ensure_played_move_in_candidates(decision, played_move)
 
         # Verify: played move should now be at position N-1 (last slot)
-        max_options = self.settings.max_mcq_options
+        max_options = self.settings.max_moves
         assert decision.candidate_moves[max_options - 1] == played_move
         assert decision.candidate_moves[max_options - 1].was_played is True
 
@@ -165,9 +165,9 @@ class TestPlayedMoveInjection:
         assert played_move in top_n_after
 
     def test_played_move_with_custom_max_options(self):
-        """Test that function respects custom max_mcq_options setting."""
-        # Test with max_mcq_options = 3
-        self.settings.max_mcq_options = 3
+        """Test that function respects custom max_moves setting."""
+        # Test with max_moves = 3
+        self.settings.max_moves = 3
         position = Position()
 
         # Create 6 moves where played move is 5th (outside top 3)
@@ -197,7 +197,7 @@ class TestPlayedMoveInjection:
 
             def _ensure_played_move_in_candidates(self, decision, played_move):
                 # Copy the implementation with configurable max_options
-                max_options = self.settings.max_mcq_options
+                max_options = self.settings.max_moves
                 top_n = decision.candidate_moves[:max_options]
                 if played_move in top_n:
                     return
@@ -207,7 +207,7 @@ class TestPlayedMoveInjection:
         mock = MainWindowMock(self.settings)
         mock._ensure_played_move_in_candidates(decision, played_move)
 
-        # Verify: played move should now be at position 2 (3rd slot, with max_mcq_options=3)
+        # Verify: played move should now be at position 2 (3rd slot, with max_moves=3)
         assert decision.candidate_moves[2] == played_move
         assert decision.candidate_moves[2].was_played is True
 

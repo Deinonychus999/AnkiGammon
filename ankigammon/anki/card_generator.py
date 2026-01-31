@@ -111,7 +111,7 @@ class CardGenerator:
         position_svg = self._render_position_svg(decision)
 
         # Prepare candidate moves
-        max_options = self.settings.max_mcq_options
+        max_options = self.settings.max_moves
         if decision.decision_type == DecisionType.CUBE_ACTION:
             # Cube decisions always show all 5 actions
             candidates = decision.candidate_moves[:5]
@@ -1732,7 +1732,7 @@ class CardGenerator:
                 xgid=decision.xgid,
                 gnubg_path=self.settings.gnubg_path,
                 ply_level=self.settings.gnubg_analysis_ply,
-                max_moves=self.settings.max_mcq_options,
+                max_moves=self.settings.max_moves,
                 progress_callback=self.progress_callback,
                 cancellation_callback=self.cancellation_callback
             )
