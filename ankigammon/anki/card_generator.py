@@ -31,7 +31,8 @@ class CardGenerator:
         renderer: Optional[SVGBoardRenderer] = None,
         animation_controller: Optional[AnimationController] = None,
         progress_callback: Optional[callable] = None,
-        cancellation_callback: Optional[callable] = None
+        cancellation_callback: Optional[callable] = None,
+        analyzer=None
     ):
         """
         Initialize the card generator.
@@ -44,6 +45,9 @@ class CardGenerator:
             animation_controller: Animation controller instance (creates default if None)
             progress_callback: Optional callback(message: str) for progress updates
             cancellation_callback: Optional callback() that returns True if cancelled
+            analyzer: Optional BackgammonAnalyzer instance for score matrix generation.
+                      If None, one will be lazily created on first use. Pass an existing
+                      instance to reuse a connection across multiple cards.
         """
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -51,6 +55,7 @@ class CardGenerator:
         self.show_options = show_options
         self.interactive_moves = interactive_moves
         self.settings = get_settings()
+        self._analyzer = analyzer
 
         # Create default renderer and animation controller with settings if not provided
         from ankigammon.renderer.color_schemes import get_scheme
@@ -67,6 +72,20 @@ class CardGenerator:
 
         self.progress_callback = progress_callback
         self.cancellation_callback = cancellation_callback
+
+    def _get_analyzer(self):
+        """Return the shared analyzer, lazily creating one if needed."""
+        if self._analyzer is None:
+            from ankigammon.utils.analyzer_base import create_analyzer
+            self._analyzer = create_analyzer(self.settings)
+        return self._analyzer
+
+    def _analysis_label(self) -> str:
+        """Return a display label for the current analyzer's depth setting."""
+        analyzer_type = getattr(self.settings, 'analyzer_type', 'gnubg')
+        if analyzer_type == "xg":
+            return self.settings.xg_analysis_level.title()
+        return f"{self.settings.gnubg_analysis_ply}-ply"
 
     def generate_card(self, decision: Decision, card_id: Optional[str] = None) -> Dict[str, any]:
         """
@@ -1655,8 +1674,13 @@ class CardGenerator:
         Returns:
             HTML string with score matrix, or empty string if unavailable
         """
-        if not self.settings.is_gnubg_available():
-            return ""
+        analyzer_type = getattr(self.settings, 'analyzer_type', 'gnubg')
+        if analyzer_type == "xg":
+            if not self.settings.is_xg_available():
+                return ""
+        else:
+            if not self.settings.is_gnubg_available():
+                return ""
 
         try:
             from ankigammon.analysis.score_matrix import generate_score_matrix, format_matrix_as_html
@@ -1669,13 +1693,10 @@ class CardGenerator:
                 decision.score_x if decision.on_roll == Player.O else decision.score_o
             )
 
-            from ankigammon.utils.analyzer_base import create_analyzer
-            matrix_analyzer = create_analyzer(self.settings)
-
             matrix = generate_score_matrix(
                 xgid=decision.xgid,
                 match_length=decision.match_length,
-                analyzer=matrix_analyzer,
+                analyzer=self._get_analyzer(),
                 progress_callback=self.progress_callback,
                 cancellation_callback=self.cancellation_callback,
                 cube_value=decision.cube_value,
@@ -1686,7 +1707,7 @@ class CardGenerator:
                 matrix=matrix,
                 current_player_away=current_player_away,
                 current_opponent_away=current_opponent_away,
-                ply_level=self.settings.gnubg_analysis_ply,
+                analysis_label=self._analysis_label(),
                 cube_value=decision.cube_value,
                 cube_owner=decision.cube_owner
             )
@@ -1735,13 +1756,10 @@ class CardGenerator:
                 generate_move_score_matrix,
                 format_move_matrix_as_html
             )
-            from ankigammon.utils.analyzer_base import create_analyzer
-
-            move_analyzer = create_analyzer(self.settings)
 
             columns = generate_move_score_matrix(
                 xgid=decision.xgid,
-                analyzer=move_analyzer,
+                analyzer=self._get_analyzer(),
                 max_moves=self.settings.max_moves,
                 progress_callback=self.progress_callback,
                 cancellation_callback=self.cancellation_callback
@@ -1749,7 +1767,7 @@ class CardGenerator:
 
             return format_move_matrix_as_html(
                 columns=columns,
-                ply_level=self.settings.gnubg_analysis_ply
+                analysis_label=self._analysis_label()
             )
 
         except Exception as e:

@@ -209,6 +209,15 @@ class ExportWorker(QThread):
 
         # Export decisions
         total = len(self.decisions)
+        output_dir = Path.home() / '.ankigammon' / 'cards'
+        card_gen = CardGenerator(
+            output_dir=output_dir,
+            show_options=self.settings.show_options,
+            interactive_moves=self.settings.interactive_moves,
+            renderer=renderer,
+            cancellation_callback=lambda: self._cancelled
+        )
+
         for i, decision in enumerate(self.decisions):
             # Check for cancellation
             if self._cancelled:
@@ -220,17 +229,21 @@ class ExportWorker(QThread):
             position_progress_range = 1.0 / total  # How much progress this position represents
 
             # Calculate sub-steps for progress tracking: render, score matrix (if applicable), generate card
+            analyzer_available = (
+                self.settings.is_xg_available() if getattr(self.settings, 'analyzer_type', 'gnubg') == 'xg'
+                else self.settings.is_gnubg_available()
+            )
             has_cube_score_matrix = (
                 decision.decision_type.name == 'CUBE_ACTION' and
                 decision.match_length > 0 and
                 self.settings.get('generate_score_matrix', False) and
-                self.settings.is_gnubg_available()
+                analyzer_available
             )
             has_move_score_matrix = (
                 decision.decision_type.name == 'CHECKER_PLAY' and
                 decision.dice and
                 self.settings.get('generate_move_score_matrix', False) and
-                self.settings.is_gnubg_available()
+                analyzer_available
             )
             cube_matrix_steps = (decision.match_length - 1) ** 2 if has_cube_score_matrix else 0
             move_matrix_steps = 4 if has_move_score_matrix else 0  # 4 score types analyzed
@@ -238,7 +251,7 @@ class ExportWorker(QThread):
 
             current_substep = [0]  # Mutable counter for nested function
 
-            # Progress callback for sub-steps
+            # Update progress callback for this position's sub-steps
             def progress_callback(message: str):
                 current_substep[0] += 1
                 # Calculate progress within this position (cap at 95% until Anki add completes)
@@ -247,20 +260,7 @@ class ExportWorker(QThread):
                 self.progress.emit(overall_progress)
                 self.status_message.emit(f"Position {i+1}/{total}: {message}")
 
-            # Cancellation callback
-            def cancellation_callback():
-                return self._cancelled
-
-            # Create card generator with progress and cancellation callbacks
-            output_dir = Path.home() / '.ankigammon' / 'cards'
-            card_gen = CardGenerator(
-                output_dir=output_dir,
-                show_options=self.settings.show_options,
-                interactive_moves=self.settings.interactive_moves,
-                renderer=renderer,
-                progress_callback=progress_callback,
-                cancellation_callback=cancellation_callback
-            )
+            card_gen.progress_callback = progress_callback
 
             self.progress.emit(base_progress)
 
@@ -355,6 +355,13 @@ class ExportWorker(QThread):
             # Generate cards and add to appropriate decks
             total = len(self.decisions)
             card_index = 0
+            card_gen = CardGenerator(
+                output_dir=output_dir,
+                show_options=self.settings.show_options,
+                interactive_moves=self.settings.interactive_moves,
+                renderer=renderer,
+                cancellation_callback=lambda: self._cancelled
+            )
 
             for deck_name, deck_decisions in decisions_by_deck.items():
                 deck = decks_dict[deck_name]
@@ -370,17 +377,21 @@ class ExportWorker(QThread):
                     position_progress_range = 1.0 / total
 
                     # Calculate sub-steps for progress tracking
+                    apkg_analyzer_available = (
+                        self.settings.is_xg_available() if getattr(self.settings, 'analyzer_type', 'gnubg') == 'xg'
+                        else self.settings.is_gnubg_available()
+                    )
                     has_cube_score_matrix = (
                         decision.decision_type.name == 'CUBE_ACTION' and
                         decision.match_length > 0 and
                         self.settings.get('generate_score_matrix', False) and
-                        self.settings.is_gnubg_available()
+                        apkg_analyzer_available
                     )
                     has_move_score_matrix = (
                         decision.decision_type.name == 'CHECKER_PLAY' and
                         decision.dice and
                         self.settings.get('generate_move_score_matrix', False) and
-                        self.settings.is_gnubg_available()
+                        apkg_analyzer_available
                     )
                     cube_matrix_steps = (decision.match_length - 1) ** 2 if has_cube_score_matrix else 0
                     move_matrix_steps = 4 if has_move_score_matrix else 0  # 4 score types analyzed
@@ -389,7 +400,7 @@ class ExportWorker(QThread):
                     current_substep = [0]
                     current_card_index = card_index  # Capture for closure
 
-                    # Progress callback for sub-steps (with captured index)
+                    # Update progress callback for this position's sub-steps
                     def make_progress_callback(idx):
                         def apkg_progress_callback(message: str):
                             current_substep[0] += 1
@@ -399,19 +410,7 @@ class ExportWorker(QThread):
                             self.status_message.emit(f"Position {idx+1}/{total}: {message}")
                         return apkg_progress_callback
 
-                    # Cancellation callback
-                    def apkg_cancellation_callback():
-                        return self._cancelled
-
-                    # Create card generator with progress and cancellation callbacks
-                    card_gen = CardGenerator(
-                        output_dir=output_dir,
-                        show_options=self.settings.show_options,
-                        interactive_moves=self.settings.interactive_moves,
-                        renderer=renderer,
-                        progress_callback=make_progress_callback(current_card_index),
-                        cancellation_callback=apkg_cancellation_callback
-                    )
+                    card_gen.progress_callback = make_progress_callback(current_card_index)
 
                     self.progress.emit(base_progress)
 

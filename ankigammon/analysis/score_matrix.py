@@ -334,7 +334,8 @@ def format_matrix_as_html(
     current_opponent_away: Optional[int] = None,
     ply_level: Optional[int] = None,
     cube_value: int = 1,
-    cube_owner: Optional['CubeState'] = None
+    cube_owner: Optional['CubeState'] = None,
+    analysis_label: Optional[str] = None
 ) -> str:
     """
     Format score matrix as HTML table.
@@ -343,9 +344,11 @@ def format_matrix_as_html(
         matrix: Score matrix from generate_score_matrix()
         current_player_away: Highlight this cell (player's score away)
         current_opponent_away: Highlight this cell (opponent's score away)
-        ply_level: Analysis depth in plies (for display in title)
+        ply_level: Analysis depth in plies (for display in title).
+                   Ignored if analysis_label is provided.
         cube_value: Current cube value (for title generation)
         cube_owner: Current cube owner (for title generation)
+        analysis_label: Display label for analysis depth (e.g., "2-ply" or "World Class")
 
     Returns:
         HTML string with styled table
@@ -371,8 +374,9 @@ def format_matrix_as_html(
         next_cube = cube_value * 2
         title = f'Score Matrix for Redouble to {next_cube}'
 
-    if ply_level is not None:
-        title += f' <span class="ply-indicator">({ply_level}-ply)</span>'
+    label = analysis_label or (f"{ply_level}-ply" if ply_level is not None else None)
+    if label:
+        title += f' <span class="ply-indicator">({label})</span>'
     html += f'<h3>{title}</h3>\n'
 
     html += '<table class="score-matrix-table">\n'

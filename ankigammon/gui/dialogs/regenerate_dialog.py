@@ -152,6 +152,12 @@ class RegenerateWorker(QThread):
             orientation=self.settings.board_orientation
         )
         output_dir = Path.home() / '.ankigammon' / 'cards'
+        card_gen = CardGenerator(
+            output_dir=output_dir,
+            show_options=self.settings.show_options,
+            interactive_moves=self.settings.interactive_moves,
+            renderer=renderer,
+        )
 
         updated = 0
         errors = 0
@@ -165,12 +171,6 @@ class RegenerateWorker(QThread):
 
             try:
                 decision = xgid_to_decision[xgid]
-                card_gen = CardGenerator(
-                    output_dir=output_dir,
-                    show_options=self.settings.show_options,
-                    interactive_moves=self.settings.interactive_moves,
-                    renderer=renderer,
-                )
                 card_data = card_gen.generate_card(decision)
 
                 client.update_note_fields(

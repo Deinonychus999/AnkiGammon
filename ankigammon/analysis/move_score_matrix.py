@@ -215,7 +215,8 @@ def generate_move_score_matrix(
 
 def format_move_matrix_as_html(
     columns: List[MoveScoreMatrixColumn],
-    ply_level: Optional[int] = None
+    ply_level: Optional[int] = None,
+    analysis_label: Optional[str] = None
 ) -> str:
     """
     Format move score matrix as compact HTML grid.
@@ -234,7 +235,9 @@ def format_move_matrix_as_html(
 
     Args:
         columns: List of MoveScoreMatrixColumn from generate_move_score_matrix()
-        ply_level: Analysis depth in plies (for display in title)
+        ply_level: Analysis depth in plies (for display in title).
+                   Ignored if analysis_label is provided.
+        analysis_label: Display label for analysis depth (e.g., "2-ply" or "World Class")
 
     Returns:
         HTML string with styled table
@@ -247,8 +250,9 @@ def format_move_matrix_as_html(
 
     # Title
     title = 'Move Analysis by Score'
-    if ply_level is not None:
-        title += f' <span class="ply-indicator">({ply_level}-ply)</span>'
+    label = analysis_label or (f"{ply_level}-ply" if ply_level is not None else None)
+    if label:
+        title += f' <span class="ply-indicator">({label})</span>'
     html += f'<h3>{title}</h3>\n'
 
     html += '<table class="move-score-matrix-table">\n'
