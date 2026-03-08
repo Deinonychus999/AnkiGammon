@@ -71,6 +71,12 @@ a = Analysis(
         'ankigammon.gui.dialogs.settings_dialog',
         'ankigammon.gui.dialogs.export_dialog',
         'ankigammon.gui.dialogs.input_dialog',
+        # XG automation (Windows only, lazily imported)
+        'ankigammon.utils.xg_analyzer',
+        'ankigammon.utils.xg_auto',
+        'ankigammon.utils.xg_auto.automator',
+        'pywinauto',
+        'pyautogui',
         # External dependencies
         'genanki',
         'requests',

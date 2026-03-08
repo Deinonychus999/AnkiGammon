@@ -557,7 +557,7 @@ class SettingsDialog(QDialog):
                 self.lbl_xg_status_icon.setPixmap(
                     qta.icon('fa6s.triangle-exclamation', color='#fab387').pixmap(18, 18)
                 )
-                self.lbl_xg_status_text.setText("pywinauto package not installed (pip install pywinauto pyautogui)")
+                self.lbl_xg_status_text.setText("pywinauto package missing — please update AnkiGammon")
         else:
             self.lbl_xg_status_icon.setPixmap(
                 qta.icon('fa6s.circle-xmark', color='#f38ba8').pixmap(18, 18)

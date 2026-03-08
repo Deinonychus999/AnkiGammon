@@ -76,7 +76,7 @@ class XGAnalyzer(BackgammonAnalyzer):
         except ImportError:
             raise ImportError(
                 "XG automation dependencies not installed. "
-                "Install with: pip install pywinauto pyautogui"
+                "Please update AnkiGammon to the latest version."
             )
 
         self._automator = XGAutomator(
