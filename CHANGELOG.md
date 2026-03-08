@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.4.0b4] - 2026-03-08
+
+### Added
+- Support for eXtreme Gammon 2.19 (auto-detects version and uses correct menu commands)
+
+### Fixed
+- .mat file import now works correctly in XG automation
+- Cancelling analysis/export immediately terminates the headless XG process instead of waiting for timeout
+- Startup dialogs in XG no longer block automated analysis
+- Score matrix export reuses the existing XG instance instead of launching a second one
+
 ## [1.4.0b3] - 2026-03-08
 
 ### Fixed
