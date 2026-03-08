@@ -214,9 +214,19 @@ jobs:
         id: version
         run: echo "number=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
 
+      - name: Check if pre-release
+        id: prerelease
+        run: |
+          if [[ "${{ github.ref_name }}" =~ (a|b|rc)[0-9]+ ]]; then
+            echo "is_prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Extract changelog for this version
         uses: mindsers/changelog-reader-action@v2
         id: changelog
+        if: steps.prerelease.outputs.is_prerelease == 'false'
         with:
           version: ${{ steps.version.outputs.number }}
 
@@ -238,7 +248,8 @@ jobs:
       - name: Upload Release Assets
         uses: softprops/action-gh-release@v1
         with:
-          body: ${{ steps.changelog.outputs.changes }}
+          body: ${{ steps.prerelease.outputs.is_prerelease == 'true' && format('Pre-release {0}', github.ref_name) || steps.changelog.outputs.changes }}
+          prerelease: ${{ steps.prerelease.outputs.is_prerelease == 'true' }}
           files: |
             ankigammon-windows.zip
             AnkiGammon-macOS.dmg
