@@ -17,8 +17,7 @@ from ankigammon.anki.card_generator import CardGenerator
 from ankigammon.renderer.svg_board_renderer import SVGBoardRenderer
 from ankigammon.renderer.color_schemes import SCHEMES
 from ankigammon.settings import Settings
-from ankigammon.utils.gnubg_analyzer import GNUBGAnalyzer
-from ankigammon.parsers.gnubg_parser import GNUBGParser
+from ankigammon.utils.analyzer_base import create_analyzer
 
 
 class AnalysisWorker(QThread):
@@ -46,12 +45,9 @@ class AnalysisWorker(QThread):
         self._cancelled = True
 
     def run(self):
-        """Analyze positions with GnuBG in background (parallel processing)."""
+        """Analyze positions in background (parallel processing)."""
         try:
-            analyzer = GNUBGAnalyzer(
-                gnubg_path=self.settings.gnubg_path,
-                analysis_ply=self.settings.gnubg_analysis_ply
-            )
+            analyzer = create_analyzer(self.settings)
 
             # Find positions that need analysis
             positions_to_analyze = [(i, d) for i, d in enumerate(self.decisions) if not d.candidate_moves]
@@ -72,12 +68,12 @@ class AnalysisWorker(QThread):
                     return
                 self.progress.emit(completed, total_positions)
                 self.status_message.emit(
-                    f"Analyzing position {completed} of {total_positions} with GnuBG ({self.settings.gnubg_analysis_ply}-ply)..."
+                    f"Analyzing position {completed} of {total_positions}..."
                 )
 
-            # Analyze all positions in parallel
+            # Analyze all positions
             self.status_message.emit(
-                f"Starting analysis of {total} position(s) with GnuBG ({self.settings.gnubg_analysis_ply}-ply)..."
+                f"Starting analysis of {total} position(s)..."
             )
             analysis_results = analyzer.analyze_positions_parallel(
                 position_ids,
@@ -91,10 +87,10 @@ class AnalysisWorker(QThread):
 
             # Parse results and update decisions
             for idx, (pos_idx, decision) in enumerate(positions_to_analyze):
-                gnubg_output, decision_type = analysis_results[idx]
+                raw_output, decision_type = analysis_results[idx]
 
-                analyzed_decision = GNUBGParser.parse_analysis(
-                    gnubg_output,
+                analyzed_decision = analyzer.parse_analysis(
+                    raw_output,
                     decision.xgid,
                     decision_type
                 )
@@ -107,11 +103,16 @@ class AnalysisWorker(QThread):
                 analyzed_decision.position_image_path = decision.position_image_path
                 analyzed_decision.original_position_format = decision.original_position_format
 
-                # Set source description for GnuBG-analyzed positions
-                ply_level = self.settings.gnubg_analysis_ply
-                ply_text = f" ({ply_level}-ply)" if ply_level is not None else ""
+                # Set source description
+                analyzer_type = getattr(self.settings, 'analyzer_type', 'gnubg')
+                if analyzer_type == "xg":
+                    level = self.settings.xg_analysis_level
+                    engine_name = f"eXtreme Gammon ({level})"
+                else:
+                    ply_level = self.settings.gnubg_analysis_ply
+                    engine_name = f"GnuBG ({ply_level}-ply)"
                 format_name = decision.original_position_format or "XGID"
-                analyzed_decision.source_description = f"Analyzed with GnuBG{ply_text} from {format_name}"
+                analyzed_decision.source_description = f"Analyzed with {engine_name} from {format_name}"
 
                 analyzed_decisions[pos_idx] = analyzed_decision
 

@@ -37,6 +37,9 @@ class Settings:
         "import_include_player_o": True,
         "import_selected_player_names": [],
         "max_moves": 5,
+        "analyzer_type": "gnubg",
+        "xg_exe_path": None,
+        "xg_analysis_level": "world class",
         "check_for_updates": True,
         "last_update_check": None,
         "snooze_update_until": None,
@@ -348,6 +351,55 @@ class Settings:
         if value < 2 or value > 10:
             raise ValueError("max_moves must be between 2 and 10")
         self.set("max_moves", value)
+
+    @property
+    def analyzer_type(self) -> str:
+        """Get the analysis engine type ('gnubg' or 'xg')."""
+        return self._settings.get("analyzer_type", "gnubg")
+
+    @analyzer_type.setter
+    def analyzer_type(self, value: str) -> None:
+        """Set the analysis engine type ('gnubg' or 'xg')."""
+        if value not in ("gnubg", "xg"):
+            raise ValueError("analyzer_type must be 'gnubg' or 'xg'")
+        self.set("analyzer_type", value)
+
+    @property
+    def xg_exe_path(self) -> Optional[str]:
+        """Get the eXtreme Gammon executable path."""
+        return self._settings.get("xg_exe_path", None)
+
+    @xg_exe_path.setter
+    def xg_exe_path(self, value: Optional[str]) -> None:
+        """Set the eXtreme Gammon executable path."""
+        self.set("xg_exe_path", value)
+
+    @property
+    def xg_analysis_level(self) -> str:
+        """Get the XG analysis level."""
+        return self._settings.get("xg_analysis_level", "world class")
+
+    @xg_analysis_level.setter
+    def xg_analysis_level(self, value: str) -> None:
+        """Set the XG analysis level."""
+        self.set("xg_analysis_level", value)
+
+    def is_xg_available(self) -> bool:
+        """Check if eXtreme Gammon is configured and accessible.
+
+        Returns:
+            True if xg_exe_path is set and the file exists.
+        """
+        import sys
+        if sys.platform != 'win32':
+            return False
+        path = self.xg_exe_path
+        if path is None:
+            return False
+        try:
+            return Path(path).exists()
+        except (OSError, ValueError):
+            return False
 
     @property
     def check_for_updates(self) -> bool:

@@ -1669,11 +1669,13 @@ class CardGenerator:
                 decision.score_x if decision.on_roll == Player.O else decision.score_o
             )
 
+            from ankigammon.utils.analyzer_base import create_analyzer
+            matrix_analyzer = create_analyzer(self.settings)
+
             matrix = generate_score_matrix(
                 xgid=decision.xgid,
                 match_length=decision.match_length,
-                gnubg_path=self.settings.gnubg_path,
-                ply_level=self.settings.gnubg_analysis_ply,
+                analyzer=matrix_analyzer,
                 progress_callback=self.progress_callback,
                 cancellation_callback=self.cancellation_callback,
                 cube_value=decision.cube_value,
@@ -1711,8 +1713,14 @@ class CardGenerator:
         Returns:
             HTML string with move score matrix, or empty string if unavailable
         """
-        if not self.settings.is_gnubg_available():
-            return ""
+        # Check analyzer availability
+        analyzer_type = getattr(self.settings, 'analyzer_type', 'gnubg')
+        if analyzer_type == "xg":
+            if not self.settings.is_xg_available():
+                return ""
+        else:
+            if not self.settings.is_gnubg_available():
+                return ""
 
         # Only for checker play decisions
         if decision.decision_type != DecisionType.CHECKER_PLAY:
@@ -1727,11 +1735,13 @@ class CardGenerator:
                 generate_move_score_matrix,
                 format_move_matrix_as_html
             )
+            from ankigammon.utils.analyzer_base import create_analyzer
+
+            move_analyzer = create_analyzer(self.settings)
 
             columns = generate_move_score_matrix(
                 xgid=decision.xgid,
-                gnubg_path=self.settings.gnubg_path,
-                ply_level=self.settings.gnubg_analysis_ply,
+                analyzer=move_analyzer,
                 max_moves=self.settings.max_moves,
                 progress_callback=self.progress_callback,
                 cancellation_callback=self.cancellation_callback

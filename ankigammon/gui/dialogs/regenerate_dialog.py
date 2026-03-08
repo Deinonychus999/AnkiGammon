@@ -54,8 +54,7 @@ class RegenerateWorker(QThread):
 
     def _do_regenerate(self):
         """Core regeneration logic."""
-        from ankigammon.utils.gnubg_analyzer import GNUBGAnalyzer
-        from ankigammon.parsers.gnubg_parser import GNUBGParser
+        from ankigammon.utils.analyzer_base import create_analyzer
         from ankigammon.anki.card_generator import CardGenerator
         from ankigammon.renderer.svg_board_renderer import SVGBoardRenderer
         from ankigammon.renderer.color_schemes import SCHEMES
@@ -103,28 +102,23 @@ class RegenerateWorker(QThread):
         # 4. Deduplicate XGIDs for efficient analysis
         unique_xgids = list(dict.fromkeys(xgid for _, xgid in note_xgid_pairs))
 
-        # 5. Analyze with GnuBG
+        # 5. Analyze positions
         if self._cancelled:
             self.finished.emit(False, "Cancelled by user")
             return
 
-        analyzer = GNUBGAnalyzer(
-            gnubg_path=self.settings.gnubg_path,
-            analysis_ply=self.settings.gnubg_analysis_ply
-        )
+        analyzer = create_analyzer(self.settings)
 
         def analysis_progress(completed: int, total_positions: int):
             if self._cancelled:
                 return
             self.progress.emit(completed, total_positions * 2)
             self.status_message.emit(
-                f"Analyzing position {completed}/{total_positions} with GnuBG "
-                f"({self.settings.gnubg_analysis_ply}-ply)..."
+                f"Analyzing position {completed}/{total_positions}..."
             )
 
         self.status_message.emit(
-            f"Analyzing {len(unique_xgids)} unique position(s) with GnuBG "
-            f"({self.settings.gnubg_analysis_ply}-ply)..."
+            f"Analyzing {len(unique_xgids)} unique position(s)..."
         )
         analysis_results = analyzer.analyze_positions_parallel(
             unique_xgids,
@@ -137,11 +131,16 @@ class RegenerateWorker(QThread):
 
         # 6. Parse into Decisions
         self.status_message.emit("Parsing analysis results...")
+        analyzer_type = getattr(self.settings, 'analyzer_type', 'gnubg')
+        if analyzer_type == "xg":
+            engine_desc = f"eXtreme Gammon ({self.settings.xg_analysis_level})"
+        else:
+            engine_desc = f"GnuBG ({self.settings.gnubg_analysis_ply}-ply)"
+
         xgid_to_decision = {}
-        for xgid, (gnubg_output, decision_type) in zip(unique_xgids, analysis_results):
-            decision = GNUBGParser.parse_analysis(gnubg_output, xgid, decision_type)
-            ply = self.settings.gnubg_analysis_ply
-            decision.source_description = f"Regenerated with GnuBG ({ply}-ply)"
+        for xgid, (raw_output, decision_type) in zip(unique_xgids, analysis_results):
+            decision = analyzer.parse_analysis(raw_output, xgid, decision_type)
+            decision.source_description = f"Regenerated with {engine_desc}"
             xgid_to_decision[xgid] = decision
 
         # 7. Regenerate card HTML and update notes

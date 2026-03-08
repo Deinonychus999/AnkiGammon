@@ -67,11 +67,13 @@ SCORE_CONFIGS = [
 
 def generate_move_score_matrix(
     xgid: str,
-    gnubg_path: str,
-    ply_level: int = 3,
+    analyzer: 'BackgammonAnalyzer',
     max_moves: int = 3,
     progress_callback: Optional[Callable[[str], None]] = None,
-    cancellation_callback: Optional[Callable[[], bool]] = None
+    cancellation_callback: Optional[Callable[[], bool]] = None,
+    # Legacy parameters for backward compatibility
+    gnubg_path: Optional[str] = None,
+    ply_level: int = 3,
 ) -> List[MoveScoreMatrixColumn]:
     """
     Generate move score matrix for checker play decisions.
@@ -84,23 +86,27 @@ def generate_move_score_matrix(
 
     Args:
         xgid: XGID position string with dice set
-        gnubg_path: Path to gnubg-cli.exe
-        ply_level: Analysis depth (default: 3)
+        analyzer: BackgammonAnalyzer instance to use for analysis
+        max_moves: Maximum moves per score type (default: 3)
         progress_callback: Optional callback(message: str) for progress updates
         cancellation_callback: Optional callback() that returns True if cancelled
+        gnubg_path: DEPRECATED - use analyzer parameter instead
+        ply_level: DEPRECATED - use analyzer parameter instead
 
     Returns:
         List of 4 MoveScoreMatrixColumn objects
 
     Raises:
         ValueError: If XGID is invalid or has no dice (not a checker play)
-        FileNotFoundError: If gnubg_path doesn't exist
         InterruptedError: If cancelled by user
     """
-    from ankigammon.utils.gnubg_analyzer import GNUBGAnalyzer
     from ankigammon.utils.xgid import parse_xgid, encode_xgid
-    from ankigammon.parsers.gnubg_parser import GNUBGParser
     from ankigammon.models import Player, CubeState
+
+    # Legacy fallback: if analyzer not provided, create from gnubg_path
+    if analyzer is None and gnubg_path is not None:
+        from ankigammon.utils.gnubg_analyzer import GNUBGAnalyzer
+        analyzer = GNUBGAnalyzer(gnubg_path, ply_level)
 
     # Parse XGID to get position and metadata
     position, metadata = parse_xgid(xgid)
@@ -111,9 +117,6 @@ def generate_move_score_matrix(
         raise ValueError("XGID must have dice set for move score matrix (checker play)")
 
     on_roll = metadata.get('on_roll', Player.O)
-
-    # Initialize analyzer
-    analyzer = GNUBGAnalyzer(gnubg_path, ply_level)
 
     # Build list of modified XGIDs for each score config
     position_ids = []
@@ -182,8 +185,8 @@ def generate_move_score_matrix(
     for idx, (output, decision_type) in enumerate(analysis_results):
         config = SCORE_CONFIGS[idx]
 
-        # Parse checker play moves from GnuBG output
-        moves = GNUBGParser._parse_checker_play(output)
+        # Parse checker play moves from analysis output
+        moves = analyzer.parse_checker_play(output)
 
         if not moves:
             raise ValueError(

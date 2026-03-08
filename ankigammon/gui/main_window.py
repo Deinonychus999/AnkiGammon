@@ -64,11 +64,8 @@ class MatchAnalysisWorker(QThread):
 
     def run(self):
         """Analyze match file in background thread."""
-        from ankigammon.utils.gnubg_analyzer import GNUBGAnalyzer
-        from ankigammon.parsers.gnubg_match_parser import parse_gnubg_match_files
+        from ankigammon.utils.analyzer_base import create_analyzer
         import logging
-        import shutil
-        from pathlib import Path
         import subprocess
 
         logger = logging.getLogger(__name__)
@@ -79,21 +76,19 @@ class MatchAnalysisWorker(QThread):
                 self.finished.emit(False, "Cancelled", [], 0)
                 return
 
-            # Create analyzer
-            self.status_message.emit(f"Analyzing match with GnuBG ({self.settings.gnubg_analysis_ply}-ply)...")
+            # Create analyzer via factory
+            analyzer_type = getattr(self.settings, 'analyzer_type', 'gnubg')
+            self.status_message.emit(f"Analyzing match...")
 
-            self._analyzer = GNUBGAnalyzer(
-                self.settings.gnubg_path,
-                self.settings.gnubg_analysis_ply
-            )
+            self._analyzer = create_analyzer(self.settings)
 
-            # Analyze match
+            # Analyze match — parsing is now internal to each analyzer
             def progress_callback(status: str):
                 if self._cancelled:
                     return
                 self.status_message.emit(status)
 
-            exported_files = self._analyzer.analyze_match_file(
+            all_decisions = self._analyzer.analyze_match_file(
                 self.file_path,
                 max_moves=self.max_moves,
                 progress_callback=progress_callback
@@ -101,50 +96,11 @@ class MatchAnalysisWorker(QThread):
 
             # Check for cancellation after analysis
             if self._cancelled:
-                # Cleanup temp files before returning
-                for temp_file in exported_files:
-                    try:
-                        temp_dir = Path(temp_file).parent
-                        shutil.rmtree(temp_dir)
-                        break
-                    except:
-                        pass
                 self.finished.emit(False, "Cancelled", [], 0)
                 return
 
-            logger.info(f"GnuBG exported {len(exported_files)} file(s)")
-
-            # Parse exported files
-            self.status_message.emit(f"Parsing analysis from {len(exported_files)} game(s)...")
-
-            # Detect if source was SGF file (need to swap scores)
-            is_sgf_source = self.file_path.endswith('.sgf')
-
-            # Extract original filename for source description
-            original_filename = Path(self.file_path).name
-
-            all_decisions = parse_gnubg_match_files(
-                exported_files,
-                is_sgf_source=is_sgf_source,
-                ply_level=self.settings.gnubg_analysis_ply,
-                source_filename=original_filename
-            )
             total_count = len(all_decisions)
-
-            # Check for cancellation after parsing
-            if self._cancelled:
-                # Cleanup temp files before returning
-                for temp_file in exported_files:
-                    try:
-                        temp_dir = Path(temp_file).parent
-                        shutil.rmtree(temp_dir)
-                        break
-                    except:
-                        pass
-                self.finished.emit(False, "Cancelled", [], 0)
-                return
-
-            logger.info(f"Parsed {total_count} positions from match")
+            logger.info(f"Analyzed {total_count} positions from match")
 
             # Filter based on user options
             self.status_message.emit("Filtering positions by error thresholds...")
@@ -159,16 +115,6 @@ class MatchAnalysisWorker(QThread):
 
             logger.info(f"Filtered to {len(decisions)} positions (checker: {self.checker_threshold}, cube: {self.cube_threshold})")
 
-            # Cleanup temp files
-            self.status_message.emit("Cleaning up temporary files...")
-            for temp_file in exported_files:
-                try:
-                    temp_dir = Path(temp_file).parent
-                    shutil.rmtree(temp_dir)
-                    break  # Only need to remove directory once
-                except Exception as e:
-                    logger.warning(f"Failed to cleanup temp files: {e}")
-
             # Final cancellation check
             if self._cancelled:
                 self.finished.emit(False, "Cancelled", [], 0)
@@ -180,8 +126,8 @@ class MatchAnalysisWorker(QThread):
             if self._cancelled:
                 self.finished.emit(False, "Cancelled", [], 0)
             else:
-                logger.error(f"GnuBG analysis failed: {e}")
-                error_msg = f"GnuBG analysis failed:\n\n{e.stderr if e.stderr else str(e)}"
+                logger.error(f"Analysis failed: {e}")
+                error_msg = f"Analysis failed:\n\n{e.stderr if e.stderr else str(e)}"
                 self.finished.emit(False, error_msg, [], 0)
 
         except Exception as e:
@@ -1104,15 +1050,23 @@ class MainWindow(QMainWindow):
 
         logger = logging.getLogger(__name__)
 
-        # Check if GnuBG is configured
-        if not self.settings.is_gnubg_available():
+        # Check if analyzer is configured
+        analyzer_type = getattr(self.settings, 'analyzer_type', 'gnubg')
+        if analyzer_type == "xg":
+            analyzer_available = self.settings.is_xg_available()
+            engine_name = "eXtreme Gammon"
+        else:
+            analyzer_available = self.settings.is_gnubg_available()
+            engine_name = "GNU Backgammon"
+
+        if not analyzer_available:
             # Only show the dialog once per import batch
             if not self._gnubg_check_shown:
                 self._gnubg_check_shown = True
                 result = silent_messagebox.question(
                     self,
-                    "GnuBG Required",
-                    "Match file analysis requires GNU Backgammon.\n\n"
+                    f"{engine_name} Required",
+                    f"Match file analysis requires {engine_name}.\n\n"
                     "Would you like to configure it in Settings?",
                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
                 )
@@ -1150,7 +1104,7 @@ class MainWindow(QMainWindow):
 
         # Create progress dialog with spinner
         progress = QProgressDialog(
-            f"Analyzing match with GnuBG ({self.settings.gnubg_analysis_ply}-ply)...",
+            "Analyzing match...",
             "Cancel",
             0,
             0,

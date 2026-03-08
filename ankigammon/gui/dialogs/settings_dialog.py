@@ -134,6 +134,9 @@ class SettingsDialog(QDialog):
         self.original_settings.gnubg_analysis_ply = settings.gnubg_analysis_ply
         self.original_settings.generate_score_matrix = settings.generate_score_matrix
         self.original_settings.max_moves = settings.max_moves
+        self.original_settings.analyzer_type = settings.analyzer_type
+        self.original_settings.xg_exe_path = settings.xg_exe_path
+        self.original_settings.xg_analysis_level = settings.xg_analysis_level
 
         # Validation worker
         self.validation_worker: Optional[GnuBGValidationWorker] = None
@@ -340,9 +343,25 @@ class SettingsDialog(QDialog):
         return group
 
     def _create_gnubg_group(self) -> QGroupBox:
-        """Create GnuBG settings group."""
-        group = QGroupBox("GnuBG Integration (for non-analyzed positions)")
+        """Create analysis engine settings group."""
+        group = QGroupBox("Analysis Engine")
         form = QFormLayout(group)
+
+        # Analyzer type selector
+        self.cmb_analyzer_type = QComboBox()
+        self.cmb_analyzer_type.addItem("GNU Backgammon", "gnubg")
+        self.cmb_analyzer_type.addItem("eXtreme Gammon", "xg")
+        self.cmb_analyzer_type.setCursor(Qt.PointingHandCursor)
+        self.cmb_analyzer_type.setToolTip(
+            "Select the analysis engine:\n"
+            "• GNU Backgammon: Open-source CLI tool (cross-platform)\n"
+            "• eXtreme Gammon: Commercial software via UI automation (Windows only)"
+        )
+        self.cmb_analyzer_type.currentIndexChanged.connect(self._on_analyzer_type_changed)
+        form.addRow("Engine:", self.cmb_analyzer_type)
+
+        # --- GnuBG-specific fields ---
+        self.gnubg_widgets = []
 
         # GnuBG path
         path_layout = QHBoxLayout()
@@ -353,20 +372,91 @@ class SettingsDialog(QDialog):
         btn_browse.clicked.connect(self._browse_gnubg)
         path_layout.addWidget(self.txt_gnubg_path)
         path_layout.addWidget(btn_browse)
-        form.addRow("GnuBG CLI Path:", path_layout)
+        self.lbl_gnubg_path = QLabel("GnuBG CLI Path:")
+        form.addRow(self.lbl_gnubg_path, path_layout)
+        self.gnubg_widgets.extend([self.lbl_gnubg_path, self.txt_gnubg_path, btn_browse])
+        self._gnubg_browse_btn = btn_browse
 
         # Analysis depth
         self.cmb_gnubg_ply = QComboBox()
         self.cmb_gnubg_ply.addItems(["0", "1", "2", "3", "4"])
         self.cmb_gnubg_ply.setCursor(Qt.PointingHandCursor)
-        self.cmb_gnubg_ply.setMaximumWidth(60)  # Small dropdown for single digits
+        self.cmb_gnubg_ply.setMaximumWidth(60)
         self.cmb_gnubg_ply.setToolTip(
             "Analysis depth (moves ahead to evaluate):\n"
             "• 0-ply: Instant evaluation (least accurate)\n"
             "• 2-ply: Balanced (recommended, ~10 seconds per position)\n"
             "• 4-ply: Most thorough (very slow, ~1+ minute per position)"
         )
-        form.addRow("Analysis Depth (ply):", self.cmb_gnubg_ply)
+        self.lbl_gnubg_ply = QLabel("Analysis Depth (ply):")
+        form.addRow(self.lbl_gnubg_ply, self.cmb_gnubg_ply)
+        self.gnubg_widgets.extend([self.lbl_gnubg_ply, self.cmb_gnubg_ply])
+
+        # GnuBG status display
+        status_layout = QHBoxLayout()
+        self.lbl_gnubg_status_icon = QLabel()
+        self.lbl_gnubg_status_text = QLabel()
+        status_layout.addWidget(self.lbl_gnubg_status_icon)
+        status_layout.addWidget(self.lbl_gnubg_status_text)
+        status_layout.addStretch()
+        self.lbl_gnubg_status_label = QLabel("Status:")
+        form.addRow(self.lbl_gnubg_status_label, status_layout)
+        self.gnubg_widgets.extend([
+            self.lbl_gnubg_status_label,
+            self.lbl_gnubg_status_icon,
+            self.lbl_gnubg_status_text
+        ])
+
+        # --- XG-specific fields ---
+        self.xg_widgets = []
+
+        # XG executable path
+        xg_path_layout = QHBoxLayout()
+        self.txt_xg_path = QLineEdit()
+        self.txt_xg_path.setToolTip("Path to eXtremeGammon2.exe")
+        btn_browse_xg = QPushButton("Browse...")
+        btn_browse_xg.setCursor(Qt.PointingHandCursor)
+        btn_browse_xg.clicked.connect(self._browse_xg)
+        xg_path_layout.addWidget(self.txt_xg_path)
+        xg_path_layout.addWidget(btn_browse_xg)
+        self.lbl_xg_path = QLabel("XG Executable:")
+        form.addRow(self.lbl_xg_path, xg_path_layout)
+        self.xg_widgets.extend([self.lbl_xg_path, self.txt_xg_path, btn_browse_xg])
+        self._xg_browse_btn = btn_browse_xg
+
+        # XG analysis level
+        self.cmb_xg_level = QComboBox()
+        self.cmb_xg_level.addItems([
+            "Very Quick", "Fast", "Deep", "Thorough", "World Class", "Extensive"
+        ])
+        self.cmb_xg_level.setCursor(Qt.PointingHandCursor)
+        self.cmb_xg_level.setToolTip(
+            "eXtreme Gammon analysis level:\n"
+            "• Very Quick / Fast: Quick evaluations\n"
+            "• Deep / Thorough: Good balance of speed and accuracy\n"
+            "• World Class: High accuracy (recommended)\n"
+            "• Extensive: Maximum accuracy (very slow)"
+        )
+        self.lbl_xg_level = QLabel("Analysis Level:")
+        form.addRow(self.lbl_xg_level, self.cmb_xg_level)
+        self.xg_widgets.extend([self.lbl_xg_level, self.cmb_xg_level])
+
+        # XG status display
+        xg_status_layout = QHBoxLayout()
+        self.lbl_xg_status_icon = QLabel()
+        self.lbl_xg_status_text = QLabel()
+        xg_status_layout.addWidget(self.lbl_xg_status_icon)
+        xg_status_layout.addWidget(self.lbl_xg_status_text)
+        xg_status_layout.addStretch()
+        self.lbl_xg_status_label = QLabel("Status:")
+        form.addRow(self.lbl_xg_status_label, xg_status_layout)
+        self.xg_widgets.extend([
+            self.lbl_xg_status_label,
+            self.lbl_xg_status_icon,
+            self.lbl_xg_status_text
+        ])
+
+        # --- Shared fields (both engines) ---
 
         # Score matrix generation
         matrix_layout = QHBoxLayout()
@@ -401,16 +491,77 @@ class SettingsDialog(QDialog):
         move_matrix_layout.addStretch()
         form.addRow(move_matrix_layout)
 
-        # Status display (icon + text in horizontal layout)
-        status_layout = QHBoxLayout()
-        self.lbl_gnubg_status_icon = QLabel()
-        self.lbl_gnubg_status_text = QLabel()
-        status_layout.addWidget(self.lbl_gnubg_status_icon)
-        status_layout.addWidget(self.lbl_gnubg_status_text)
-        status_layout.addStretch()
-        form.addRow("Status:", status_layout)
-
         return group
+
+    def _on_analyzer_type_changed(self, index: int):
+        """Show/hide engine-specific fields based on selected analyzer type."""
+        is_gnubg = self.cmb_analyzer_type.currentData() == "gnubg"
+        is_xg = not is_gnubg
+
+        for widget in self.gnubg_widgets:
+            widget.setVisible(is_gnubg)
+
+        for widget in self.xg_widgets:
+            widget.setVisible(is_xg)
+
+        # Update status for the visible engine
+        if is_gnubg:
+            self._update_gnubg_status()
+        else:
+            self._update_xg_status()
+
+    def _browse_xg(self):
+        """Browse for eXtreme Gammon executable."""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select eXtreme Gammon Executable",
+            "",
+            "Executables (*.exe);;All Files (*)"
+        )
+        if file_path:
+            self.txt_xg_path.setText(file_path)
+            self._update_xg_status()
+
+    def _update_xg_status(self):
+        """Update XG status label."""
+        path = self.txt_xg_path.text()
+        if not path:
+            self.lbl_xg_status_icon.setPixmap(
+                qta.icon('fa6s.circle', color='#6c7086').pixmap(18, 18)
+            )
+            self.lbl_xg_status_text.setText("Not configured")
+            self.lbl_xg_status_text.setStyleSheet("")
+            return
+
+        import sys
+        if sys.platform != 'win32':
+            self.lbl_xg_status_icon.setPixmap(
+                qta.icon('fa6s.circle-xmark', color='#f38ba8').pixmap(18, 18)
+            )
+            self.lbl_xg_status_text.setText("Windows only")
+            self.lbl_xg_status_text.setStyleSheet("")
+            return
+
+        path_obj = Path(path)
+        if path_obj.exists():
+            # Check if pywinauto is installed (required for XG automation)
+            try:
+                import pywinauto  # noqa: F401
+                self.lbl_xg_status_icon.setPixmap(
+                    qta.icon('fa6s.circle-check', color='#a6e3a1').pixmap(18, 18)
+                )
+                self.lbl_xg_status_text.setText("Ready")
+            except ImportError:
+                self.lbl_xg_status_icon.setPixmap(
+                    qta.icon('fa6s.triangle-exclamation', color='#fab387').pixmap(18, 18)
+                )
+                self.lbl_xg_status_text.setText("pywinauto package not installed (pip install pywinauto pyautogui)")
+        else:
+            self.lbl_xg_status_icon.setPixmap(
+                qta.icon('fa6s.circle-xmark', color='#f38ba8').pixmap(18, 18)
+            )
+            self.lbl_xg_status_text.setText("File not found")
+        self.lbl_xg_status_text.setStyleSheet("")
 
     def _on_subdeck_toggled(self, _state):
         """Show info when enabling subdecks for the first time."""
@@ -460,13 +611,32 @@ class SettingsDialog(QDialog):
         # Initialize preview enabled state based on show options checkbox
         self._on_show_options_toggled_preview(self.settings.show_options)
 
+        # Analysis engine
+        analyzer_type = self.settings.analyzer_type
+        analyzer_index = 0 if analyzer_type == "gnubg" else 1
+        self.cmb_analyzer_type.setCurrentIndex(analyzer_index)
+
         # GnuBG
         if self.settings.gnubg_path:
             self.txt_gnubg_path.setText(self.settings.gnubg_path)
         self.cmb_gnubg_ply.setCurrentIndex(self.settings.gnubg_analysis_ply)
+
+        # XG
+        if self.settings.xg_exe_path:
+            self.txt_xg_path.setText(self.settings.xg_exe_path)
+        xg_level_map = {
+            "very quick": 0, "fast": 1, "deep": 2,
+            "thorough": 3, "world class": 4, "extensive": 5
+        }
+        xg_level_index = xg_level_map.get(self.settings.xg_analysis_level.lower(), 4)
+        self.cmb_xg_level.setCurrentIndex(xg_level_index)
+
+        # Shared
         self.chk_generate_score_matrix.setChecked(self.settings.generate_score_matrix)
         self.chk_generate_move_score_matrix.setChecked(self.settings.generate_move_score_matrix)
-        self._update_gnubg_status()
+
+        # Trigger visibility update
+        self._on_analyzer_type_changed(analyzer_index)
 
     def _browse_gnubg(self):
         """Browse for GnuBG executable."""
@@ -568,8 +738,12 @@ class SettingsDialog(QDialog):
         self.settings.interactive_moves = self.chk_interactive_moves.isChecked()
         self.settings.preview_moves_before_submit = self.chk_preview_moves.isChecked()
         self.settings.max_moves = self.cmb_max_moves.currentIndex() + 2
+        self.settings.analyzer_type = self.cmb_analyzer_type.currentData()
         self.settings.gnubg_path = self.txt_gnubg_path.text() or None
         self.settings.gnubg_analysis_ply = self.cmb_gnubg_ply.currentIndex()
+        self.settings.xg_exe_path = self.txt_xg_path.text() or None
+        xg_levels = ["very quick", "fast", "deep", "thorough", "world class", "extensive"]
+        self.settings.xg_analysis_level = xg_levels[self.cmb_xg_level.currentIndex()]
         self.settings.generate_score_matrix = self.chk_generate_score_matrix.isChecked()
         self.settings.generate_move_score_matrix = self.chk_generate_move_score_matrix.isChecked()
 

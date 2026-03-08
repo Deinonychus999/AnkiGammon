@@ -109,13 +109,15 @@ class ScoreMatrixCell:
 def generate_score_matrix(
     xgid: str,
     match_length: int,
-    gnubg_path: str,
-    ply_level: int = 3,
+    analyzer: 'BackgammonAnalyzer',
     progress_callback: Optional[callable] = None,
     cancellation_callback: Optional[callable] = None,
     use_parallel: bool = True,
     cube_value: int = 1,
-    cube_owner: Optional['CubeState'] = None
+    cube_owner: Optional['CubeState'] = None,
+    # Legacy parameters for backward compatibility
+    gnubg_path: Optional[str] = None,
+    ply_level: int = 3,
 ) -> List[List[ScoreMatrixCell]]:
     """
     Generate a score matrix for all RELEVANT score combinations in a match.
@@ -127,40 +129,33 @@ def generate_score_matrix(
     Args:
         xgid: XGID position string (cube decision)
         match_length: Match length (e.g., 7 for 7-point match)
-        gnubg_path: Path to gnubg-cli.exe
-        ply_level: Analysis depth in plies
+        analyzer: BackgammonAnalyzer instance to use for analysis
         progress_callback: Optional callback(message: str) for progress updates
         cancellation_callback: Optional callback() that returns True if cancelled
         use_parallel: Use parallel analysis (default: True, ~5-9x faster)
         cube_value: Current cube value before doubling (default: 1)
         cube_owner: Current cube owner (default: extracted from XGID)
+        gnubg_path: DEPRECATED - use analyzer parameter instead
+        ply_level: DEPRECATED - use analyzer parameter instead
 
     Returns:
         2D list of ScoreMatrixCell objects, indexed as [row][col]
         where row = player_away - min_away, col = opponent_away - min_away
 
-        For a 7-point match with cube at 1 (initial double to 2):
-        - Returns 6x6 matrix (2a through 7a)
-        - matrix[0][0] = 2a-2a, matrix[5][5] = 7a-7a
-
-        For a 7-point match with cube at 2 (redouble to 4):
-        - Returns 4x4 matrix (4a through 7a)
-        - matrix[0][0] = 4a-4a, matrix[3][3] = 7a-7a
-
     Raises:
         ValueError: If match_length < 2 or next_cube_value > match_length
-        FileNotFoundError: If gnubg_path doesn't exist
     """
     if match_length < 2:
         raise ValueError(f"Match length must be >= 2, got {match_length}")
 
-    from ankigammon.utils.gnubg_analyzer import GNUBGAnalyzer
     from ankigammon.utils.xgid import parse_xgid, encode_xgid
     from ankigammon.models import Player, CubeState
-    from ankigammon.parsers.gnubg_parser import GNUBGParser
+    from ankigammon.utils.analyzer_base import BackgammonAnalyzer
 
-    # Initialize analyzer
-    analyzer = GNUBGAnalyzer(gnubg_path, ply_level)
+    # Legacy fallback: if analyzer not provided, create from gnubg_path
+    if analyzer is None and gnubg_path is not None:
+        from ankigammon.utils.gnubg_analyzer import GNUBGAnalyzer
+        analyzer = GNUBGAnalyzer(gnubg_path, ply_level)
 
     # Parse original XGID to get position and metadata
     position, metadata = parse_xgid(xgid)
@@ -279,7 +274,7 @@ def generate_score_matrix(
             result_idx += 1
 
             # Parse cube decision
-            moves = GNUBGParser._parse_cube_decision(output)
+            moves = analyzer.parse_cube_decision(output)
 
             if not moves:
                 raise ValueError(
@@ -302,7 +297,7 @@ def generate_score_matrix(
             double_pass_eq = equity_map.get("Double/Pass", equity_map.get("Redouble/Pass", None))
 
             # Simplify best action notation
-            best_action_simplified = analyzer._simplify_cube_notation(best_move.notation)
+            best_action_simplified = BackgammonAnalyzer.simplify_cube_notation(best_move.notation)
 
             # Calculate errors for wrong decisions
             best_equity = best_move.equity

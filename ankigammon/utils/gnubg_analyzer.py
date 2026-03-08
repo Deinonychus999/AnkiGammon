@@ -2,6 +2,7 @@
 GNU Backgammon command-line interface wrapper.
 
 Provides functionality to analyze backgammon positions using gnubg-cli.exe.
+Implements the BackgammonAnalyzer interface for use as a pluggable analysis engine.
 """
 
 import os
@@ -14,11 +15,12 @@ from pathlib import Path
 from typing import Tuple, List, Callable, Optional
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
-from ankigammon.models import DecisionType
+from ankigammon.models import Decision, DecisionType, Move
 from ankigammon.utils.xgid import parse_xgid
+from ankigammon.utils.analyzer_base import BackgammonAnalyzer
 
 
-class GNUBGAnalyzer:
+class GNUBGAnalyzer(BackgammonAnalyzer):
     """Wrapper for gnubg-cli.exe command-line interface."""
 
     def __init__(self, gnubg_path: str, analysis_ply: int = 3):
@@ -161,9 +163,9 @@ class GNUBGAnalyzer:
         mat_file_path: str,
         max_moves: int = 8,
         progress_callback: Optional[Callable[[str], None]] = None
-    ) -> List[str]:
+    ) -> List[Decision]:
         """
-        Analyze entire match file using gnubg and export to text files.
+        Analyze entire match file using gnubg and return Decision objects.
 
         Supports both .mat (Jellyfish) and .sgf (Smart Game Format) files.
         Also handles SGF position files (single position setups) by analyzing
@@ -175,8 +177,7 @@ class GNUBGAnalyzer:
             progress_callback: Optional callback(status_message) for progress updates
 
         Returns:
-            List of paths to exported text files (one per game/position)
-            Caller is responsible for cleaning up these temp files after parsing.
+            List of Decision objects with analysis data
 
         Raises:
             FileNotFoundError: If match file not found
@@ -362,7 +363,31 @@ class GNUBGAnalyzer:
             if progress_callback:
                 progress_callback(f"Analysis complete. {len(exported_files)} game(s) exported.")
 
-            return exported_files
+            # Parse exported files into Decision objects
+            if progress_callback:
+                progress_callback(f"Parsing analysis from {len(exported_files)} game(s)...")
+
+            from ankigammon.parsers.gnubg_match_parser import parse_gnubg_match_files
+            import shutil
+
+            is_sgf_source = mat_path.suffix.lower() == '.sgf'
+            source_filename = mat_path.name
+
+            try:
+                decisions = parse_gnubg_match_files(
+                    exported_files,
+                    is_sgf_source=is_sgf_source,
+                    ply_level=self.analysis_ply,
+                    source_filename=source_filename
+                )
+            finally:
+                # Clean up temp directory
+                try:
+                    shutil.rmtree(temp_dir)
+                except Exception as cleanup_err:
+                    logger.warning(f"Failed to cleanup temp files: {cleanup_err}")
+
+            return decisions
 
         finally:
             # Cleanup command file
@@ -562,8 +587,7 @@ class GNUBGAnalyzer:
 
         output, decision_type = self.analyze_position(modified_xgid)
 
-        from ankigammon.parsers.gnubg_parser import GNUBGParser
-        moves = GNUBGParser._parse_cube_decision(output)
+        moves = self.parse_cube_decision(output)
 
         if not moves:
             raise ValueError(f"Could not parse cube decision from GnuBG output")
@@ -604,31 +628,32 @@ class GNUBGAnalyzer:
 
     @staticmethod
     def _simplify_cube_notation(notation: str) -> str:
+        """Simplify cube notation for display in score matrix.
+
+        Delegates to BackgammonAnalyzer.simplify_cube_notation().
+        Kept for backward compatibility.
         """
-        Simplify cube notation for display in score matrix.
+        return BackgammonAnalyzer.simplify_cube_notation(notation)
 
-        Args:
-            notation: Full notation (e.g., "No Double/Take", "Double/Take")
+    def parse_analysis(
+        self,
+        raw_output: str,
+        xgid: str,
+        decision_type: DecisionType
+    ) -> Decision:
+        """Parse GnuBG raw output into a Decision object."""
+        from ankigammon.parsers.gnubg_parser import GNUBGParser
+        return GNUBGParser.parse_analysis(raw_output, xgid, decision_type)
 
-        Returns:
-            Simplified notation (e.g., "N/T", "D/T", "D/P", "TG/T", "TG/P")
-        """
-        notation_lower = notation.lower()
+    def parse_checker_play(self, raw_output: str) -> List[Move]:
+        """Parse checker play moves from GnuBG output."""
+        from ankigammon.parsers.gnubg_parser import GNUBGParser
+        return GNUBGParser._parse_checker_play(raw_output)
 
-        if "too good" in notation_lower:
-            if "take" in notation_lower:
-                return "TG/T"
-            elif "pass" in notation_lower:
-                return "TG/P"
-        elif "no double" in notation_lower or "no redouble" in notation_lower:
-            return "N/T"
-        elif "double" in notation_lower or "redouble" in notation_lower:
-            if "take" in notation_lower:
-                return "D/T"
-            elif "pass" in notation_lower or "drop" in notation_lower:
-                return "D/P"
-
-        return notation
+    def parse_cube_decision(self, raw_output: str, cube_value: int = 1) -> List[Move]:
+        """Parse cube decision moves from GnuBG output."""
+        from ankigammon.parsers.gnubg_parser import GNUBGParser
+        return GNUBGParser._parse_cube_decision(raw_output, cube_value)
 
 
 def _analyze_position_worker(gnubg_path: str, analysis_ply: int, position_id: str) -> Tuple[str, DecisionType]:
