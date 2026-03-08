@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0b3] - 2026-03-08
+
+### Fixed
+- Score matrix now reuses the analysis engine, improving export speed
+- Analysis engine label now correctly shows "XG" when using eXtreme Gammon
+- Resolved a Windows threading warning when using XG automation
+
 ## [1.4.0b2] - 2026-03-08
 
 ### Improved
