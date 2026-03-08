@@ -12,11 +12,13 @@ import ctypes
 import ctypes.wintypes as wt
 import logging
 import subprocess
+import sys
 import time
 from pathlib import Path
 from typing import Optional
 
 import pyautogui
+sys.coinit_flags = 2  # COINIT_APARTMENTTHREADED — must precede pywinauto import
 from pywinauto import Application
 from pywinauto.findwindows import ElementNotFoundError
 
