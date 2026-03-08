@@ -279,7 +279,6 @@ class XGAnalyzer(BackgammonAnalyzer):
         5. Return (text, decision_type)
         """
         import time
-        from ankigammon.utils.xg_auto.automator import XGCmd
 
         if position_id is None:
             raise ValueError(
@@ -304,7 +303,7 @@ class XGAnalyzer(BackgammonAnalyzer):
         self._automator.run_analysis()
 
         # Export position analysis to clipboard (no file dialog needed)
-        self._automator.send_command(XGCmd.EXPORT_POS_CLIPBOARD)
+        self._automator.send_command(self._automator.cmd.EXPORT_POS_CLIPBOARD)
         time.sleep(1.0)
         text_content = self._automator.get_clipboard_text()
 
@@ -344,11 +343,16 @@ class XGAnalyzer(BackgammonAnalyzer):
             if cancellation_callback and cancellation_callback():
                 raise InterruptedError("Analysis cancelled by user")
 
+            # Report progress before starting (0-based: 0/N, 1/N, ...)
+            if progress_callback:
+                progress_callback(i, total)
+
             result = self.analyze_position(pos_id)
             results.append(result)
 
-            if progress_callback:
-                progress_callback(i + 1, total)
+        # Report final progress (all done)
+        if progress_callback and total > 0:
+            progress_callback(total, total)
 
             # Brief pause between positions to let XG stabilize
             if i < total - 1:

@@ -234,13 +234,11 @@ def generate_score_matrix(
             if cancellation_callback and cancellation_callback():
                 raise InterruptedError("Score matrix generation cancelled by user")
 
-            if progress_callback:
-                # Get current coordinates for display
-                if completed > 0 and completed <= len(coord_list):
-                    p_away, o_away = coord_list[completed - 1]
-                    progress_callback(
-                        f"Analyzing score {p_away}a-{o_away}a ({completed}/{total})..."
-                    )
+            if progress_callback and completed < total:
+                p_away, o_away = coord_list[completed]
+                progress_callback(
+                    f"Analyzing score {p_away}a-{o_away}a ({completed + 1}/{total})..."
+                )
 
         analysis_results = analyzer.analyze_positions_parallel(
             position_ids,

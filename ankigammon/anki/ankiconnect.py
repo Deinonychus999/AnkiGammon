@@ -250,10 +250,25 @@ class AnkiConnect:
                 note_id = existing_ids[0]
                 self.update_note_fields(note_id, front, back, xgid)
                 self.update_note_tags(note_id, tags)
+                # Move card to the correct deck (upsert may target a different deck)
+                self._move_note_to_deck(note_id, deck_name)
                 return note_id
 
         # No existing note found — add new
         return self.add_note(front, back, tags, deck_name, xgid)
+
+    def _move_note_to_deck(self, note_id: int, deck_name: str) -> None:
+        """Move all cards of a note to the specified deck.
+
+        AnkiConnect's changeDeck operates on card IDs, so we first
+        look up the cards belonging to the note.
+        """
+        note_info = self.invoke('notesInfo', notes=[note_id])
+        if not note_info or not note_info[0]:
+            return
+        card_ids = note_info[0].get('cards', [])
+        if card_ids:
+            self.invoke('changeDeck', cards=card_ids, deck=deck_name)
 
     def delete_notes(self, note_ids: List[int]) -> None:
         """

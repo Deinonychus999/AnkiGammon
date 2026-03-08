@@ -39,6 +39,7 @@ class AnalysisWorker(QThread):
         self.decisions = decisions
         self.settings = settings
         self._cancelled = False
+        self.analyzer = None  # Preserved for reuse by CardGenerator
 
     def cancel(self):
         """Request cancellation of the analysis."""
@@ -47,7 +48,8 @@ class AnalysisWorker(QThread):
     def run(self):
         """Analyze positions in background (parallel processing)."""
         try:
-            analyzer = create_analyzer(self.settings)
+            self.analyzer = create_analyzer(self.settings)
+            analyzer = self.analyzer
 
             # Find positions that need analysis
             positions_to_analyze = [(i, d) for i, d in enumerate(self.decisions) if not d.candidate_moves]
@@ -67,9 +69,10 @@ class AnalysisWorker(QThread):
                 if self._cancelled:
                     return
                 self.progress.emit(completed, total_positions)
-                self.status_message.emit(
-                    f"Analyzing position {completed} of {total_positions}..."
-                )
+                if completed < total_positions:
+                    self.status_message.emit(
+                        f"Analyzing position {completed + 1} of {total_positions}..."
+                    )
 
             # Analyze all positions
             self.status_message.emit(
@@ -77,7 +80,8 @@ class AnalysisWorker(QThread):
             )
             analysis_results = analyzer.analyze_positions_parallel(
                 position_ids,
-                progress_callback=progress_callback
+                progress_callback=progress_callback,
+                cancellation_callback=lambda: self._cancelled,
             )
 
             # Check for cancellation after batch completes
@@ -142,7 +146,8 @@ class ExportWorker(QThread):
         settings: Settings,
         export_method: str,
         output_path: str = None,
-        import_mode: str = "add"
+        import_mode: str = "add",
+        analyzer=None,
     ):
         super().__init__()
         self.decisions = decisions
@@ -151,6 +156,7 @@ class ExportWorker(QThread):
         self.output_path = output_path
         self.import_mode = import_mode
         self._cancelled = False
+        self._analyzer = analyzer
 
     def cancel(self):
         """Request cancellation of the export."""
@@ -215,7 +221,8 @@ class ExportWorker(QThread):
             show_options=self.settings.show_options,
             interactive_moves=self.settings.interactive_moves,
             renderer=renderer,
-            cancellation_callback=lambda: self._cancelled
+            cancellation_callback=lambda: self._cancelled,
+            analyzer=self._analyzer,
         )
 
         for i, decision in enumerate(self.decisions):
@@ -360,7 +367,8 @@ class ExportWorker(QThread):
                 show_options=self.settings.show_options,
                 interactive_moves=self.settings.interactive_moves,
                 renderer=renderer,
-                cancellation_callback=lambda: self._cancelled
+                cancellation_callback=lambda: self._cancelled,
+                analyzer=self._analyzer,
             )
 
             for deck_name, deck_decisions in decisions_by_deck.items():
@@ -517,52 +525,58 @@ class ExportDialog(QDialog):
 
     def closeEvent(self, event):
         """Handle window close event (X button, ESC key, etc)."""
-        # Use the same close logic
         analysis_running = self.analysis_worker and self.analysis_worker.isRunning()
         export_running = self.worker and self.worker.isRunning()
 
         if analysis_running or export_running:
-            # Request cancellation and ignore this close event
-            self._closing = True
-            self.btn_close.setEnabled(False)
-
-            if analysis_running:
-                self.analysis_worker.cancel()
-                self.status_label.setText("Cancelling analysis...")
-            elif export_running:
-                self.worker.cancel()
-                self.status_label.setText("Cancelling export...")
-
-            event.ignore()  # Don't close yet
+            self._cancel_workers()
+            event.ignore()  # Don't close yet — finished signal will close
             return
 
-        # No workers running, allow close
         event.accept()
 
     @Slot()
     def close_dialog(self):
         """Handle close button click - cancel any running operations."""
-        # Check if any workers are running
         analysis_running = self.analysis_worker and self.analysis_worker.isRunning()
         export_running = self.worker and self.worker.isRunning()
 
         if analysis_running or export_running:
-            # Set closing flag and request cancellation
-            self._closing = True
-            self.btn_close.setEnabled(False)
-
-            if analysis_running:
-                self.analysis_worker.cancel()
-                self.status_label.setText("Cancelling analysis...")
-            elif export_running:
-                self.worker.cancel()
-                self.status_label.setText("Cancelling export...")
-
-            # The finished signals will handle actually closing the dialog
+            self._cancel_workers()
             return
 
-        # No workers running, close immediately
         self.reject()
+
+    def _cancel_workers(self):
+        """Cancel running workers and kill the headless XG process.
+
+        Sets the cancellation flag AND immediately terminates the XG
+        process so blocking Win32 calls in the worker thread fail fast
+        instead of waiting for a 600s timeout.
+        """
+        self._closing = True
+        self.btn_close.setEnabled(False)
+        self.status_label.setText("Cancelling...")
+
+        if self.analysis_worker and self.analysis_worker.isRunning():
+            self.analysis_worker.cancel()
+        if self.worker and self.worker.isRunning():
+            self.worker.cancel()
+
+        # Kill the headless XG process immediately.  PostMessageW(WM_CLOSE)
+        # is thread-safe, so the worker thread's next Win32 call on the
+        # now-dead handle will raise an exception and unwind cleanly.
+        self._cleanup_analyzer()
+
+    def _cleanup_analyzer(self):
+        """Terminate the headless XG process if one was started."""
+        analyzer = getattr(self.analysis_worker, 'analyzer', None) if self.analysis_worker else None
+        if analyzer is not None:
+            try:
+                analyzer.terminate()
+            except Exception:
+                pass
+            self.analysis_worker.analyzer = None
 
     @Slot()
     def start_export(self):
@@ -620,13 +634,18 @@ class ExportDialog(QDialog):
         # AnkiConnect uses upsert to update existing cards by XGID
         import_mode = "upsert" if self.settings.export_method == "ankiconnect" else "add"
 
+        # Reuse the analyzer from the analysis phase so the score matrix
+        # doesn't launch a second headless XG instance.
+        analyzer = getattr(self.analysis_worker, 'analyzer', None) if hasattr(self, 'analysis_worker') else None
+
         # Create worker thread
         self.worker = ExportWorker(
             self.decisions,
             self.settings,
             self.settings.export_method,
             self.output_path,
-            import_mode=import_mode
+            import_mode=import_mode,
+            analyzer=analyzer,
         )
 
         # Connect signals
@@ -648,6 +667,7 @@ class ExportDialog(QDialog):
         """Handle analysis completion."""
         # Check if user requested to close
         if self._closing:
+            self._cleanup_analyzer()
             self.reject()
             return
 
@@ -658,7 +678,8 @@ class ExportDialog(QDialog):
             # Proceed with export
             self._start_export_worker()
         else:
-            # Analysis failed
+            # Analysis failed — clean up headless XG process
+            self._cleanup_analyzer()
             self.status_label.setText(f"Analysis failed: {message}")
             self.log_text.append(f"ERROR: {message}")
             self.btn_export.setEnabled(True)
@@ -691,6 +712,9 @@ class ExportDialog(QDialog):
     @Slot(bool, str)
     def on_finished(self, success, message):
         """Handle export completion."""
+        # Clean up the headless XG process (if any)
+        self._cleanup_analyzer()
+
         # Check if user requested to close
         if self._closing:
             self.reject()

@@ -153,10 +153,10 @@ def generate_move_score_matrix(
         if cancellation_callback and cancellation_callback():
             raise InterruptedError("Move score matrix generation cancelled by user")
 
-        if progress_callback:
-            config = SCORE_CONFIGS[completed - 1] if completed > 0 else SCORE_CONFIGS[0]
+        if progress_callback and completed < total:
+            config = SCORE_CONFIGS[completed]
             progress_callback(
-                f"Analyzing {config['type']} ({completed}/{total})..."
+                f"Analyzing {config['type']} ({completed + 1}/{total})..."
             )
 
     # Analyze all 4 positions

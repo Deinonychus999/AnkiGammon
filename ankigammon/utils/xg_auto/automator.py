@@ -94,60 +94,104 @@ pyautogui.FAILSAFE = True
 
 
 # ------------------------------------------------------------------
-# XG Menu Command IDs (extracted from DFM resources)
+# XG Menu Command IDs (extracted from Delphi TMenuItem.Command)
 # ------------------------------------------------------------------
-# These are the wID values for WM_COMMAND. Discovered by:
-#   1. scripts/menu_spy.py  — enumerates owner-drawn menu wIDs
-#   2. DFM resource extraction — maps wIDs to caption strings
-#   3. Manual testing — confirmed wID=70 triggers File > Open
+# These are the wID values for WM_COMMAND, version-specific.
+# Discovered by walking the VCL component tree via pymem and reading
+# TMenuItem.FCommand at object offset +0x54.
+#
+# IDs differ between XG versions because the developer added new menu
+# items, shifting the auto-assigned Delphi command IDs.
 
-class XGCmd:
-    """Known WM_COMMAND IDs for eXtreme Gammon 2.10."""
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class XGCommandProfile:
+    """WM_COMMAND IDs for a specific eXtreme Gammon version."""
+
+    version: str
 
     # File menu
-    NEW_MATCH = 64
-    NEW_MONEY = 65
-    NEW_SETUP = 66
-    NEW_TRANSCRIPTION = 67
-    REMATCH = 69
-    OPEN = 70                        # File > Open  (confirmed ✓)
-    SAVE = 92
-    SAVE_AS = 93
-    CLOSE = 94
+    NEW_MATCH: int
+    NEW_MONEY: int
+    NEW_SETUP: int
+    NEW_TRANSCRIPTION: int
+    REMATCH: int
+    OPEN: int
+    SAVE: int
+    SAVE_AS: int
+    CLOSE: int
 
     # File > Import submenu
-    IMPORT = 96                      # submenu header
-    IMPORT_GNUBG = 116
-    IMPORT_JELLYFISH = 117
-    IMPORT_OTHERS = 118
-    IMPORT_CLIPBOARD = 120           # opens file dialog (not clipboard!)
-    IMPORT_LAST_PLAYED = 121
-    IMPORT_POS_CLIPBOARD = 123       # Position from Clipboard (Ctrl+V) ✓
-    BATCH_IMPORT = 125
+    IMPORT_GNUBG: int
+    IMPORT_JELLYFISH: int
+    IMPORT_OTHERS: int
+    IMPORT_POS_CLIPBOARD: int
+    IMPORT_LAST_PLAYED: int
+    BATCH_IMPORT: int
 
     # File > Export submenu
-    EXPORT = 129                     # submenu header
-    EXPORT_POS_CLIPBOARD = 130
-    EXPORT_POS_CLIPBOARD_DLG = 131
-    EXPORT_XGID_CLIPBOARD = 132
-    EXPORT_POS_XGP = 134
-    EXPORT_POS_TEXT = 135
-    EXPORT_POS_IMAGE = 136
-    EXPORT_HTML = 138                # Game or Match to HTML
-    EXPORT_JELLYFISH = 139
-    EXPORT_TEXT = 140                # Match to Text File
+    EXPORT_POS_CLIPBOARD: int
+    EXPORT_POS_CLIPBOARD_DLG: int
+    EXPORT_XGID_CLIPBOARD: int
+    EXPORT_POS_XGP: int
+    EXPORT_POS_TEXT: int
+    EXPORT_POS_IMAGE: int
+    EXPORT_HTML: int
+    EXPORT_JELLYFISH: int
+    EXPORT_TEXT: int
 
-    EXIT = 143
+    EXIT: int
 
     # Analyze menu
-    ANALYZE_DOUBLE = 265
-    ANALYZE_POSITION = 266
-    ANALYZE_GAME = 267
-    ANALYZE_MATCH = 268              # Analyse > Match...
-    GENERATE_COMMENT = 269
-    SET_ANALYZE_LEVEL = 271
-    CLEAR_ANALYZE = 272
-    BATCH_ANALYZE = 281              # Analyse > Batch Analyze...
+    ANALYZE_DOUBLE: int
+    ANALYZE_POSITION: int
+    ANALYZE_GAME: int
+    ANALYZE_MATCH: int
+    GENERATE_COMMENT: int
+    SET_ANALYZE_LEVEL: int
+    CLEAR_ANALYZE: int
+    BATCH_ANALYZE: int
+
+
+XG_PROFILES: dict[str, XGCommandProfile] = {
+    "2.10": XGCommandProfile(
+        version="2.10",
+        NEW_MATCH=64, NEW_MONEY=65, NEW_SETUP=66, NEW_TRANSCRIPTION=67,
+        REMATCH=69, OPEN=70, SAVE=92, SAVE_AS=93, CLOSE=94,
+        IMPORT_GNUBG=116, IMPORT_JELLYFISH=117, IMPORT_OTHERS=118,
+        IMPORT_POS_CLIPBOARD=123, IMPORT_LAST_PLAYED=121, BATCH_IMPORT=125,
+        EXPORT_POS_CLIPBOARD=130, EXPORT_POS_CLIPBOARD_DLG=131,
+        EXPORT_XGID_CLIPBOARD=132, EXPORT_POS_XGP=134,
+        EXPORT_POS_TEXT=135, EXPORT_POS_IMAGE=136,
+        EXPORT_HTML=138, EXPORT_JELLYFISH=139, EXPORT_TEXT=140,
+        EXIT=143,
+        ANALYZE_DOUBLE=265, ANALYZE_POSITION=266,
+        ANALYZE_GAME=267, ANALYZE_MATCH=268,
+        GENERATE_COMMENT=269, SET_ANALYZE_LEVEL=271,
+        CLEAR_ANALYZE=272, BATCH_ANALYZE=281,
+    ),
+    "2.19": XGCommandProfile(
+        version="2.19",
+        NEW_MATCH=65, NEW_MONEY=66, NEW_SETUP=67, NEW_TRANSCRIPTION=68,
+        REMATCH=70, OPEN=71, SAVE=93, SAVE_AS=94, CLOSE=95,
+        IMPORT_GNUBG=120, IMPORT_JELLYFISH=121, IMPORT_OTHERS=122,
+        IMPORT_POS_CLIPBOARD=124, IMPORT_LAST_PLAYED=125, BATCH_IMPORT=129,
+        EXPORT_POS_CLIPBOARD=131, EXPORT_POS_CLIPBOARD_DLG=132,
+        EXPORT_XGID_CLIPBOARD=133, EXPORT_POS_XGP=135,
+        EXPORT_POS_TEXT=136, EXPORT_POS_IMAGE=137,
+        EXPORT_HTML=139, EXPORT_JELLYFISH=140, EXPORT_TEXT=141,
+        EXIT=149,
+        ANALYZE_DOUBLE=268, ANALYZE_POSITION=269,
+        ANALYZE_GAME=270, ANALYZE_MATCH=271,
+        GENERATE_COMMENT=272, SET_ANALYZE_LEVEL=274,
+        CLEAR_ANALYZE=275, BATCH_ANALYZE=284,
+    ),
+}
+
+# Backward-compatible module-level alias (defaults to 2.10)
+XGCmd = XG_PROFILES["2.10"]
 
 
 class XGAutomationError(Exception):
@@ -196,12 +240,51 @@ class XGAutomator:
         self.app: Application | None = None
         self._main = None
         self._hwnd: int = 0
+        self._cmd: XGCommandProfile | None = None
+        self._xg_base_title: str = ""
         self._memory = None   # Optional[XGMemoryReader]
         self._hooks = None    # Optional[XGEventHooks]
         self._current_file: Path | None = None
         # Persistent set of window handles that have no buttons and should
         # be skipped in dialog dismissal (e.g. GameDLg, Message, etc.)
         self._skip_hwnds: set[int] = set()
+
+    @property
+    def cmd(self) -> XGCommandProfile:
+        """Active command profile for the connected XG version."""
+        if self._cmd is None:
+            return XGCmd  # fallback to 2.10 default before connect()
+        return self._cmd
+
+    def _detect_xg_version(self) -> XGCommandProfile:
+        """Detect XG version from window title and return the matching profile.
+
+        Retries briefly if the title doesn't contain a version number yet
+        (XG shows a placeholder title like "eXtreme Gammon IDE" during init).
+        Falls back to 2.10 if detection fails after retries.
+        """
+        for attempt in range(6):
+            title = ctypes.create_unicode_buffer(256)
+            user32.GetWindowTextW(self._hwnd, title, 256)
+
+            for version_key, profile in XG_PROFILES.items():
+                if f"eXtreme Gammon {version_key}" in title.value:
+                    self._xg_base_title = title.value
+                    log.info(
+                        "Detected XG version %s (title: %r)",
+                        version_key, title.value,
+                    )
+                    return profile
+
+            if attempt < 5:
+                time.sleep(1.0)
+
+        # Store whatever title we have as the base title
+        self._xg_base_title = title.value
+        log.warning(
+            "Unknown XG version from title %r — using 2.10 profile", title.value
+        )
+        return XG_PROFILES["2.10"]
 
     # ------------------------------------------------------------------
     # Connection
@@ -211,9 +294,10 @@ class XGAutomator:
         """Connect to a running XG instance, or launch it."""
         if self.headless:
             self._connect_headless()
-            # Now dismiss any startup dialogs
-            time.sleep(1.0)
-            self._dismiss_unexpected_dialogs(accept=True)
+            # Dismiss startup dialogs (TStartDlg, TMessageDlgG, etc.)
+            # Use a settling loop — dialogs can appear after the main
+            # message loop is idle, so a single pass isn't enough.
+            self._wait_for_dialogs_cleared(max_wait=10.0, settle=2.0)
         else:
             self._connect_gui()
             # Initialize optional subsystems after connection
@@ -241,6 +325,7 @@ class XGAutomator:
                 )
         self._main = self.app.top_window()
         self._hwnd = self._main.handle
+        self._cmd = self._detect_xg_version()
 
     def _connect_headless(self) -> None:
         """Connect via pure Win32 and hide the window (headless mode).
@@ -311,16 +396,54 @@ class XGAutomator:
         # Hide the new window immediately
         user32.ShowWindow(self._hwnd, 0)  # SW_HIDE
 
-        # Attach hooks BEFORE the init sleep so the in-process
+        # Attach hooks BEFORE waiting so the in-process
         # CreateWindowExW hook hides startup dialogs at creation time.
         self._setup_memory_reader()
         self._setup_hooks()
 
-        time.sleep(3.0)  # Let Delphi finish initialization
+        # Wait for XG to finish initialization using WaitForInputIdle
+        # (blocks until the process message loop is idle, rather than
+        # guessing with a fixed sleep).
+        self._wait_for_process_idle()
+
         # Re-hide in case VCL restored WS_VISIBLE during init
         user32.ShowWindow(self._hwnd, 0)  # SW_HIDE
 
+        # Detect version AFTER init — the window title is a placeholder
+        # ("eXtreme Gammon IDE") until initialization completes.
+        self._cmd = self._detect_xg_version()
+
         log.info("Connected (headless). hwnd=0x%08X, window hidden.", self._hwnd)
+
+    def _wait_for_process_idle(self, timeout_ms: int = 30000) -> None:
+        """Wait for XG's process to finish initialization.
+
+        Uses WaitForInputIdle which blocks until the process message loop
+        is idle — the standard Win32 way to know a GUI app is ready.
+        """
+        PROCESS_SYNCHRONIZE = 0x00100000
+        PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+
+        pid = wt.DWORD()
+        user32.GetWindowThreadProcessId(self._hwnd, ctypes.byref(pid))
+        h_process = kernel32.OpenProcess(
+            PROCESS_SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION,
+            False,
+            pid.value,
+        )
+        if not h_process:
+            log.debug("OpenProcess failed — falling back to 3s sleep")
+            time.sleep(3.0)
+            return
+
+        try:
+            result = user32.WaitForInputIdle(h_process, timeout_ms)
+            if result == 0:
+                log.debug("WaitForInputIdle: process is idle")
+            else:
+                log.debug("WaitForInputIdle returned %d — continuing", result)
+        finally:
+            kernel32.CloseHandle(h_process)
 
     def _setup_memory_reader(self) -> None:
         """Initialize the memory reader if requested and available."""
@@ -426,11 +549,13 @@ class XGAutomator:
     # File operations
     # ------------------------------------------------------------------
 
-    # File extensions that require Import instead of Open
-    IMPORT_EXTENSIONS = {
-        ".mat": XGCmd.IMPORT_JELLYFISH,
-        ".sgf": XGCmd.IMPORT_OTHERS,
-    }
+    def _get_import_cmd(self, ext: str) -> Optional[int]:
+        """Get the import command ID for a file extension, if any."""
+        import_map = {
+            ".mat": self.cmd.IMPORT_OTHERS,
+            ".sgf": self.cmd.IMPORT_OTHERS,
+        }
+        return import_map.get(ext)
 
     def open_file(self, filepath: Path) -> None:
         """Open a match file via File > Open or File > Import."""
@@ -439,8 +564,8 @@ class XGAutomator:
             raise FileNotFoundError(f"Match file not found: {filepath}")
 
         ext = filepath.suffix.lower()
-        import_cmd = self.IMPORT_EXTENSIONS.get(ext)
-        cmd_id = import_cmd if import_cmd else XGCmd.OPEN
+        import_cmd = self._get_import_cmd(ext)
+        cmd_id = import_cmd if import_cmd else self.cmd.OPEN
 
         log.info("Opening file: %s", filepath)
 
@@ -458,7 +583,7 @@ class XGAutomator:
             log.debug("Using Import (wID=%d) for %s file", import_cmd, ext)
             self.send_command(import_cmd)
         else:
-            self.send_command(XGCmd.OPEN)
+            self.send_command(self.cmd.OPEN)
 
         time.sleep(1.0)
 
@@ -478,7 +603,7 @@ class XGAutomator:
         """Close the current match (wID=94)."""
         if not self.headless:
             self.focus()
-        self.send_command(XGCmd.CLOSE)
+        self.send_command(self.cmd.CLOSE)
         time.sleep(0.5)
         self._dismiss_unexpected_dialogs()
 
@@ -541,7 +666,7 @@ class XGAutomator:
 
         if not self.headless:
             self.focus()
-        self.send_command(XGCmd.IMPORT_POS_CLIPBOARD)
+        self.send_command(self.cmd.IMPORT_POS_CLIPBOARD)
 
         self._wait_for_position_loaded()
         log.info("Position loaded from XGID.")
@@ -596,7 +721,7 @@ class XGAutomator:
             # Check if XG's title changed (indicates content loaded)
             title = ctypes.create_unicode_buffer(256)
             user32.GetWindowTextW(self._hwnd, title, 256)
-            if title.value and title.value != "eXtreme Gammon 2.10 ":
+            if title.value and title.value != self._xg_base_title:
                 log.debug("Position loaded — title: %s", title.value)
                 return
 
@@ -618,7 +743,7 @@ class XGAutomator:
             # imported files (.mat, .sgf) because XG has no associated path
             # and would trigger its own Save As dialog, creating conflicts.
             self._headless_file_operation(
-                output_path, XGCmd.SAVE_AS, "save"
+                output_path, self.cmd.SAVE_AS, "save"
             )
             # Wait for the file dialog to process Enter and for any overwrite
             # confirmation to appear before we start dismissing dialogs.
@@ -628,7 +753,7 @@ class XGAutomator:
             return
 
         self.focus()
-        self.send_command(XGCmd.SAVE_AS)
+        self.send_command(self.cmd.SAVE_AS)
         time.sleep(1.0)
 
         save_dlg = self._wait_for_dialog(
@@ -652,14 +777,14 @@ class XGAutomator:
                         "control is limited — file will save to XG's "
                         "default export location.")
             self._headless_file_operation(
-                output_path, XGCmd.EXPORT_TEXT, "save"
+                output_path, self.cmd.EXPORT_TEXT, "save"
             )
             self._wait_for_dialogs_cleared(max_wait=5.0)
             log.info("Text export complete (headless): %s", output_path.name)
             return
 
         self.focus()
-        self.send_command(XGCmd.EXPORT_TEXT)
+        self.send_command(self.cmd.EXPORT_TEXT)
         time.sleep(1.0)
 
         save_dlg = self._wait_for_dialog(
@@ -682,14 +807,14 @@ class XGAutomator:
                         "control is limited — file will save to XG's "
                         "default export location.")
             self._headless_file_operation(
-                output_path, XGCmd.EXPORT_HTML, "save"
+                output_path, self.cmd.EXPORT_HTML, "save"
             )
             self._wait_for_dialogs_cleared(max_wait=5.0)
             log.info("HTML export complete (headless): %s", output_path.name)
             return
 
         self.focus()
-        self.send_command(XGCmd.EXPORT_HTML)
+        self.send_command(self.cmd.EXPORT_HTML)
         time.sleep(1.0)
 
         save_dlg = self._wait_for_dialog(
@@ -714,7 +839,7 @@ class XGAutomator:
         if self.headless:
             self._dismiss_unexpected_dialogs(accept=True)
 
-        self.send_command(XGCmd.ANALYZE_MATCH)
+        self.send_command(self.cmd.ANALYZE_MATCH)
 
         # Handle the "Analyze Session" settings dialog
         time.sleep(1.5)
@@ -755,9 +880,13 @@ class XGAutomator:
                     break
                 # Accept if title contains "analy" AND it has clickable buttons
                 # (filters out persistent windows like "Analyze Queue & Rollout")
+                # BUT reject completion dialogs ("Analyze completed") — these
+                # must be handled by _wait_for_analysis, not consumed here.
                 title_buf = ctypes.create_unicode_buffer(256)
                 user32.GetWindowTextW(candidate, title_buf, 256)
-                if ("analy" in title_buf.value.lower()
+                title_lower = title_buf.value.lower()
+                if ("analy" in title_lower
+                        and "complete" not in title_lower
                         and self._find_buttons(candidate)):
                     dlg_hwnd = candidate
                     break
@@ -901,7 +1030,7 @@ class XGAutomator:
         for _ in range(10):
             if self._check_for_completion_dialog():
                 return  # Already done (very fast analysis)
-            if not self._check_menu_item_enabled(XGCmd.ANALYZE_MATCH):
+            if not self._check_menu_item_enabled(self.cmd.ANALYZE_MATCH):
                 analysis_started = True
                 log.debug("Analysis started (menu item disabled)")
                 break
@@ -934,14 +1063,32 @@ class XGAutomator:
             if self._check_for_completion_dialog():
                 return
 
-            # Check if the Analyze > Match menu item is enabled again
-            if analysis_started and self._check_menu_item_enabled(XGCmd.ANALYZE_MATCH):
-                time.sleep(2.0)
-                if self._check_menu_item_enabled(XGCmd.ANALYZE_MATCH):
-                    return
+            # Check if the Analyze > Match menu item is enabled again.
+            # Also check when analysis_started is False — analysis may have
+            # completed before we began polling (fast single-position analysis).
+            if self._check_menu_item_enabled(self.cmd.ANALYZE_MATCH):
+                if not analysis_started:
+                    # Analysis completed before we could observe the start.
+                    # Brief confirmation to avoid false positives.
+                    time.sleep(1.0)
+                    if self._check_menu_item_enabled(self.cmd.ANALYZE_MATCH):
+                        log.info("Analysis complete (menu re-enabled, fast completion)")
+                        self._dismiss_unexpected_dialogs(accept=False)
+                        return
+                else:
+                    time.sleep(2.0)
+                    if self._check_menu_item_enabled(self.cmd.ANALYZE_MATCH):
+                        return
 
             if self._check_status_bar():
                 return
+
+            # Dismiss any stray dialogs (startup dialogs, error popups)
+            # that could block the completion dialog from appearing.
+            # Only do this in headless mode where unexpected dialogs
+            # can silently block the UI thread.
+            if self.headless:
+                self._dismiss_unexpected_dialogs(accept=True)
 
             # Log progress from status bar and/or window title
             status = self._read_progress()
