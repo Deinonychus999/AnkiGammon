@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0b2] - 2026-03-08
+
+### Improved
+- XG automation dependencies (pywinauto, pyautogui) are now bundled with the application
+- eXtreme Gammon integration is disabled on non-Windows platforms
+- Version number now shown in the main window title bar
+
 ## [1.4.0b1] - 2026-03-08
 
 ### Added
