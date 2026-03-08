@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.4.0b1] - 2026-03-08
+
+### Added
+- eXtreme Gammon (XG) as an analysis engine option alongside GNU Backgammon
+- Double cubeless equity with MET calculation for XG text and binary parsing
+- Pre-release version support for beta releases
+
+### Improved
+- Max moves setting now works independently of MCQ mode
+
 ## [1.3.0] - 2026-01-31
 
 ### Added
