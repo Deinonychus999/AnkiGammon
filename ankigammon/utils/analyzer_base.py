@@ -154,6 +154,11 @@ def create_analyzer(settings) -> BackgammonAnalyzer:
     analyzer_type = getattr(settings, 'analyzer_type', 'gnubg')
 
     if analyzer_type == "xg":
+        import sys
+        if sys.platform != 'win32':
+            raise ValueError(
+                "eXtreme Gammon analysis is only available on Windows"
+            )
         from ankigammon.utils.xg_analyzer import XGAnalyzer
         return XGAnalyzer(
             xg_path=settings.xg_exe_path,

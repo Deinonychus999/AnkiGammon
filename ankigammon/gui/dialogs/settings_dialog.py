@@ -348,9 +348,11 @@ class SettingsDialog(QDialog):
         form = QFormLayout(group)
 
         # Analyzer type selector
+        import sys
         self.cmb_analyzer_type = QComboBox()
         self.cmb_analyzer_type.addItem("GNU Backgammon", "gnubg")
-        self.cmb_analyzer_type.addItem("eXtreme Gammon", "xg")
+        if sys.platform == 'win32':
+            self.cmb_analyzer_type.addItem("eXtreme Gammon", "xg")
         self.cmb_analyzer_type.setCursor(Qt.PointingHandCursor)
         self.cmb_analyzer_type.setToolTip(
             "Select the analysis engine:\n"
@@ -613,7 +615,9 @@ class SettingsDialog(QDialog):
 
         # Analysis engine
         analyzer_type = self.settings.analyzer_type
-        analyzer_index = 0 if analyzer_type == "gnubg" else 1
+        analyzer_index = self.cmb_analyzer_type.findData(analyzer_type)
+        if analyzer_index < 0:
+            analyzer_index = 0  # Fall back to GnuBG if type not available
         self.cmb_analyzer_type.setCurrentIndex(analyzer_index)
 
         # GnuBG
