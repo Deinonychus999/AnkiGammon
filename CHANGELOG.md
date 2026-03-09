@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.4.0b6] - 2026-03-09
+
+### Added
+- "Send Diagnostic Logs" button in Help menu to collect and share logs for troubleshooting
+- Persistent debug logging to `~/.ankigammon/ankigammon.log` for diagnosing issues
+
 ## [1.4.0b5] - 2026-03-08
 
 ### Fixed
