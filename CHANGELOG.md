@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.4.0b5] - 2026-03-08
+
+### Fixed
+- XG position import now uses a temp file instead of the clipboard, preventing interference from user copy/paste activity
+- Clipboard export from XG now validates content and retries automatically if overwritten
+
 ## [1.4.0b4] - 2026-03-08
 
 ### Added
