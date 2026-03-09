@@ -520,6 +520,10 @@ class MainWindow(QMainWindow):
         act_check_updates.triggered.connect(self.check_for_updates_manual)
         help_menu.addAction(act_check_updates)
 
+        act_send_logs = QAction("Send &Diagnostic Logs...", self)
+        act_send_logs.triggered.connect(self.send_diagnostic_logs)
+        help_menu.addAction(act_send_logs)
+
         help_menu.addSeparator()
 
         act_website = QAction("&Visit Website", self)
@@ -890,6 +894,89 @@ class MainWindow(QMainWindow):
             <p><a href="https://github.com/Deinonychus999/AnkiGammon">GitHub Repository</a> | <a href="https://ko-fi.com/ankigammon">Donate</a></p>
             """
         )
+
+    @Slot()
+    def send_diagnostic_logs(self):
+        """Collect diagnostic logs and system info into a ZIP file."""
+        import os
+        import zipfile
+        import platform
+        from pathlib import Path
+        from PySide6.QtWidgets import QFileDialog
+
+        config_dir = Path.home() / ".ankigammon"
+
+        # Ask user where to save the ZIP
+        save_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save Diagnostic Logs",
+            str(Path.home() / "ankigammon-diagnostics.zip"),
+            "ZIP Files (*.zip)"
+        )
+
+        if not save_path:
+            return
+
+        save_path = Path(save_path)
+
+        try:
+            with zipfile.ZipFile(str(save_path), 'w', zipfile.ZIP_DEFLATED) as zf:
+                # Log files (current + rotated backups)
+                for log_name in ["ankigammon.log", "ankigammon.log.1",
+                                 "ankigammon.log.2", "ankigammon.log.3"]:
+                    log_path = config_dir / log_name
+                    if log_path.exists():
+                        zf.write(str(log_path), log_name)
+
+                # Config file
+                config_path = config_dir / "config.json"
+                if config_path.exists():
+                    zf.write(str(config_path), "config.json")
+
+                # GnuBG debug output if present
+                gnubg_debug = config_dir / "debug_gnubg_output.txt"
+                if gnubg_debug.exists():
+                    zf.write(str(gnubg_debug), "debug_gnubg_output.txt")
+
+                # System information
+                from PySide6 import __version__ as pyside_version
+
+                system_info_lines = [
+                    f"AnkiGammon Version: {__version__}",
+                    f"Python Version: {sys.version}",
+                    f"PySide6 Version: {pyside_version}",
+                    f"OS: {platform.system()} {platform.release()} ({platform.version()})",
+                    f"Platform: {platform.platform()}",
+                    f"Machine: {platform.machine()}",
+                    f"Analyzer Type: {self.settings.analyzer_type}",
+                    f"GnuBG Path: {self.settings.gnubg_path or '(not configured)'}",
+                    f"XG Path: {self.settings.xg_exe_path or '(not configured)'}",
+                    f"XG Analysis Level: {self.settings.xg_analysis_level}",
+                ]
+                zf.writestr("system_info.txt", "\n".join(system_info_lines) + "\n")
+
+            QMessageBox.information(
+                self,
+                "Diagnostic Logs Saved",
+                f"Diagnostic logs saved to:\n{save_path}\n\n"
+                "Please send this file to the developer for troubleshooting."
+            )
+
+            # Open containing folder
+            folder = str(save_path.parent)
+            if sys.platform == 'win32':
+                os.startfile(folder)
+            elif sys.platform == 'darwin':
+                subprocess.Popen(['open', folder])
+            else:
+                subprocess.Popen(['xdg-open', folder])
+
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Failed to create diagnostic logs:\n{e}"
+            )
 
     def _ensure_played_move_in_candidates(self, decision: Decision, played_move: Move) -> None:
         """

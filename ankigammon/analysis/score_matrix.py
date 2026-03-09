@@ -5,8 +5,11 @@ Generates matrices showing optimal cube actions across all score combinations
 in a match (e.g., 2a-2a through 7a-7a for a 7-point match).
 """
 
+import logging
 from dataclasses import dataclass
 from typing import List, Optional
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -226,6 +229,11 @@ def generate_score_matrix(
             position_ids.append(modified_xgid)
             coord_list.append((player_away, opponent_away))
 
+    logger.info(
+        "Score matrix: %dx%d (%d cells), cube=%d, min_away=%d",
+        matrix_size, matrix_size, total_cells, cube_value, min_away
+    )
+
     # Analyze all positions (parallel or sequential)
     if use_parallel and len(position_ids) > 2:
         # Parallel analysis with progress tracking
@@ -234,6 +242,12 @@ def generate_score_matrix(
             if cancellation_callback and cancellation_callback():
                 raise InterruptedError("Score matrix generation cancelled by user")
 
+            if completed < total:
+                p_away, o_away = coord_list[completed]
+                logger.debug(
+                    "Score matrix: analyzing cell %da-%da (%d/%d)",
+                    p_away, o_away, completed + 1, total
+                )
             if progress_callback and completed < total:
                 p_away, o_away = coord_list[completed]
                 progress_callback(
@@ -253,8 +267,12 @@ def generate_score_matrix(
             if cancellation_callback and cancellation_callback():
                 raise InterruptedError("Score matrix generation cancelled by user")
 
+            p_away, o_away = coord_list[idx]
+            logger.debug(
+                "Score matrix: analyzing cell %da-%da (%d/%d)",
+                p_away, o_away, idx + 1, total_cells
+            )
             if progress_callback:
-                p_away, o_away = coord_list[idx]
                 progress_callback(
                     f"Analyzing score {p_away}a-{o_away}a ({idx + 1}/{total_cells})..."
                 )
@@ -323,6 +341,7 @@ def generate_score_matrix(
 
         matrix.append(row)
 
+    logger.info("Score matrix complete: %dx%d (%d cells)", matrix_size, matrix_size, total_cells)
     return matrix
 
 

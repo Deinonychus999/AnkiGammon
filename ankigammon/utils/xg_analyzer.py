@@ -296,22 +296,31 @@ class XGAnalyzer(BackgammonAnalyzer):
         if not xgid.startswith("XGID="):
             xgid = f"XGID={xgid}"
 
+        logger.debug("analyze_position: starting %s (type=%s)", xgid, decision_type.value)
+
         # Import position via temp file — avoids clipboard interference
         self._automator.import_xgid_from_file(xgid)
+        logger.debug("analyze_position: imported %s", xgid)
 
         # Run analysis with proper completion detection
         self._automator.run_analysis()
+        logger.debug("analyze_position: analysis complete for %s", xgid)
 
         # Export position analysis to clipboard with validation
         self._automator.send_command(self._automator.cmd.EXPORT_POS_CLIPBOARD)
         time.sleep(1.0)
         text_content = self._automator.get_clipboard_text_validated()
+        logger.debug(
+            "analyze_position: exported clipboard for %s (%d chars)",
+            xgid, len(text_content) if text_content else 0
+        )
 
         # Close the match to prepare for the next position
         try:
             self._automator.close_match()
+            logger.debug("analyze_position: closed match for %s", xgid)
         except Exception:
-            pass
+            logger.debug("analyze_position: close_match failed for %s (non-fatal)", xgid)
 
         return text_content, decision_type
 

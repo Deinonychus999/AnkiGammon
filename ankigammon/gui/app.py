@@ -129,15 +129,32 @@ def main():
     """
     import multiprocessing
     import logging
+    from logging.handlers import RotatingFileHandler
 
     # CRITICAL: Required for PyInstaller + multiprocessing on Windows
     # Without this, worker processes will spawn new GUI windows when using ProcessPoolExecutor
     multiprocessing.freeze_support()
 
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    # Configure logging: DEBUG to file, INFO to console
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.DEBUG)
+    formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
+
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.INFO)
+    console_handler.setFormatter(formatter)
+    root_logger.addHandler(console_handler)
+
+    log_file = Path.home() / ".ankigammon" / "ankigammon.log"
+    log_file.parent.mkdir(parents=True, exist_ok=True)
+    file_handler = RotatingFileHandler(
+        str(log_file), maxBytes=1_000_000, backupCount=3, encoding='utf-8'
+    )
+    file_handler.setLevel(logging.DEBUG)
+    file_handler.setFormatter(formatter)
+    root_logger.addHandler(file_handler)
 
     set_windows_app_id()
 
