@@ -10,7 +10,7 @@ A graphical application for converting backgammon positions into Anki flashcards
 - **Multiple input formats** - XGID/OGID/GNUID position IDs, XG binary files (.xg, .xgp), match files (.mat), SGF files
 - **Direct XG export support** - Copy/paste pre-analyzed positions from eXtreme Gammon
 - **File import with filtering** - Drag-and-drop files with error threshold and player selection
-- **GNU Backgammon integration** - Analyze unanalyzed positions automatically
+- **Dual analysis engines** - Analyze positions using GNU Backgammon (cross-platform) or eXtreme Gammon (Windows)
 - **Automatic format detection** - Paste any supported format, the app detects it automatically
 - **Two export methods**:
   - AnkiConnect: Push directly to Anki (recommended)
@@ -106,7 +106,12 @@ ankigammon  # Launches the GUI
 
 ### Position Analysis
 
-Unanalyzed positions (position IDs, match files, SGF files) can be analyzed using GNU Backgammon if configured in Settings (see Customization Options below).
+Unanalyzed positions (position IDs, match files, SGF files) can be analyzed using one of two engines:
+
+- **GNU Backgammon** — Open-source CLI tool, works on Windows/macOS/Linux
+- **eXtreme Gammon** — Commercial software via UI automation, Windows only
+
+Configure your preferred engine in Settings → Analysis (see Customization Options below).
 
 ## Supported Formats
 
@@ -221,8 +226,11 @@ Open Settings with **Ctrl+,** to configure:
 - **Clear After Export**: Automatically clear the position list after successful export
 
 **Analysis:**
-- **GNU Backgammon Path**: Configure path to `gnubg-cli` executable for automatic position analysis
-- **Analysis Ply**: Set depth (0-4, default: 3)
+- **Analysis Engine**: Choose between GNU Backgammon (cross-platform) or eXtreme Gammon (Windows only)
+- **GNU Backgammon Path**: Configure path to `gnubg-cli` executable
+- **Analysis Ply**: Set GnuBG depth (0-4, default: 3)
+- **eXtreme Gammon Path**: Configure path to `eXtremeGammon2.exe` (Windows only)
+- **XG Analysis Level**: Set XG depth (Very Quick → Extensive, default: World Class)
 - **Score Matrix**: Generate cube decision matrix for all match scores (optional, time-consuming)
 - **Move Score Matrix**: Generate move analysis at different match contexts - Neutral, DMP, Gammon-Save, Gammon-Go (optional, time-consuming)
 
@@ -329,7 +337,7 @@ Settings persist across application restarts, even when using the standalone exe
 ## Requirements
 
 - Python 3.8+ (for development install only)
-- Dependencies automatically installed via `pip install .`: genanki, requests, PySide6, qtawesome
+- Dependencies automatically installed via `pip install .`: genanki, requests, PySide6, qtawesome, pywinauto/pyautogui (Windows only, for XG integration)
 - For standalone executable: No requirements - Python and all dependencies are bundled
 
 ## License
