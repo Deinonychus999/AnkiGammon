@@ -130,6 +130,7 @@ class XGCommandProfile:
     IMPORT_POS_CLIPBOARD: int
     IMPORT_LAST_PLAYED: int
     BATCH_IMPORT: int
+    IMPORT_POS_TEXT: int
 
     # File > Export submenu
     EXPORT_POS_CLIPBOARD: int
@@ -160,8 +161,9 @@ XG_PROFILES: dict[str, XGCommandProfile] = {
         version="2.10",
         NEW_MATCH=64, NEW_MONEY=65, NEW_SETUP=66, NEW_TRANSCRIPTION=67,
         REMATCH=69, OPEN=70, SAVE=92, SAVE_AS=93, CLOSE=94,
-        IMPORT_GNUBG=116, IMPORT_JELLYFISH=117, IMPORT_OTHERS=118,
-        IMPORT_POS_CLIPBOARD=123, IMPORT_LAST_PLAYED=121, BATCH_IMPORT=125,
+        IMPORT_GNUBG=119, IMPORT_JELLYFISH=120, IMPORT_OTHERS=121,
+        IMPORT_POS_CLIPBOARD=123, IMPORT_LAST_PLAYED=124, BATCH_IMPORT=128,
+        IMPORT_POS_TEXT=126,
         EXPORT_POS_CLIPBOARD=130, EXPORT_POS_CLIPBOARD_DLG=131,
         EXPORT_XGID_CLIPBOARD=132, EXPORT_POS_XGP=134,
         EXPORT_POS_TEXT=135, EXPORT_POS_IMAGE=136,
@@ -178,6 +180,7 @@ XG_PROFILES: dict[str, XGCommandProfile] = {
         REMATCH=70, OPEN=71, SAVE=93, SAVE_AS=94, CLOSE=95,
         IMPORT_GNUBG=120, IMPORT_JELLYFISH=121, IMPORT_OTHERS=122,
         IMPORT_POS_CLIPBOARD=124, IMPORT_LAST_PLAYED=125, BATCH_IMPORT=129,
+        IMPORT_POS_TEXT=127,
         EXPORT_POS_CLIPBOARD=131, EXPORT_POS_CLIPBOARD_DLG=132,
         EXPORT_XGID_CLIPBOARD=133, EXPORT_POS_XGP=135,
         EXPORT_POS_TEXT=136, EXPORT_POS_IMAGE=137,
@@ -652,6 +655,33 @@ class XGAutomator:
         finally:
             _CloseClipboard()
 
+    def get_clipboard_text_validated(self, max_retries: int = 3) -> str:
+        """Read XG analysis text from clipboard with validation and retry.
+
+        Verifies the clipboard content looks like XG analysis output
+        (starts with 'XGID='). Retries on failure to handle cases
+        where user clipboard activity temporarily overwrites the data.
+        """
+        for attempt in range(max_retries):
+            text = self.get_clipboard_text()
+            if text and "XGID=" in text:
+                return text
+            if attempt < max_retries - 1:
+                log.warning(
+                    "Clipboard validation failed (attempt %d/%d): "
+                    "content does not look like XG analysis",
+                    attempt + 1, max_retries,
+                )
+                time.sleep(0.5)
+                # Re-trigger export in case clipboard was overwritten
+                self.send_command(self.cmd.EXPORT_POS_CLIPBOARD)
+                time.sleep(1.0)
+        raise XGAutomationError(
+            "Clipboard does not contain valid XG analysis after "
+            f"{max_retries} attempts. Ensure no other application "
+            "is modifying the clipboard during analysis."
+        )
+
     def import_xgid(self, xgid: str) -> None:
         """Import a position from an XGID string via clipboard.
 
@@ -670,6 +700,39 @@ class XGAutomator:
 
         self._wait_for_position_loaded()
         log.info("Position loaded from XGID.")
+
+    def import_xgid_from_file(self, xgid: str) -> None:
+        """Import a position from an XGID string via a temp text file.
+
+        Writes the XGID to a temporary .txt file, then uses
+        Import > Position from text... to load it. This avoids
+        the clipboard, preventing interference from user copy/paste.
+        """
+        import tempfile
+
+        xgid = self._validate_xgid(xgid)
+        log.info("Importing XGID from file: %s", xgid[:60])
+
+        # Write XGID to a temp file with a short path (avoid IFileDialog issues)
+        temp_dir = Path(tempfile.gettempdir()) / "ankigammon"
+        temp_dir.mkdir(exist_ok=True)
+        temp_file = temp_dir / "xgid_import.txt"
+        temp_file.write_text(xgid, encoding="utf-8")
+
+        try:
+            if not self.headless:
+                self.focus()
+            self._headless_file_operation(
+                temp_file, self.cmd.IMPORT_POS_TEXT, "open"
+            )
+            self._wait_for_dialogs_cleared(max_wait=5.0)
+            self._wait_for_position_loaded()
+            log.info("Position loaded from text file.")
+        finally:
+            try:
+                temp_file.unlink(missing_ok=True)
+            except OSError:
+                pass
 
     @staticmethod
     def _validate_xgid(xgid: str) -> str:

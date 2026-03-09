@@ -269,12 +269,12 @@ class XGAnalyzer(BackgammonAnalyzer):
         )
 
     def analyze_position(self, position_id: str) -> Tuple[str, DecisionType]:
-        """Analyze a single position via XG clipboard import.
+        """Analyze a single position via XG.
 
         Flow:
-        1. Import XGID via clipboard (creates a mini-match context in XG)
+        1. Import XGID via text file (avoids clipboard race conditions)
         2. Run full match analysis (handles dialog + completion polling)
-        3. Export position analysis to clipboard (avoids file dialog issues)
+        3. Export position analysis to clipboard (with validation/retry)
         4. Close match to prepare for next position
         5. Return (text, decision_type)
         """
@@ -296,19 +296,16 @@ class XGAnalyzer(BackgammonAnalyzer):
         if not xgid.startswith("XGID="):
             xgid = f"XGID={xgid}"
 
-        # Import position via clipboard — XG creates a match context
-        self._automator.import_xgid(xgid)
+        # Import position via temp file — avoids clipboard interference
+        self._automator.import_xgid_from_file(xgid)
 
         # Run analysis with proper completion detection
         self._automator.run_analysis()
 
-        # Export position analysis to clipboard (no file dialog needed)
+        # Export position analysis to clipboard with validation
         self._automator.send_command(self._automator.cmd.EXPORT_POS_CLIPBOARD)
         time.sleep(1.0)
-        text_content = self._automator.get_clipboard_text()
-
-        if not text_content:
-            raise ValueError("Clipboard export returned empty text")
+        text_content = self._automator.get_clipboard_text_validated()
 
         # Close the match to prepare for the next position
         try:
