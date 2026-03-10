@@ -560,6 +560,23 @@ CARD_CSS = """
     color: #66bb6a;
 }
 
+/* Error magnitude coloring in analysis table */
+.moves-table td.error-minor {
+    color: #fdd835;
+}
+
+.moves-table td.error-blunder {
+    color: #ef5350;
+}
+
+.night_mode .moves-table td.error-minor {
+    color: #ffee58;
+}
+
+.night_mode .moves-table td.error-blunder {
+    color: #ef5350;
+}
+
 .move-row {
     cursor: pointer;
     transition: background-color 0.2s ease;

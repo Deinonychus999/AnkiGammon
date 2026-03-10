@@ -552,8 +552,18 @@ class CardGenerator:
             if is_cube_decision:
                 signed_error = move.equity - best_equity
                 error_str = f"{signed_error:+.3f}" if signed_error != 0 else "0.000"
+                abs_error = abs(signed_error)
             else:
                 error_str = f"{-abs(display_error):+.3f}" if display_error != 0 else "0.000"
+                abs_error = abs(display_error) if display_error else 0.0
+
+            # Color-code row by error magnitude
+            if abs_error >= 0.020 and abs_error <= 0.080:
+                error_class = "error-minor"
+            elif abs_error > 0.080:
+                error_class = "error-blunder"
+            else:
+                error_class = ""
 
             # Add played indicator if this move was played
             played_indicator = ' <span class="played-indicator">← Played</span>' if move.was_played else ""
@@ -570,6 +580,9 @@ class CardGenerator:
                     f'data-opponent-backgammon="{move.opponent_backgammon_pct:.2f}"'
                 )
 
+            # Build td class attribute for error coloring (applied to each td)
+            td_error_attr = f' class="{error_class}"' if error_class else ""
+
             if self.interactive_moves:
                 row_class = f"{rank_class} move-row clickable-move-row"
                 row_attrs = f'data-move-notation="{move.notation}" {wgb_attrs}'
@@ -584,8 +597,11 @@ class CardGenerator:
                 wgb_inline_html = ""
 
             # Format equity cell with data attributes for column toggle
+            equity_classes = f"equity-cell {error_class}".strip() if move.cubeless_equity is not None else error_class
             if move.cubeless_equity is not None:
-                equity_cell = f'<td class="equity-cell" data-cubeful="{move.equity:.3f}" data-cubeless="{move.cubeless_equity:.3f}">{move.equity:.3f}</td>'
+                equity_cell = f'<td class="{equity_classes}" data-cubeful="{move.equity:.3f}" data-cubeless="{move.cubeless_equity:.3f}">{move.equity:.3f}</td>'
+            elif error_class:
+                equity_cell = f'<td class="{error_class}">{move.equity:.3f}</td>'
             else:
                 equity_cell = f'<td>{move.equity:.3f}</td>'
 
@@ -593,21 +609,21 @@ class CardGenerator:
             if is_cube_decision:
                 table_rows.append(f"""
 <tr class="{row_class}" {row_attrs}>
-    <td>
+    <td{td_error_attr}>
         <div class="move-notation">{display_notation}{played_indicator}</div>{wgb_inline_html}
     </td>
     {equity_cell}
-    <td>{error_str}</td>
+    <td{td_error_attr}>{error_str}</td>
 </tr>""")
             else:
                 table_rows.append(f"""
 <tr class="{row_class}" {row_attrs}>
-    <td>{display_rank}</td>
-    <td>
+    <td{td_error_attr}>{display_rank}</td>
+    <td{td_error_attr}>
         <div class="move-notation">{display_notation}{played_indicator}</div>{wgb_inline_html}
     </td>
     {equity_cell}
-    <td>{error_str}</td>
+    <td{td_error_attr}>{error_str}</td>
 </tr>""")
 
         # Generate answer section
