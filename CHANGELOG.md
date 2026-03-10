@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.4.0b7] - 2026-03-10
+
+### Fixed
+- XG automation now correctly imports .txt and other non-native file formats (e.g. from Backgammon Studio) using Import instead of File > Open, preventing the "Open Saved Game" dialog from blocking analysis
+
 ## [1.4.0b6] - 2026-03-09
 
 ### Added
