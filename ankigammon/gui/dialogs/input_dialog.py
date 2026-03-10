@@ -245,7 +245,7 @@ class InputDialog(QDialog):
 
         self.setWindowTitle("Add Positions")
         self.setModal(True)
-        self.setMinimumSize(1100, 850)
+        self.setMinimumSize(800, 600)
         self.resize(1150, 900)  # Default size - taller for better preview
 
         self._setup_ui()
@@ -449,7 +449,7 @@ class InputDialog(QDialog):
 
         self.preview = QWebEngineView()
         self.preview.setContextMenuPolicy(Qt.NoContextMenu)
-        self.preview.setMinimumHeight(400)
+        self.preview.setMinimumHeight(250)
         self.preview.setHtml(self._get_empty_preview_html())
         preview_layout.addWidget(self.preview, stretch=1)
 
@@ -711,15 +711,23 @@ class InputDialog(QDialog):
         <html>
         <head>
             <style>
-                body {{
+                html, body {{
                     margin: 0;
+                    padding: 0;
+                    height: 100%;
+                    overflow: hidden;
+                }}
+                body {{
                     padding: 10px;
                     background: #1e1e2e;
                     display: flex;
                     justify-content: center;
+                    align-items: center;
+                    box-sizing: border-box;
                 }}
                 svg {{
                     max-width: 100%;
+                    max-height: 100%;
                     height: auto;
                 }}
             </style>
