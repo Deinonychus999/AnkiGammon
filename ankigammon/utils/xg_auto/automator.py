@@ -553,12 +553,14 @@ class XGAutomator:
     # ------------------------------------------------------------------
 
     def _get_import_cmd(self, ext: str) -> Optional[int]:
-        """Get the import command ID for a file extension, if any."""
-        import_map = {
-            ".mat": self.cmd.IMPORT_OTHERS,
-            ".sgf": self.cmd.IMPORT_OTHERS,
-        }
-        return import_map.get(ext)
+        """Get the import command ID for a file extension.
+
+        Only .xg/.xgp use File > Open; everything else uses Import > Others.
+        Returns None for native XG formats (handled by File > Open).
+        """
+        if ext in (".xg", ".xgp"):
+            return None
+        return self.cmd.IMPORT_OTHERS
 
     def open_file(self, filepath: Path) -> None:
         """Open a match file via File > Open or File > Import."""
