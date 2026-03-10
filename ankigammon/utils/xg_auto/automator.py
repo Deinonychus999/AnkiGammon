@@ -1439,6 +1439,20 @@ class XGAutomator:
             # Clear existing text: select all → delete
             SendMessageW(edit_hwnd, self.EM_SETSEL, 0, -1)
             SendMessageW(edit_hwnd, self.WM_CLEAR, 0, 0)
+            # Verify text was cleared; fall back to WM_SETTEXT if not.
+            # Some Delphi TEdit controls ignore EM_SETSEL+WM_CLEAR when
+            # the control doesn't have focus.
+            length = SendMessageW(edit_hwnd, WM_GETTEXTLENGTH, 0, 0)
+            if length > 0:
+                log.debug(
+                    "WM_CLEAR did not clear edit; "
+                    "using WM_SETTEXT fallback (%d chars remaining)", length
+                )
+                empty = ctypes.create_unicode_buffer(1)
+                SendMessageW(
+                    edit_hwnd, self.WM_SETTEXT, 0,
+                    ctypes.addressof(empty),
+                )
             # Type path via WM_CHAR so the IFileDialog processes each
             # character and updates its internal COM state.
             path_str = str(filepath)
@@ -1455,8 +1469,19 @@ class XGAutomator:
                        length, verify_buf.value)
             if verify_buf.value != path_str:
                 log.warning(
-                    "Edit text mismatch! Expected: %s", path_str
+                    "Edit text mismatch after WM_CHAR! "
+                    "Got: %s  Expected: %s",
+                    verify_buf.value, path_str,
                 )
+                # Last resort: force-set via WM_SETTEXT. This works
+                # because we confirm with Enter (reads Edit text), not
+                # BM_CLICK (reads IFileDialog COM state).
+                path_buf = ctypes.create_unicode_buffer(path_str)
+                SendMessageW(
+                    edit_hwnd, self.WM_SETTEXT, 0,
+                    ctypes.addressof(path_buf),
+                )
+                log.debug("Forced path via WM_SETTEXT fallback")
         else:
             log.warning("Could not find Edit control in file dialog")
 
