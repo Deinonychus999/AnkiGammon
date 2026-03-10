@@ -1441,7 +1441,7 @@ class MainWindow(QMainWindow):
 
             # Detect format
             detector = FormatDetector(self.settings)
-            result = detector.detect_binary(data)
+            result = detector.detect_binary(data, file_path=file_path)
 
             logger.info(f"Detected format: {result.format}, count: {result.count}")
 

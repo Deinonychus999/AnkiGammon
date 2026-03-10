@@ -132,16 +132,22 @@ class FormatDetector:
                 position_previews=previews
             )
 
-    def detect_binary(self, data: bytes) -> DetectionResult:
+    def detect_binary(self, data: bytes, file_path: str = None) -> DetectionResult:
         """
         Detect format from binary data for file imports.
 
         Args:
             data: Raw binary data from file
+            file_path: Optional file path for extension-based detection
 
         Returns:
             DetectionResult with format classification
         """
+        # Use file extension as a deterministic signal when available
+        ext = ''
+        if file_path:
+            ext = file_path.rsplit('.', 1)[-1].lower() if '.' in file_path else ''
+
         if self._is_xg_binary(data):
             return DetectionResult(
                 format=InputFormat.XG_BINARY,
@@ -164,7 +170,7 @@ class FormatDetector:
                 position_previews=["SGF file - requires analysis"]
             )
 
-        if FormatDetector.is_match_file(data):
+        if ext == 'mat' or FormatDetector.is_match_file(data):
             warnings = []
             if not self.settings.is_gnubg_available():
                 warnings.append("GnuBG required for match analysis (not configured)")
@@ -218,8 +224,8 @@ class FormatDetector:
             if text.startswith(';'):
                 return True
 
-            first_lines = '\n'.join(text.split('\n')[:10])
-            if re.search(r'\d+\s+point\s+match', first_lines, re.IGNORECASE):
+            # "N point match" is specific to backgammon — safe to scan entire file
+            if re.search(r'\d+\s+point\s+match', text, re.IGNORECASE):
                 return True
 
             header = text[:500]
