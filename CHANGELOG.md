@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.4.0b8] - 2026-03-11
+
+### Added
+- Deck tree for organizing positions into named decks with drag-and-drop support
+- Sync deck structure from Anki via AnkiConnect (automatic on startup, manual via File menu or right-click)
+- Drop files directly onto a deck in the tree to import into that deck
+- Color-coded analysis table rows: yellow for minor errors, red for blunders
+
+### Fixed
+- XGP comment extraction when comment index exceeds embedded RTF document count
+- Board preview scaling in Add Positions dialog
+- .mat file import now correctly detects "point match" format
+- File dialog path corruption in XG automation
+
+### Improved
+- Anki model renamed from "XG Backgammon Decision" to "AnkiGammon"
+- XG automation dialog dismissal is more robust with fallback button handling
+
 ## [1.4.0b7] - 2026-03-10
 
 ### Fixed
