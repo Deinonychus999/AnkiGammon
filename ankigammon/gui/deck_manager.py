@@ -176,6 +176,25 @@ class DeckManager:
 
     # -- Bulk operations --
 
+    def merge_deck_names(self, names: List[str]) -> int:
+        """Merge external deck names into existing structure (additive only).
+
+        Creates any decks that don't already exist. Never deletes existing decks.
+
+        Args:
+            names: List of deck names to merge.
+
+        Returns:
+            Number of new decks created.
+        """
+        created = 0
+        for name in names:
+            name = name.strip()
+            if name and name not in self._decks:
+                self._decks[name] = []
+                created += 1
+        return created
+
     def clear_all(self) -> None:
         """Remove all decisions but preserve deck structure."""
         for deck_name in self._decks:

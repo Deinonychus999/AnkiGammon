@@ -1560,7 +1560,7 @@ class XGAutomator:
         or skip in non-headless mode.
         """
         main_handle = self._hwnd
-        accept_names = ["OK", "Yes", "Continue", "Close"]
+        accept_names = ["OK", "Yes", "Continue", "Close", "Import", "Load", "Open"]
         reject_names = ["Cancel", "No", "Close"]
         btn_names = accept_names if accept else reject_names
 
@@ -1647,7 +1647,10 @@ class XGAutomator:
             user32.GetWindowTextW(dlg_hwnd, title, 256)
             log.debug("Dismissing lingering dialog: %s", title.value)
 
-            targets = ["OK", "Yes", "Open", "&Open", "&Yes", "Close"]
+            targets = [
+                "OK", "Yes", "Open", "&Open", "&Yes", "Close",
+                "Import", "&Import", "Load", "&Load",
+            ]
             target_set = {n.replace("&", "").lower() for n in targets}
             clicked = False
             for btn_hwnd, btn_text in buttons:
@@ -1660,11 +1663,26 @@ class XGAutomator:
                     clicked = True
                     break
             if not clicked:
-                # No matching target button — skip this dialog instead of
-                # clicking a random button (which could trigger modal dialogs
-                # and deadlock via SendMessageW).
-                log.debug("No target button found in %r, skipping", title.value)
-                self._skip_hwnds.add(dlg_hwnd)
+                # No preferred button found — try the first button that
+                # isn't a reject action (Cancel/No/Abort).  Use PostMessage
+                # to avoid deadlocking on modal follow-up dialogs.
+                reject = {"cancel", "no", "abort", "abbrechen", "nein"}
+                btn_texts = [t for _, t in buttons]
+                for btn_hwnd, btn_text in buttons:
+                    if btn_text.replace("&", "").lower() not in reject:
+                        log.debug(
+                            "Clicking fallback button %r in %r (all: %s)",
+                            btn_text, title.value, btn_texts,
+                        )
+                        PostMessageW(btn_hwnd, BM_CLICK, 0, 0)
+                        clicked = True
+                        break
+                if not clicked:
+                    log.debug(
+                        "No usable button in %r (buttons: %s), skipping",
+                        title.value, btn_texts,
+                    )
+                    self._skip_hwnds.add(dlg_hwnd)
             time.sleep(0.5)
 
         log.debug("Dialogs still present after %.1fs wait", max_wait)

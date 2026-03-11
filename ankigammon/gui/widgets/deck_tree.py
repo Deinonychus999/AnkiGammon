@@ -31,14 +31,10 @@ class DeckTreeItem(QTreeWidgetItem):
 
         self._update_display(count)
 
-        if is_virtual:
-            # Virtual parents (no real deck in DeckManager) — not droppable
-            self.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
-        else:
-            # Real deck items accept drops but are NOT draggable
-            self.setFlags(
-                Qt.ItemIsEnabled | Qt.ItemIsSelectable | Qt.ItemIsDropEnabled
-            )
+        # All deck items accept drops (auto-creates the deck if virtual)
+        self.setFlags(
+            Qt.ItemIsEnabled | Qt.ItemIsSelectable | Qt.ItemIsDropEnabled
+        )
 
     def _update_display(self, count: int) -> None:
         """Update the display text with deck name and count."""
@@ -93,11 +89,13 @@ class DeckTreeWidget(QTreeWidget):
         position_selected(Decision): Emitted when user selects a position
         positions_changed(): Emitted when positions are added/removed/moved
         deck_structure_changed(): Emitted when decks are created/renamed/deleted
+        sync_from_anki_requested(): Emitted when user requests deck sync from Anki
     """
 
     position_selected = Signal(Decision)
     positions_changed = Signal()
     deck_structure_changed = Signal()
+    sync_from_anki_requested = Signal()
 
     def __init__(self, deck_manager: DeckManager, settings: Settings, parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -208,8 +206,13 @@ class DeckTreeWidget(QTreeWidget):
                         and deck_name == selected_deck):
                     item_to_select = pos_item
 
-            # Restore expansion state (default: expanded if has children)
-            if deck_name in expanded_decks or decisions:
+            # Restore expansion state.
+            # Expand if: previously expanded, has positions, or has child subdecks.
+            has_subdecks = any(
+                dn != deck_name and dn.startswith(deck_name + "::")
+                for dn in deck_names
+            )
+            if deck_name in expanded_decks or decisions or has_subdecks:
                 deck_item.setExpanded(True)
             else:
                 deck_item.setExpanded(False)
@@ -250,30 +253,30 @@ class DeckTreeWidget(QTreeWidget):
             _walk(self.topLevelItem(i))
 
     def _update_parent_icons(self) -> None:
-        """Update deck icons so parents reflect positions in subdecks.
+        """Update deck icons and counts so parents reflect all descendant positions.
 
-        A parent deck should show the 'has content' icon if any of its
-        descendant decks contain positions, even if it has none directly.
+        A parent deck shows the total count across itself and all subdecks,
+        and the 'has content' icon if any descendant contains positions.
         """
-        def _has_positions_recursive(item: QTreeWidgetItem) -> bool:
+        def _count_positions_recursive(item: QTreeWidgetItem) -> int:
+            """Count all PositionTreeItem descendants (direct + nested subdecks)."""
+            total = 0
             for i in range(item.childCount()):
                 child = item.child(i)
                 if isinstance(child, PositionTreeItem):
-                    return True
-                if isinstance(child, DeckTreeItem) and _has_positions_recursive(child):
-                    return True
-            return False
+                    total += 1
+                elif isinstance(child, DeckTreeItem):
+                    total += _count_positions_recursive(child)
+            return total
 
         def _update(item: QTreeWidgetItem) -> None:
             if isinstance(item, DeckTreeItem):
                 # Recurse into children first (bottom-up)
                 for i in range(item.childCount()):
                     _update(item.child(i))
-                # Update icon based on recursive content
-                if _has_positions_recursive(item):
-                    item.setIcon(0, qta.icon('fa6s.folder-open', color='#f9e2af'))
-                else:
-                    item.setIcon(0, qta.icon('fa6s.folder', color='#7f849c'))
+                # Update display with recursive count
+                total = _count_positions_recursive(item)
+                item._update_display(total)
 
         for i in range(self.topLevelItemCount()):
             _update(self.topLevelItem(i))
@@ -608,6 +611,16 @@ class DeckTreeWidget(QTreeWidget):
         )
         new_deck_action.triggered.connect(self.create_new_deck_dialog)
         menu.addAction(new_deck_action)
+
+        menu.addSeparator()
+
+        sync_action = QAction(
+            qta.icon('fa6s.rotate', color='#89b4fa'),
+            "Sync Decks from Anki",
+            self
+        )
+        sync_action.triggered.connect(self.sync_from_anki_requested.emit)
+        menu.addAction(sync_action)
 
     # -- Deck operations --
 

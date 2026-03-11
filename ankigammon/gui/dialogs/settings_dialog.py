@@ -193,7 +193,8 @@ class SettingsDialog(QDialog):
 
         # Deck name
         self.txt_deck_name = QLineEdit()
-        form.addRow("Default Deck Name:", self.txt_deck_name)
+        self.txt_deck_name.setToolTip("Subdecks of this deck in Anki will be synced to your deck tree")
+        form.addRow("Anki Deck:", self.txt_deck_name)
 
         # Export method
         self.cmb_export_method = QComboBox()

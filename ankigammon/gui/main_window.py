@@ -13,14 +13,14 @@ import qtawesome as qta
 import base64
 import subprocess
 import sys
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 from ankigammon import __version__
 from ankigammon.settings import Settings
 from ankigammon.renderer.svg_board_renderer import SVGBoardRenderer
 from ankigammon.renderer.color_schemes import get_scheme
 from ankigammon.models import Decision, Move
-from ankigammon.gui.widgets.deck_tree import DeckTreeWidget
+from ankigammon.gui.widgets.deck_tree import DeckTreeWidget, DeckTreeItem, PositionTreeItem
 from ankigammon.gui.deck_manager import DeckManager
 from ankigammon.gui.dialogs import SettingsDialog, ExportDialog, InputDialog, ImportOptionsDialog, ShortcutsDialog
 from ankigammon.gui.dialogs.update_dialog import UpdateDialog, CheckingUpdateDialog, NoUpdateDialog, UpdateCheckFailedDialog
@@ -167,7 +167,14 @@ class MainWindow(QMainWindow):
         self._import_in_progress = False  # Track if an import is currently being processed
         self._batch_import_results = []  # Accumulate results from batch imports (for combined success message)
         self._in_batch_import = False  # Flag to track if we're currently in a batch import of .xgp files
+        self._import_target_deck: Optional[str] = None  # Target deck for file drops on specific deck
+        self._file_drag_deck_item: Optional[DeckTreeItem] = None  # Deck highlighted during file drag
+        self._drag_expand_timer = QTimer(self)  # Auto-expand collapsed decks during drag hover
+        self._drag_expand_timer.setSingleShot(True)
+        self._drag_expand_timer.setInterval(600)
+        self._drag_expand_timer.timeout.connect(self._on_drag_expand_timeout)
         self._version_checker_thread = None  # Version checker thread
+        self._deck_sync_thread = None  # Deck sync thread
 
         # Enable drag and drop
         self.setAcceptDrops(True)
@@ -179,10 +186,15 @@ class MainWindow(QMainWindow):
 
         # Create drop overlay (will be shown during drag operations)
         self._create_drop_overlay()
+        self._create_deck_drop_highlight()
 
         # Start background version check if enabled
         if self.settings.check_for_updates:
             QTimer.singleShot(2000, self._check_for_updates_background)
+
+        # Start background deck sync from Anki if using AnkiConnect
+        if self.settings.export_method == "ankiconnect":
+            QTimer.singleShot(1000, self._sync_decks_from_anki)
 
     def _setup_ui(self):
         """Initialize the user interface."""
@@ -388,6 +400,7 @@ class MainWindow(QMainWindow):
         self.deck_tree.position_selected.connect(self.show_decision)
         self.deck_tree.positions_changed.connect(self._on_positions_changed)
         self.deck_tree.deck_structure_changed.connect(self._on_deck_structure_changed)
+        self.deck_tree.sync_from_anki_requested.connect(self._sync_decks_from_anki_manual)
         list_container_layout.addWidget(self.deck_tree, stretch=1)
 
         layout.addWidget(list_container, stretch=1)
@@ -442,6 +455,11 @@ class MainWindow(QMainWindow):
         act_regenerate.setShortcut("Ctrl+R")
         act_regenerate.triggered.connect(self.on_regenerate_clicked)
         file_menu.addAction(act_regenerate)
+
+        act_sync_decks = QAction("Sync Decks from &Anki", self)
+        act_sync_decks.setShortcut("Ctrl+Shift+D")
+        act_sync_decks.triggered.connect(self._sync_decks_from_anki_manual)
+        file_menu.addAction(act_sync_decks)
 
         file_menu.addSeparator()
 
@@ -529,6 +547,64 @@ class MainWindow(QMainWindow):
         """Handle deck create/rename/delete — save deck names to settings."""
         self.settings.saved_deck_names = self.deck_manager.get_deck_names()
 
+    # -- Anki deck sync --
+
+    @Slot()
+    def _sync_decks_from_anki(self):
+        """Silently sync deck structure from Anki (startup)."""
+        from ankigammon.gui.deck_sync import DeckSyncThread
+
+        self._deck_sync_thread = DeckSyncThread(self.settings.deck_name)
+        self._deck_sync_thread.decks_loaded.connect(self._on_anki_decks_loaded)
+        self._deck_sync_thread.start()
+
+    @Slot()
+    def _sync_decks_from_anki_manual(self):
+        """Manually sync deck structure from Anki with user feedback."""
+        from ankigammon.gui.deck_sync import DeckSyncThread
+
+        if self._deck_sync_thread and self._deck_sync_thread.isRunning():
+            return
+
+        self._deck_sync_thread = DeckSyncThread(self.settings.deck_name)
+        self._deck_sync_thread.decks_loaded.connect(self._on_anki_decks_loaded_manual)
+        self._deck_sync_thread.sync_failed.connect(self._on_anki_sync_failed_manual)
+        self._deck_sync_thread.start()
+
+    @Slot(list)
+    def _on_anki_decks_loaded(self, deck_names: list):
+        """Handle deck names from silent startup sync."""
+        created = self.deck_manager.merge_deck_names(deck_names)
+        if created > 0:
+            self.deck_tree.rebuild_tree()
+            self._on_deck_structure_changed()
+
+    @Slot(list)
+    def _on_anki_decks_loaded_manual(self, deck_names: list):
+        """Handle deck names from manual sync with user feedback."""
+        created = self.deck_manager.merge_deck_names(deck_names)
+        if created > 0:
+            self.deck_tree.rebuild_tree()
+            self._on_deck_structure_changed()
+            silent_messagebox.information(
+                self, "Deck Sync",
+                f"Added {created} new deck(s) from Anki."
+            )
+        else:
+            silent_messagebox.information(
+                self, "Deck Sync",
+                "Deck tree is already up to date with Anki."
+            )
+
+    @Slot(str)
+    def _on_anki_sync_failed_manual(self, error_message: str):
+        """Handle manual sync failure with user feedback."""
+        silent_messagebox.warning(
+            self, "Deck Sync Failed",
+            f"Could not sync decks from Anki.\n\n{error_message}\n\n"
+            "Make sure Anki is running with the AnkiConnect addon installed."
+        )
+
     def _restore_window_state(self):
         """Restore window size and position from QSettings."""
         settings = QSettings()
@@ -583,6 +659,23 @@ class MainWindow(QMainWindow):
         # Initially hidden
         self.drop_overlay.hide()
         self.drop_overlay.setAttribute(Qt.WA_TransparentForMouseEvents)  # Don't block mouse events
+
+    def _create_deck_drop_highlight(self):
+        """Create a small overlay widget for highlighting deck drop targets.
+
+        Positioned over a specific tree item during file drags.
+        Bypasses QSS ::item:hover rules that override setBackground().
+        """
+        self._deck_highlight = QWidget(self.deck_tree.viewport())
+        self._deck_highlight.setStyleSheet("""
+            QWidget {
+                background-color: rgba(137, 180, 250, 0.25);
+                border: 2px solid rgba(137, 180, 250, 0.6);
+                border-radius: 4px;
+            }
+        """)
+        self._deck_highlight.hide()
+        self._deck_highlight.setAttribute(Qt.WA_TransparentForMouseEvents)
 
     @Slot()
     def on_add_positions_clicked(self):
@@ -726,12 +819,6 @@ class MainWindow(QMainWindow):
 
         # Update swap checkers checkbox
         self.act_swap_checkers.setChecked(settings.swap_checker_colors)
-
-        # If default deck name changed in settings, rename the default deck
-        if settings.deck_name != self.deck_manager.default_deck_name:
-            old_default = self.deck_manager.default_deck_name
-            if self.deck_manager.rename_deck(old_default, settings.deck_name):
-                self.settings.saved_deck_names = self.deck_manager.get_deck_names()
 
         # Refresh deck tree with new score format
         self.deck_tree.rebuild_tree()
@@ -968,7 +1055,7 @@ class MainWindow(QMainWindow):
         filtered = []
 
         cube_decisions_found = sum(1 for d in decisions if d.decision_type == DecisionType.CUBE_ACTION)
-        logger.info(f"DEBUG: Filtering {len(decisions)} total decisions ({cube_decisions_found} cube decisions)")
+        logger.debug(f"Filtering {len(decisions)} total decisions ({cube_decisions_found} cube decisions)")
 
         for decision in decisions:
             # Skip decisions with no moves
@@ -991,17 +1078,17 @@ class MainWindow(QMainWindow):
                 doubler_error = attr['doubler_error']
                 responder_error = attr['responder_error']
 
-                logger.info(f"DEBUG: Cube decision - doubler={doubler}, doubler_error={doubler_error}, responder={responder}, responder_error={responder_error}, cube_threshold={cube_threshold}")
+                logger.debug(f"Cube decision - doubler={doubler}, doubler_error={doubler_error}, responder={responder}, responder_error={responder_error}, cube_threshold={cube_threshold}")
 
                 # Determine which player(s) made errors above threshold
                 doubler_made_error = doubler_error is not None and abs(doubler_error) >= cube_threshold
                 responder_made_error = responder_error is not None and abs(responder_error) >= cube_threshold
 
-                logger.info(f"DEBUG: doubler_made_error={doubler_made_error}, responder_made_error={responder_made_error}")
+                logger.debug(f"doubler_made_error={doubler_made_error}, responder_made_error={responder_made_error}")
 
                 # Skip if no errors above threshold
                 if not doubler_made_error and not responder_made_error:
-                    logger.info(f"DEBUG: Skipping cube decision - no errors above threshold")
+                    logger.debug(f"Skipping cube decision - no errors above threshold")
                     continue
 
                 # Check if we should include this decision based on player filter
@@ -1016,13 +1103,13 @@ class MainWindow(QMainWindow):
                 if responder == Player.O and responder_made_error and include_player_o:
                     include_decision = True
 
-                logger.info(f"DEBUG: include_decision={include_decision} (include_player_x={include_player_x}, include_player_o={include_player_o})")
+                logger.debug(f"include_decision={include_decision} (include_player_x={include_player_x}, include_player_o={include_player_o})")
 
                 if include_decision:
                     # Include the played move in MCQ candidates
                     self._ensure_played_move_in_candidates(decision, played_move)
                     filtered.append(decision)
-                    logger.info(f"DEBUG: Added cube decision to filtered list")
+                    logger.debug(f"Added cube decision to filtered list")
             else:
                 # For checker play from XG binary files, use XG's authoritative ErrMove field
                 # Otherwise fall back to recalculated error
@@ -1051,7 +1138,7 @@ class MainWindow(QMainWindow):
                 filtered.append(decision)
 
         cube_decisions_filtered = sum(1 for d in filtered if d.decision_type == DecisionType.CUBE_ACTION)
-        logger.info(f"DEBUG: After filtering: {len(filtered)} decisions ({cube_decisions_filtered} cube decisions)")
+        logger.debug(f"After filtering: {len(filtered)} decisions ({cube_decisions_filtered} cube decisions)")
 
         return filtered
 
@@ -1244,25 +1331,102 @@ class MainWindow(QMainWindow):
     def dragEnterEvent(self, event):
         """Handle drag enter event - accept if it contains valid files."""
         if event.mimeData().hasUrls():
-            # Accept any file - format detector will validate
             urls = event.mimeData().urls()
             for url in urls:
                 if url.isLocalFile():
-                    # Show visual overlay
-                    self._show_drop_overlay()
+                    # Don't show overlay here — dragMoveEvent manages it
+                    # based on whether cursor is over the tree or not
                     event.acceptProposedAction()
                     return
         event.ignore()
 
+    def dragMoveEvent(self, event):
+        """Track cursor over deck tree to highlight drop targets."""
+        if not event.mimeData().hasUrls():
+            event.ignore()
+            return
+
+        # Map cursor to the tree viewport coordinates
+        global_pos = self.mapToGlobal(event.position().toPoint())
+        viewport = self.deck_tree.viewport()
+        viewport_pos = viewport.mapFromGlobal(global_pos)
+        over_tree = viewport.rect().contains(viewport_pos)
+
+        if over_tree:
+            # Cursor is over the deck tree — resolve to a deck item
+            item = self.deck_tree.itemAt(viewport_pos)
+
+            target_deck = None
+            if isinstance(item, DeckTreeItem):
+                target_deck = item
+            elif isinstance(item, PositionTreeItem):
+                parent = item.parent()
+                if isinstance(parent, DeckTreeItem):
+                    target_deck = parent
+
+            prev_target = self._file_drag_deck_item
+            self._file_drag_deck_item = target_deck
+
+            # Auto-expand: restart timer when hovering over a new collapsed deck
+            if target_deck is not prev_target:
+                self._drag_expand_timer.stop()
+                if (target_deck and not target_deck.isExpanded()
+                        and target_deck.childCount() > 0):
+                    self._drag_expand_timer.start()
+
+            # Position highlight overlay on the target deck item
+            if target_deck:
+                rect = self.deck_tree.visualItemRect(target_deck)
+                self._deck_highlight.setGeometry(rect)
+                self._deck_highlight.show()
+                self._deck_highlight.raise_()
+            else:
+                self._deck_highlight.hide()
+
+            self._hide_drop_overlay()
+        else:
+            # Cursor is outside the tree — show overlay, hide deck highlight
+            self._file_drag_deck_item = None
+            self._deck_highlight.hide()
+            self._drag_expand_timer.stop()
+            self._show_drop_overlay()
+
+        event.acceptProposedAction()
+
+    def _on_drag_expand_timeout(self):
+        """Expand the deck item currently being hovered during a file drag."""
+        if self._file_drag_deck_item and not self._file_drag_deck_item.isExpanded():
+            self._file_drag_deck_item.setExpanded(True)
+
     def dragLeaveEvent(self, event):
-        """Handle drag leave event - hide overlay when drag leaves the window."""
+        """Handle drag leave event - hide overlay and clear tree highlight."""
         self._hide_drop_overlay()
+        self._deck_highlight.hide()
+        self._drag_expand_timer.stop()
+        self._file_drag_deck_item = None
         event.accept()
 
     def dropEvent(self, event):
         """Handle drop event - import the dropped backgammon files."""
-        # Hide overlay immediately
         self._hide_drop_overlay()
+
+        import logging
+        logger = logging.getLogger(__name__)
+
+        # Capture targeted deck from tree highlight before clearing
+        self._deck_highlight.hide()
+        self._drag_expand_timer.stop()
+        if self._file_drag_deck_item:
+            self._import_target_deck = self._file_drag_deck_item.deck_name
+            self._file_drag_deck_item = None
+            # Auto-create deck if it's a virtual node (hierarchy-only, not in DeckManager)
+            if not self.deck_manager.has_deck(self._import_target_deck):
+                self.deck_manager.create_deck(self._import_target_deck)
+                logger.info(f"Auto-created deck: {self._import_target_deck}")
+            logger.info(f"File dropped on deck: {self._import_target_deck}")
+        else:
+            self._import_target_deck = None
+            logger.info("File dropped on window (no deck target)")
 
         if not event.mimeData().hasUrls():
             event.ignore()
@@ -1312,6 +1476,7 @@ class MainWindow(QMainWindow):
 
         # If queue is empty, show accumulated batch results and return
         if not self._import_queue:
+            self._import_target_deck = None
             self._show_batch_import_results()
             return
 
@@ -1556,10 +1721,16 @@ class MainWindow(QMainWindow):
                 )
                 return
 
-            # Add to currently active deck
-            active_deck = self.deck_tree.get_active_deck_name()
+            # Add to target deck (from tree drop) or currently active deck
+            if self._import_target_deck:
+                active_deck = self._import_target_deck
+            else:
+                active_deck = self.deck_tree.get_active_deck_name()
             self.deck_manager.add_decisions(decisions, active_deck)
             self.deck_tree.rebuild_tree()
+            # Expand and scroll to the target deck so the user sees the result
+            if self._import_target_deck:
+                self.deck_tree._expand_and_select_deck(self._import_target_deck)
             self.btn_export.setEnabled(True)
 
             # Show success message (or accumulate for batch)

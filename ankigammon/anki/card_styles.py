@@ -1,7 +1,7 @@
 """Shared card styling constants for Anki exports."""
 
-# Model name for XG cards
-MODEL_NAME = "XG Backgammon Decision"
+# Model name for AnkiGammon cards
+MODEL_NAME = "AnkiGammon"
 
 # CSS for card styling with dark mode support
 CARD_CSS = """

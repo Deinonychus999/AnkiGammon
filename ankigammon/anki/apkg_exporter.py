@@ -20,7 +20,7 @@ def _deterministic_id(name: str) -> int:
     the same deck/model across exports.
 
     Args:
-        name: Identifier string (e.g., "model:XG Backgammon Decision")
+        name: Identifier string (e.g., "model:AnkiGammon")
 
     Returns:
         Deterministic integer ID
