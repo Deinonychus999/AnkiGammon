@@ -80,6 +80,63 @@ QListWidget::item:selected:hover {
     background-color: #a0c8fc;
 }
 
+/* Deck Tree Widget */
+QTreeWidget {
+    background-color: #181825;
+    border: 2px solid #313244;
+    border-radius: 8px;
+    padding: 6px;
+    outline: none;
+    font-size: 13px;
+}
+
+QTreeWidget::item {
+    padding: 6px 4px;
+    border-radius: 0px;
+    color: #cdd6f4;
+}
+
+QTreeWidget::item:selected {
+    background-color: #89b4fa;
+    color: #1e1e2e;
+}
+
+QTreeWidget::item:hover {
+    background-color: #313244;
+}
+
+QTreeWidget::item:selected:hover {
+    background-color: #a0c8fc;
+}
+
+QTreeWidget::branch {
+    background-color: transparent;
+}
+
+QTreeWidget::branch:selected {
+    background-color: transparent;
+}
+
+QTreeWidget::branch:hover {
+    background-color: transparent;
+}
+
+QTreeWidget::branch:has-children:closed {
+    image: url(ankigammon/gui/resources/branch-closed.svg);
+}
+
+QTreeWidget::branch:has-children:open {
+    image: url(ankigammon/gui/resources/branch-open.svg);
+}
+
+QTreeWidget::branch:has-children:selected {
+    background-color: #89b4fa;
+}
+
+QTreeWidget::branch:has-children:hover:!selected {
+    background-color: #313244;
+}
+
 /* Group Boxes */
 QGroupBox {
     border: 2px solid #45475a;

@@ -4,7 +4,7 @@ Main application window.
 
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QPushButton, QLabel, QMessageBox, QInputDialog, QApplication
+    QPushButton, QLabel, QMessageBox, QApplication
 )
 from PySide6.QtCore import Qt, Signal, Slot, QUrl, QSettings, QSize, QThread, QTimer
 from PySide6.QtGui import QAction, QKeySequence, QDesktopServices
@@ -20,7 +20,8 @@ from ankigammon.settings import Settings
 from ankigammon.renderer.svg_board_renderer import SVGBoardRenderer
 from ankigammon.renderer.color_schemes import get_scheme
 from ankigammon.models import Decision, Move
-from ankigammon.gui.widgets import PositionListWidget
+from ankigammon.gui.widgets.deck_tree import DeckTreeWidget
+from ankigammon.gui.deck_manager import DeckManager
 from ankigammon.gui.dialogs import SettingsDialog, ExportDialog, InputDialog, ImportOptionsDialog, ShortcutsDialog
 from ankigammon.gui.dialogs.update_dialog import UpdateDialog, CheckingUpdateDialog, NoUpdateDialog, UpdateCheckFailedDialog
 from ankigammon.gui.update_checker import VersionCheckerThread
@@ -148,7 +149,11 @@ class MainWindow(QMainWindow):
     def __init__(self, settings: Settings):
         super().__init__()
         self.settings = settings
-        self.current_decisions = []
+        self.deck_manager = DeckManager(settings.deck_name)
+        # Restore saved deck structure from previous session
+        for deck_name in settings.saved_deck_names:
+            if deck_name != settings.deck_name:
+                self.deck_manager.create_deck(deck_name)
         scheme = get_scheme(settings.color_scheme)
         if settings.swap_checker_colors:
             scheme = scheme.with_swapped_checkers()
@@ -318,7 +323,32 @@ class MainWindow(QMainWindow):
         list_container_layout.setContentsMargins(0, 0, 0, 0)
         list_container_layout.setSpacing(0)
 
-        # Clear All button positioned at top-right
+        # Header row: New Deck + Clear All (initially hidden)
+        self.btn_new_deck = QPushButton("  New Deck")
+        self.btn_new_deck.setIcon(qta.icon('fa6s.folder-plus', color='#a6adc8'))
+        self.btn_new_deck.setIconSize(QSize(11, 11))
+        self.btn_new_deck.setCursor(Qt.PointingHandCursor)
+        self.btn_new_deck.clicked.connect(self._on_new_deck_clicked)
+        self.btn_new_deck.setToolTip("Create a new deck")
+        self.btn_new_deck.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                color: #6c7086;
+                border: none;
+                padding: 6px 10px;
+                font-size: 11px;
+                font-weight: 500;
+                border-radius: 4px;
+            }
+            QPushButton:hover:enabled {
+                background-color: rgba(166, 227, 161, 0.15);
+                color: #a6e3a1;
+            }
+            QPushButton:pressed:enabled {
+                background-color: rgba(166, 227, 161, 0.25);
+            }
+        """)
+
         self.btn_clear_all = QPushButton("  Clear All")
         self.btn_clear_all.setIcon(qta.icon('fa6s.trash-can', color='#a6adc8'))
         self.btn_clear_all.setIconSize(QSize(11, 11))
@@ -344,78 +374,23 @@ class MainWindow(QMainWindow):
             }
         """)
 
-        # Create header row with clear button aligned right (initially hidden)
         self.list_header_row = QWidget()
         header_layout = QHBoxLayout(self.list_header_row)
         header_layout.setContentsMargins(0, 0, 0, 4)
         header_layout.setSpacing(0)
+        header_layout.addWidget(self.btn_new_deck)
         header_layout.addStretch()
         header_layout.addWidget(self.btn_clear_all)
-        self.list_header_row.hide()  # Hidden until positions are added
         list_container_layout.addWidget(self.list_header_row)
 
-        # Position list widget
-        self.position_list = PositionListWidget(self.settings)
-        self.position_list.position_selected.connect(self.show_decision)
-        self.position_list.positions_deleted.connect(self.on_positions_deleted)
-        list_container_layout.addWidget(self.position_list, stretch=1)
+        # Deck tree widget (replaces flat position list)
+        self.deck_tree = DeckTreeWidget(self.deck_manager, self.settings)
+        self.deck_tree.position_selected.connect(self.show_decision)
+        self.deck_tree.positions_changed.connect(self._on_positions_changed)
+        self.deck_tree.deck_structure_changed.connect(self._on_deck_structure_changed)
+        list_container_layout.addWidget(self.deck_tree, stretch=1)
 
         layout.addWidget(list_container, stretch=1)
-
-        # Spacer
-        layout.addSpacing(12)
-
-        # Deck name indicator with edit button
-        deck_container = QWidget()
-        deck_layout = QHBoxLayout(deck_container)
-        deck_layout.setContentsMargins(18, 16, 18, 16)
-        deck_layout.setSpacing(14)
-        deck_container.setStyleSheet("""
-            QWidget {
-                background-color: rgba(137, 180, 250, 0.08);
-                border-radius: 12px;
-            }
-        """)
-
-        self.lbl_deck_name = QLabel()
-        self.lbl_deck_name.setWordWrap(True)
-        self.lbl_deck_name.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        self.lbl_deck_name.setTextFormat(Qt.RichText)
-        self.lbl_deck_name.setStyleSheet("""
-            QLabel {
-                color: #cdd6f4;
-                padding: 2px 0px;
-                background: transparent;
-            }
-        """)
-        self._update_deck_label()
-        deck_layout.addWidget(self.lbl_deck_name, stretch=1)
-
-        # Edit button for deck name
-        self.btn_edit_deck = QPushButton()
-        self.btn_edit_deck.setIcon(qta.icon('fa6s.pencil', color='#a6adc8'))
-        self.btn_edit_deck.setIconSize(QSize(16, 16))
-        self.btn_edit_deck.setFixedSize(32, 32)
-        self.btn_edit_deck.setToolTip("Edit deck name")
-        self.btn_edit_deck.setStyleSheet("""
-            QPushButton {
-                background-color: rgba(205, 214, 244, 0.05);
-                border: none;
-                border-radius: 8px;
-                padding: 0px;
-            }
-            QPushButton:hover {
-                background-color: rgba(205, 214, 244, 0.12);
-            }
-            QPushButton:pressed {
-                background-color: rgba(205, 214, 244, 0.18);
-            }
-        """)
-        self.btn_edit_deck.setCursor(Qt.PointingHandCursor)
-        self.btn_edit_deck.clicked.connect(self.on_edit_deck_name)
-        deck_layout.addWidget(self.btn_edit_deck, alignment=Qt.AlignVCenter)
-
-        layout.addWidget(deck_container)
 
         layout.addSpacing(12)
 
@@ -538,15 +513,21 @@ class MainWindow(QMainWindow):
         """Connect signals and slots."""
         self.decisions_parsed.connect(self.on_decisions_loaded)
 
-    def _update_deck_label(self):
-        """Update the deck name label with current settings."""
-        export_method = "AnkiConnect" if self.settings.export_method == "ankiconnect" else "APKG"
-        self.lbl_deck_name.setText(
-            f"<div style='line-height: 1.5;'>"
-            f"<div style='color: #a6adc8; font-size: 12px; font-weight: 500; margin-bottom: 6px;'>Exporting to</div>"
-            f"<div style='font-size: 18px; font-weight: 600; color: #cdd6f4;'>{self.settings.deck_name} <span style='color: #6c7086; font-size: 13px; font-weight: 400;'>· {export_method}</span></div>"
-            f"</div>"
-        )
+    def _on_new_deck_clicked(self):
+        """Handle New Deck button click."""
+        self.deck_tree.create_new_deck_dialog()
+
+    def _on_positions_changed(self):
+        """Handle position changes (add/remove/move) from deck tree."""
+        has_positions = not self.deck_manager.is_empty
+        self.btn_export.setEnabled(has_positions)
+        if not has_positions:
+            self.preview.setHtml(self.welcome_html)
+            self.preview.update()
+
+    def _on_deck_structure_changed(self):
+        """Handle deck create/rename/delete — save deck names to settings."""
+        self.settings.saved_deck_names = self.deck_manager.get_deck_names()
 
     def _restore_window_state(self):
         """Restore window size and position from QSettings."""
@@ -617,54 +598,41 @@ class MainWindow(QMainWindow):
         if not decisions:
             return
 
-        # Append to current decisions
-        self.current_decisions.extend(decisions)
+        # Add to the currently active deck
+        active_deck = self.deck_tree.get_active_deck_name()
+        self.deck_manager.add_decisions(decisions, active_deck)
         self.btn_export.setEnabled(True)
-        self.list_header_row.show()
 
-        # Update position list
-        self.position_list.set_decisions(self.current_decisions)
+        # Rebuild tree to show new positions
+        self.deck_tree.rebuild_tree()
 
-    @Slot(list)
-    def on_positions_deleted(self, indices: list):
-        """Handle deletion of multiple positions."""
-        # Sort indices in descending order and delete
-        for index in sorted(indices, reverse=True):
-            if 0 <= index < len(self.current_decisions):
-                self.current_decisions.pop(index)
-
-        # Refresh the position list
-        self.position_list.set_decisions(self.current_decisions)
-
-        # Disable export and hide clear all if no positions remain
-        if not self.current_decisions:
+    def _check_empty_state(self):
+        """Update UI state when positions may have changed."""
+        if self.deck_manager.is_empty:
             self.btn_export.setEnabled(False)
-            self.list_header_row.hide()
-            # Show welcome screen
             self.preview.setHtml(self.welcome_html)
-            self.preview.update()  # Force repaint to avoid black screen issue
+            self.preview.update()
 
     @Slot()
     def on_clear_all_clicked(self):
         """Handle clear all button click."""
-        if not self.current_decisions:
+        if self.deck_manager.is_empty:
             return
 
         # Show confirmation dialog
         reply = silent_messagebox.question(
             self,
             "Clear All Positions",
-            f"Are you sure you want to clear all {len(self.current_decisions)} position(s)?",
+            f"Are you sure you want to clear all {self.deck_manager.total_count} position(s)?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No
         )
 
         if reply == QMessageBox.StandardButton.Yes:
-            # Clear all decisions
-            self.current_decisions.clear()
-            self.position_list.set_decisions(self.current_decisions)
+            # Clear all decisions but preserve deck structure
+            self.deck_manager.clear_all()
+            self.deck_tree.rebuild_tree()
             self.btn_export.setEnabled(False)
-            self.list_header_row.hide()
 
             # Show welcome screen
             self.preview.setHtml(self.welcome_html)
@@ -673,12 +641,12 @@ class MainWindow(QMainWindow):
     @Slot(list)
     def on_decisions_loaded(self, decisions):
         """Handle newly loaded decisions."""
-        self.current_decisions = decisions
+        active_deck = self.deck_tree.get_active_deck_name()
+        self.deck_manager.add_decisions(decisions, active_deck)
         self.btn_export.setEnabled(True)
-        self.list_header_row.show()
 
-        # Update position list
-        self.position_list.set_decisions(decisions)
+        # Update deck tree
+        self.deck_tree.rebuild_tree()
 
     def show_decision(self, decision: Decision):
         """Display a decision in the preview pane."""
@@ -734,35 +702,6 @@ class MainWindow(QMainWindow):
         self.preview.update()  # Force repaint to avoid black screen issue
 
     @Slot()
-    def on_edit_deck_name(self):
-        """Handle deck name edit button click."""
-        # Create input dialog
-        dialog = QInputDialog(self)
-        dialog.setWindowTitle("Edit Deck Name")
-        dialog.setLabelText("Enter deck name:")
-        dialog.setTextValue(self.settings.deck_name)
-
-        # Use a timer to set cursor pointers after dialog widgets are created
-        from PySide6.QtCore import QTimer
-        from PySide6.QtWidgets import QDialogButtonBox
-
-        def set_button_cursors():
-            button_box = dialog.findChild(QDialogButtonBox)
-            if button_box:
-                for button in button_box.buttons():
-                    button.setCursor(Qt.PointingHandCursor)
-
-        QTimer.singleShot(0, set_button_cursors)
-
-        # Show dialog and get result
-        ok = dialog.exec()
-        new_name = dialog.textValue()
-
-        if ok and new_name.strip():
-            self.settings.deck_name = new_name.strip()
-            self._update_deck_label()
-
-    @Slot()
     def on_settings_clicked(self):
         """Handle settings button click."""
         dialog = SettingsDialog(self.settings, self)
@@ -788,26 +727,24 @@ class MainWindow(QMainWindow):
         # Update swap checkers checkbox
         self.act_swap_checkers.setChecked(settings.swap_checker_colors)
 
-        # Update deck name label
-        self._update_deck_label()
+        # If default deck name changed in settings, rename the default deck
+        if settings.deck_name != self.deck_manager.default_deck_name:
+            old_default = self.deck_manager.default_deck_name
+            if self.deck_manager.rename_deck(old_default, settings.deck_name):
+                self.settings.saved_deck_names = self.deck_manager.get_deck_names()
 
-        # Refresh position list with new score format
-        if self.current_decisions:
-            current_row = self.position_list.currentRow()
-            self.position_list.set_decisions(self.current_decisions)
-            if current_row >= 0:
-                self.position_list.setCurrentRow(current_row)
+        # Refresh deck tree with new score format
+        self.deck_tree.rebuild_tree()
 
         # Refresh current preview if a decision is displayed
-        if self.current_decisions:
-            selected = self.position_list.get_selected_decision()
-            if selected:
-                self.show_decision(selected)
+        selected = self.deck_tree.get_selected_decision()
+        if selected:
+            self.show_decision(selected)
 
     @Slot()
     def on_export_clicked(self):
         """Handle export button click."""
-        if not self.current_decisions:
+        if self.deck_manager.is_empty:
             silent_messagebox.warning(
                 self,
                 "No Positions",
@@ -815,7 +752,8 @@ class MainWindow(QMainWindow):
             )
             return
 
-        dialog = ExportDialog(self.current_decisions, self.settings, self)
+        grouped = self.deck_manager.get_grouped_decisions()
+        dialog = ExportDialog(grouped, self.settings, self)
         dialog.export_succeeded.connect(self.on_export_succeeded)
         dialog.exec()
 
@@ -829,17 +767,16 @@ class MainWindow(QMainWindow):
     @Slot()
     def on_export_succeeded(self):
         """Handle successful export by optionally clearing the positions list."""
-        if not self.current_decisions:
+        if self.deck_manager.is_empty:
             return
 
         if not self.settings.clear_positions_after_export:
             return
 
-        # Clear all decisions
-        self.current_decisions.clear()
-        self.position_list.set_decisions(self.current_decisions)
+        # Clear all decisions but preserve deck structure
+        self.deck_manager.clear_all()
+        self.deck_tree.rebuild_tree()
         self.btn_export.setEnabled(False)
-        self.list_header_row.hide()
 
         # Show welcome screen
         self.preview.setHtml(self.welcome_html)
@@ -1619,11 +1556,11 @@ class MainWindow(QMainWindow):
                 )
                 return
 
-            # Add to current decisions
-            self.current_decisions.extend(decisions)
-            self.position_list.set_decisions(self.current_decisions)
+            # Add to currently active deck
+            active_deck = self.deck_tree.get_active_deck_name()
+            self.deck_manager.add_decisions(decisions, active_deck)
+            self.deck_tree.rebuild_tree()
             self.btn_export.setEnabled(True)
-            self.list_header_row.show()
 
             # Show success message (or accumulate for batch)
             from pathlib import Path
@@ -1766,9 +1703,12 @@ class MainWindow(QMainWindow):
             self.drop_overlay.setGeometry(self.drop_overlay.parentWidget().rect())
 
     def closeEvent(self, event):
-        """Save window state on close."""
+        """Save window state and deck structure on close."""
         settings = QSettings()
         settings.setValue("window/geometry", self.saveGeometry())
         settings.setValue("window/state", self.saveState())
+
+        # Persist deck names for next session
+        self.settings.saved_deck_names = self.deck_manager.get_deck_names()
 
         event.accept()

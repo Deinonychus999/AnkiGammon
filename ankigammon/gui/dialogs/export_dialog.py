@@ -2,7 +2,7 @@
 Export progress dialog with AnkiConnect/APKG support.
 """
 
-from typing import List
+from typing import Dict, List
 from pathlib import Path
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QLabel, QProgressBar,
@@ -142,7 +142,7 @@ class ExportWorker(QThread):
 
     def __init__(
         self,
-        decisions: List[Decision],
+        grouped_decisions: Dict[str, List[Decision]],
         settings: Settings,
         export_method: str,
         output_path: str = None,
@@ -150,7 +150,8 @@ class ExportWorker(QThread):
         analyzer=None,
     ):
         super().__init__()
-        self.decisions = decisions
+        self.grouped_decisions = grouped_decisions
+        self.all_decisions = [d for decs in grouped_decisions.values() for d in decs]
         self.settings = settings
         self.export_method = export_method
         self.output_path = output_path
@@ -183,19 +184,19 @@ class ExportWorker(QThread):
             self.finished.emit(False, "Could not connect to Anki. Is Anki running with AnkiConnect installed?")
             return
 
+        # Apply type subdecks if enabled
+        from ankigammon.anki.deck_utils import apply_type_subdecks
+        export_groups = self.grouped_decisions
+        if self.settings.use_subdecks_by_type:
+            export_groups = apply_type_subdecks(export_groups)
+
         # Create model and decks if needed
         self.status_message.emit("Setting up Anki deck(s)...")
         try:
-            from ankigammon.anki.deck_utils import get_deck_name_for_decision, get_required_deck_names
-
             client.create_model()
 
             # Create all needed decks upfront
-            for deck_name in get_required_deck_names(
-                self.decisions,
-                self.settings.deck_name,
-                self.settings.use_subdecks_by_type
-            ):
+            for deck_name in export_groups.keys():
                 client.create_deck(deck_name)
         except Exception as e:
             self.finished.emit(False, f"Failed to setup Anki deck: {str(e)}")
@@ -213,8 +214,9 @@ class ExportWorker(QThread):
             orientation=self.settings.board_orientation
         )
 
-        # Export decisions
-        total = len(self.decisions)
+        # Export decisions across all deck groups
+        total = len(self.all_decisions)
+        card_index = 0
         output_dir = Path.home() / '.ankigammon' / 'cards'
         card_gen = CardGenerator(
             output_dir=output_dir,
@@ -225,92 +227,86 @@ class ExportWorker(QThread):
             analyzer=self._analyzer,
         )
 
-        for i, decision in enumerate(self.decisions):
-            # Check for cancellation
-            if self._cancelled:
-                self.finished.emit(False, "Export cancelled by user")
-                return
+        for deck_name, deck_decisions in export_groups.items():
+            for decision in deck_decisions:
+                i = card_index
+                card_index += 1
 
-            # Calculate base progress for this position
-            base_progress = i / total
-            position_progress_range = 1.0 / total  # How much progress this position represents
+                # Check for cancellation
+                if self._cancelled:
+                    self.finished.emit(False, "Export cancelled by user")
+                    return
 
-            # Calculate sub-steps for progress tracking: render, score matrix (if applicable), generate card
-            analyzer_available = (
-                self.settings.is_xg_available() if getattr(self.settings, 'analyzer_type', 'gnubg') == 'xg'
-                else self.settings.is_gnubg_available()
-            )
-            has_cube_score_matrix = (
-                decision.decision_type.name == 'CUBE_ACTION' and
-                decision.match_length > 0 and
-                self.settings.get('generate_score_matrix', False) and
-                analyzer_available
-            )
-            has_move_score_matrix = (
-                decision.decision_type.name == 'CHECKER_PLAY' and
-                decision.dice and
-                self.settings.get('generate_move_score_matrix', False) and
-                analyzer_available
-            )
-            cube_matrix_steps = (decision.match_length - 1) ** 2 if has_cube_score_matrix else 0
-            move_matrix_steps = 4 if has_move_score_matrix else 0  # 4 score types analyzed
-            total_substeps = 2 + cube_matrix_steps + move_matrix_steps  # render + matrices + generate card
+                # Calculate base progress for this position
+                base_progress = i / total
+                position_progress_range = 1.0 / total
 
-            current_substep = [0]  # Mutable counter for nested function
-
-            # Update progress callback for this position's sub-steps
-            def progress_callback(message: str):
-                current_substep[0] += 1
-                # Calculate progress within this position (cap at 95% until Anki add completes)
-                substep_progress = min(current_substep[0] / total_substeps, 0.95)
-                overall_progress = base_progress + (substep_progress * position_progress_range)
-                self.progress.emit(overall_progress)
-                self.status_message.emit(f"Position {i+1}/{total}: {message}")
-
-            card_gen.progress_callback = progress_callback
-
-            self.progress.emit(base_progress)
-
-            # Generate card with progress tracking
-            try:
-                card_data = card_gen.generate_card(decision)
-            except InterruptedError as e:
-                # Cancellation during card generation (e.g., score matrix)
-                self.finished.emit(False, "Export cancelled by user")
-                return
-
-            # Add to Anki
-            self.status_message.emit(f"Position {i+1}/{total}: Adding to Anki...")
-            self.progress.emit(base_progress + (0.95 * position_progress_range))
-            try:
-                # Determine the appropriate deck name for this decision
-                deck_name = get_deck_name_for_decision(
-                    self.settings.deck_name,
-                    decision,
-                    self.settings.use_subdecks_by_type
+                # Calculate sub-steps for progress tracking
+                analyzer_available = (
+                    self.settings.is_xg_available() if getattr(self.settings, 'analyzer_type', 'gnubg') == 'xg'
+                    else self.settings.is_gnubg_available()
                 )
-                if self.import_mode == "upsert":
-                    client.upsert_note(
-                        front=card_data['front'],
-                        back=card_data['back'],
-                        tags=card_data.get('tags', []),
-                        deck_name=deck_name,
-                        xgid=card_data.get('xgid', '')
-                    )
-                else:
-                    client.add_note(
-                        front=card_data['front'],
-                        back=card_data['back'],
-                        tags=card_data.get('tags', []),
-                        deck_name=deck_name,
-                        xgid=card_data.get('xgid', '')
-                    )
-            except Exception as e:
-                self.finished.emit(False, f"Failed to add card {i+1}: {str(e)}")
-                return
+                has_cube_score_matrix = (
+                    decision.decision_type.name == 'CUBE_ACTION' and
+                    decision.match_length > 0 and
+                    self.settings.get('generate_score_matrix', False) and
+                    analyzer_available
+                )
+                has_move_score_matrix = (
+                    decision.decision_type.name == 'CHECKER_PLAY' and
+                    decision.dice and
+                    self.settings.get('generate_move_score_matrix', False) and
+                    analyzer_available
+                )
+                cube_matrix_steps = (decision.match_length - 1) ** 2 if has_cube_score_matrix else 0
+                move_matrix_steps = 4 if has_move_score_matrix else 0
+                total_substeps = 2 + cube_matrix_steps + move_matrix_steps
 
-            # Update progress after card is successfully added
-            self.progress.emit((i + 1) / total)
+                current_substep = [0]
+
+                def progress_callback(message: str, _i=i, _total_substeps=total_substeps,
+                                      _base_progress=base_progress, _range=position_progress_range):
+                    current_substep[0] += 1
+                    substep_progress = min(current_substep[0] / _total_substeps, 0.95)
+                    overall_progress = _base_progress + (substep_progress * _range)
+                    self.progress.emit(overall_progress)
+                    self.status_message.emit(f"Position {_i+1}/{total}: {message}")
+
+                card_gen.progress_callback = progress_callback
+
+                self.progress.emit(base_progress)
+
+                try:
+                    card_data = card_gen.generate_card(decision)
+                except InterruptedError:
+                    self.finished.emit(False, "Export cancelled by user")
+                    return
+
+                # Add to Anki with the deck name from our grouped structure
+                self.status_message.emit(f"Position {i+1}/{total}: Adding to Anki...")
+                self.progress.emit(base_progress + (0.95 * position_progress_range))
+                try:
+                    if self.import_mode == "upsert":
+                        client.upsert_note(
+                            front=card_data['front'],
+                            back=card_data['back'],
+                            tags=card_data.get('tags', []),
+                            deck_name=deck_name,
+                            xgid=card_data.get('xgid', '')
+                        )
+                    else:
+                        client.add_note(
+                            front=card_data['front'],
+                            back=card_data['back'],
+                            tags=card_data.get('tags', []),
+                            deck_name=deck_name,
+                            xgid=card_data.get('xgid', '')
+                        )
+                except Exception as e:
+                    self.finished.emit(False, f"Failed to add card {i+1}: {str(e)}")
+                    return
+
+                self.progress.emit((i + 1) / total)
 
         self.finished.emit(True, f"Successfully exported {total} card(s) to Anki")
 
@@ -335,7 +331,7 @@ class ExportWorker(QThread):
             from ankigammon.renderer.color_schemes import get_scheme
             from ankigammon.renderer.svg_board_renderer import SVGBoardRenderer
             from ankigammon.anki.card_generator import CardGenerator
-            from ankigammon.anki.deck_utils import group_decisions_by_deck
+            from ankigammon.anki.deck_utils import apply_type_subdecks
             import genanki
 
             scheme = get_scheme(self.settings.color_scheme)
@@ -346,21 +342,19 @@ class ExportWorker(QThread):
                 orientation=self.settings.board_orientation
             )
 
-            # Group decisions by deck
-            decisions_by_deck = group_decisions_by_deck(
-                self.decisions,
-                self.settings.deck_name,
-                self.settings.use_subdecks_by_type
-            )
+            # Apply type subdecks if enabled
+            export_groups = self.grouped_decisions
+            if self.settings.use_subdecks_by_type:
+                export_groups = apply_type_subdecks(export_groups)
 
             # Create deck objects for each group
             decks_dict = {}
-            for deck_name in decisions_by_deck.keys():
+            for deck_name in export_groups.keys():
                 deck_id = _deterministic_id(f"deck:{deck_name}")
                 decks_dict[deck_name] = genanki.Deck(deck_id, deck_name)
 
             # Generate cards and add to appropriate decks
-            total = len(self.decisions)
+            total = len(self.all_decisions)
             card_index = 0
             card_gen = CardGenerator(
                 output_dir=output_dir,
@@ -371,7 +365,7 @@ class ExportWorker(QThread):
                 analyzer=self._analyzer,
             )
 
-            for deck_name, deck_decisions in decisions_by_deck.items():
+            for deck_name, deck_decisions in export_groups.items():
                 deck = decks_dict[deck_name]
 
                 for decision in deck_decisions:
@@ -462,12 +456,13 @@ class ExportDialog(QDialog):
 
     def __init__(
         self,
-        decisions: List[Decision],
+        grouped_decisions: Dict[str, List[Decision]],
         settings: Settings,
         parent=None
     ):
         super().__init__(parent)
-        self.decisions = decisions
+        self.grouped_decisions = grouped_decisions
+        self.all_decisions = [d for decs in grouped_decisions.values() for d in decs]
         self.settings = settings
         self.worker = None
         self.analysis_worker = None
@@ -483,13 +478,24 @@ class ExportDialog(QDialog):
         """Initialize the user interface."""
         layout = QVBoxLayout(self)
 
-        # Info label with deck name
-        info = QLabel(f"Exporting {len(self.decisions)} position(s)")
+        # Info label with position count and deck breakdown
+        num_decks = len(self.grouped_decisions)
+        total_positions = len(self.all_decisions)
+        if num_decks == 1:
+            deck_name = next(iter(self.grouped_decisions))
+            info_text = f"Exporting {total_positions} position(s)"
+            deck_display = deck_name
+        else:
+            info_text = f"Exporting {total_positions} position(s) across {num_decks} decks"
+            deck_display = ", ".join(self.grouped_decisions.keys())
+
+        info = QLabel(info_text)
         info.setStyleSheet("font-size: 13px; color: #a6adc8; margin-bottom: 4px;")
         layout.addWidget(info)
 
         # Deck name label (modern styling)
-        deck_label = QLabel(f"<span style='font-size: 16px; font-weight: 600; color: #cdd6f4;'>{self.settings.deck_name}</span>")
+        deck_label = QLabel(f"<span style='font-size: 16px; font-weight: 600; color: #cdd6f4;'>{deck_display}</span>")
+        deck_label.setWordWrap(True)
         deck_label.setStyleSheet("padding: 12px 16px; background-color: rgba(137, 180, 250, 0.08); border-radius: 8px;")
         layout.addWidget(deck_label)
 
@@ -499,7 +505,7 @@ class ExportDialog(QDialog):
         layout.addWidget(self.progress_bar)
 
         # Status label
-        self.status_label = QLabel(f"Ready to export {len(self.decisions)} position(s) to deck {self.settings.deck_name}")
+        self.status_label = QLabel(f"Ready to export {len(self.all_decisions)} position(s)")
         layout.addWidget(self.status_label)
 
         # Log text (hidden initially)
@@ -605,22 +611,31 @@ class ExportDialog(QDialog):
             # Save the directory for next time
             self.settings.last_apkg_directory = str(Path(self.output_path).parent)
 
-        # Check if any positions need GnuBG analysis
-        needs_analysis = [d for d in self.decisions if not d.candidate_moves]
+        # Check if any positions need analysis
+        needs_analysis = [d for d in self.all_decisions if not d.candidate_moves]
 
         if needs_analysis:
-            # Verify GnuBG is available before attempting analysis
-            if not self.settings.is_gnubg_available():
+            # Verify the configured analyzer is available
+            analyzer_type = getattr(self.settings, 'analyzer_type', 'gnubg')
+            if analyzer_type == "xg":
+                analyzer_available = self.settings.is_xg_available()
+                engine_name = "eXtreme Gammon"
+            else:
+                analyzer_available = self.settings.is_gnubg_available()
+                engine_name = "GnuBG"
+
+            if not analyzer_available:
                 self.status_label.setText(
-                    f"Cannot export: {len(needs_analysis)} position(s) need analysis but GnuBG is not configured.\n"
-                    "Please configure GnuBG in Settings, or import an analyzed file."
+                    f"Cannot export: {len(needs_analysis)} position(s) need analysis "
+                    f"but {engine_name} is not configured.\n"
+                    "Please configure an analysis engine in Settings, or import an analyzed file."
                 )
                 self.btn_export.setEnabled(True)
                 return
 
-            # Run analysis first
-            self.status_label.setText(f"Analyzing {len(needs_analysis)} position(s) with GnuBG...")
-            self.analysis_worker = AnalysisWorker(self.decisions, self.settings)
+            # Run analysis first (flat list — analysis doesn't care about deck grouping)
+            self.status_label.setText(f"Analyzing {len(needs_analysis)} position(s) with {engine_name}...")
+            self.analysis_worker = AnalysisWorker(self.all_decisions, self.settings)
             self.analysis_worker.progress.connect(self.on_analysis_progress)
             self.analysis_worker.status_message.connect(self.on_status_message)
             self.analysis_worker.finished.connect(self.on_analysis_finished)
@@ -640,7 +655,7 @@ class ExportDialog(QDialog):
 
         # Create worker thread
         self.worker = ExportWorker(
-            self.decisions,
+            self.grouped_decisions,
             self.settings,
             self.settings.export_method,
             self.output_path,
@@ -672,8 +687,15 @@ class ExportDialog(QDialog):
             return
 
         if success:
-            # Update decisions with analyzed versions
-            self.decisions = analyzed_decisions
+            # Rebuild grouped_decisions with the analyzed Decision objects.
+            # parse_analysis() creates NEW Decision objects, so the old
+            # references in grouped_decisions must be replaced.
+            self.all_decisions = analyzed_decisions
+            idx = 0
+            for deck_name in self.grouped_decisions:
+                count = len(self.grouped_decisions[deck_name])
+                self.grouped_decisions[deck_name] = analyzed_decisions[idx:idx + count]
+                idx += count
             self.status_label.setText(f"{message} - Starting export...")
             # Proceed with export
             self._start_export_worker()

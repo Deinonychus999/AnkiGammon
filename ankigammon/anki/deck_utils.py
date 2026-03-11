@@ -1,5 +1,6 @@
 """Utility functions for deck management and naming."""
 
+from collections import OrderedDict
 from typing import Dict, List, Set
 from ankigammon.models import Decision, DecisionType
 
@@ -88,3 +89,36 @@ def group_decisions_by_deck(
         grouped[deck_name].append(decision)
 
     return grouped
+
+
+def apply_type_subdecks(
+    grouped_decisions: Dict[str, List[Decision]]
+) -> Dict[str, List[Decision]]:
+    """Further split pre-grouped decisions by decision type.
+
+    Takes decisions already organized into user-defined decks and adds
+    type-based subdeck suffixes (::Checker Play or ::Cube Decisions).
+
+    Example:
+        {"My Deck": [checker, cube]} ->
+        {"My Deck::Checker Play": [checker], "My Deck::Cube Decisions": [cube]}
+
+    Args:
+        grouped_decisions: Dictionary mapping deck names to lists of decisions
+
+    Returns:
+        Dictionary with type-based subdeck names as keys
+    """
+    result: Dict[str, List[Decision]] = OrderedDict()
+
+    for deck_name, decisions in grouped_decisions.items():
+        for decision in decisions:
+            if decision.decision_type == DecisionType.CHECKER_PLAY:
+                key = f"{deck_name}::Checker Play"
+            else:
+                key = f"{deck_name}::Cube Decisions"
+            if key not in result:
+                result[key] = []
+            result[key].append(decision)
+
+    return result

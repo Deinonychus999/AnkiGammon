@@ -356,15 +356,13 @@ class XGAnalyzer(BackgammonAnalyzer):
     ) -> Decision:
         """Parse XG text export into a Decision object.
 
-        Uses XGTextParser which already handles XG's text export format.
+        Uses XGTextParser which handles XG's text export format.
         """
         from ankigammon.parsers.xg_text_parser import XGTextParser
 
         decisions = XGTextParser.parse_string(raw_output)
         if decisions:
-            # Return the first (and usually only) decision
             decision = decisions[0]
-            # Preserve the original XGID if the parsed one differs
             if xgid and not decision.xgid:
                 decision.xgid = xgid
             return decision

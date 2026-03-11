@@ -40,6 +40,7 @@ class Settings:
         "analyzer_type": "gnubg",
         "xg_exe_path": None,
         "xg_analysis_level": "world class",
+        "saved_deck_names": [],
         "check_for_updates": True,
         "last_update_check": None,
         "snooze_update_until": None,
@@ -400,6 +401,18 @@ class Settings:
             return Path(path).exists()
         except (OSError, ValueError):
             return False
+
+    @property
+    def saved_deck_names(self) -> list:
+        """Get the list of saved deck names from previous session."""
+        return self._settings.get("saved_deck_names", [])
+
+    @saved_deck_names.setter
+    def saved_deck_names(self, value: list) -> None:
+        """Set the list of saved deck names."""
+        if not isinstance(value, list):
+            value = []
+        self.set("saved_deck_names", [n for n in value if isinstance(n, str) and n.strip()])
 
     @property
     def check_for_updates(self) -> bool:
