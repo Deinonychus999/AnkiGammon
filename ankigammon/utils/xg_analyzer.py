@@ -195,32 +195,14 @@ class XGAnalyzer(BackgammonAnalyzer):
 
         In headless mode, the IFileDialog may ignore the specified path and
         save to the input directory instead. This method checks multiple
-        sources: expected path, Frida hook events, and directory scanning.
+        sources: expected path and directory scanning.
         """
         # 1. Check expected path
         if expected_path.exists() and expected_path.stat().st_size > 0:
             logger.info("Found saved .xg at expected path: %s", expected_path)
             return expected_path
 
-        # 2. Check Frida hooks for actual file write paths
-        if automator and automator._hooks:
-            try:
-                events = automator._hooks.drain_events()
-                for event in reversed(events):
-                    data = event.data or {}
-                    path_str = data.get("path", "")
-                    if path_str.lower().endswith(".xg"):
-                        hook_path = Path(path_str)
-                        if hook_path.exists() and hook_path.stat().st_size > 0:
-                            logger.info(
-                                "Found saved .xg via Frida hooks: %s",
-                                hook_path,
-                            )
-                            return hook_path
-            except Exception as e:
-                logger.debug("Hook-based file detection failed: %s", e)
-
-        # 3. Check input directory for a .xg with the same stem (most common)
+        # 2. Check input directory for a .xg with the same stem (most common)
         fallback = input_dir / f"{stem}.xg"
         if fallback.exists():
             old_mtime = pre_snapshot.get(fallback, 0)
@@ -231,7 +213,7 @@ class XGAnalyzer(BackgammonAnalyzer):
                 )
                 return fallback
 
-        # 4. Search input directory for any newly modified .xg file
+        # 3. Search input directory for any newly modified .xg file
         for f in input_dir.glob("*.xg"):
             if f.is_file():
                 old_mtime = pre_snapshot.get(f, 0)
@@ -241,7 +223,7 @@ class XGAnalyzer(BackgammonAnalyzer):
                     )
                     return f
 
-        # 5. Search common XG save locations
+        # 4. Search common XG save locations
         import os
         search_dirs = [
             Path(os.environ.get("USERPROFILE", "")) / "Documents",

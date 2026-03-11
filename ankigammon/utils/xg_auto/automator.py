@@ -34,12 +34,6 @@ def _try_import_memory():
         return None
 
 
-def _try_import_hooks():
-    try:
-        from .hooks import XGEventHooks, EventType
-        return XGEventHooks, EventType
-    except (ImportError, Exception):
-        return None, None
 
 CLASS_NAME = "TMainX"
 
@@ -222,9 +216,7 @@ class XGAutomator:
         poll_interval: float = 3.0,
         timeout: float = 600.0,
         use_memory_reader: bool = False,
-        use_hooks: bool = False,
         address_map_path: Optional[Path | str] = None,
-        hook_timeout: float = 5.0,
         analysis_level: Optional[str] = None,
         headless: bool = False,
     ):
@@ -233,12 +225,8 @@ class XGAutomator:
         self.poll_interval = poll_interval
         self.timeout = timeout
         self.use_memory_reader = use_memory_reader
-        self.use_hooks = use_hooks
         self.headless = headless
-        if headless:
-            self.use_hooks = True  # Headless requires Frida hooks
         self.address_map_path = address_map_path
-        self.hook_timeout = hook_timeout
         self.analysis_level = analysis_level
         self.app: Application | None = None
         self._main = None
@@ -246,7 +234,6 @@ class XGAutomator:
         self._cmd: XGCommandProfile | None = None
         self._xg_base_title: str = ""
         self._memory = None   # Optional[XGMemoryReader]
-        self._hooks = None    # Optional[XGEventHooks]
         self._current_file: Path | None = None
         # Persistent set of window handles that have no buttons and should
         # be skipped in dialog dismissal (e.g. GameDLg, Message, etc.)
@@ -305,7 +292,6 @@ class XGAutomator:
             self._connect_gui()
             # Initialize optional subsystems after connection
             self._setup_memory_reader()
-            self._setup_hooks()
 
     def _connect_gui(self) -> None:
         """Connect via pywinauto (normal GUI mode)."""
@@ -336,8 +322,6 @@ class XGAutomator:
         Always launches a new hidden XG instance to avoid hijacking any
         user-visible XG window. XG supports multiple instances.
 
-        Attaches Frida hooks as early as possible so the in-process
-        ShowWindow(SW_HIDE) hook catches startup dialogs at creation time.
         """
         if not self.xg_path or not self.xg_path.exists():
             raise XGAutomationError(
@@ -399,10 +383,7 @@ class XGAutomator:
         # Hide the new window immediately
         user32.ShowWindow(self._hwnd, 0)  # SW_HIDE
 
-        # Attach hooks BEFORE waiting so the in-process
-        # CreateWindowExW hook hides startup dialogs at creation time.
         self._setup_memory_reader()
-        self._setup_hooks()
 
         # Wait for XG to finish initialization using WaitForInputIdle
         # (blocks until the process message loop is idle, rather than
@@ -469,30 +450,6 @@ class XGAutomator:
             log.warning("Memory reader setup failed: %s", e)
             self._memory = None
 
-    def _setup_hooks(self) -> None:
-        """Initialize Frida event hooks if requested and available."""
-        if not self.use_hooks:
-            return
-
-        HooksClass, _ = _try_import_hooks()
-        if HooksClass is None:
-            log.info("frida not installed. Event hooks disabled.")
-            return
-
-        try:
-            pid = wt.DWORD()
-            user32.GetWindowThreadProcessId(self._hwnd, ctypes.byref(pid))
-
-            self._hooks = HooksClass(headless=self.headless)
-            if self._hooks.attach(pid.value):
-                log.info("Frida hooks attached successfully.")
-            else:
-                log.warning("Frida hooks failed to attach. Falling back to polling.")
-                self._hooks = None
-        except Exception as e:
-            log.warning("Frida hooks setup failed: %s", e)
-            self._hooks = None
-
     def disconnect(self) -> None:
         """Clean up optional subsystems."""
         if self.headless and self._hwnd:
@@ -502,12 +459,6 @@ class XGAutomator:
             # Dismiss any "save changes?" dialogs
             self._dismiss_unexpected_dialogs(accept=False)
             log.info("XG closed (headless cleanup).")
-        if self._hooks:
-            try:
-                self._hooks.detach()
-            except Exception:
-                pass
-            self._hooks = None
         if self._memory:
             try:
                 self._memory.detach()
@@ -1060,34 +1011,17 @@ class XGAutomator:
         )
 
     def _wait_for_analysis(self) -> None:
-        """Wait for analysis completion using a hybrid approach.
+        """Wait for analysis completion via UI polling.
 
-        Combines hooks (if available) with UI polling in a single loop.
-        Every poll_interval, checks: hook events, completion dialog,
-        menu state, and status bar. This avoids blocking exclusively
-        on hooks that may miss certain dialog creation patterns.
+        Every poll_interval, checks: completion dialog, menu state,
+        and status bar.
         """
-        _, EventType = _try_import_hooks()
         start = time.time()
-        use_hooks = bool(
-            self._hooks and self._hooks.is_attached and EventType
-        )
-
-        if use_hooks:
-            # Drain stale events, but check if analysis already completed
-            # (happens for very short matches that finish before we start polling)
-            for event in self._hooks.drain_events():
-                if event.event_type == EventType.ANALYSIS_COMPLETE:
-                    log.info("Analysis already complete (event in queue)")
-                    time.sleep(1.0)
-                    self._dismiss_unexpected_dialogs()
-                    return
 
         log.info(
-            "Waiting for analysis (timeout: %.0fs, poll: %.1fs, hooks: %s)...",
+            "Waiting for analysis (timeout: %.0fs, poll: %.1fs)...",
             self.timeout,
             self.poll_interval,
-            use_hooks,
         )
 
         # Wait for analysis to actually START first (menu item becomes disabled)
@@ -1109,21 +1043,6 @@ class XGAutomator:
 
         last_status = ""
         while time.time() - start < self.timeout:
-            # Check hook events (non-blocking, wait up to poll_interval)
-            if use_hooks:
-                event = self._hooks.wait_for_event(
-                    EventType.ANALYSIS_COMPLETE,
-                    timeout=self.poll_interval,
-                )
-                if event is not None:
-                    log.info(
-                        "Analysis complete (hook: %s)",
-                        event.data.get("trigger", "unknown"),
-                    )
-                    time.sleep(1.0)
-                    self._dismiss_unexpected_dialogs()
-                    return
-
             # Check for the "Analyze completed" dialog (most reliable signal)
             if self._check_for_completion_dialog():
                 return
@@ -1162,8 +1081,7 @@ class XGAutomator:
                 log.info("  [%ds] %s", elapsed, status)
                 last_status = status
 
-            if not use_hooks:
-                time.sleep(self.poll_interval)
+            time.sleep(self.poll_interval)
 
         raise XGAutomationError(
             f"Analysis did not complete within {self.timeout}s timeout."
