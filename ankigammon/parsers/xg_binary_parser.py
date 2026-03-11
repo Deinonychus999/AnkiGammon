@@ -1201,6 +1201,16 @@ class XGBinaryParser:
         if assigned_comment_idx < len(comments):
             return XGBinaryParser._clean_rtf_comment(comments[assigned_comment_idx])
 
+        # Fallback: when index exceeds available comments (e.g., XGP files saved
+        # from a larger match retain the original comment index, but only embed
+        # a subset of RTF documents), use the last available comment
+        if comments:
+            logger.debug(
+                f"Comment index {assigned_comment_idx} exceeds available comments "
+                f"({len(comments)}), falling back to last comment"
+            )
+            return XGBinaryParser._clean_rtf_comment(comments[-1])
+
         return None
 
     @staticmethod
