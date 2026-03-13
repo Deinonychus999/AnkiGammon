@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.4.0b10] - 2026-03-13
+
+### Fixed
+- File dialog confirmation is more robust across Windows versions and locales (fixes timeout on systems where Enter key was not forwarded to the dialog)
+
 ## [1.4.0b9] - 2026-03-12
 
 ### Fixed
