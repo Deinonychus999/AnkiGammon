@@ -198,6 +198,58 @@ class XGAutomationError(Exception):
 class XGAutomator:
     """Drive eXtreme Gammon 2 through its GUI."""
 
+    # Button labels across XG's 7 supported languages:
+    # English, German, French, Spanish, Japanese, Greek, Russian
+    # Verified from XGLanguage/*/STRINGS.TXT (MSG DIALOG IDs 440-443)
+    # and Windows common dialog locale strings.
+    _BTN_OK = {"ok"}
+    _BTN_YES = {
+        "yes", "ja", "oui", "sí", "si", "はい", "ναι", "да",
+    }
+    _BTN_NO = {
+        "no", "nein", "non", "いいえ", "όχι", "нет",
+    }
+    _BTN_CANCEL = {
+        "cancel", "abbrechen", "annuler", "cancelar",
+        "キャンセル", "ακύρωση",
+        "отменить",  # XG custom dialog (STRINGS.TXT ID 443)
+        "отмена",    # Windows common dialog
+    }
+    _BTN_OPEN = {
+        "open", "öffnen", "ouvrir", "abrir",
+        "開く", "άνοιγμα", "открыть",
+    }
+    _BTN_CLOSE = {
+        "close", "schließen", "fermer", "cerrar",
+        "閉じる", "κλείσιμο", "закрыть",
+    }
+    _BTN_SAVE = {
+        "save", "speichern", "enregistrer", "guardar",
+        "保存", "αποθήκευση", "сохранить",
+    }
+    _BTN_IMPORT = {
+        "import", "importieren", "importer", "importar",
+        "インポート", "εισαγωγή", "импорт",
+    }
+    _BTN_CONTINUE = {
+        "continue", "weiter", "continuer", "continuar",
+        "続行", "συνέχεια", "продолжить",
+    }
+    _BTN_HELP = {
+        "help", "hilfe", "aide", "ayuda",
+        "ヘルプ", "βοήθεια", "справка",
+    }
+    _BTN_LOAD = {
+        "load", "laden", "charger", "cargar",
+        "読み込む", "φόρτωση", "загрузить",
+    }
+
+    _ACCEPT_BUTTONS = (
+        _BTN_OK | _BTN_YES | _BTN_OPEN | _BTN_CLOSE | _BTN_CONTINUE
+        | _BTN_IMPORT | _BTN_LOAD
+    )
+    _REJECT_BUTTONS = _BTN_CANCEL | _BTN_NO | _BTN_CLOSE | _BTN_HELP
+
     # XG analysis level indices (in the TComboBox dropdown)
     ANALYSIS_LEVELS = {
         "none": 0,
@@ -1138,7 +1190,10 @@ class XGAutomator:
             def __init__(self, h):
                 self.handle = h
 
-        self._click_button(_HwndWrap(dlg_hwnd), ["No", "OK", "Close", "Yes"])
+        self._click_button(
+            _HwndWrap(dlg_hwnd),
+            list(self._BTN_NO | self._BTN_OK | self._BTN_CLOSE | self._BTN_YES),
+        )
         time.sleep(0.5)
         # Dismiss any follow-up dialogs (e.g. "Add Results to Profile")
         self._dismiss_unexpected_dialogs(accept=False)
@@ -1430,7 +1485,7 @@ class XGAutomator:
 
             self._click_button(
                 _HwndWrap(dlg_hwnd),
-                ["Open", "Save", "OK", "&Open", "&Save"],
+                list(self._BTN_OPEN | self._BTN_SAVE | self._BTN_OK),
             )
 
     @staticmethod
@@ -1498,13 +1553,36 @@ class XGAutomator:
             pyautogui.typewrite(str(filepath), interval=0.02)
 
         time.sleep(0.5)
-        self._click_button(dialog, ["Open", "Save", "OK", "&Open", "&Save"])
+        self._click_button(
+            dialog, list(self._BTN_OPEN | self._BTN_SAVE | self._BTN_OK),
+        )
+
+    @staticmethod
+    def _send_button_click(
+        btn_hwnd: int, dlg_hwnd: int, *, non_blocking: bool = False
+    ) -> None:
+        """Click a button using WM_COMMAND (most reliable for Delphi).
+
+        Sends a BN_CLICKED WM_COMMAND to the parent dialog, which is what
+        Windows does internally when a button is pressed. This works on
+        Delphi TButton which may ignore BM_CLICK messages.
+
+        Falls back to BM_CLICK if the control ID cannot be retrieved.
+        """
+        ctrl_id = user32.GetDlgCtrlID(btn_hwnd)
+        send = PostMessageW if non_blocking else SendMessageW
+        if ctrl_id:
+            # BN_CLICKED = 0 → HIWORD(wParam)=0, LOWORD(wParam)=ctrl_id
+            send(dlg_hwnd, WM_COMMAND, ctrl_id, btn_hwnd)
+        else:
+            send(btn_hwnd, BM_CLICK, 0, 0)
 
     def _click_button(self, dialog, button_names: list[str]) -> None:
         """Try to click one of the named buttons in a dialog.
 
-        Uses Win32 EnumChildWindows + BM_CLICK to reliably click buttons,
-        even for Delphi dialogs with &-prefixed labels (e.g. '&Yes').
+        Uses BM_CLICK which works for standard Delphi TButton controls
+        (Analyze Session, completion dialogs, etc.).  For dialogs where
+        BM_CLICK doesn't work, use _send_button_click (WM_COMMAND) instead.
         """
         dlg_hwnd = dialog.handle if hasattr(dialog, "handle") else int(dialog)
         buttons = self._find_buttons(dlg_hwnd)
@@ -1560,9 +1638,6 @@ class XGAutomator:
         or skip in non-headless mode.
         """
         main_handle = self._hwnd
-        accept_names = ["OK", "Yes", "Continue", "Close", "Import", "Load", "Open"]
-        reject_names = ["Cancel", "No", "Close"]
-        btn_names = accept_names if accept else reject_names
 
         pid = wt.DWORD()
         user32.GetWindowThreadProcessId(main_handle, ctypes.byref(pid))
@@ -1597,10 +1672,20 @@ class XGAutomator:
 
             log.debug("Dismissing dialog: %s", title.value)
 
-            class _HwndWrap:
-                def __init__(self, h):
-                    self.handle = h
-            self._click_button(_HwndWrap(dlg_hwnd), btn_names)
+            btn_targets = self._ACCEPT_BUTTONS if accept else self._REJECT_BUTTONS
+
+            # Try matching a target button, fall back to first button
+            clicked = False
+            for btn_hwnd, btn_text in buttons:
+                if btn_text.replace("&", "").lower() in btn_targets:
+                    log.debug("Clicking button %r via BM_CLICK", btn_text)
+                    SendMessageW(btn_hwnd, BM_CLICK, 0, 0)
+                    clicked = True
+                    break
+            if not clicked:
+                btn_hwnd = buttons[0][0]
+                log.debug("Clicking first button via BM_CLICK")
+                SendMessageW(btn_hwnd, BM_CLICK, 0, 0)
             time.sleep(0.5)
 
     def _wait_for_dialogs_cleared(
@@ -1647,42 +1732,31 @@ class XGAutomator:
             user32.GetWindowTextW(dlg_hwnd, title, 256)
             log.debug("Dismissing lingering dialog: %s", title.value)
 
-            targets = [
-                "OK", "Yes", "Open", "&Open", "&Yes", "Close",
-                "Import", "&Import", "Load", "&Load",
-            ]
-            target_set = {n.replace("&", "").lower() for n in targets}
-            clicked = False
-            for btn_hwnd, btn_text in buttons:
-                if btn_text.replace("&", "").lower() in target_set:
-                    log.debug("Clicking button %r via BM_CLICK", btn_text)
-                    # Use PostMessage to avoid blocking on modal dialogs
-                    # (e.g. clicking Save triggers an overwrite confirmation
-                    # which would deadlock SendMessageW)
-                    PostMessageW(btn_hwnd, BM_CLICK, 0, 0)
-                    clicked = True
-                    break
-            if not clicked:
-                # No preferred button found — try the first button that
-                # isn't a reject action (Cancel/No/Abort).  Use PostMessage
-                # to avoid deadlocking on modal follow-up dialogs.
-                reject = {"cancel", "no", "abort", "abbrechen", "nein"}
-                btn_texts = [t for _, t in buttons]
-                for btn_hwnd, btn_text in buttons:
-                    if btn_text.replace("&", "").lower() not in reject:
-                        log.debug(
-                            "Clicking fallback button %r in %r (all: %s)",
-                            btn_text, title.value, btn_texts,
-                        )
-                        PostMessageW(btn_hwnd, BM_CLICK, 0, 0)
-                        clicked = True
-                        break
-                if not clicked:
-                    log.debug(
-                        "No usable button in %r (buttons: %s), skipping",
-                        title.value, btn_texts,
-                    )
-                    self._skip_hwnds.add(dlg_hwnd)
+            # Click the first non-reject button. Uses WM_COMMAND which
+            # works on Delphi TButton dialogs where BM_CLICK is ignored
+            # (e.g. the "Import Game" dialog on German XG).
+            reject = self._REJECT_BUTTONS
+            btn_texts = [t for _, t in buttons]
+            target = next(
+                ((h, t) for h, t in buttons
+                 if t.replace("&", "").lower() not in reject),
+                None,
+            )
+            if target:
+                btn_hwnd, btn_text = target
+                log.debug(
+                    "Clicking %r in %r (all: %s)",
+                    btn_text, title.value, btn_texts,
+                )
+                self._send_button_click(
+                    btn_hwnd, dlg_hwnd, non_blocking=True,
+                )
+            else:
+                log.debug(
+                    "Only reject buttons in %r (all: %s), skipping",
+                    title.value, btn_texts,
+                )
+                self._skip_hwnds.add(dlg_hwnd)
             time.sleep(0.5)
 
         log.debug("Dialogs still present after %.1fs wait", max_wait)
