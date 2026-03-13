@@ -1460,33 +1460,66 @@ class XGAutomator:
 
         time.sleep(0.3)
 
-        # Press Enter in the Edit control instead of clicking the button.
-        # IFileDialog processes Enter differently from BM_CLICK: it reads
-        # the Edit text, parses it as a path, and navigates/opens/saves.
-        # BM_CLICK reads the dialog's internal COM state which WM_CHAR
-        # doesn't update.
-        if edit_hwnd:
-            WM_KEYDOWN = 0x0100
-            WM_KEYUP = 0x0101
-            VK_RETURN = 0x0D
-            if non_blocking:
-                log.debug("Pressing Enter in file dialog (PostMessage)")
-                PostMessageW(edit_hwnd, WM_KEYDOWN, VK_RETURN, 0x001C0001)
-                PostMessageW(edit_hwnd, WM_KEYUP, VK_RETURN, 0xC01C0001)
-            else:
-                log.debug("Pressing Enter in file dialog (SendMessage)")
-                SendMessageW(edit_hwnd, WM_KEYDOWN, VK_RETURN, 0x001C0001)
-                SendMessageW(edit_hwnd, WM_KEYUP, VK_RETURN, 0xC01C0001)
-        else:
-            # Fallback: click the button directly
-            class _HwndWrap:
-                def __init__(self, h):
-                    self.handle = h
+        # Confirm the file dialog.  We use three strategies in order:
+        #
+        # 1. WM_COMMAND IDOK to the dialog — this is how the dialog's own
+        #    button handler works internally and is the most reliable across
+        #    Windows versions (10, 11) and dialog types (IFileDialog, old
+        #    GetOpenFileName, Delphi TOpenDialog).
+        #
+        # 2. VK_RETURN to the Edit control — IFileDialog processes Enter in
+        #    the filename edit by reading the text and navigating/opening.
+        #    This may do a two-step navigate (dir → file) so we retry.
+        #
+        # 3. BM_CLICK on the Open/Save button — last resort fallback.
+        #
+        # Some file dialogs need a two-step confirm: first Enter navigates
+        # to the directory, second Enter opens the file.  We retry up to 3
+        # times with a brief pause between attempts.
 
-            self._click_button(
-                _HwndWrap(dlg_hwnd),
-                list(self._BTN_OPEN | self._BTN_SAVE | self._BTN_OK),
+        IDOK = 1  # Standard dialog OK button control ID
+        send = PostMessageW if non_blocking else SendMessageW
+
+        for attempt in range(3):
+            # Strategy 1: WM_COMMAND IDOK
+            log.debug(
+                "Confirming file dialog via WM_COMMAND IDOK (attempt %d)",
+                attempt + 1,
             )
+            send(dlg_hwnd, WM_COMMAND, IDOK, 0)
+            time.sleep(1.0)
+
+            # Check if the dialog closed
+            if not user32.IsWindow(dlg_hwnd):
+                log.debug("File dialog closed after WM_COMMAND IDOK")
+                return
+
+            # Strategy 2: VK_RETURN to the Edit control
+            if edit_hwnd:
+                WM_KEYDOWN = 0x0100
+                WM_KEYUP = 0x0101
+                VK_RETURN = 0x0D
+                log.debug("Pressing Enter in file dialog edit (attempt %d)",
+                           attempt + 1)
+                send(edit_hwnd, WM_KEYDOWN, VK_RETURN, 0x001C0001)
+                send(edit_hwnd, WM_KEYUP, VK_RETURN, 0xC01C0001)
+                time.sleep(1.0)
+
+                if not user32.IsWindow(dlg_hwnd):
+                    log.debug("File dialog closed after VK_RETURN")
+                    return
+
+        # Strategy 3: BM_CLICK on the button
+        log.debug("Falling back to BM_CLICK on Open/Save button")
+
+        class _HwndWrap:
+            def __init__(self, h):
+                self.handle = h
+
+        self._click_button(
+            _HwndWrap(dlg_hwnd),
+            list(self._BTN_OPEN | self._BTN_SAVE | self._BTN_OK),
+        )
 
     @staticmethod
     def _find_child_by_class(
@@ -1730,11 +1763,25 @@ class XGAutomator:
 
             title = ctypes.create_unicode_buffer(256)
             user32.GetWindowTextW(dlg_hwnd, title, 256)
+            title_lower = title.value.lower()
             log.debug("Dismissing lingering dialog: %s", title.value)
 
-            # Click the first non-reject button. Uses WM_COMMAND which
-            # works on Delphi TButton dialogs where BM_CLICK is ignored
-            # (e.g. the "Import Game" dialog on German XG).
+            # For file dialogs (Open/Save/Import), try WM_COMMAND IDOK
+            # first — this is the most reliable way to confirm a Windows
+            # Common File Dialog across all Windows versions and locales.
+            # Uses translation sets to match all 7 XG languages.
+            _file_dialog_kw = self._BTN_OPEN | self._BTN_SAVE | self._BTN_IMPORT
+            if any(kw in title_lower for kw in _file_dialog_kw):
+                log.debug("Trying WM_COMMAND IDOK for file dialog %r",
+                           title.value)
+                PostMessageW(dlg_hwnd, WM_COMMAND, 1, 0)  # IDOK
+                time.sleep(0.5)
+                if not user32.IsWindow(dlg_hwnd):
+                    log.debug("File dialog closed via IDOK")
+                    last_dismiss_time = time.time()
+                    continue
+
+            # Click the first non-reject button via WM_COMMAND.
             reject = self._REJECT_BUTTONS
             btn_texts = [t for _, t in buttons]
             target = next(
