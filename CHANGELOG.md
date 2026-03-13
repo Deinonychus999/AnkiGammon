@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.4.0b9] - 2026-03-12
+
+### Fixed
+- XG automation now works on non-English Windows systems (German, French, Spanish, Japanese, Greek, Russian) by recognizing translated button labels in all 7 XG-supported languages
+
 ## [1.4.0b8] - 2026-03-11
 
 ### Added
