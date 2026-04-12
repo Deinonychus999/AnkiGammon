@@ -1463,7 +1463,9 @@ class XGBinaryParser:
                 from_str = str(from_point + 1)  # Convert 0-based to 1-based (0→1, 23→24)
 
             # Handle to_point
-            if to_point == -1:
+            # XG binary uses -1 for exact bear-off, but can also use more negative
+            # values when bearing off with excess pips (e.g., point 2 with die 6 → -4)
+            if to_point < 0:
                 to_str = "off"  # Bearing off
             elif to_point == 24:
                 to_str = "bar"  # Opponent hit and sent to bar
