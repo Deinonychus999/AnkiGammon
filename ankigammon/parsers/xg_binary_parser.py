@@ -218,6 +218,38 @@ class XGBinaryParser:
                         f"Comment index corruption detected! Correcting {len(comment_index_map)} indices."
                     )
 
+            # For .xgp (single-position) exports, XG attaches a CubeEntry as
+            # context whenever a MoveEntry is present — even when the user
+            # saved from the move-analysis window and doesn't want the cube
+            # question. Detect this here so the main pass can skip the cube
+            # entry. Does not apply to .xg match files, which legitimately
+            # interleave move and cube decisions.
+            skip_cube_entries = False
+            if path.name.lower().endswith('.xgp'):
+                has_move_entry = False
+                file_version_scan = -1
+                for segment in xg_import.getfilesegment():
+                    if segment.type != xgimport.Import.Segment.XG_GAMEFILE:
+                        continue
+                    segment.fd.seek(0)
+                    while True:
+                        record = xgstruct.GameFileRecord(version=file_version_scan).fromstream(segment.fd)
+                        if record is None:
+                            break
+                        if isinstance(record, xgstruct.HeaderMatchEntry):
+                            file_version_scan = record.Version
+                        elif isinstance(record, xgstruct.MoveEntry):
+                            has_move_entry = True
+                            break
+                    if has_move_entry:
+                        break
+                if has_move_entry:
+                    skip_cube_entries = True
+                    logger.info(
+                        f"{path.name}: MoveEntry present in .xgp — treating as move question, "
+                        "skipping attached CubeEntry context."
+                    )
+
             # Third pass: process game file segments
             for segment in xg_import.getfilesegment():
                 if segment.type == xgimport.Import.Segment.XG_GAMEFILE:
@@ -257,6 +289,8 @@ class XGBinaryParser:
                                 logger.warning(f"Failed to parse move entry: {e}")
 
                         elif isinstance(record, xgstruct.CubeEntry):
+                            if skip_cube_entries:
+                                continue
                             try:
                                 decision = XGBinaryParser._parse_cube_entry(
                                     record, match_length, score_x, score_o, crawford, path.name, comments, comment_index_map, game_number
