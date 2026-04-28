@@ -1,7 +1,7 @@
 """Anki-Connect integration for direct note creation in Anki."""
 
 import requests
-from typing import Any, List
+from typing import Any, List, Optional
 
 from ankigammon.anki.card_styles import MODEL_NAME, CARD_CSS
 
@@ -127,16 +127,24 @@ class AnkiConnect:
         if MODEL_NAME in model_names:
             # Update styling for existing model
             self.invoke('updateModelStyling', model={'name': MODEL_NAME, 'css': CARD_CSS})
-            # Check if XGID field exists, add it if missing
+            # Migrate older models that are missing fields added in later versions
             field_names = self.invoke('modelFieldNames', modelName=MODEL_NAME)
             if 'XGID' not in field_names:
-                # Add XGID field at the beginning (index 0)
                 self.invoke('modelFieldAdd', modelName=MODEL_NAME, fieldName='XGID', index=0)
+                field_names = self.invoke('modelFieldNames', modelName=MODEL_NAME)
+            if 'AnalysisData' not in field_names:
+                # Append at the end so existing field indices stay stable
+                self.invoke(
+                    'modelFieldAdd',
+                    modelName=MODEL_NAME,
+                    fieldName='AnalysisData',
+                    index=len(field_names),
+                )
             return
 
         model = {
             'modelName': MODEL_NAME,
-            'inOrderFields': ['XGID', 'Front', 'Back'],
+            'inOrderFields': ['XGID', 'Front', 'Back', 'AnalysisData'],
             'css': CARD_CSS,
             'cardTemplates': [
                 {
@@ -154,7 +162,8 @@ class AnkiConnect:
         back: str,
         tags: List[str],
         deck_name: str = None,
-        xgid: str = ''
+        xgid: str = '',
+        analysis_data: str = ''
     ) -> int:
         """
         Add a note to Anki.
@@ -165,6 +174,7 @@ class AnkiConnect:
             tags: List of tags
             deck_name: Target deck name. If None, uses self.deck_name.
             xgid: XGID string for the position (used as sort field)
+            analysis_data: Serialized Decision JSON for cosmetic re-rendering
 
         Returns:
             Note ID
@@ -179,6 +189,7 @@ class AnkiConnect:
                 'XGID': xgid,
                 'Front': front,
                 'Back': back,
+                'AnalysisData': analysis_data,
             },
             'tags': tags,
             'options': {
@@ -207,7 +218,8 @@ class AnkiConnect:
         note_id: int,
         front: str,
         back: str,
-        xgid: str = ''
+        xgid: str = '',
+        analysis_data: Optional[str] = None
     ) -> None:
         """
         Update an existing note's fields.
@@ -217,14 +229,20 @@ class AnkiConnect:
             front: New front HTML
             back: New back HTML
             xgid: XGID string
+            analysis_data: Serialized Decision JSON. If None, AnalysisData is
+                left untouched (avoids overwriting an existing blob during a
+                cosmetic re-render). Pass an empty string to explicitly clear it.
         """
+        fields = {
+            'XGID': xgid,
+            'Front': front,
+            'Back': back,
+        }
+        if analysis_data is not None:
+            fields['AnalysisData'] = analysis_data
         self.invoke('updateNoteFields', note={
             'id': note_id,
-            'fields': {
-                'XGID': xgid,
-                'Front': front,
-                'Back': back,
-            }
+            'fields': fields,
         })
 
     def update_note_tags(self, note_id: int, tags: List[str]) -> None:
@@ -249,7 +267,8 @@ class AnkiConnect:
         back: str,
         tags: List[str],
         deck_name: str = None,
-        xgid: str = ''
+        xgid: str = '',
+        analysis_data: str = ''
     ) -> int:
         """
         Update an existing note or add a new one, matched by XGID.
@@ -264,6 +283,7 @@ class AnkiConnect:
             tags: List of tags
             deck_name: Target deck name. If None, uses self.deck_name.
             xgid: XGID string for matching
+            analysis_data: Serialized Decision JSON for cosmetic re-rendering
 
         Returns:
             Note ID (existing or new)
@@ -276,14 +296,14 @@ class AnkiConnect:
             existing_ids = self.find_notes_by_xgid(xgid)
             if existing_ids:
                 note_id = existing_ids[0]
-                self.update_note_fields(note_id, front, back, xgid)
+                self.update_note_fields(note_id, front, back, xgid, analysis_data)
                 self.update_note_tags(note_id, tags)
                 # Move card to the correct deck (upsert may target a different deck)
                 self._move_note_to_deck(note_id, deck_name)
                 return note_id
 
         # No existing note found — add new
-        return self.add_note(front, back, tags, deck_name, xgid)
+        return self.add_note(front, back, tags, deck_name, xgid, analysis_data)
 
     def _move_note_to_deck(self, note_id: int, deck_name: str) -> None:
         """Move all cards of a note to the specified deck.

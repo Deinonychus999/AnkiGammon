@@ -85,6 +85,7 @@ class ApkgExporter:
                 {'name': 'XGID'},
                 {'name': 'Front'},
                 {'name': 'Back'},
+                {'name': 'AnalysisData'},
             ],
             templates=[
                 {
@@ -163,7 +164,12 @@ class ApkgExporter:
 
                 note = StableNote(
                     model=self.model,
-                    fields=[card_data.get('xgid', ''), card_data['front'], card_data['back']],
+                    fields=[
+                        card_data.get('xgid', ''),
+                        card_data['front'],
+                        card_data['back'],
+                        card_data.get('analysis_data', ''),
+                    ],
                     tags=card_data['tags']
                 )
 

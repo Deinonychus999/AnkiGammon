@@ -12,6 +12,7 @@ from ankigammon.renderer.svg_board_renderer import SVGBoardRenderer
 from ankigammon.renderer.animation_controller import AnimationController
 from ankigammon.utils.move_parser import MoveParser
 from ankigammon.settings import get_settings
+from ankigammon.anki.decision_serialize import decision_to_json
 
 
 class CardGenerator:
@@ -210,6 +211,7 @@ class CardGenerator:
             'back': back_html,
             'tags': tags,
             'xgid': decision.xgid or '',
+            'analysis_data': decision_to_json(decision),
         }
 
     def _get_metadata_html(self, decision: Decision) -> str:

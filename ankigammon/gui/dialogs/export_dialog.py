@@ -292,7 +292,8 @@ class ExportWorker(QThread):
                             back=card_data['back'],
                             tags=card_data.get('tags', []),
                             deck_name=deck_name,
-                            xgid=card_data.get('xgid', '')
+                            xgid=card_data.get('xgid', ''),
+                            analysis_data=card_data.get('analysis_data', '')
                         )
                     else:
                         client.add_note(
@@ -300,7 +301,8 @@ class ExportWorker(QThread):
                             back=card_data['back'],
                             tags=card_data.get('tags', []),
                             deck_name=deck_name,
-                            xgid=card_data.get('xgid', '')
+                            xgid=card_data.get('xgid', ''),
+                            analysis_data=card_data.get('analysis_data', '')
                         )
                 except Exception as e:
                     self.finished.emit(False, f"Failed to add card {i+1}: {str(e)}")
@@ -426,7 +428,12 @@ class ExportWorker(QThread):
                     # Create note
                     note = StableNote(
                         model=exporter.model,
-                        fields=[card_data.get('xgid', ''), card_data['front'], card_data['back']],
+                        fields=[
+                            card_data.get('xgid', ''),
+                            card_data['front'],
+                            card_data['back'],
+                            card_data.get('analysis_data', ''),
+                        ],
                         tags=card_data['tags']
                     )
 
