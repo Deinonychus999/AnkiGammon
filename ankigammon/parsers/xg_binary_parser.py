@@ -466,7 +466,41 @@ class XGBinaryParser:
             data_moves = move_entry.DataMoves
             n_moves = min(move_entry.NMoveEval, data_moves.NMoves)
 
+            # XG analyzes top candidates at the requested ply (e.g. ++ / 4-ply)
+            # and leaves the rest at a lower screening ply. It can also roll
+            # out an arbitrary subset. Mixing tiers in one ranked list yields
+            # misleading errors (a noisy 1-ply equity can outrank a deeply
+            # analyzed move). Keep only slots in the best tier: rollouts
+            # always outrank non-rollouts (rolled-out slots have their own
+            # level=100 marker, but the rolled_out flag dominates the tuple
+            # comparison), then EvalLevel.Level breaks ties.
+            rollout_idxs = (move_entry.RolloutIndexM
+                            if getattr(move_entry, 'RolloutIndexM', None)
+                            else None)
+            eval_levels = (data_moves.EvalLevel
+                           if getattr(data_moves, 'EvalLevel', None)
+                           else None)
+            slot_tiers = []
             for i in range(n_moves):
+                # XG stores -1 in RolloutIndexM for slots without a rollout;
+                # any non-negative value is a valid index into temp.xgr.
+                ri = rollout_idxs[i] if rollout_idxs and i < len(rollout_idxs) else -1
+                rolled_out = ri is not None and ri >= 0
+                level = (eval_levels[i].Level
+                         if eval_levels and i < len(eval_levels)
+                         else 0)
+                slot_tiers.append((1 if rolled_out else 0, level))
+            best_tier = max(slot_tiers) if slot_tiers else (0, 0)
+            dropped = sum(1 for t in slot_tiers if t != best_tier)
+            if dropped:
+                logger.info(
+                    f"Filtered {dropped}/{n_moves} candidate moves with weaker "
+                    f"analysis than best tier {best_tier} (rollout, EvalLevel)"
+                )
+
+            for i in range(n_moves):
+                if slot_tiers[i] != best_tier:
+                    continue
                 # Parse move notation with compound move combination and hit detection
                 notation = XGBinaryParser._convert_move_notation(
                     data_moves.Moves[i],
