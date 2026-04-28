@@ -128,7 +128,10 @@ class CardGenerator:
             )
 
         # Generate position SVG
-        position_svg = self._render_position_svg(decision)
+        # Front uses the global show_pip_count setting; back always shows pip count
+        # so the user can verify the answer regardless of the setting.
+        position_svg_front = self._render_position_svg(decision)
+        position_svg_back = self._render_position_svg(decision, show_pip_count=True)
 
         # Prepare candidate moves
         max_options = self.settings.max_moves
@@ -160,9 +163,11 @@ class CardGenerator:
         )
 
         if not self.interactive_moves and not preview_enabled:
-            # Render only the best move's resulting position
+            # Render only the best move's resulting position (back card)
             if best_move:
-                result_svg = self._render_resulting_position_svg(decision, best_move)
+                result_svg = self._render_resulting_position_svg(
+                    decision, best_move, show_pip_count=True
+                )
             else:
                 result_svg = None
         else:
@@ -170,7 +175,8 @@ class CardGenerator:
             if self.progress_callback:
                 self.progress_callback(f"Rendering board positions...")
 
-            # Use shuffled_candidates for front card (MCQ order), candidates for back card (analysis order)
+            # Front previews follow the user's show_pip_count setting,
+            # back-card interactive renders always show pip count.
             if preview_enabled:
                 for candidate in shuffled_candidates:
                     if candidate:
@@ -180,7 +186,9 @@ class CardGenerator:
             if self.interactive_moves:
                 for candidate in candidates:
                     if candidate:
-                        result_svg_for_move = self._render_resulting_position_svg(decision, candidate)
+                        result_svg_for_move = self._render_resulting_position_svg(
+                            decision, candidate, show_pip_count=True
+                        )
                         move_result_svgs[candidate.notation] = result_svg_for_move
 
             result_svg = None
@@ -188,18 +196,18 @@ class CardGenerator:
         # Generate card front
         if self.show_options:
             front_html = self._generate_interactive_mcq_front(
-                decision, position_svg, shuffled_candidates, move_result_svgs_front
+                decision, position_svg_front, shuffled_candidates, move_result_svgs_front
             )
         else:
             front_html = self._generate_simple_front(
-                decision, position_svg
+                decision, position_svg_front
             )
 
         # Generate card back
         if self.progress_callback:
             self.progress_callback("Generating card content...")
         back_html = self._generate_back(
-            decision, position_svg, result_svg, candidates, shuffled_candidates,
+            decision, position_svg_back, result_svg, candidates, shuffled_candidates,
             answer_index, self.show_options, move_result_svgs
         )
 
@@ -1889,8 +1897,14 @@ class CardGenerator:
 
         return tags
 
-    def _render_position_svg(self, decision: Decision) -> str:
-        """Render position as SVG markup."""
+    def _render_position_svg(
+        self, decision: Decision, show_pip_count: Optional[bool] = None
+    ) -> str:
+        """Render position as SVG markup.
+
+        show_pip_count overrides the global setting (None = use setting).
+        Back-card renders pass True so pip counts always appear on the answer side.
+        """
         return self.renderer.render_svg(
             position=decision.position,
             on_roll=decision.on_roll,
@@ -1901,10 +1915,16 @@ class CardGenerator:
             score_o=decision.score_o,
             match_length=decision.match_length,
             score_format=self.settings.score_format,
+            show_pip_count=show_pip_count,
         )
 
-    def _render_resulting_position_svg(self, decision: Decision, move: Move) -> str:
-        """Render the resulting position after a move as SVG markup."""
+    def _render_resulting_position_svg(
+        self, decision: Decision, move: Move, show_pip_count: Optional[bool] = None
+    ) -> str:
+        """Render the resulting position after a move as SVG markup.
+
+        show_pip_count overrides the global setting (None = use setting).
+        """
         if move.resulting_position:
             resulting_pos = move.resulting_position
         else:
@@ -1927,6 +1947,7 @@ class CardGenerator:
             score_o=decision.score_o,
             match_length=decision.match_length,
             score_format=self.settings.score_format,
+            show_pip_count=show_pip_count,
         )
 
     def _shuffle_candidates(

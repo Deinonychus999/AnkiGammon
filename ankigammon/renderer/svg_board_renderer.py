@@ -65,6 +65,7 @@ class SVGBoardRenderer:
         score_o: int = 0,
         match_length: int = 0,
         score_format: str = "absolute",
+        show_pip_count: Optional[bool] = None,
     ) -> str:
         """
         Render a backgammon position as SVG.
@@ -81,6 +82,7 @@ class SVGBoardRenderer:
             score_o: O player's current score
             match_length: Match length (0 = unlimited game, > 0 = match play)
             score_format: "absolute" (current scores) or "away" (points needed to win)
+            show_pip_count: Override the global show_pip_count setting (None = use setting)
 
         Returns:
             SVG markup string
@@ -129,8 +131,11 @@ class SVGBoardRenderer:
         # Draw cube
         svg_parts.append(self._draw_cube(cube_value, cube_owner, board_x, board_y, flipped))
 
-        # Draw pip counts
-        if self.settings.show_pip_count:
+        # Draw pip counts (caller may override the global setting)
+        pip_count_visible = (
+            show_pip_count if show_pip_count is not None else self.settings.show_pip_count
+        )
+        if pip_count_visible:
             svg_parts.append(self._draw_pip_counts(position, board_x, board_y, flipped))
 
         # Draw scores (for match play only)
