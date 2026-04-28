@@ -1,8 +1,26 @@
 """Utility functions for deck management and naming."""
 
-from collections import OrderedDict
+from collections import Counter, OrderedDict
 from typing import Dict, List, Set
 from ankigammon.models import Decision, DecisionType
+
+
+def find_duplicate_xgids(decisions: List[Decision]) -> Dict[str, int]:
+    """Return XGID strings that appear in more than one Decision.
+
+    Anki dedupes notes on import by GUID (computed from XGID), so duplicates
+    are silently dropped. Surfacing them lets the GUI warn the user instead
+    of pretending all input cards landed in the deck.
+
+    Args:
+        decisions: Decisions to scan.
+
+    Returns:
+        Mapping of duplicate XGID strings to their occurrence count
+        (always >= 2). Empty XGIDs are ignored.
+    """
+    counts = Counter(d.xgid for d in decisions if d.xgid)
+    return {xgid: n for xgid, n in counts.items() if n > 1}
 
 
 def get_deck_name_for_decision(

@@ -14,10 +14,13 @@ from ankigammon.models import Decision
 from ankigammon.anki.ankiconnect import AnkiConnect
 from ankigammon.anki.apkg_exporter import ApkgExporter, StableNote, _deterministic_id
 from ankigammon.anki.card_generator import CardGenerator
+from ankigammon.anki.deck_utils import find_duplicate_xgids
+from ankigammon.gui import silent_messagebox
 from ankigammon.renderer.svg_board_renderer import SVGBoardRenderer
 from ankigammon.renderer.color_schemes import SCHEMES
 from ankigammon.settings import Settings
 from ankigammon.utils.analyzer_base import create_analyzer
+from PySide6.QtWidgets import QMessageBox
 
 
 class AnalysisWorker(QThread):
@@ -310,7 +313,15 @@ class ExportWorker(QThread):
 
                 self.progress.emit((i + 1) / total)
 
-        self.finished.emit(True, f"Successfully exported {total} card(s) to Anki")
+        unique_xgids = len({d.xgid for d in self.all_decisions if d.xgid})
+        if unique_xgids and unique_xgids < total:
+            self.finished.emit(
+                True,
+                f"Exported {unique_xgids} unique card(s) to Anki "
+                f"({total - unique_xgids} duplicate(s) merged by XGID)"
+            )
+        else:
+            self.finished.emit(True, f"Successfully exported {total} card(s) to Anki")
 
     def _export_apkg(self):
         """Export to APKG file."""
@@ -450,7 +461,17 @@ class ExportWorker(QThread):
             package.write_to_file(str(self.output_path))
 
             self.progress.emit(1.0)
-            self.finished.emit(True, f"Successfully created {self.output_path}")
+            unique_xgids = len({d.xgid for d in self.all_decisions if d.xgid})
+            total = len(self.all_decisions)
+            if unique_xgids and unique_xgids < total:
+                self.finished.emit(
+                    True,
+                    f"Created {self.output_path} with {unique_xgids} unique "
+                    f"card(s) ({total - unique_xgids} duplicate(s) will be "
+                    f"merged by Anki on import)"
+                )
+            else:
+                self.finished.emit(True, f"Successfully created {self.output_path}")
         except Exception as e:
             self.finished.emit(False, f"APKG export failed: {str(e)}")
 
@@ -594,6 +615,36 @@ class ExportDialog(QDialog):
     @Slot()
     def start_export(self):
         """Start export process in background thread."""
+        # Anki dedupes notes by GUID (computed from XGID) at import time,
+        # so duplicate XGIDs in the input result in fewer cards than expected.
+        # Surface them up front rather than letting the user discover the
+        # silent loss after import.
+        duplicates = find_duplicate_xgids(self.all_decisions)
+        if duplicates:
+            total = len(self.all_decisions)
+            duplicate_count = sum(n - 1 for n in duplicates.values())
+            unique_count = total - duplicate_count
+
+            sample_lines = []
+            for xgid, n in list(duplicates.items())[:5]:
+                sample_lines.append(f"  - {xgid}  (×{n})")
+            if len(duplicates) > 5:
+                sample_lines.append(f"  - ...and {len(duplicates) - 5} more")
+            sample = "\n".join(sample_lines)
+
+            reply = silent_messagebox.question(
+                self,
+                "Duplicate XGIDs Detected",
+                f"{duplicate_count} duplicate position(s) detected among "
+                f"{total} input(s). Anki will keep only one card per unique "
+                f"XGID, so {unique_count} card(s) will end up in your deck.\n\n"
+                f"Duplicates:\n{sample}\n\n"
+                f"Continue with the export?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            )
+            if reply != QMessageBox.StandardButton.Yes:
+                return
+
         self.btn_export.setEnabled(False)
 
         # Get output path for APKG if needed

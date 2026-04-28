@@ -6,7 +6,7 @@ Supports:
 - Full XG analysis text - parsed directly
 """
 
-from typing import List
+from typing import List, Optional
 from pathlib import Path
 
 import qtawesome as qta
@@ -579,7 +579,9 @@ class InputDialog(QDialog):
         if 'XGID=' in position_id or ':' in position_id:
             try:
                 position, metadata = parse_xgid(position_id)
-                return self._create_decision_from_metadata(position, metadata)
+                return self._create_decision_from_metadata(
+                    position, metadata, original_xgid=position_id
+                )
             except:
                 pass
 
@@ -603,8 +605,20 @@ class InputDialog(QDialog):
 
         return None
 
-    def _create_decision_from_metadata(self, position: Position, metadata: dict, original_format: str = "XGID") -> Decision:
-        """Create a Decision object from position and metadata."""
+    def _create_decision_from_metadata(
+        self,
+        position: Position,
+        metadata: dict,
+        original_format: str = "XGID",
+        original_xgid: Optional[str] = None,
+    ) -> Decision:
+        """Create a Decision object from position and metadata.
+
+        When ``original_xgid`` is provided, it is stored verbatim as
+        ``Decision.xgid`` to avoid lossy round-tripping through ``encode_xgid``
+        (which would normalize away the cube-action flag and the max-cube
+        field, causing GUID collisions in Anki for distinct user inputs).
+        """
         from ankigammon.utils.xgid import encode_xgid
 
         # Determine Crawford status (only applies to match play, not unlimited games)
@@ -619,18 +633,23 @@ class InputDialog(QDialog):
             elif 'match_modifier' in metadata and metadata['match_modifier'] == 'C':
                 crawford = True
 
-        # Generate XGID for GnuBG analysis
-        xgid = encode_xgid(
-            position=position,
-            cube_value=metadata.get('cube_value', 1),
-            cube_owner=metadata.get('cube_owner', CubeState.CENTERED),
-            dice=metadata.get('dice'),
-            on_roll=metadata.get('on_roll', Player.X),
-            score_x=metadata.get('score_x', 0),
-            score_o=metadata.get('score_o', 0),
-            match_length=metadata.get('match_length', 0),
-            crawford_jacoby=metadata.get('crawford_jacoby', 1 if crawford else 0)
-        )
+        if original_xgid is not None:
+            xgid = original_xgid
+        else:
+            # Re-encode for OGID/GNUID inputs (analyzers consume XGID).
+            # Pass max_cube through so it survives the round-trip.
+            xgid = encode_xgid(
+                position=position,
+                cube_value=metadata.get('cube_value', 1),
+                cube_owner=metadata.get('cube_owner', CubeState.CENTERED),
+                dice=metadata.get('dice'),
+                on_roll=metadata.get('on_roll', Player.X),
+                score_x=metadata.get('score_x', 0),
+                score_o=metadata.get('score_o', 0),
+                match_length=metadata.get('match_length', 0),
+                crawford_jacoby=metadata.get('crawford_jacoby', 1 if crawford else 0),
+                max_cube=metadata.get('max_cube', 256),
+            )
 
         return Decision(
             position=position,
