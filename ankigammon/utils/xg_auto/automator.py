@@ -11,6 +11,7 @@ reading standard Windows controls (edit boxes, buttons, etc.).
 import ctypes
 import ctypes.wintypes as wt
 import logging
+import os
 import subprocess
 import sys
 import time
@@ -46,6 +47,23 @@ BM_CLICK = 0x00F5
 CF_UNICODETEXT = 13
 GMEM_MOVEABLE = 0x0002
 
+# Standard dialog button IDs
+IDOK = 1
+
+# Process access rights
+PROCESS_TERMINATE = 0x0001
+
+# SetWindowPos flags
+SWP_NOSIZE = 0x0001
+SWP_NOZORDER = 0x0004
+
+# ShowWindow command
+SW_HIDE = 0
+
+# Off-screen sentinel coordinate (matches Windows' own minimized-window pos)
+OFFSCREEN_X = -32000
+OFFSCREEN_Y = -32000
+
 user32 = ctypes.windll.user32
 kernel32 = ctypes.windll.kernel32
 
@@ -56,6 +74,32 @@ PostMessageW.restype = wt.BOOL
 SendMessageW = user32.SendMessageW
 SendMessageW.argtypes = [wt.HWND, ctypes.c_uint, wt.WPARAM, wt.LPARAM]
 SendMessageW.restype = wt.LPARAM
+
+user32.GetDlgItem.argtypes = [wt.HWND, ctypes.c_int]
+user32.GetDlgItem.restype = wt.HWND
+
+user32.SetWindowPos.argtypes = [
+    wt.HWND, wt.HWND, ctypes.c_int, ctypes.c_int,
+    ctypes.c_int, ctypes.c_int, ctypes.c_uint,
+]
+user32.SetWindowPos.restype = wt.BOOL
+
+user32.IsWindow.argtypes = [wt.HWND]
+user32.IsWindow.restype = wt.BOOL
+
+user32.IsWindowVisible.argtypes = [wt.HWND]
+user32.IsWindowVisible.restype = wt.BOOL
+
+kernel32.OpenProcess.argtypes = [wt.DWORD, wt.BOOL, wt.DWORD]
+kernel32.OpenProcess.restype = wt.HANDLE
+
+kernel32.TerminateProcess.argtypes = [wt.HANDLE, ctypes.c_uint]
+kernel32.TerminateProcess.restype = wt.BOOL
+
+kernel32.CloseHandle.argtypes = [wt.HANDLE]
+kernel32.CloseHandle.restype = wt.BOOL
+
+kernel32.GetLastError.restype = wt.DWORD
 
 # Clipboard API
 _OpenClipboard = user32.OpenClipboard
@@ -368,6 +412,81 @@ class XGAutomator:
         self._hwnd = self._main.handle
         self._cmd = self._detect_xg_version()
 
+    def _kill_stale_xg_instances(self, hwnds: set[int]) -> None:
+        """Terminate hidden XG instances; leave visible ones alone.
+
+        Hidden XG windows are stale headless instances orphaned by a
+        prior crashed run. Visible instances belong to the user.
+
+        Each hwnd's class is re-validated immediately before termination
+        because hwnds can be recycled to other processes between
+        enumeration and the kill call.
+        """
+        my_pid = os.getpid()
+        for stale_hwnd in hwnds:
+            try:
+                if user32.IsWindowVisible(stale_hwnd):
+                    continue
+                # Re-verify class — guards against hwnd recycling.
+                cls = ctypes.create_unicode_buffer(64)
+                if (user32.GetClassNameW(stale_hwnd, cls, 64) == 0
+                        or cls.value != CLASS_NAME):
+                    log.debug(
+                        "hwnd 0x%08X no longer an XG window — skip",
+                        stale_hwnd,
+                    )
+                    continue
+                stale_pid = wt.DWORD()
+                tid = user32.GetWindowThreadProcessId(
+                    stale_hwnd, ctypes.byref(stale_pid)
+                )
+                if tid == 0 or stale_pid.value == 0:
+                    log.warning(
+                        "Cannot resolve PID for stale hwnd 0x%08X "
+                        "(window gone?) — skipping",
+                        stale_hwnd,
+                    )
+                    continue
+                if stale_pid.value == my_pid:
+                    log.error(
+                        "Refusing to terminate own process (pid=%d)",
+                        stale_pid.value,
+                    )
+                    continue
+                log.info(
+                    "Killing stale hidden XG: hwnd=0x%08X pid=%d",
+                    stale_hwnd, stale_pid.value,
+                )
+                hp = kernel32.OpenProcess(
+                    PROCESS_TERMINATE, False, stale_pid.value
+                )
+                if not hp:
+                    log.warning(
+                        "OpenProcess(pid=%d) failed: GetLastError=%d "
+                        "— stale instance left running",
+                        stale_pid.value, kernel32.GetLastError(),
+                    )
+                    continue
+                try:
+                    if not kernel32.TerminateProcess(hp, 1):
+                        log.warning(
+                            "TerminateProcess(pid=%d) failed: "
+                            "GetLastError=%d",
+                            stale_pid.value, kernel32.GetLastError(),
+                        )
+                finally:
+                    if not kernel32.CloseHandle(hp):
+                        log.warning(
+                            "CloseHandle leaked for pid=%d: "
+                            "GetLastError=%d",
+                            stale_pid.value, kernel32.GetLastError(),
+                        )
+            except OSError as exc:
+                log.exception(
+                    "Error killing stale XG hwnd=0x%08X: %s",
+                    stale_hwnd, exc,
+                )
+
     def _connect_headless(self) -> None:
         """Connect via pure Win32 and hide the window (headless mode).
 
@@ -381,22 +500,46 @@ class XGAutomator:
             )
 
         # Collect existing XG window handles so we can identify our new one
-        existing_hwnds = set()
+        existing_hwnds: set[int] = set()
 
-        def _collect_existing(hwnd, _lparam):
-            cls = ctypes.create_unicode_buffer(64)
-            user32.GetClassNameW(hwnd, cls, 64)
-            if cls.value == CLASS_NAME:
-                existing_hwnds.add(int(hwnd))
+        def _enum_xg_main(hwnd, _lparam):
+            try:
+                cls = ctypes.create_unicode_buffer(64)
+                user32.GetClassNameW(hwnd, cls, 64)
+                if cls.value == CLASS_NAME:
+                    existing_hwnds.add(int(hwnd))
+            except Exception:
+                pass
             return True
 
-        user32.EnumWindows(WNDENUMPROC(_collect_existing), 0)
+        user32.EnumWindows(WNDENUMPROC(_enum_xg_main), 0)
 
         if existing_hwnds:
             log.info(
                 "Found %d existing XG instance(s) — launching a new one.",
                 len(existing_hwnds),
             )
+            self._kill_stale_xg_instances(existing_hwnds)
+            existing_hwnds.clear()
+            time.sleep(1.0)
+            user32.EnumWindows(WNDENUMPROC(_enum_xg_main), 0)
+            if existing_hwnds:
+                visible = sum(
+                    1 for h in existing_hwnds if user32.IsWindowVisible(h)
+                )
+                hidden = len(existing_hwnds) - visible
+                if hidden:
+                    log.warning(
+                        "%d hidden XG instance(s) survived kill — "
+                        "automation may conflict",
+                        hidden,
+                    )
+                if visible:
+                    log.info(
+                        "%d visible XG instance(s) left alone "
+                        "(user's own XG)",
+                        visible,
+                    )
 
         log.info("Launching XG (headless): %s", self.xg_path)
         si = subprocess.STARTUPINFO()
@@ -1304,6 +1447,12 @@ class XGAutomator:
 
         Sends the WM_COMMAND, waits for the IFileDialog to appear,
         then auto-fills it via Win32 messages.
+
+        The dialog's WS_VISIBLE state is preserved (it is moved
+        off-screen rather than hidden via SW_HIDE) because Windows 11's
+        IFileDialog only updates its COM state from WM_CHAR
+        notifications while the window is technically visible. SW_HIDE
+        is applied only after the confirmation attempt.
         """
         self.send_command(cmd_id)
 
@@ -1311,11 +1460,27 @@ class XGAutomator:
         while time.time() < deadline:
             dlg_hwnd = self._find_file_dialog_win32()
             if dlg_hwnd:
-                user32.ShowWindow(dlg_hwnd, 0)  # SW_HIDE
+                ok = user32.SetWindowPos(
+                    dlg_hwnd, 0,
+                    OFFSCREEN_X, OFFSCREEN_Y,
+                    0, 0,
+                    SWP_NOSIZE | SWP_NOZORDER,
+                )
+                if not ok:
+                    log.warning(
+                        "SetWindowPos off-screen failed for hwnd=0x%08X "
+                        "(GetLastError=%d) — dialog may flash on screen",
+                        dlg_hwnd, kernel32.GetLastError(),
+                    )
                 non_block = dialog_type == "save"
                 self._autofill_file_dialog_win32(
                     dlg_hwnd, filepath, non_blocking=non_block,
                 )
+                # Autofill+confirm usually destroys the dialog already;
+                # apply SW_HIDE only if the hwnd is still alive so we
+                # leave a consistent visibility state for the next op.
+                if user32.IsWindow(dlg_hwnd):
+                    user32.ShowWindow(dlg_hwnd, SW_HIDE)
                 return
             time.sleep(0.3)
 
@@ -1394,11 +1559,16 @@ class XGAutomator:
         """
         edit_hwnd = 0
 
+        cls_buf = ctypes.create_unicode_buffer(64)
+        user32.GetClassNameW(dlg_hwnd, cls_buf, 64)
+        title_buf = ctypes.create_unicode_buffer(256)
+        user32.GetWindowTextW(dlg_hwnd, title_buf, 256)
+        log.info("File dialog hwnd=0x%08X class=%r title=%r",
+                 dlg_hwnd, cls_buf.value, title_buf.value)
+
         # Strategy 1: Find the filename ComboBoxEx32 by control ID (0x047C),
         # then get the Edit inside it.
-        GetDlgItem = user32.GetDlgItem
-        GetDlgItem.restype = wt.HWND
-        combo_ex = GetDlgItem(dlg_hwnd, 0x047C)
+        combo_ex = user32.GetDlgItem(dlg_hwnd, 0x047C)
         if combo_ex:
             edit_hwnd = self._find_child_by_class(int(combo_ex), ["Edit"])
 
@@ -1477,11 +1647,82 @@ class XGAutomator:
         # to the directory, second Enter opens the file.  We retry up to 3
         # times with a brief pause between attempts.
 
-        IDOK = 1  # Standard dialog OK button control ID
         send = PostMessageW if non_blocking else SendMessageW
 
+        pid = wt.DWORD()
+        user32.GetWindowThreadProcessId(dlg_hwnd, ctypes.byref(pid))
+        xg_pid = pid.value
+
+        def _dismiss_error_popups() -> int:
+            """Dismiss XG-process MessageBox popups blocking the dialog.
+
+            A real error popup is a #32770 window without an Edit
+            control (an Edit would mean it's another file dialog, not a
+            MessageBox). Loops until no more popups remain so cascading
+            errors don't get partially handled.
+
+            Returns the number of popups dismissed.
+            """
+            dismissed = 0
+            for _ in range(5):
+                found = [0]
+
+                def _cb(hwnd, _lp):
+                    try:
+                        h = int(hwnd)
+                        if h == dlg_hwnd:
+                            return True
+                        p = wt.DWORD()
+                        user32.GetWindowThreadProcessId(
+                            hwnd, ctypes.byref(p)
+                        )
+                        if p.value != xg_pid:
+                            return True
+                        cls = ctypes.create_unicode_buffer(64)
+                        user32.GetClassNameW(hwnd, cls, 64)
+                        if cls.value != "#32770":
+                            return True
+                        # Skip if it has an Edit — that's a file dialog,
+                        # not an error popup.
+                        if (user32.GetDlgItem(hwnd, 0x047C)
+                                or self._find_child_by_class(
+                                    h, ["Edit", "TEdit"])):
+                            return True
+                        found[0] = h
+                        return False
+                    except Exception:
+                        return True
+
+                user32.EnumWindows(WNDENUMPROC(_cb), 0)
+                if not found[0]:
+                    break
+                ebuf = ctypes.create_unicode_buffer(256)
+                user32.GetWindowTextW(found[0], ebuf, 256)
+                log.warning(
+                    "Dismissing XG error popup: hwnd=0x%08X title=%r",
+                    found[0], ebuf.value,
+                )
+                PostMessageW(found[0], WM_COMMAND, IDOK, 0)
+                time.sleep(0.5)
+                dismissed += 1
+            return dismissed
+
+        def _log_edit_text(when: str) -> None:
+            if not edit_hwnd:
+                return
+            rl = SendMessageW(edit_hwnd, WM_GETTEXTLENGTH, 0, 0)
+            rb = ctypes.create_unicode_buffer(rl + 1)
+            SendMessageW(
+                edit_hwnd, WM_GETTEXT, rl + 1, ctypes.addressof(rb),
+            )
+            log.warning("Edit text %s: %r", when, rb.value)
+
+        total_popups_dismissed = 0
+        WM_KEYDOWN = 0x0100
+        WM_KEYUP = 0x0101
+        VK_RETURN = 0x0D
+
         for attempt in range(3):
-            # Strategy 1: WM_COMMAND IDOK
             log.debug(
                 "Confirming file dialog via WM_COMMAND IDOK (attempt %d)",
                 attempt + 1,
@@ -1489,18 +1730,20 @@ class XGAutomator:
             send(dlg_hwnd, WM_COMMAND, IDOK, 0)
             time.sleep(1.0)
 
-            # Check if the dialog closed
             if not user32.IsWindow(dlg_hwnd):
                 log.debug("File dialog closed after WM_COMMAND IDOK")
                 return
 
-            # Strategy 2: VK_RETURN to the Edit control
+            n = _dismiss_error_popups()
+            if n:
+                total_popups_dismissed += n
+                _log_edit_text("after IDOK error popup")
+
             if edit_hwnd:
-                WM_KEYDOWN = 0x0100
-                WM_KEYUP = 0x0101
-                VK_RETURN = 0x0D
-                log.debug("Pressing Enter in file dialog edit (attempt %d)",
-                           attempt + 1)
+                log.debug(
+                    "Pressing Enter in file dialog edit (attempt %d)",
+                    attempt + 1,
+                )
                 send(edit_hwnd, WM_KEYDOWN, VK_RETURN, 0x001C0001)
                 send(edit_hwnd, WM_KEYUP, VK_RETURN, 0xC01C0001)
                 time.sleep(1.0)
@@ -1509,7 +1752,22 @@ class XGAutomator:
                     log.debug("File dialog closed after VK_RETURN")
                     return
 
-        # Strategy 3: BM_CLICK on the button
+                n = _dismiss_error_popups()
+                if n:
+                    total_popups_dismissed += n
+                    _log_edit_text("after VK_RETURN error popup")
+
+        # XG repeatedly rejected the path — fail loudly rather than
+        # silently falling through to a button click that will trigger
+        # the same error.
+        if total_popups_dismissed >= 2:
+            raise XGAutomationError(
+                f"XG rejected the filename for {filepath} "
+                f"({total_popups_dismissed} error popups dismissed). "
+                f"The file may not exist, be in an unsupported format, "
+                f"or be locked by another process."
+            )
+
         log.debug("Falling back to BM_CLICK on Open/Save button")
 
         class _HwndWrap:
@@ -1705,6 +1963,42 @@ class XGAutomator:
 
             log.debug("Dismissing dialog: %s", title.value)
 
+            # Stuck file dialogs (Edit control + Open/Save/Import title)
+            # are closed via WM_CLOSE rather than clicking the accept
+            # button: at this point the dialog is in an error state
+            # (file-not-found from a prior failed attempt) and clicking
+            # the accept button just retriggers the error popup.
+            # Multilingual: matches the same _BTN_* sets used elsewhere
+            # in this file for XG's 7 supported locales.
+            _has_edit = bool(
+                user32.GetDlgItem(dlg_hwnd, 0x047C)
+                or self._find_child_by_class(
+                    dlg_hwnd, ["Edit", "TEdit"]
+                )
+            )
+            _file_dialog_kw = (
+                self._BTN_OPEN | self._BTN_SAVE | self._BTN_IMPORT
+            )
+            title_lower = title.value.lower()
+            _is_file_dlg = _has_edit and any(
+                kw in title_lower for kw in _file_dialog_kw
+            )
+            if _is_file_dlg:
+                log.debug(
+                    "Stuck file dialog %r — sending WM_CLOSE",
+                    title.value,
+                )
+                PostMessageW(dlg_hwnd, WM_CLOSE, 0, 0)
+                time.sleep(0.5)
+                if user32.IsWindow(dlg_hwnd):
+                    log.warning(
+                        "WM_CLOSE ignored — file dialog %r still "
+                        "alive; adding to skip set",
+                        title.value,
+                    )
+                    self._skip_hwnds.add(dlg_hwnd)
+                continue
+
             btn_targets = self._ACCEPT_BUTTONS if accept else self._REJECT_BUTTONS
 
             # Try matching a target button, fall back to first button
@@ -1774,12 +2068,30 @@ class XGAutomator:
             if any(kw in title_lower for kw in _file_dialog_kw):
                 log.debug("Trying WM_COMMAND IDOK for file dialog %r",
                            title.value)
-                PostMessageW(dlg_hwnd, WM_COMMAND, 1, 0)  # IDOK
+                PostMessageW(dlg_hwnd, WM_COMMAND, IDOK, 0)
                 time.sleep(0.5)
                 if not user32.IsWindow(dlg_hwnd):
                     log.debug("File dialog closed via IDOK")
                     last_dismiss_time = time.time()
                     continue
+                # IDOK didn't close it — clicking the accept button now
+                # would just retrigger the same error popup. Force-close
+                # via WM_CLOSE; if even that fails, blacklist the hwnd
+                # so we stop targeting it.
+                log.debug(
+                    "File dialog %r did not close via IDOK — "
+                    "sending WM_CLOSE", title.value,
+                )
+                PostMessageW(dlg_hwnd, WM_CLOSE, 0, 0)
+                time.sleep(0.5)
+                if user32.IsWindow(dlg_hwnd):
+                    log.warning(
+                        "WM_CLOSE ignored for file dialog %r — "
+                        "blacklisting hwnd",
+                        title.value,
+                    )
+                    self._skip_hwnds.add(dlg_hwnd)
+                continue
 
             # Click the first non-reject button via WM_COMMAND.
             reject = self._REJECT_BUTTONS
