@@ -1,9 +1,16 @@
 """Anki-Connect integration for direct note creation in Anki."""
 
 import requests
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Tuple
 
 from ankigammon.anki.card_styles import MODEL_NAME, CARD_CSS
+
+# Historic note-type names. AnkiConnect has no rename action, so when
+# MODEL_NAME changes (commit 6a61037 renamed "XG Backgammon Decision" ->
+# "AnkiGammon"), users carrying notes under the old name would otherwise
+# be invisible to upsert lookups, producing duplicate cards on re-export.
+# Append future renames here; never remove entries.
+LEGACY_MODEL_NAMES: Tuple[str, ...] = ("XG Backgammon Decision",)
 
 
 class AnkiConnect:
@@ -24,6 +31,10 @@ class AnkiConnect:
         """
         self.url = url
         self.deck_name = deck_name
+        # The model new notes should be added to. Resolved by create_model()
+        # to the legacy name if a user is carrying pre-rename notes and has
+        # no current-named model yet, so we don't fork their collection.
+        self._active_model_name: str = MODEL_NAME
 
     def invoke(self, action: str, **params) -> Any:
         """
@@ -122,26 +133,40 @@ class AnkiConnect:
         self.invoke('createDeck', deck=deck_name)
 
     def create_model(self) -> None:
-        """Create the XG Backgammon note type if it doesn't exist."""
+        """Create the AnkiGammon note type if it doesn't exist.
+
+        Resolves ``self._active_model_name`` so subsequent ``add_note``
+        calls land on the right model. If only a legacy model exists in
+        the user's collection (carryover from a pre-rename install),
+        adopt it instead of creating a fresh one alongside it — the
+        rename then stays invisible.
+        """
         model_names = self.invoke('modelNames')
-        if MODEL_NAME in model_names:
-            # Update styling for existing model
-            self.invoke('updateModelStyling', model={'name': MODEL_NAME, 'css': CARD_CSS})
+
+        active = MODEL_NAME if MODEL_NAME in model_names else next(
+            (legacy for legacy in LEGACY_MODEL_NAMES if legacy in model_names),
+            None,
+        )
+
+        if active is not None:
+            self._active_model_name = active
+            self.invoke('updateModelStyling', model={'name': active, 'css': CARD_CSS})
             # Migrate older models that are missing fields added in later versions
-            field_names = self.invoke('modelFieldNames', modelName=MODEL_NAME)
+            field_names = self.invoke('modelFieldNames', modelName=active)
             if 'XGID' not in field_names:
-                self.invoke('modelFieldAdd', modelName=MODEL_NAME, fieldName='XGID', index=0)
-                field_names = self.invoke('modelFieldNames', modelName=MODEL_NAME)
+                self.invoke('modelFieldAdd', modelName=active, fieldName='XGID', index=0)
+                field_names = self.invoke('modelFieldNames', modelName=active)
             if 'AnalysisData' not in field_names:
                 # Append at the end so existing field indices stay stable
                 self.invoke(
                     'modelFieldAdd',
-                    modelName=MODEL_NAME,
+                    modelName=active,
                     fieldName='AnalysisData',
                     index=len(field_names),
                 )
             return
 
+        self._active_model_name = MODEL_NAME
         model = {
             'modelName': MODEL_NAME,
             'inOrderFields': ['XGID', 'Front', 'Back', 'AnalysisData'],
@@ -184,7 +209,7 @@ class AnkiConnect:
 
         note = {
             'deckName': deck_name,
-            'modelName': MODEL_NAME,
+            'modelName': self._active_model_name,
             'fields': {
                 'XGID': xgid,
                 'Front': front,
@@ -201,7 +226,10 @@ class AnkiConnect:
 
     def find_notes_by_xgid(self, xgid: str) -> List[int]:
         """
-        Find note IDs matching an XGID value.
+        Find note IDs matching an XGID value across the current and any
+        legacy note types. Searching legacy names lets upsert match
+        notes created by older versions whose model has since been
+        renamed, preventing duplicate creation on re-export.
 
         Args:
             xgid: XGID string to search for
@@ -210,7 +238,7 @@ class AnkiConnect:
             List of matching note IDs (may be empty)
         """
         escaped_xgid = xgid.replace('"', '\\"')
-        query = f'"XGID:{escaped_xgid}" "note:{MODEL_NAME}"'
+        query = f'"XGID:{escaped_xgid}" {self._note_type_clause()}'
         return self.invoke('findNotes', query=query)
 
     def update_note_fields(
@@ -330,7 +358,9 @@ class AnkiConnect:
 
     def find_all_deck_notes(self, deck_name: str = None) -> List[int]:
         """
-        Find all AnkiGammon note IDs in a specific deck.
+        Find all AnkiGammon note IDs in a specific deck. Searches the
+        current model name and any legacy names so notes carried over
+        from older versions are still discovered.
 
         Args:
             deck_name: Deck name to search. If None, uses self.deck_name.
@@ -341,8 +371,16 @@ class AnkiConnect:
         if deck_name is None:
             deck_name = self.deck_name
         escaped_deck = deck_name.replace('"', '\\"')
-        query = f'"deck:{escaped_deck}" "note:{MODEL_NAME}"'
+        query = f'"deck:{escaped_deck}" {self._note_type_clause()}'
         return self.invoke('findNotes', query=query)
+
+    @staticmethod
+    def _note_type_clause() -> str:
+        """Anki search fragment matching the current or any legacy model."""
+        names = (MODEL_NAME, *LEGACY_MODEL_NAMES)
+        if len(names) == 1:
+            return f'"note:{names[0]}"'
+        return "(" + " OR ".join(f'"note:{name}"' for name in names) + ")"
 
     def notes_info(self, note_ids: List[int]) -> List[dict]:
         """
