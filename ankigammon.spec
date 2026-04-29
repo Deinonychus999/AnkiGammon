@@ -113,12 +113,28 @@ if sys.platform == 'linux':
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
+# Native bootloader splash — shown by PyInstaller's bootloader during onefile
+# extraction, before Python starts. Not supported on macOS, where the .app
+# bundle relies on the OS-level launch indicator + the Qt splash in app.py.
+splash = None
+if sys.platform != 'darwin':
+    splash = Splash(
+        'ankigammon/gui/resources/splash.png',
+        binaries=a.binaries,
+        datas=a.datas,
+        text_pos=None,  # PNG is self-contained; no dynamic text overlay
+        always_on_top=True,
+    )
+
+_exe_extra = [splash, splash.binaries] if splash else []
+
 exe = EXE(
     pyz,
     a.scripts,
     a.binaries,
     a.zipfiles,
     a.datas,
+    *_exe_extra,
     [],
     name='ankigammon',
     debug=False,

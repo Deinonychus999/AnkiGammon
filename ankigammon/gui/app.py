@@ -186,11 +186,23 @@ def main():
     if icon_path.exists():
         app.setWindowIcon(QIcon(str(icon_path)))
 
-    # Show splash screen with PNG icon for high-quality rendering
-    splash_icon_path = get_resource_path("ankigammon/gui/resources/icon.png")
-    splash = create_splash_screen(splash_icon_path)
-    splash.show()
-    app.processEvents()
+    # PyInstaller's bootloader native splash is injected as the `pyi_splash`
+    # module on Windows/Linux frozen builds. When present it has been visible
+    # since onefile extraction began, so we skip the Qt splash to avoid a
+    # visible swap. macOS bundles and dev runs fall through to the Qt splash.
+    try:
+        import pyi_splash  # type: ignore[import-not-found]
+        native_splash_active = pyi_splash.is_alive()
+    except (ImportError, ModuleNotFoundError):
+        pyi_splash = None
+        native_splash_active = False
+
+    splash = None
+    if not native_splash_active:
+        splash_icon_path = get_resource_path("ankigammon/gui/resources/icon.png")
+        splash = create_splash_screen(splash_icon_path)
+        splash.show()
+        app.processEvents()
 
     # Load and apply stylesheet
     style_path = get_resource_path("ankigammon/gui/resources/style.qss")
@@ -201,12 +213,12 @@ def main():
     settings = get_settings()
     window = MainWindow(settings)
 
-    # Display splash screen for minimum 1 second before showing main window
-    def show_main_window():
+    if splash is not None:
         splash.finish(window)
-        window.show()
+    window.show()
 
-    QTimer.singleShot(1000, show_main_window)
+    if native_splash_active and pyi_splash is not None:
+        pyi_splash.close()
 
     return app.exec()
 

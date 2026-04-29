@@ -285,7 +285,9 @@ class MainWindow(QMainWindow):
         </body>
         </html>
         """
-        self.preview.setHtml(self.welcome_html)
+        # Defer setHtml until after the window paints — Chromium subprocess
+        # spawn (~500ms) would otherwise block first paint of the main window.
+        QTimer.singleShot(0, lambda: self.preview.setHtml(self.welcome_html))
         layout.addWidget(self.preview, stretch=2)
 
         # Status bar
