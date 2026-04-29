@@ -284,6 +284,12 @@ class ExportWorker(QThread):
                 except InterruptedError:
                     self.finished.emit(False, "Export cancelled by user")
                     return
+                except Exception as e:
+                    raise RuntimeError(
+                        f"Failed to render position {i+1}/{total} "
+                        f"(xgid={decision.xgid!r}, dice={decision.dice}, "
+                        f"type={decision.decision_type.name}): {e}"
+                    ) from e
 
                 # Add to Anki with the deck name from our grouped structure
                 self.status_message.emit(f"Position {i+1}/{total}: Adding to Anki...")
@@ -435,6 +441,12 @@ class ExportWorker(QThread):
                     except InterruptedError:
                         self.finished.emit(False, "Export cancelled by user")
                         return
+                    except Exception as e:
+                        raise RuntimeError(
+                            f"Failed to render position {card_index+1}/{total} "
+                            f"(xgid={decision.xgid!r}, dice={decision.dice}, "
+                            f"type={decision.decision_type.name}): {e}"
+                        ) from e
 
                     # Create note
                     note = StableNote(

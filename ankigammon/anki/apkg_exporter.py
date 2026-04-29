@@ -160,7 +160,14 @@ class ApkgExporter:
                 if progress_callback:
                     progress_callback(f"Position {card_index+1}/{len(decisions)}: Starting...")
 
-                card_data = card_gen.generate_card(decision, card_id=f"card_{card_index}")
+                try:
+                    card_data = card_gen.generate_card(decision, card_id=f"card_{card_index}")
+                except Exception as e:
+                    raise RuntimeError(
+                        f"Failed to render position {card_index+1}/{len(decisions)} "
+                        f"(xgid={decision.xgid!r}, dice={decision.dice}, "
+                        f"type={decision.decision_type.name}): {e}"
+                    ) from e
 
                 note = StableNote(
                     model=self.model,
