@@ -1,84 +1,48 @@
 # Changelog
 
-## [1.4.0b10] - 2026-03-13
-
-### Fixed
-- File dialog confirmation is more robust across Windows versions and locales (fixes timeout on systems where Enter key was not forwarded to the dialog)
-
-## [1.4.0b9] - 2026-03-12
-
-### Fixed
-- XG automation now works on non-English Windows systems (German, French, Spanish, Japanese, Greek, Russian) by recognizing translated button labels in all 7 XG-supported languages
-
-## [1.4.0b8] - 2026-03-11
+## [1.5.0] - 2026-04-28
 
 ### Added
-- Deck tree for organizing positions into named decks with drag-and-drop support
-- Sync deck structure from Anki via AnkiConnect (automatic on startup, manual via File menu or right-click)
-- Drop files directly onto a deck in the tree to import into that deck
+- **eXtreme Gammon (XG) as an analysis engine** alongside GNU Backgammon (Windows only)
+  - **⚠ Experimental — likely to fail on setups different from those tested. Fall back to GNU Backgammon if it doesn't work and send diagnostic logs (Help → Send Diagnostic Logs).**
+  - Supports eXtreme Gammon 2.10 and 2.19 with auto-detected menu commands
+  - Works on non-English Windows (German, French, Spanish, Japanese, Greek, Russian)
+- **Deck tree** for organizing positions into named decks with drag-and-drop support
+  - Sync deck structure from Anki via AnkiConnect (automatic on startup, manual via File menu or right-click)
+  - Drop files directly onto a deck in the tree to import into that deck
 - Color-coded analysis table rows: yellow for minor errors, red for blunders
-
-### Fixed
-- XGP comment extraction when comment index exceeds embedded RTF document count
-- Board preview scaling in Add Positions dialog
-- .mat file import now correctly detects "point match" format
-- File dialog path corruption in XG automation
+- Cubeless and doubled cubeless equity for XG text and binary parsing
+- "Send Diagnostic Logs" button in the Help menu and persistent debug logging to `~/.ankigammon/ankigammon.log`
 
 ### Improved
+- Faster startup with a native splash screen
+- Card regeneration is decoupled from analysis, so existing rollouts are preserved when changing card settings
+- Pip count is always shown on the back card, regardless of the show_pip_count setting
+- Number of moves shown on the back card is now independent of MCQ mode
+- APKG and AnkiConnect export errors include the failing position for easier troubleshooting
 - Anki model renamed from "XG Backgammon Decision" to "AnkiGammon"
-- XG automation dialog dismissal is more robust with fallback button handling
-
-## [1.4.0b7] - 2026-03-10
-
-### Fixed
-- XG automation now correctly imports .txt and other non-native file formats (e.g. from Backgammon Studio) using Import instead of File > Open, preventing the "Open Saved Game" dialog from blocking analysis
-
-## [1.4.0b6] - 2026-03-09
-
-### Added
-- "Send Diagnostic Logs" button in Help menu to collect and share logs for troubleshooting
-- Persistent debug logging to `~/.ankigammon/ankigammon.log` for diagnosing issues
-
-## [1.4.0b5] - 2026-03-08
+- File dialog confirmation more robust across Windows versions and locales
+- Faster score matrix export by reusing the analysis engine
+- Cancelling analysis/export now terminates immediately instead of waiting for timeout
+- Version number is now shown in the main window title bar
+- Reduced minimum size of the Add Positions dialog
 
 ### Fixed
-- XG position import now uses a temp file instead of the clipboard, preventing interference from user copy/paste activity
-- Clipboard export from XG now validates content and retries automatically if overwritten
-
-## [1.4.0b4] - 2026-03-08
-
-### Added
-- Support for eXtreme Gammon 2.19 (auto-detects version and uses correct menu commands)
-
-### Fixed
-- .mat file import now works correctly in XG automation
-- Cancelling analysis/export immediately terminates the headless XG process instead of waiting for timeout
+- AnkiConnect no longer creates duplicate cards after the note type is renamed.
+  - **If you already have duplicates from an earlier beta:** in Anki's Browse window, search `"note:AnkiGammon" prop:reps=0`, verify the results are unstudied duplicates of cards you already have under `"note:XG Backgammon Decision"`, then select all and delete. Your reviewed cards under the legacy note type will be updated in place by future re-exports.
+- Distinct XGIDs are no longer silently deduplicated on Anki import
+- .xgp imports no longer mix screening-ply and rollout candidates within the same analysis
+- .xgp move imports no longer create a spurious cube card alongside the checker card
+- XG binary bear-off parsing now handles excess pip values correctly
+- Notes from source files are no longer lost when importing multiple files at once
+- .mat file import correctly detects "point match" format and tolerates text headers
+- XG position import uses a temp file instead of the clipboard, preventing interference with copy/paste
+- XG automation correctly imports .txt and other non-native file formats (e.g. from Backgammon Studio)
 - Startup dialogs in XG no longer block automated analysis
-- Score matrix export reuses the existing XG instance instead of launching a second one
-
-## [1.4.0b3] - 2026-03-08
-
-### Fixed
-- Score matrix now reuses the analysis engine, improving export speed
-- Analysis engine label now correctly shows "XG" when using eXtreme Gammon
-- Resolved a Windows threading warning when using XG automation
-
-## [1.4.0b2] - 2026-03-08
-
-### Improved
-- XG automation dependencies (pywinauto, pyautogui) are now bundled with the application
-- eXtreme Gammon integration is disabled on non-Windows platforms
-- Version number now shown in the main window title bar
-
-## [1.4.0b1] - 2026-03-08
-
-### Added
-- eXtreme Gammon (XG) as an analysis engine option alongside GNU Backgammon
-- Double cubeless equity with MET calculation for XG text and binary parsing
-- Pre-release version support for beta releases
-
-### Improved
-- Max moves setting now works independently of MCQ mode
+- Headless XG automation works reliably on Windows 11
+- File dialog path corruption in XG automation
+- Board preview scaling in the Add Positions dialog
+- XGP comments are extracted correctly when the comment index exceeds the embedded RTF document count
 
 ## [1.3.0] - 2026-01-31
 
