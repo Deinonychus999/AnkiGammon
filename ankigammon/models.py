@@ -423,7 +423,8 @@ class Decision:
         else:
             cube_str = f"{self.cube_value}"
 
-        # Position flipping places on-roll player at bottom
+        # "Black" is a sentinel that card_generator.py replaces with a
+        # colored circle indicating the on-roll player's checker color.
         player_name = "Black"
 
         # Build metadata string based on game type
@@ -432,13 +433,19 @@ class Decision:
             if self.crawford:
                 match_str += " (Crawford)"
 
-            # Format score based on preference
-            x_away = self.match_length - self.score_x
-            o_away = self.match_length - self.score_o
+            # Score order follows board orientation: bottom player first.
+            # The on-roll player is rendered at the bottom of the board.
+            if self.on_roll == Player.X:
+                bottom_score, top_score = self.score_x, self.score_o
+            else:
+                bottom_score, top_score = self.score_o, self.score_x
+
             if score_format == "away":
-                score_str = f"{x_away}a-{o_away}a"
+                bottom_away = self.match_length - bottom_score
+                top_away = self.match_length - top_score
+                score_str = f"{bottom_away}a-{top_away}a"
             else:  # "absolute" is the default
-                score_str = f"{self.score_x}-{self.score_o}"
+                score_str = f"{bottom_score}-{top_score}"
 
             return (
                 f"{player_name} | "

@@ -122,7 +122,6 @@ class SettingsDialog(QDialog):
         self.original_settings = Settings()
         self.original_settings.color_scheme = settings.color_scheme
         self.original_settings.swap_checker_colors = settings.swap_checker_colors
-        self.original_settings.deck_name = settings.deck_name
         self.original_settings.use_subdecks_by_type = settings.use_subdecks_by_type
         self.original_settings.show_options = settings.show_options
         self.original_settings.show_pip_count = settings.show_pip_count
@@ -190,11 +189,6 @@ class SettingsDialog(QDialog):
         """Create Anki settings group."""
         group = QGroupBox("Anki Export")
         form = QFormLayout(group)
-
-        # Deck name
-        self.txt_deck_name = QLineEdit()
-        self.txt_deck_name.setToolTip("Subdecks of this deck in Anki will be synced to your deck tree")
-        form.addRow("Anki Deck:", self.txt_deck_name)
 
         # Export method
         self.cmb_export_method = QComboBox()
@@ -580,7 +574,6 @@ class SettingsDialog(QDialog):
 
     def _load_settings(self):
         """Load current settings into widgets."""
-        self.txt_deck_name.setText(self.settings.deck_name)
         self.chk_use_subdecks.setChecked(self.settings.use_subdecks_by_type)
         self.chk_clear_after_export.setChecked(self.settings.clear_positions_after_export)
 
@@ -728,7 +721,6 @@ class SettingsDialog(QDialog):
     def accept(self):
         """Save settings and close dialog."""
         # Update settings object
-        self.settings.deck_name = self.txt_deck_name.text()
         self.settings.use_subdecks_by_type = self.chk_use_subdecks.isChecked()
         self.settings.clear_positions_after_export = self.chk_clear_after_export.isChecked()
         self.settings.export_method = (

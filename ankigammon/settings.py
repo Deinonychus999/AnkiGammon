@@ -16,7 +16,7 @@ class Settings:
     DEFAULT_SETTINGS = {
         "default_color_scheme": "classic",
         "swap_checker_colors": False,
-        "deck_name": "My AnkiGammon Deck",
+        "deck_name": "AnkiGammon",
         "use_subdecks_by_type": False,
         "clear_positions_after_export": True,
         "show_options": True,
@@ -120,12 +120,12 @@ class Settings:
 
     @property
     def deck_name(self) -> str:
-        """Get the default deck name."""
-        return self._settings.get("deck_name", "My AnkiGammon Deck")
+        """Get the default root deck name (used as the parent for synced subdecks)."""
+        return self._settings.get("deck_name", "AnkiGammon")
 
     @deck_name.setter
     def deck_name(self, value: str) -> None:
-        """Set the default deck name."""
+        """Set the default root deck name."""
         self.set("deck_name", value)
 
     @property

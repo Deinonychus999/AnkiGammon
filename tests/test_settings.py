@@ -20,7 +20,7 @@ class TestSettings:
         """Test that default settings are used when no config file exists."""
         settings = Settings(config_path=self.config_path)
         assert settings.color_scheme == "classic"
-        assert settings.deck_name == "My AnkiGammon Deck"
+        assert settings.deck_name == "AnkiGammon"
         assert settings.show_options is True
 
     def test_save_color_scheme(self):
