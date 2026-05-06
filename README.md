@@ -10,12 +10,13 @@ A graphical application for converting backgammon positions into Anki flashcards
 - **Multiple input formats** - XGID/OGID/GNUID position IDs, XG binary files (.xg, .xgp), match files (.mat), SGF files
 - **Direct XG export support** - Copy/paste pre-analyzed positions from eXtreme Gammon
 - **File import with filtering** - Drag-and-drop files with error threshold and player selection
-- **Dual analysis engines** - Analyze positions using GNU Backgammon (cross-platform) or eXtreme Gammon (Windows)
+- **Dual analysis engines** - Analyze positions using GNU Backgammon (cross-platform) or eXtreme Gammon (Windows, experimental; see [Position Analysis](#position-analysis))
 - **Automatic format detection** - Paste any supported format, the app detects it automatically
 - **Two export methods**:
   - AnkiConnect: Push directly to Anki (recommended)
   - APKG: Self-contained package for manual import
 - **Customizable appearance** - 7 color schemes, board orientation (including random), configurable MCQ options (2-10)
+- **Deck tree organization** - Drag-and-drop positions into named decks and subdecks; tree syncs with Anki via AnkiConnect (automatic on startup)
 - **Position management** - Multi-select, add notes, preview positions before export
 - **Automatic update notifications** - Get notified when new versions are available
 - **Comments extraction** - Automatically imports comments and notes from XG files (.xg, .xgp)
@@ -92,8 +93,10 @@ ankigammon  # Launches the GUI
    - **Paste position IDs**: Press Ctrl+N, paste XGID/OGID/GNUID strings (requires GNU Backgammon for analysis)
    - **Import files**: Press Ctrl+O or drag-and-drop files (.xg, .xgp, .mat, .sgf, .txt)
      - For match files: Choose error threshold and which player's mistakes to import
-3. **Configure settings** - Choose color scheme, board orientation, and export method (Ctrl+,)
-4. **Generate cards** - Click "Generate Cards" (Ctrl+E) to create Anki flashcards
+     - Drop files directly onto a deck in the deck tree to import into that deck
+3. **Organize into decks** - Use the deck tree on the left to create named decks/subdecks and drag positions between them. The tree syncs with Anki via AnkiConnect (automatic on startup, or manually via File → Sync Decks from Anki, Ctrl+Shift+D).
+4. **Configure settings** - Choose color scheme, board orientation, and export method (Ctrl+,)
+5. **Generate cards** - Click "Generate Cards" (Ctrl+E) to create Anki flashcards
 
 ### Keyboard Shortcuts
 
@@ -101,6 +104,7 @@ ankigammon  # Launches the GUI
 - **Ctrl+O** - Import file
 - **Ctrl+E** - Export cards
 - **Ctrl+,** - Settings
+- **Ctrl+Shift+D** - Sync decks from Anki
 - **Ctrl+Q** - Quit
 - **Delete/Backspace** - Remove selected positions
 
@@ -108,8 +112,10 @@ ankigammon  # Launches the GUI
 
 Unanalyzed positions (position IDs, match files, SGF files) can be analyzed using one of two engines:
 
-- **GNU Backgammon** — Open-source CLI tool, works on Windows/macOS/Linux
-- **eXtreme Gammon** — Commercial software via UI automation, Windows only
+- **GNU Backgammon**: Open-source CLI tool, works on Windows/macOS/Linux
+- **eXtreme Gammon**: Commercial software via UI automation, Windows only.
+  - ⚠ **Experimental**: likely to fail on setups different from those tested. If it doesn't work for you, fall back to GNU Backgammon and send diagnostic logs (Help → Send Diagnostic Logs).
+  - Supports XG 2.10 and 2.19, with auto-detected menu commands across English, German, French, Spanish, Japanese, Greek, and Russian Windows.
 
 Configure your preferred engine in Settings → Analysis (see Customization Options below).
 
@@ -226,10 +232,10 @@ Open Settings with **Ctrl+,** to configure:
 - **Clear After Export**: Automatically clear the position list after successful export
 
 **Analysis:**
-- **Analysis Engine**: Choose between GNU Backgammon (cross-platform) or eXtreme Gammon (Windows only)
+- **Analysis Engine**: Choose between GNU Backgammon (cross-platform) or eXtreme Gammon (Windows only, experimental)
 - **GNU Backgammon Path**: Configure path to `gnubg-cli` executable
 - **Analysis Ply**: Set GnuBG depth (0-4, default: 3)
-- **eXtreme Gammon Path**: Configure path to `eXtremeGammon2.exe` (Windows only)
+- **eXtreme Gammon Path**: Configure path to `eXtremeGammon2.exe` (Windows only, experimental)
 - **XG Analysis Level**: Set XG depth (Very Quick → Extensive, default: World Class)
 - **Score Matrix**: Generate cube decision matrix for all match scores (optional, time-consuming)
 - **Move Score Matrix**: Generate move analysis at different match contexts - Neutral, DMP, Gammon-Save, Gammon-Go (optional, time-consuming)
