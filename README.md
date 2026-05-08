@@ -346,6 +346,21 @@ Settings persist across application restarts, even when using the standalone exe
 - Dependencies automatically installed via `pip install .`: genanki, requests, PySide6, qtawesome, pywinauto/pyautogui (Windows only, for XG integration)
 - For standalone executable: No requirements - Python and all dependencies are bundled
 
+## Code signing policy
+
+AnkiGammon has applied to the [SignPath Foundation](https://signpath.org/) free code-signing program for open-source projects. Once approved, free code signing on Windows will be provided by [SignPath.io](https://signpath.io/), with a certificate issued by the SignPath Foundation. The policy below describes the signing roles, infrastructure, and privacy posture that will apply to signed releases.
+
+**Signing roles:** AnkiGammon is currently maintained by a single developer, [Deinonychus999](https://github.com/Deinonychus999), who fills all three signing roles (Committer, Reviewer, and Approver). Every signed release is reviewed and approved manually before the certificate is applied; the signing key never leaves SignPath's infrastructure.
+
+**Privacy policy:**
+
+AnkiGammon does not collect telemetry, analytics, or any personal information. The application makes outbound network connections only in the following cases, all of which are user-initiated or configurable:
+
+- **Update check** — On startup, if the *Check for updates* setting is enabled (default: on; toggleable in *Settings → General*), the application queries the GitHub Releases API at `https://api.github.com/repos/Deinonychus999/AnkiGammon/releases` to compare the installed version against the latest published release. Disabling this setting suppresses the request.
+- **AnkiConnect export** — When the *AnkiConnect* export method is selected, the application communicates with Anki's [AnkiConnect](https://ankiweb.net/shared/info/2055492159) add-on on `http://localhost:8765`. No data leaves the local machine.
+
+No data is transmitted to any other system. Source code, build configuration, and the signed binary are reproducible from the public GitHub repository.
+
 ## License
 
 AnkiGammon is licensed under the MIT License. See [LICENSE](LICENSE) for details.
