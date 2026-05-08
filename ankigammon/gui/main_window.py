@@ -558,6 +558,7 @@ class MainWindow(QMainWindow):
 
         self._deck_sync_thread = DeckSyncThread(self.settings.deck_name)
         self._deck_sync_thread.decks_loaded.connect(self._on_anki_decks_loaded)
+        self._deck_sync_thread.finished.connect(self._deck_sync_thread.deleteLater)
         self._deck_sync_thread.start()
 
     @Slot()
@@ -571,6 +572,7 @@ class MainWindow(QMainWindow):
         self._deck_sync_thread = DeckSyncThread(self.settings.deck_name)
         self._deck_sync_thread.decks_loaded.connect(self._on_anki_decks_loaded_manual)
         self._deck_sync_thread.sync_failed.connect(self._on_anki_sync_failed_manual)
+        self._deck_sync_thread.finished.connect(self._deck_sync_thread.deleteLater)
         self._deck_sync_thread.start()
 
     @Slot(list)
@@ -1803,6 +1805,7 @@ class MainWindow(QMainWindow):
             force_check=False
         )
         self._version_checker_thread.update_available.connect(self._on_update_available)
+        self._version_checker_thread.finished.connect(self._version_checker_thread.deleteLater)
         self._version_checker_thread.start()
 
     @Slot()
@@ -1831,6 +1834,7 @@ class MainWindow(QMainWindow):
         self._version_checker_thread.check_failed.connect(on_check_failed)
         self._version_checker_thread.check_complete.connect(on_check_complete)
         self._version_checker_thread.finished.connect(lambda: self._on_manual_check_no_update(checking_dialog))
+        self._version_checker_thread.finished.connect(self._version_checker_thread.deleteLater)
         self._version_checker_thread.start()
 
     def _on_manual_check_no_update(self, checking_dialog):
@@ -1883,5 +1887,20 @@ class MainWindow(QMainWindow):
 
         # Persist deck names for next session
         self.settings.saved_deck_names = self.deck_manager.get_deck_names()
+
+        # Stop any background threads before teardown so queued signals
+        # cannot fire on receivers that QApplication is about to destroy.
+        # The thread C++ objects may already be scheduled for deletion via
+        # deleteLater(), so guard each access with RuntimeError.
+        for attr in ("_version_checker_thread", "_deck_sync_thread"):
+            thread = getattr(self, attr, None)
+            if thread is None:
+                continue
+            try:
+                if thread.isRunning():
+                    thread.quit()
+                    thread.wait(2000)
+            except RuntimeError:
+                pass
 
         event.accept()

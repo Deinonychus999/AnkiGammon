@@ -127,6 +127,7 @@ def main():
     Returns:
         int: Application exit code
     """
+    import faulthandler
     import multiprocessing
     import logging
     from logging.handlers import RotatingFileHandler
@@ -134,6 +135,13 @@ def main():
     # CRITICAL: Required for PyInstaller + multiprocessing on Windows
     # Without this, worker processes will spawn new GUI windows when using ProcessPoolExecutor
     multiprocessing.freeze_support()
+
+    # Persist Python tracebacks across native crashes (Qt fast-fail, segfault).
+    # Kept open for the process lifetime so the dump survives the crash itself.
+    fault_log = Path.home() / ".ankigammon" / "faulthandler.log"
+    fault_log.parent.mkdir(parents=True, exist_ok=True)
+    _fault_log_file = open(fault_log, "a", buffering=1, encoding="utf-8")
+    faulthandler.enable(file=_fault_log_file, all_threads=True)
 
     # Configure logging: DEBUG to file, INFO to console
     root_logger = logging.getLogger()
