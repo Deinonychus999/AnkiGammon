@@ -166,7 +166,9 @@ class MainWindow(QMainWindow):
         self._import_queue = []  # Queue for sequential file imports
         self._import_in_progress = False  # Track if an import is currently being processed
         self._batch_import_results = []  # Accumulate results from batch imports (for combined success message)
-        self._in_batch_import = False  # Flag to track if we're currently in a batch import of .xgp files
+        self._in_batch_import = False  # Flag to track whether we are in a multi-file batch import
+        self._batch_import_options: Optional[dict] = None  # Cached ImportOptionsDialog choices for the current batch
+        self._batch_skipped_files: list = []  # (file_path, reason) tuples for files skipped during the current batch
         self._import_target_deck: Optional[str] = None  # Target deck for file drops on specific deck
         self._file_drag_deck_item: Optional[DeckTreeItem] = None  # Deck highlighted during file drag
         self._drag_expand_timer = QTimer(self)  # Auto-expand collapsed decks during drag hover
@@ -1031,6 +1033,134 @@ class MainWindow(QMainWindow):
         decision.candidate_moves.remove(played_move)
         decision.candidate_moves.insert(max_options - 1, played_move)
 
+    def _prescan_player_names(self, file_paths: List[str]) -> Tuple[dict, int, List[str]]:
+        """
+        Read just the headers of every queued match file and collect distinct
+        player names with occurrence counts.
+
+        Returns:
+            (name_counts, match_file_count, files_without_names) where:
+              - name_counts: Dict[name, count] across all match files
+              - match_file_count: number of files that need filtering (.xg/.mat/.sgf match)
+              - files_without_names: list of paths whose header could not be parsed
+        """
+        from collections import Counter
+        from pathlib import Path
+        from ankigammon.parsers.xg_binary_parser import XGBinaryParser
+        from ankigammon.parsers.gnubg_match_parser import GNUBGMatchParser
+        from ankigammon.parsers.sgf_parser import extract_player_names_from_sgf, is_sgf_position_file
+        import logging
+        logger = logging.getLogger(__name__)
+
+        name_counts: Counter = Counter()
+        match_file_count = 0
+        files_without_names: List[str] = []
+
+        for file_path in file_paths:
+            ext = Path(file_path).suffix.lower()
+            names: Tuple[Optional[str], Optional[str]] = (None, None)
+            is_match = False
+
+            try:
+                if ext == '.xg':
+                    names = XGBinaryParser.extract_player_names(file_path)
+                    is_match = True
+                elif ext in ('.mat', '.txt'):
+                    names = GNUBGMatchParser.extract_player_names_from_mat(file_path)
+                    is_match = True
+                elif ext == '.sgf':
+                    if not is_sgf_position_file(file_path):
+                        names = extract_player_names_from_sgf(file_path)
+                        is_match = True
+                # .xgp position files: no filtering needed, skip
+            except Exception as e:
+                logger.warning(f"Pre-scan: could not extract names from {file_path}: {e}")
+
+            if not is_match:
+                continue
+
+            match_file_count += 1
+            extracted = [n for n in names if n]
+            if not extracted:
+                files_without_names.append(file_path)
+                continue
+            for name in extracted:
+                name_counts[name] += 1
+
+        return dict(name_counts), match_file_count, files_without_names
+
+    def _configure_batch_options(self, file_paths: List[str]) -> bool:
+        """
+        Pre-scan player names and show the batch ImportOptionsDialog once.
+
+        Populates self._batch_import_options on success.
+
+        Returns:
+            False if the user cancelled the dialog (caller should abort import).
+            True otherwise — including the case where no batch dialog was needed
+            (e.g. all files are position files).
+        """
+        from PySide6.QtWidgets import QApplication
+        from PySide6.QtCore import Qt
+
+        QApplication.setOverrideCursor(Qt.WaitCursor)
+        try:
+            name_counts, match_file_count, _ = self._prescan_player_names(file_paths)
+        finally:
+            QApplication.restoreOverrideCursor()
+
+        if match_file_count == 0:
+            # Only position files queued — no filtering needed.
+            return True
+
+        if not name_counts:
+            # Match files exist but no headers parsed. Skip the dialog and let
+            # the per-file path record each one as skipped via _resolve_player_flags
+            # returning (False, False) — keeps the summary the single source of truth.
+            self._batch_import_options = {
+                'checker_threshold': self.settings.import_checker_error_threshold,
+                'cube_threshold': self.settings.import_cube_error_threshold,
+                'selected_player_names': [],
+            }
+            return True
+
+        dialog = ImportOptionsDialog(
+            self.settings,
+            batch_player_counts=name_counts,
+            batch_file_count=match_file_count,
+            parent=self
+        )
+        if not dialog.exec():
+            return False
+
+        checker_threshold, cube_threshold, _, _ = dialog.get_options()
+        self._batch_import_options = {
+            'checker_threshold': checker_threshold,
+            'cube_threshold': cube_threshold,
+            'selected_player_names': list(self.settings.import_selected_player_names),
+        }
+        return True
+
+    @staticmethod
+    def _resolve_player_flags(
+        player1_name: Optional[str],
+        player2_name: Optional[str],
+        selected_names: list[str]
+    ) -> Tuple[bool, bool]:
+        """
+        Resolve (include_player_x, include_player_o) by name-matching.
+
+        XG/match files use player1 = internal Player.O, player2 = Player.X.
+        Returns (False, False) when neither file player is in the selected list,
+        which the caller should treat as 'skip this file'.
+        """
+        selected_lower = {n.strip().lower() for n in selected_names if n}
+        p1 = (player1_name or "").strip().lower()
+        p2 = (player2_name or "").strip().lower()
+        p1_match = bool(p1) and p1 in selected_lower
+        p2_match = bool(p2) and p2 in selected_lower
+        return p2_match, p1_match
+
     def _filter_decisions_by_import_options(
         self,
         decisions: list[Decision],
@@ -1202,20 +1332,42 @@ class MainWindow(QMainWindow):
             # Extract from .mat file
             player1_name, player2_name = GNUBGMatchParser.extract_player_names_from_mat(file_path)
 
-        # Show import options dialog with actual player names
-        import_dialog = ImportOptionsDialog(
-            self.settings,
-            player1_name=player1_name,
-            player2_name=player2_name,
-            parent=self
-        )
+        # Resolve filter options from batch state or by showing the dialog
+        if self._batch_import_options is not None:
+            opts = self._batch_import_options
+            checker_threshold = opts['checker_threshold']
+            cube_threshold = opts['cube_threshold']
+            include_player_x, include_player_o = self._resolve_player_flags(
+                player1_name, player2_name, opts['selected_player_names']
+            )
+            if not (include_player_x or include_player_o):
+                reason = (
+                    "neither player was selected in the batch dialog"
+                    if (player1_name or player2_name)
+                    else "could not extract player names"
+                )
+                logger.info(
+                    f"Skipping {file_path}: {reason}. "
+                    f"File players: {player1_name!r}, {player2_name!r}; "
+                    f"selected: {opts['selected_player_names']!r}"
+                )
+                self._batch_skipped_files.append((file_path, reason))
+                # None signals to the caller: don't add to deck, don't count in batch totals
+                return None, None
+        else:
+            # Single-file import: per-file dialog
+            import_dialog = ImportOptionsDialog(
+                self.settings,
+                player1_name=player1_name,
+                player2_name=player2_name,
+                parent=self
+            )
 
-        if not import_dialog.exec():
-            # User cancelled
-            return None, None
+            if not import_dialog.exec():
+                # User cancelled
+                return None, None
 
-        # Get filter options
-        checker_threshold, cube_threshold, include_player_x, include_player_o = import_dialog.get_options()
+            checker_threshold, cube_threshold, include_player_x, include_player_o = import_dialog.get_options()
 
         # Create progress dialog with spinner
         progress = QProgressDialog(
@@ -1322,11 +1474,15 @@ class MainWindow(QMainWindow):
         # Reset GnuBG check flag for this batch of imports
         self._gnubg_check_shown = False
 
-        # Track if this is a batch import (multiple .xgp files)
-        xgp_files = [f for f in file_paths if f.lower().endswith('.xgp')]
-        if len(xgp_files) > 1:
-            # Set flag to accumulate results for .xgp files
+        # Multi-file selection: pre-scan headers and show a single batch dialog
+        # before any file is processed. Single-file imports keep the per-file
+        # dialog flow.
+        if len(file_paths) > 1:
             self._in_batch_import = True
+            if not self._configure_batch_options(file_paths):
+                # User cancelled the batch dialog; abort the import entirely
+                self._reset_batch_state()
+                return
 
         # Add to import queue and start processing
         self._import_queue.extend(file_paths)
@@ -1449,14 +1605,16 @@ class MainWindow(QMainWindow):
         # Reset GnuBG check flag for this batch of imports
         self._gnubg_check_shown = False
 
+        # Multi-file drop: pre-scan headers and show a single batch dialog
+        # before any file is processed.
+        if len(file_paths) > 1:
+            self._in_batch_import = True
+            if not self._configure_batch_options(file_paths):
+                self._reset_batch_state()
+                return
+
         # Add files to import queue
         self._import_queue.extend(file_paths)
-
-        # Track if this is a batch import (multiple .xgp files)
-        xgp_files = [f for f in file_paths if f.lower().endswith('.xgp')]
-        if len(xgp_files) > 1:
-            # Set flag to accumulate results for .xgp files
-            self._in_batch_import = True
 
         # Start processing the queue
         self._process_import_queue()
@@ -1482,6 +1640,7 @@ class MainWindow(QMainWindow):
         if not self._import_queue:
             self._import_target_deck = None
             self._show_batch_import_results()
+            self._reset_batch_state()
             return
 
         # Mark as in progress
@@ -1503,30 +1662,39 @@ class MainWindow(QMainWindow):
 
         QTimer.singleShot(0, process_file)
 
+    def _reset_batch_state(self):
+        """Clear all batch-import bookkeeping. Called when the queue empties or aborts."""
+        self._batch_import_results.clear()
+        self._batch_skipped_files.clear()
+        self._batch_import_options = None
+        self._in_batch_import = False
+
     def _show_batch_import_results(self):
         """Show combined success message for batch imports."""
-        if not self._batch_import_results:
-            # Reset batch flag even if no results
-            self._in_batch_import = False
+        # If nothing was imported and nothing was skipped, stay silent
+        if not self._batch_import_results and not self._batch_skipped_files:
             return
 
-        # Calculate total positions imported
         total_positions = sum(self._batch_import_results)
         file_count = len(self._batch_import_results)
+        skipped_count = len(self._batch_skipped_files)
 
-        # Build message - simple summary without listing files
-        message = f"Imported {total_positions} position(s) from {file_count} file(s)"
+        lines = [f"Imported {total_positions} position(s) from {file_count} file(s)."]
+        if skipped_count:
+            lines.append("")
+            lines.append(f"Skipped {skipped_count} file(s):")
+            from pathlib import Path
+            shown = self._batch_skipped_files[:10]
+            for path, reason in shown:
+                lines.append(f"  • {Path(path).name} — {reason}")
+            if skipped_count > len(shown):
+                lines.append(f"  …and {skipped_count - len(shown)} more")
 
-        # Show the dialog
         silent_messagebox.information(
             self,
-            "Import Successful",
-            message
+            "Import Successful" if total_positions else "Import Finished",
+            "\n".join(lines)
         )
-
-        # Clear accumulated results and reset batch flag
-        self._batch_import_results.clear()
-        self._in_batch_import = False
 
     def _import_file(self, file_path: str):
         """
@@ -1565,26 +1733,34 @@ class MainWindow(QMainWindow):
                     total_count = len(decisions)
                     logger.info(f"Imported {len(decisions)} position(s) from .xgp file")
                 else:
-                    # Match files may contain many positions - show import options dialog
+                    # Match files may contain many positions - need filtering options
                     # Extract player names from XG file
                     player1_name, player2_name = XGBinaryParser.extract_player_names(file_path)
 
-                    # Show import options dialog for XG match files
-                    import_dialog = ImportOptionsDialog(
-                        self.settings,
-                        player1_name=player1_name,
-                        player2_name=player2_name,
-                        parent=self
-                    )
-                    if import_dialog.exec():
-                        # User accepted - get options
-                        checker_threshold, cube_threshold, include_player_x, include_player_o = import_dialog.get_options()
+                    if self._batch_import_options is not None:
+                        # Reuse the options the user set earlier in the batch
+                        opts = self._batch_import_options
+                        checker_threshold = opts['checker_threshold']
+                        cube_threshold = opts['cube_threshold']
+                        include_player_x, include_player_o = self._resolve_player_flags(
+                            player1_name, player2_name, opts['selected_player_names']
+                        )
 
-                        # Parse all decisions
+                        if not (include_player_x or include_player_o):
+                            reason = (
+                                "neither player was selected in the batch dialog"
+                                if (player1_name or player2_name)
+                                else "could not extract player names"
+                            )
+                            logger.info(
+                                f"Skipping {file_path}: {reason}. "
+                                f"File players: {player1_name!r}, {player2_name!r}; "
+                                f"selected: {opts['selected_player_names']!r}"
+                            )
+                            self._batch_skipped_files.append((file_path, reason))
+                            return
                         all_decisions = XGBinaryParser.parse_file(file_path)
                         total_count = len(all_decisions)
-
-                        # Filter based on user options
                         decisions = self._filter_decisions_by_import_options(
                             all_decisions,
                             checker_threshold,
@@ -1592,11 +1768,30 @@ class MainWindow(QMainWindow):
                             include_player_x,
                             include_player_o
                         )
-
-                        logger.info(f"Filtered {len(decisions)} positions from {total_count} total")
+                        logger.info(f"Filtered {len(decisions)} positions from {total_count} total (batch options)")
                     else:
-                        # User cancelled
-                        return
+                        # Single-file import: per-file dialog
+                        import_dialog = ImportOptionsDialog(
+                            self.settings,
+                            player1_name=player1_name,
+                            player2_name=player2_name,
+                            parent=self
+                        )
+                        if import_dialog.exec():
+                            checker_threshold, cube_threshold, include_player_x, include_player_o = import_dialog.get_options()
+                            all_decisions = XGBinaryParser.parse_file(file_path)
+                            total_count = len(all_decisions)
+                            decisions = self._filter_decisions_by_import_options(
+                                all_decisions,
+                                checker_threshold,
+                                cube_threshold,
+                                include_player_x,
+                                include_player_o
+                            )
+                            logger.info(f"Filtered {len(decisions)} positions from {total_count} total")
+                        else:
+                            # User cancelled
+                            return
 
             elif result.format == InputFormat.MATCH_FILE or result.format == InputFormat.SGF_FILE:
                 # Check if this is an SGF position file (vs a match file)
@@ -1741,18 +1936,12 @@ class MainWindow(QMainWindow):
             from pathlib import Path
             filename = Path(file_path).name
 
-            # Determine if this was a position file (.xgp or SGF position file) import
-            is_position_file = file_path.lower().endswith('.xgp')
-            if result.format == InputFormat.SGF_FILE:
-                from ankigammon.parsers.sgf_parser import is_sgf_position_file
-                is_position_file = is_position_file or is_sgf_position_file(file_path)
-
-            if self._in_batch_import and is_position_file:
-                # Accumulate results for position file batch imports
+            if self._in_batch_import:
+                # Accumulate results across the batch; one combined dialog at the end.
                 self._batch_import_results.append(len(decisions))
                 logger.info(f"Accumulated import result: {len(decisions)} positions from {file_path}")
             else:
-                # Show immediate success message for single imports or .xg match files
+                # Show immediate success message for single-file imports
                 filtered_count = len(decisions)
                 message = f"Imported {filtered_count} position(s) from {filename}"
                 if total_count > filtered_count:
@@ -1766,23 +1955,28 @@ class MainWindow(QMainWindow):
                 logger.info(f"Successfully imported {len(decisions)} positions from {file_path}")
 
         except FileNotFoundError:
-            silent_messagebox.critical(
-                self,
-                "File Not Found",
-                f"Could not find file: {file_path}"
-            )
+            self._handle_import_error(file_path, "file not found", logger)
         except ValueError as e:
-            silent_messagebox.critical(
-                self,
-                "Invalid Format",
-                f"Invalid file format:\n{str(e)}"
-            )
+            self._handle_import_error(file_path, f"invalid format: {e}", logger)
         except Exception as e:
             logger.error(f"Failed to import file {file_path}: {e}", exc_info=True)
+            self._handle_import_error(file_path, f"import error: {e}", logger)
+
+    def _handle_import_error(self, file_path: str, reason: str, logger):
+        """Record or surface an import error depending on batch state.
+
+        In a batch, accumulate so the end-of-batch summary can list it; surface
+        immediately for single-file imports where the user expects per-file feedback.
+        """
+        if self._in_batch_import:
+            self._batch_skipped_files.append((file_path, reason))
+            logger.warning(f"Skipping {file_path}: {reason}")
+        else:
+            from pathlib import Path
             silent_messagebox.critical(
                 self,
                 "Import Failed",
-                f"Failed to import file:\n{str(e)}"
+                f"Could not import {Path(file_path).name}:\n{reason}"
             )
 
     def _check_for_updates_background(self):
