@@ -3,7 +3,7 @@ name: Board Theme Request
 about: Suggest a new color scheme for the backgammon board
 title: '[THEME] '
 labels: enhancement, theme
-assignees: ''
+assignees: 'Deinonychus999'
 ---
 
 <!--
