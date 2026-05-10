@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.6.0] - 2026-05-10
+
+### Added
+- Optional setting to split cube decisions into two focused cards — one for the doubler (should you double?) and one for the receiver (take or pass?). Applies only when importing positions filtered to a single player.
+- Batch import options dialog for configuring multi-file imports in one step
+
+### Improved
+- Lower-tier candidate moves are now kept and tagged with their analysis level instead of being discarded, giving a fuller picture of the analysis
+- Anki subdecks now always sync from a deck named `AnkiGammon` (the deck name setting was removed)
+
+### Fixed
+- Windows Qt6Core fast-fail crash on startup
+- Trailing free-text notes are now captured from XG analysis exports
+- Score in the card metadata now matches the board orientation (bottom player's score shown first)
+
 ## [1.5.0] - 2026-04-28
 
 ### Added
