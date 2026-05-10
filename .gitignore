@@ -57,3 +57,15 @@ temp/
 CLAUDE.md
 .claude/
 match_files
+
+# QA / debug artifacts
+# qa_split_cube.py dumps the viewer to the repo root; ad-hoc smoke tests
+# leave behind HTML/SVG files. None of these belong in version control.
+_qa_artifacts.html
+_test_*.html
+/default.svg
+/variant.svg
+*_diff.txt
+
+# Local fixture / dump data — large, user-specific, never shared
+xg_dump/

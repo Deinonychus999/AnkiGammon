@@ -1062,8 +1062,31 @@ class XGBinaryParser:
             # Swap borne-off counts
             position.x_off, position.o_off = position.o_off, position.x_off
 
-        # Generate XGID for the position
-        crawford_jacoby = 1 if crawford else 0
+        # Detect beaverable take and the Beavers/Jacoby rules from XG's
+        # Doubled.* fields, computed early so we can include the bits in the
+        # generated XGID below. Doubled.Jacoby holds the same bitfield as
+        # XGID field 7 (bit 0 = Jacoby, bit 1 = Beavers-allowed).
+        beaverable = False
+        beavers_allowed = False
+        jacoby = False
+        if hasattr(cube_entry, 'Doubled') and cube_entry.Doubled:
+            beaverable = bool(cube_entry.Doubled.get('isBeaver', 0))
+            jacoby_bits = cube_entry.Doubled.get('Jacoby', 0) or 0
+            beavers_allowed = match_length == 0 and bool(jacoby_bits & 2)
+            jacoby = match_length == 0 and bool(jacoby_bits & 1)
+        # If the engine flagged the take as beaverable, the rule must be on.
+        beavers_allowed = beavers_allowed or beaverable
+
+        # Generate XGID. Compose field 7 (Crawford/Jacoby/Beavers) via the
+        # GameRules value type so the polymorphism-by-match_length lives in
+        # exactly one place.
+        from ankigammon.models import GameRules
+        crawford_jacoby = GameRules(
+            match_length=match_length,
+            crawford=crawford if match_length > 0 else False,
+            jacoby=jacoby if match_length == 0 else False,
+            beavers_allowed=beavers_allowed if match_length == 0 else False,
+        ).to_xgid_field()
         xgid = position.to_xgid(
             cube_value=cube_value,
             cube_owner=cube_owner,
@@ -1141,6 +1164,18 @@ class XGBinaryParser:
                 # Money game: double equity is exactly 2x
                 decision_double_cubeless_equity = decision_cubeless_equity * 2 if decision_cubeless_equity is not None else None
 
+        # Detect beaverable take from XG's analysis (Doubled.isBeaver flag).
+        # Doubled.Jacoby is the same bitfield as XGID field 7 (bit 0 = Jacoby,
+        # bit 1 = Beavers allowed) and is only meaningful for unlimited games.
+        beaverable = False
+        beavers_allowed = False
+        if hasattr(cube_entry, 'Doubled') and cube_entry.Doubled:
+            beaverable = bool(cube_entry.Doubled.get('isBeaver', 0))
+            jacoby_bits = cube_entry.Doubled.get('Jacoby', 0) or 0
+            beavers_allowed = match_length == 0 and bool(jacoby_bits & 2)
+        # If the engine flagged the take as beaverable, the rule must be on.
+        beavers_allowed = beavers_allowed or beaverable
+
         # Create Decision
         decision = Decision(
             position=position,
@@ -1168,7 +1203,10 @@ class XGBinaryParser:
             source_description=f"XG file '{filename}'",
             original_position_format=file_format,
             game_number=game_number,
-            note=note
+            note=note,
+            beaverable=beaverable,
+            beavers_allowed=beavers_allowed,
+            jacoby=jacoby,
         )
 
         return decision

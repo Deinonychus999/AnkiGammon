@@ -332,6 +332,20 @@ class SettingsDialog(QDialog):
         )
         form.addRow(self.chk_interactive_moves)
 
+        # Split cube decisions into separate doubler/receiver cards
+        self.chk_split_cube_decisions = QCheckBox("Split cube decisions by player")
+        self.chk_split_cube_decisions.setCursor(Qt.PointingHandCursor)
+        self.chk_split_cube_decisions.setStyleSheet("font-size: 14px;")
+        self.chk_split_cube_decisions.setToolTip(
+            "When importing matches and filtering to a single player, generate a focused\n"
+            "card for the decision that player got wrong:\n"
+            "  • Doubler-only card (Double / Roll) if they erred on the doubling decision\n"
+            "  • Receiver-only card (Take / Pass / Beaver) if they erred on the take decision —\n"
+            "    shown from the receiver's POV with the cube prominently displayed.\n"
+            "Pure XGID imports and both-players imports always show the full 5-option card."
+        )
+        form.addRow(self.chk_split_cube_decisions)
+
         # Connect checkbox to enable/disable preview sub-option
         self.chk_show_options.toggled.connect(self._on_show_options_toggled_preview)
 
@@ -600,6 +614,7 @@ class SettingsDialog(QDialog):
         self.cmb_score_format.setCurrentIndex(score_format_index)
         self.chk_interactive_moves.setChecked(self.settings.interactive_moves)
         self.chk_preview_moves.setChecked(self.settings.preview_moves_before_submit)
+        self.chk_split_cube_decisions.setChecked(self.settings.split_cube_decisions)
 
         # Max moves dropdown (index is value minus 2)
         self.cmb_max_moves.setCurrentIndex(self.settings.max_moves - 2)
@@ -734,6 +749,7 @@ class SettingsDialog(QDialog):
         self.settings.score_format = self.cmb_score_format.currentData()
         self.settings.interactive_moves = self.chk_interactive_moves.isChecked()
         self.settings.preview_moves_before_submit = self.chk_preview_moves.isChecked()
+        self.settings.split_cube_decisions = self.chk_split_cube_decisions.isChecked()
         self.settings.max_moves = self.cmb_max_moves.currentIndex() + 2
         self.settings.analyzer_type = self.cmb_analyzer_type.currentData()
         self.settings.gnubg_path = self.txt_gnubg_path.text() or None

@@ -749,17 +749,51 @@ class MainWindow(QMainWindow):
 
     def show_decision(self, decision: Decision):
         """Display a decision in the preview pane."""
-        # Generate SVG for the position
+        # Mirror the split-cube variant rendering in CardGenerator.generate_card
+        # so the preview matches what the exported Anki card will look like.
+        from ankigammon.models import DecisionType, Player, CubeState
+        from ankigammon.anki.card_generator import CardGenerator
+
+        position = decision.position
+        on_roll = decision.on_roll
+        cube_value = decision.cube_value
+        cube_owner = decision.cube_owner
+        score_x = decision.score_x
+        score_o = decision.score_o
+        cube_offered = False
+
+        if (
+            self.settings.split_cube_decisions
+            and decision.decision_type == DecisionType.CUBE_ACTION
+            and decision.user_player is not None
+        ):
+            doubler = decision.on_roll
+            responder = Player.X if doubler == Player.O else Player.O
+            if decision.user_player == responder:
+                # Take card: physically flip the position so the receiver sits
+                # at the bottom (the parser had put the doubler there for the
+                # standard 5-option card view).
+                position = CardGenerator._flip_position_for_pov(position)
+                score_x, score_o = score_o, score_x
+                on_roll = Player.O if on_roll == Player.X else Player.X
+                if cube_owner == CubeState.X_OWNS:
+                    cube_owner = CubeState.O_OWNS
+                elif cube_owner == CubeState.O_OWNS:
+                    cube_owner = CubeState.X_OWNS
+                cube_value = decision.cube_value * 2
+                cube_offered = True
+
         svg = self.renderer.render_svg(
-            decision.position,
+            position,
             dice=decision.dice,
-            on_roll=decision.on_roll,
-            cube_value=decision.cube_value,
-            cube_owner=decision.cube_owner,
-            score_x=decision.score_x,
-            score_o=decision.score_o,
+            on_roll=on_roll,
+            cube_value=cube_value,
+            cube_owner=cube_owner,
+            score_x=score_x,
+            score_o=score_o,
             match_length=decision.match_length,
             score_format=self.settings.score_format,
+            cube_offered=cube_offered,
         )
 
         # Wrap SVG in minimal HTML with dark theme
@@ -1242,8 +1276,28 @@ class MainWindow(QMainWindow):
                 if include_decision:
                     # Include the played move in MCQ candidates
                     self._ensure_played_move_in_candidates(decision, played_move)
+
+                    # When the user filtered to a single player, tag which player
+                    # this decision was kept for. This drives split-cube card variants
+                    # (doubler-only / receiver-only) downstream in card_generator.
+                    # When both players are included we leave user_player=None so the
+                    # full 5-option card is generated.
+                    only_x = include_player_x and not include_player_o
+                    only_o = include_player_o and not include_player_x
+                    if only_x:
+                        # Side that erred determines variant (doubler vs responder)
+                        if doubler == Player.X and doubler_made_error:
+                            decision.user_player = Player.X
+                        elif responder == Player.X and responder_made_error:
+                            decision.user_player = Player.X
+                    elif only_o:
+                        if doubler == Player.O and doubler_made_error:
+                            decision.user_player = Player.O
+                        elif responder == Player.O and responder_made_error:
+                            decision.user_player = Player.O
+
                     filtered.append(decision)
-                    logger.debug(f"Added cube decision to filtered list")
+                    logger.debug(f"Added cube decision to filtered list (user_player={decision.user_player})")
             else:
                 # For checker play from XG binary files, use XG's authoritative ErrMove field
                 # Otherwise fall back to recalculated error
@@ -1859,7 +1913,17 @@ class MainWindow(QMainWindow):
 
                         position, metadata = parse_gnuid(gnuid_str)
 
-                        # Generate XGID for the position
+                        # Generate XGID for the position. Field 7 polymorphism
+                        # (Crawford in match / Jacoby+Beavers in unlimited) is
+                        # encapsulated in GameRules.
+                        from ankigammon.models import GameRules
+                        match_len = metadata.get('match_length', 0)
+                        crawford_jacoby = GameRules(
+                            match_length=match_len,
+                            crawford=metadata.get('crawford', False) if match_len > 0 else False,
+                            jacoby=metadata.get('jacoby', False) if match_len == 0 else False,
+                            beavers_allowed=metadata.get('beavers_allowed', False) if match_len == 0 else False,
+                        ).to_xgid_field()
                         xgid = position.to_xgid(
                             cube_value=metadata.get('cube_value', 1),
                             cube_owner=metadata.get('cube_owner'),
@@ -1867,8 +1931,8 @@ class MainWindow(QMainWindow):
                             on_roll=metadata.get('on_roll', Player.X),
                             score_x=metadata.get('score_x', 0),
                             score_o=metadata.get('score_o', 0),
-                            match_length=metadata.get('match_length', 0),
-                            crawford_jacoby=1 if metadata.get('crawford', False) else 0
+                            match_length=match_len,
+                            crawford_jacoby=crawford_jacoby,
                         )
 
                         # Create a decision with no analysis

@@ -121,8 +121,13 @@ def parse_xgid(xgid: str) -> Tuple[Position, dict]:
     # Match length
     metadata['match_length'] = match_length
 
-    # Crawford/Jacoby
+    # Crawford/Jacoby field is a bitfield. In match play (match_length > 0)
+    # bit 0 is the Crawford flag; in unlimited games (match_length == 0) bit 0
+    # is Jacoby and bit 1 is "Beavers allowed". GnuBG honors bit 1 when
+    # producing "No double, beaver" in its Proper-cube-action line.
     metadata['crawford_jacoby'] = crawford_jacoby
+    metadata['beavers_allowed'] = match_length == 0 and bool(crawford_jacoby & 2)
+    metadata['jacoby'] = match_length == 0 and bool(crawford_jacoby & 1)
 
     # Max cube
     metadata['max_cube'] = 2 ** max_cube if max_cube >= 0 else 256

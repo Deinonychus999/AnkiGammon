@@ -24,6 +24,71 @@ class DecisionType(Enum):
     CUBE_ACTION = "cube_action"
 
 
+@dataclass(frozen=True)
+class GameRules:
+    """Game-rule flags carried by XGID field 7.
+
+    Per the XGID spec, the meaning of the bits depends on match_length:
+
+      Match play (match_length > 0):
+          bit 0 = Crawford rule. Higher bits are unused.
+
+      Unlimited (match_length == 0):
+          value = Jacoby + 2*Beaver
+          bit 0 = Jacoby, bit 1 = Beavers-allowed.
+
+    Encapsulating the polymorphism here means the rest of the code can read
+    `rules.crawford` / `rules.jacoby` / `rules.beavers_allowed` without bit-
+    twiddling, and impossible combinations (e.g. crawford in unlimited) are
+    rejected at construction time.
+    """
+
+    match_length: int = 0
+    crawford: bool = False
+    jacoby: bool = False
+    beavers_allowed: bool = False
+
+    def __post_init__(self):
+        if self.match_length < 0:
+            raise ValueError(f"match_length must be >= 0, got {self.match_length}")
+        if self.match_length > 0:
+            if self.jacoby or self.beavers_allowed:
+                raise ValueError(
+                    "jacoby/beavers_allowed only apply to unlimited games "
+                    f"(match_length == 0); got match_length={self.match_length}"
+                )
+        else:  # match_length == 0
+            if self.crawford:
+                raise ValueError(
+                    "crawford only applies to match play; "
+                    "got match_length=0 with crawford=True"
+                )
+
+    @classmethod
+    def from_xgid_field(cls, match_length: int, cj: int) -> "GameRules":
+        """Decode XGID field 7 into a GameRules.
+
+        cj is the integer at field 7. In match play only bit 0 is meaningful;
+        higher bits are dropped (XG can emit cj=3 in match play and we treat
+        bit 1 as a no-op rather than an error).
+        """
+        if cj < 0 or cj > 3:
+            raise ValueError(f"XGID field 7 must be in [0, 3], got {cj}")
+        if match_length > 0:
+            return cls(match_length=match_length, crawford=bool(cj & 1))
+        return cls(
+            match_length=0,
+            jacoby=bool(cj & 1),
+            beavers_allowed=bool(cj & 2),
+        )
+
+    def to_xgid_field(self) -> int:
+        """Encode this rules set as the XGID field 7 integer."""
+        if self.match_length > 0:
+            return 1 if self.crawford else 0
+        return (1 if self.jacoby else 0) | (2 if self.beavers_allowed else 0)
+
+
 @dataclass
 class Position:
     """
@@ -335,11 +400,36 @@ class Decision:
     # User annotations
     note: Optional[str] = None  # User's note or explanation for this position
 
+    # Cube-card variant signals (only meaningful for CUBE_ACTION decisions)
+    user_player: Optional[Player] = None  # Set during import filtering when only one player is studied; None means full card
+    beaverable: bool = False  # True iff analyzer flagged the take as beaverable (used for take card MCQ in unlimited games)
+    beavers_allowed: bool = False  # True iff the Beavers rule is enabled for this game (XGID field 7 bit 1, only meaningful for match_length == 0)
+    jacoby: bool = False  # True iff the Jacoby rule is enabled for this game (XGID field 7 bit 0, only meaningful for match_length == 0)
+
     def __post_init__(self):
         """Post-initialization processing."""
         # Sort dice so larger value is first (e.g., (3, 6) -> (6, 3))
         if self.dice is not None:
             self.dice = tuple(sorted(self.dice, reverse=True))
+        # Validate the rule flags via GameRules. Constructing one will raise
+        # ValueError on impossible combinations (e.g. match_length=5 with
+        # jacoby=True, or unlimited with crawford=True).
+        GameRules(
+            match_length=self.match_length,
+            crawford=self.crawford,
+            jacoby=self.jacoby,
+            beavers_allowed=self.beavers_allowed,
+        )
+
+    @property
+    def rules(self) -> "GameRules":
+        """Read-only view of the rule flags as a single value object."""
+        return GameRules(
+            match_length=self.match_length,
+            crawford=self.crawford,
+            jacoby=self.jacoby,
+            beavers_allowed=self.beavers_allowed,
+        )
 
     def get_best_move(self) -> Optional[Move]:
         """Get the best move (rank 1)."""

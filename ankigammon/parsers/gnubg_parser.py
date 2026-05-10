@@ -80,6 +80,22 @@ class GNUBGParser:
             decision.opponent_backgammon_pct = winning_chances.get('opponent_backgammon_pct')
             decision.cubeless_equity = winning_chances.get('cubeless_equity')
 
+        # Detect beaverable cube actions from gnubg's "Proper cube action:" line.
+        if decision_type == DecisionType.CUBE_ACTION:
+            proper_match = re.search(
+                r'Proper cube action:\s*(.+?)(?:\n|$)', gnubg_output, re.IGNORECASE
+            )
+            if proper_match and "beaver" in proper_match.group(1).lower():
+                decision.beaverable = True
+
+        # Beavers-allowed comes from XGID field 7 bit 1; if the engine flagged
+        # the take as beaverable that also implies the rule is on. Jacoby is
+        # bit 0 of the same field (only meaningful in unlimited games).
+        decision.beavers_allowed = (
+            bool(metadata.get('beavers_allowed', False)) or decision.beaverable
+        )
+        decision.jacoby = bool(metadata.get('jacoby', False))
+
         return decision
 
     @staticmethod

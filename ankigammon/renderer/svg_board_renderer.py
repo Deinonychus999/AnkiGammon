@@ -66,6 +66,8 @@ class SVGBoardRenderer:
         match_length: int = 0,
         score_format: str = "absolute",
         show_pip_count: Optional[bool] = None,
+        view_from: Optional[Player] = None,
+        cube_offered: bool = False,
     ) -> str:
         """
         Render a backgammon position as SVG.
@@ -83,6 +85,8 @@ class SVGBoardRenderer:
             match_length: Match length (0 = unlimited game, > 0 = match play)
             score_format: "absolute" (current scores) or "away" (points needed to win)
             show_pip_count: Override the global show_pip_count setting (None = use setting)
+            view_from: If provided, render with this player at the bottom of the board
+                instead of the on-roll player. Used for receiver-POV cube take cards.
 
         Returns:
             SVG markup string
@@ -117,8 +121,13 @@ class SVGBoardRenderer:
         svg_parts.append(self._draw_points(board_x, board_y))
 
         # Draw checkers
-        # When X is on roll, the board is flipped (X at bottom, O at top)
-        flipped = (on_roll == Player.X)
+        # By default the on-roll player sits at the bottom (flipped iff X is on roll).
+        # When view_from is provided, that player sits at the bottom instead — used
+        # for receiver-POV cube take cards.
+        if view_from is not None:
+            flipped = (view_from == Player.X)
+        else:
+            flipped = (on_roll == Player.X)
         svg_parts.append(self._draw_checkers(position, board_x, board_y, flipped, move_data))
 
         # Draw bear-off trays
@@ -128,8 +137,18 @@ class SVGBoardRenderer:
         if dice:
             svg_parts.append(self._draw_dice(dice, on_roll, board_x, board_y, dice_opacity))
 
-        # Draw cube
-        svg_parts.append(self._draw_cube(cube_value, cube_owner, board_x, board_y, flipped))
+        # Draw cube. When cube_offered is set, the cube has been doubled but
+        # not yet accepted — draw it inside the playing area (on the bar) on
+        # the side opposite the doubler/on-roll player. Otherwise use the
+        # standard side-area placement keyed on cube_owner.
+        if cube_offered:
+            svg_parts.append(
+                self._draw_offered_cube(cube_value, board_x, board_y)
+            )
+        else:
+            svg_parts.append(
+                self._draw_cube(cube_value, cube_owner, board_x, board_y, flipped)
+            )
 
         # Draw pip counts (caller may override the global setting)
         pip_count_visible = (
@@ -139,14 +158,11 @@ class SVGBoardRenderer:
             svg_parts.append(self._draw_pip_counts(position, board_x, board_y, flipped))
 
         # Draw scores (for match play only)
-        # When X is on roll, position is flipped so X is at bottom, O at top
-        # Swap score display to match visual player positions
+        # `flipped` means X is at bottom, O at top — show O's score at top, X's at bottom
         if match_length > 0:
-            if on_roll == Player.X:
-                # X at bottom, O at top -> show O's score at top, X's at bottom
+            if flipped:
                 svg_parts.append(self._draw_scores(score_o, score_x, match_length, board_x, board_y, flipped, score_format))
             else:
-                # O at bottom, X at top -> show X's score at top, O's at bottom
                 svg_parts.append(self._draw_scores(score_x, score_o, match_length, board_x, board_y, flipped, score_format))
 
         # Close SVG
@@ -636,6 +652,42 @@ class SVGBoardRenderer:
 
         return ''.join(svg_parts)
 
+    def _draw_offered_cube(
+        self,
+        cube_value: int,
+        board_x: float,
+        board_y: float,
+    ) -> str:
+        """Draw a doubling cube that has been offered but not yet accepted.
+
+        Convention (per XG/GnuBG): the cube sits inside the playing area
+        horizontally centered in the outer-board half — the left side in
+        counter-clockwise orientation, the right side in clockwise — and
+        vertically centered on the board (sitting on the outer-board boundary).
+        """
+        cube_size = 50
+
+        # Horizontal: middle of the receiver's outer-board half. The outer
+        # board is on the LEFT in counter-clockwise, RIGHT in clockwise.
+        if self.orientation == "clockwise":
+            outer_center_x = board_x + self.half_width + self.bar_width + self.half_width / 2
+        else:
+            outer_center_x = board_x + self.half_width / 2
+        cube_x = outer_center_x - cube_size / 2
+
+        # Vertically centered on the board (matches XG/GnuBG convention for
+        # an offered cube — it sits on the outer-board boundary, not biased
+        # toward either player's half).
+        cube_y = board_y + (self.board_height - cube_size) / 2
+
+        return f'''
+<g class="cube cube-offered">
+    <rect class="cube" x="{cube_x}" y="{cube_y}"
+          width="{cube_size}" height="{cube_size}" rx="3"/>
+    <text class="cube-text" x="{cube_x + cube_size / 2}" y="{cube_y + cube_size / 2 + 2}">{cube_value}</text>
+</g>
+'''
+
     def _draw_cube(
         self,
         cube_value: int,
@@ -667,7 +719,15 @@ class SVGBoardRenderer:
             cube_x = cube_area_center - cube_size / 2
             cube_y = board_y + 10 if not flipped else board_y + self.board_height - cube_size - 10
 
-        text = "64" if cube_owner == CubeState.CENTERED else str(cube_value)
+        # A centered cube at the starting value 1 shows "64" by convention
+        # (the max value the cube can reach). Any centered cube with a non-1
+        # value represents a cube that's been offered but not yet accepted —
+        # show its actual value so the receiver sees what they're being asked
+        # to take.
+        if cube_owner == CubeState.CENTERED and cube_value <= 1:
+            text = "64"
+        else:
+            text = str(cube_value)
 
         return f'''
 <g class="cube">

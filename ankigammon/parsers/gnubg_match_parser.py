@@ -584,7 +584,15 @@ class GNUBGMatchParser:
             opponent_win_pct=no_double_probs[3] * 100 if no_double_probs else None,
             opponent_gammon_pct=no_double_probs[4] * 100 if no_double_probs else None,
             opponent_backgammon_pct=no_double_probs[5] * 100 if no_double_probs else None,
-            source_description=metadata.get('source_description')
+            source_description=metadata.get('source_description'),
+            beaverable=bool(proper_action and "beaver" in proper_action.lower()),
+            # Beavers are an unlimited-game-only rule. Match files don't carry
+            # an explicit Beavers-allowed flag, but if gnubg flagged the
+            # position as beaverable in an unlimited game, the rule must be on.
+            beavers_allowed=(
+                metadata.get('match_length', 0) == 0
+                and bool(proper_action and "beaver" in proper_action.lower())
+            ),
         )
 
         return decision
@@ -953,7 +961,15 @@ class GNUBGMatchParser:
             opponent_win_pct=no_double_probs[3] * 100 if no_double_probs else None,
             opponent_gammon_pct=no_double_probs[4] * 100 if no_double_probs else None,
             opponent_backgammon_pct=no_double_probs[5] * 100 if no_double_probs else None,
-            source_description=metadata.get('source_description')
+            source_description=metadata.get('source_description'),
+            beaverable=bool(proper_action and "beaver" in proper_action.lower()),
+            # Beavers are an unlimited-game-only rule. Match files don't carry
+            # an explicit Beavers-allowed flag, but if gnubg flagged the
+            # position as beaverable in an unlimited game, the rule must be on.
+            beavers_allowed=(
+                metadata.get('match_length', 0) == 0
+                and bool(proper_action and "beaver" in proper_action.lower())
+            ),
         )
 
         return decision

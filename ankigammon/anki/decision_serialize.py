@@ -122,4 +122,8 @@ def decision_from_json(blob: str) -> Decision:
         game_number=data.get("game_number"),
         move_number=data.get("move_number"),
         note=data.get("note"),
+        user_player=Player(data["user_player"]) if data.get("user_player") is not None else None,
+        beaverable=data.get("beaverable", False),
+        beavers_allowed=data.get("beavers_allowed", False),
+        jacoby=data.get("jacoby", False),
     )

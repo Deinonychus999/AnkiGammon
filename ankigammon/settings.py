@@ -29,6 +29,7 @@ class Settings:
         "gnubg_analysis_ply": 3,
         "generate_score_matrix": False,
         "generate_move_score_matrix": False,
+        "split_cube_decisions": False,
         "board_orientation": "counter-clockwise",
         "last_apkg_directory": None,
         "import_checker_error_threshold": 0.080,
@@ -249,6 +250,16 @@ class Settings:
     def generate_move_score_matrix(self, value: bool) -> None:
         """Set whether to generate move score matrix for checker play decisions."""
         self.set("generate_move_score_matrix", value)
+
+    @property
+    def split_cube_decisions(self) -> bool:
+        """Get whether to split cube decisions into doubler-only / receiver-only cards
+        when the import filtered to a single player."""
+        return self._settings.get("split_cube_decisions", False)
+
+    @split_cube_decisions.setter
+    def split_cube_decisions(self, value: bool) -> None:
+        self.set("split_cube_decisions", value)
 
     @property
     def board_orientation(self) -> str:

@@ -7,7 +7,7 @@ import html
 from pathlib import Path
 from typing import List, Dict, Optional, Tuple
 
-from ankigammon.models import Decision, Move, Player, DecisionType
+from ankigammon.models import Decision, Move, Player, DecisionType, CubeState
 from ankigammon.renderer.svg_board_renderer import SVGBoardRenderer
 from ankigammon.renderer.animation_controller import AnimationController
 from ankigammon.utils.move_parser import MoveParser
@@ -127,22 +127,70 @@ class CardGenerator:
                 "For XGID-only input, use GnuBG analysis to populate moves."
             )
 
+        # If split_cube_decisions is on and the import filter tagged this
+        # decision with a single user_player, swap in a focused 2- or 3-option
+        # MCQ (Roll/Double for the doubler, Take/Pass[/Beaver] for the receiver)
+        # and render the board from the appropriate POV.
+        cube_variant = self._maybe_build_cube_variant(decision)
+        variant_candidates: Optional[List[Move]] = None
+        variant_cube_value: Optional[int] = None
+        variant_cube_offered: bool = False
+        variant_flip_for_receiver: bool = False
+        variant_kind: Optional[str] = None
+        if cube_variant is not None:
+            variant_candidates, _ = cube_variant
+            variant_notations = {c.notation for c in variant_candidates if c}
+            # Receiver take card: synthetic candidates are Take/Pass(/Beaver).
+            # Show the doubled cube as an offered (unaccepted) cube — drawn
+            # inside the playing area — and physically flip the position so
+            # the receiver sits at the bottom (the parser put the doubler
+            # there, which is what the existing 5-option card wants).
+            if "Take" in variant_notations:
+                variant_cube_value = decision.cube_value * 2
+                variant_cube_offered = True
+                variant_flip_for_receiver = True
+                variant_kind = (
+                    "receiver_with_beaver"
+                    if "Beaver" in variant_notations
+                    else "receiver"
+                )
+            else:
+                variant_kind = "doubler"
+
         # Generate position SVG
         # Front uses the global show_pip_count setting; back always shows pip count
         # so the user can verify the answer regardless of the setting.
-        position_svg_front = self._render_position_svg(decision)
-        position_svg_back = self._render_position_svg(decision, show_pip_count=True)
+        position_svg_front = self._render_position_svg(
+            decision,
+            cube_value_override=variant_cube_value,
+            cube_offered=variant_cube_offered,
+            flip_for_receiver_pov=variant_flip_for_receiver,
+        )
+        position_svg_back = self._render_position_svg(
+            decision,
+            show_pip_count=True,
+            cube_value_override=variant_cube_value,
+            cube_offered=variant_cube_offered,
+            flip_for_receiver_pov=variant_flip_for_receiver,
+        )
 
         # Prepare candidate moves
         max_options = self.settings.max_moves
         if decision.decision_type == DecisionType.CUBE_ACTION:
-            # Cube decisions always show all 5 actions
+            # Cube decisions always show all 5 actions in the analysis table
             candidates = decision.candidate_moves[:5]
         else:
             candidates = decision.candidate_moves[:max_options]
 
-        # Shuffle candidates for MCQ (preserve order for cube decisions)
-        if decision.decision_type == DecisionType.CUBE_ACTION:
+        # Shuffle candidates for MCQ (preserve order for cube decisions and variants).
+        # For split-cube variants, the front-of-card MCQ uses the focused 2- or 3-option
+        # set while the back-of-card analysis table still shows the full 5-option set.
+        if variant_candidates is not None:
+            shuffled_candidates = variant_candidates
+            answer_index = next(
+                (i for i, c in enumerate(variant_candidates) if c and c.rank == 1), 0
+            )
+        elif decision.decision_type == DecisionType.CUBE_ACTION:
             # Preserve logical order for cube actions
             shuffled_candidates = candidates
             answer_index = next((i for i, c in enumerate(candidates) if c and c.rank == 1), 0)
@@ -163,10 +211,15 @@ class CardGenerator:
         )
 
         if not self.interactive_moves and not preview_enabled:
-            # Render only the best move's resulting position (back card)
-            if best_move:
+            # Render only the best move's resulting position (back card).
+            # For split-cube variants the synthetic moves don't represent
+            # checker plays, so we just re-render the original position from
+            # the variant's POV.
+            if variant_candidates is not None:
+                result_svg = position_svg_back
+            elif best_move:
                 result_svg = self._render_resulting_position_svg(
-                    decision, best_move, show_pip_count=True
+                    decision, best_move, show_pip_count=True,
                 )
             else:
                 result_svg = None
@@ -180,14 +233,19 @@ class CardGenerator:
             if preview_enabled:
                 for candidate in shuffled_candidates:
                     if candidate:
-                        result_svg_for_move = self._render_resulting_position_svg(decision, candidate)
+                        result_svg_for_move = self._render_resulting_position_svg(
+                            decision, candidate
+                        )
                         move_result_svgs_front[candidate.notation] = result_svg_for_move
 
-            if self.interactive_moves:
+            if self.interactive_moves and variant_candidates is None:
+                # Skip per-move rendering for split-cube variants — synthetic
+                # cube actions (Roll/Double/Take/Pass/Beaver) have no resulting
+                # checker positions to show.
                 for candidate in candidates:
                     if candidate:
                         result_svg_for_move = self._render_resulting_position_svg(
-                            decision, candidate, show_pip_count=True
+                            decision, candidate, show_pip_count=True,
                         )
                         move_result_svgs[candidate.notation] = result_svg_for_move
 
@@ -200,7 +258,7 @@ class CardGenerator:
             )
         else:
             front_html = self._generate_simple_front(
-                decision, position_svg_front
+                decision, position_svg_front, variant_kind=variant_kind
             )
 
         # Generate card back
@@ -242,13 +300,24 @@ class CardGenerator:
     def _generate_simple_front(
         self,
         decision: Decision,
-        position_svg: str
+        position_svg: str,
+        variant_kind: Optional[str] = None,
     ) -> str:
-        """Generate HTML for simple front (no options)."""
+        """Generate HTML for simple front (no options).
+
+        variant_kind: when the caller built a split-cube variant, "doubler" or
+        "receiver" / "receiver_with_beaver" picks the appropriate question text.
+        None means the standard cube/checker question is shown.
+        """
         metadata = self._get_metadata_html(decision)
 
-        # Determine question text based on decision type
-        if decision.decision_type == DecisionType.CUBE_ACTION:
+        if variant_kind == "doubler":
+            question_text = "Should you double or roll?"
+        elif variant_kind == "receiver_with_beaver":
+            question_text = "Take, pass, or beaver?"
+        elif variant_kind == "receiver":
+            question_text = "Take or pass?"
+        elif decision.decision_type == DecisionType.CUBE_ACTION:
             question_text = "What is the best cube action?"
         else:
             question_text = "What is the best move?"
@@ -278,8 +347,17 @@ class CardGenerator:
         letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J']
         preview_enabled = self.settings.preview_moves_before_submit and move_result_svgs
 
-        # Determine question text based on decision type
-        if decision.decision_type == DecisionType.CUBE_ACTION:
+        # Determine question text based on decision type and (optionally) split-cube variant.
+        candidate_notations = {c.notation for c in candidates if c}
+        if {"Roll", "Double"} <= candidate_notations:
+            question_text = "Should you double or roll?"
+        elif "Take" in candidate_notations and "Pass" in candidate_notations:
+            question_text = (
+                "Take, pass, or beaver?"
+                if "Beaver" in candidate_notations
+                else "Take or pass?"
+            )
+        elif decision.decision_type == DecisionType.CUBE_ACTION:
             question_text = "What is the best cube action?"
         else:
             question_text = "What is the best move?"
@@ -1897,33 +1975,226 @@ class CardGenerator:
 
         return tags
 
+    @staticmethod
+    def _flip_position_for_pov(position):
+        """Return a flipped copy of the position swapping X/O semantics.
+
+        Mirrors the same flip the XG binary parser applies when the doubler is
+        X (xg_binary_parser.py:1048-1063). Used to invert the player at the
+        bottom of the rendered board — needed for receiver-POV take cards,
+        since the parser has already flipped the position to put the doubler
+        at the bottom (Player.O slot) and we need the receiver there instead.
+        """
+        from ankigammon.models import Position
+        flipped = Position()
+        flipped.points = [0] * 26
+        flipped.points[0] = -position.points[25]
+        flipped.points[25] = -position.points[0]
+        for i in range(1, 25):
+            flipped.points[i] = -position.points[25 - i]
+        flipped.x_off = position.o_off
+        flipped.o_off = position.x_off
+        return flipped
+
+    def _maybe_build_cube_variant(
+        self, decision: Decision
+    ) -> Optional[Tuple[List[Move], Optional[Player]]]:
+        """Build a focused doubler-only or receiver-only cube card variant.
+
+        Returns (synthetic_candidates, view_from) when split_cube_decisions is
+        enabled and the decision was tagged with a single user_player at import
+        filter time. Returns None otherwise — caller falls through to the
+        standard 5-option cube card.
+
+        Variants:
+          - Doubler-only (user is on roll): 2-option MCQ {Roll, Double},
+            board rendered with default doubler POV (view_from=None).
+          - Receiver-only (user is the responder): {Take, Pass} or
+            {Take, Pass, Beaver} for unlimited games when the analyzer flagged
+            decision.beaverable. Board rendered from receiver POV (view_from
+            set to the responder).
+        """
+        if not self.settings.split_cube_decisions:
+            return None
+        if decision.decision_type != DecisionType.CUBE_ACTION:
+            return None
+        if decision.user_player is None:
+            return None
+
+        doubler = decision.on_roll
+        responder = Player.X if doubler == Player.O else Player.O
+        best = decision.get_best_move()
+        if best is None:
+            return None
+
+        by_notation = {m.notation: m for m in decision.candidate_moves}
+        nd_move = by_notation.get("No Double/Take")
+        dt_move = by_notation.get("Double/Take")
+        dp_move = by_notation.get("Double/Pass")
+        if not (nd_move and dt_move and dp_move):
+            return None
+
+        best_lower = best.notation.lower()
+
+        if decision.user_player == doubler:
+            roll_correct = (
+                "no double" in best_lower or "too good" in best_lower
+            )
+            # When doubling, an optimal receiver picks the response worst for
+            # the doubler — so the doubler's expected equity is min(DT, DP).
+            doubling_equity = min(dt_move.equity, dp_move.equity)
+            best_equity = max(nd_move.equity, doubling_equity)
+
+            roll_move = Move(
+                notation="Roll",
+                equity=nd_move.equity,
+                error=abs(best_equity - nd_move.equity),
+                rank=1 if roll_correct else 2,
+                from_xg_analysis=False,
+            )
+            double_move = Move(
+                notation="Double",
+                equity=doubling_equity,
+                error=abs(best_equity - doubling_equity),
+                rank=2 if roll_correct else 1,
+                from_xg_analysis=False,
+            )
+            return ([roll_move, double_move], None)
+
+        if decision.user_player == responder:
+            # Equities are kept from the doubler's POV (matching the rest of
+            # the analysis tables) but ranking reflects what the receiver
+            # should do.
+            # Beaver is the right answer only when the analyzer flagged the
+            # take as beaverable AND the rule is on for this game.
+            is_beaver_correct = bool(decision.beaverable and decision.beavers_allowed)
+            is_pass_correct = "pass" in best_lower
+
+            # Synthetic equities from receiver POV (negate doubler equities).
+            take_eq = -dt_move.equity
+            pass_eq = -dp_move.equity
+
+            take_move = Move(
+                notation="Take",
+                equity=take_eq,
+                error=0.0,
+                rank=2,
+                from_xg_analysis=False,
+            )
+            pass_move = Move(
+                notation="Pass",
+                equity=pass_eq,
+                error=0.0,
+                rank=2,
+                from_xg_analysis=False,
+            )
+            candidates = [take_move, pass_move]
+
+            beaver_move: Optional[Move] = None
+            # beavers_allowed already encodes the match_length==0 precondition
+            # — parsers gate it on match_length, and GameRules.__post_init__
+            # rejects beavers_allowed=True in match play.
+            if decision.beavers_allowed:
+                # After a beaver the cube doubles for the receiver. The
+                # receiver's equity is approximately 2x the take equity.
+                beaver_move = Move(
+                    notation="Beaver",
+                    equity=take_eq * 2,
+                    error=0.0,
+                    rank=2,
+                    from_xg_analysis=False,
+                )
+                candidates.append(beaver_move)
+
+            if is_beaver_correct and beaver_move is not None:
+                beaver_move.rank = 1
+                best_eq = beaver_move.equity
+            elif is_pass_correct:
+                pass_move.rank = 1
+                best_eq = pass_move.equity
+            else:
+                take_move.rank = 1
+                best_eq = take_move.equity
+
+            for m in candidates:
+                m.error = abs(best_eq - m.equity)
+
+            # Receiver POV: invert the default cube-card flipped flag so the
+            # receiver — not the doubler — drives score/cube placement. The
+            # renderer derives `flipped` from view_from when set, so passing
+            # the responder as view_from inverts flipped relative to the
+            # default (which is keyed off on_roll = doubler).
+            return (candidates, responder)
+
+        return None
+
     def _render_position_svg(
-        self, decision: Decision, show_pip_count: Optional[bool] = None
+        self,
+        decision: Decision,
+        show_pip_count: Optional[bool] = None,
+        view_from: Optional[Player] = None,
+        cube_value_override: Optional[int] = None,
+        cube_offered: bool = False,
+        flip_for_receiver_pov: bool = False,
     ) -> str:
         """Render position as SVG markup.
 
         show_pip_count overrides the global setting (None = use setting).
         Back-card renders pass True so pip counts always appear on the answer side.
+        view_from forces a non-default POV (used for receiver-POV cube take cards).
+        cube_value_override displays a different cube value (e.g. doubled for take cards).
+        cube_offered draws the cube inside the playing area to indicate an
+        unaccepted double offer, instead of the side-area "owned" placement.
+        flip_for_receiver_pov physically flips the position (and swaps scores,
+        bears-off, cube ownership) so the receiver — currently in the Player.X
+        slot post-parser-flip — visually sits at the bottom (Player.O slot).
         """
+        position = decision.position
+        score_x = decision.score_x
+        score_o = decision.score_o
+        on_roll = decision.on_roll
+        cube_owner = decision.cube_owner
+
+        if flip_for_receiver_pov:
+            position = self._flip_position_for_pov(position)
+            score_x, score_o = score_o, score_x
+            # on_roll flips: X ↔ O. Cube owner X↔O too (CENTERED stays).
+            on_roll = Player.O if on_roll == Player.X else Player.X
+            if cube_owner == CubeState.X_OWNS:
+                cube_owner = CubeState.O_OWNS
+            elif cube_owner == CubeState.O_OWNS:
+                cube_owner = CubeState.X_OWNS
+
         return self.renderer.render_svg(
-            position=decision.position,
-            on_roll=decision.on_roll,
+            position=position,
+            on_roll=on_roll,
             dice=decision.dice,
-            cube_value=decision.cube_value,
-            cube_owner=decision.cube_owner,
-            score_x=decision.score_x,
-            score_o=decision.score_o,
+            cube_value=(
+                cube_value_override if cube_value_override is not None else decision.cube_value
+            ),
+            cube_owner=cube_owner,
+            score_x=score_x,
+            score_o=score_o,
             match_length=decision.match_length,
             score_format=self.settings.score_format,
             show_pip_count=show_pip_count,
+            view_from=view_from,
+            cube_offered=cube_offered,
         )
 
     def _render_resulting_position_svg(
-        self, decision: Decision, move: Move, show_pip_count: Optional[bool] = None
+        self,
+        decision: Decision,
+        move: Move,
+        show_pip_count: Optional[bool] = None,
+        view_from: Optional[Player] = None,
+        cube_value_override: Optional[int] = None,
+        cube_offered: bool = False,
     ) -> str:
         """Render the resulting position after a move as SVG markup.
 
         show_pip_count overrides the global setting (None = use setting).
+        view_from forces a non-default POV (used for receiver-POV cube take cards).
         """
         if move.resulting_position:
             resulting_pos = move.resulting_position
@@ -1941,13 +2212,17 @@ class CardGenerator:
             on_roll=decision.on_roll,
             dice=decision.dice,
             dice_opacity=0.3,
-            cube_value=decision.cube_value,
+            cube_value=(
+                cube_value_override if cube_value_override is not None else decision.cube_value
+            ),
             cube_owner=decision.cube_owner,
             score_x=decision.score_x,
             score_o=decision.score_o,
             match_length=decision.match_length,
             score_format=self.settings.score_format,
             show_pip_count=show_pip_count,
+            view_from=view_from,
+            cube_offered=cube_offered,
         )
 
     def _shuffle_candidates(
