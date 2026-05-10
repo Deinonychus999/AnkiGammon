@@ -756,6 +756,263 @@ eXtreme Gammon Version: 2.10"""
         assert decision.candidate_moves[1].notation == "13/9 6/1"
         assert decision.candidate_moves[1].error == pytest.approx(0.140, abs=0.001)
 
+    def test_parse_checker_play_with_trailing_note(self):
+        """Regression test for issue #41: trailing free-text note on a move
+        analysis (XG Roller++ output, no rollout metadata) must be captured
+        on Decision.note so it lands on the Anki card back."""
+        text = """XGID=-b----E-C--AeD---bAdb---A-:0:0:1:52:0:0:3:0:10
+X:Player 1 O:Player 2
+Score is X:0 O:0. Unlimited Game, Jacoby Beaver
+
+Pip count X: 159 O: 163 X-O: 0-0
+Cube: 1
+X to play 52
+
+1. XG Roller++ 18/11 eq:-0.0026
+   Player: 50.64% (G:11.55% B:0.54%)
+   Opponent: 49.36% (G:13.95% B:0.42%)
+
+2. XG Roller++ 24/22 18/13 eq:-0.1141 (-0.1114)
+   Player: 48.27% (G:10.81% B:0.55%)
+   Opponent: 51.73% (G:15.83% B:0.49%)
+
+When ahead in the race, race!
+
+eXtreme Gammon Version: 2.10"""
+
+        decisions = XGTextParser.parse_string(text)
+        assert len(decisions) == 1
+        assert decisions[0].decision_type == DecisionType.CHECKER_PLAY
+        assert decisions[0].note == "When ahead in the race, race!"
+
+    def test_parse_checker_play_with_short_note(self):
+        """A note as short as 'TEST' must still be captured. (Earlier
+        implementation imposed a 10-character minimum that silently dropped
+        short user notes.)"""
+        text = """XGID=-b----E-C--AeD---bAdb---A-:0:0:1:52:0:0:3:0:10
+
+X:Player 1   O:Player 2
+Score is X:0 O:0. Unlimited Game, Jacoby Beaver
+ +13-14-15-16-17-18------19-20-21-22-23-24-+
+ | X           O  X |   | O  O           X |
+ +12-11-10--9--8--7-------6--5--4--3--2--1-+
+Pip count  X: 159  O: 163 X-O: 0-0
+Cube: 1
+X to play 52
+
+    1. XG Roller++ 18/11                        eq:-0.003
+      Player:   50.65% (G:11.55% B:0.54%)
+      Opponent: 49.35% (G:13.95% B:0.42%)
+
+    2. XG Roller++ 24/22 18/13                  eq:-0.114 (-0.111)
+      Player:   48.27% (G:10.81% B:0.55%)
+      Opponent: 51.73% (G:15.83% B:0.49%)
+
+
+TEST
+
+eXtreme Gammon Version: 2.19.211.pre-release"""
+
+        decisions = XGTextParser.parse_string(text)
+        assert len(decisions) == 1
+        assert decisions[0].decision_type == DecisionType.CHECKER_PLAY
+        assert decisions[0].note == "TEST"
+
+    def test_parse_cube_with_percentage_line_and_note(self):
+        """When the cube analysis contains a 'Percentage of wrong pass/take'
+        line after 'Best Cube action:', the note must come from below that
+        line — the percentage line is analysis output, not the user's note."""
+        text = """XGID=-b----E-C--AeD---bAdb---A-:0:0:1:00:0:0:3:0:10
+
+X:Player 1   O:Player 2
+Score is X:0 O:0. Unlimited Game, Jacoby Beaver
+Pip count  X: 159  O: 163 X-O: 0-0
+Cube: 1
+X on roll, cube action
+
+Analyzed in XG Roller+
+Player Winning Chances:   51.83% (G:12.07% B:0.48%)
+Opponent Winning Chances: 48.17% (G:12.06% B:0.44%)
+
+Cubeless Equities: No Double=+0.037, Double=+0.069
+
+Cubeful Equities:
+       No double:     +0.057
+       Double/Beaver: -0.568 (-0.624)
+       Double/Pass:   +1.000 (+0.943)
+
+Best Cube action: No double / Beaver
+Percentage of wrong pass needed to make the double decision right: 39.8%
+
+another test
+
+eXtreme Gammon Version: 2.19.211.pre-release"""
+
+        decisions = XGTextParser.parse_string(text)
+        assert len(decisions) == 1
+        assert decisions[0].decision_type == DecisionType.CUBE_ACTION
+        assert decisions[0].note == "another test"
+
+    def test_parse_cube_without_percentage_line_and_note(self):
+        """Cube decision where 'Best Cube action:' is the last analysis line
+        (no Percentage follow-up). The note must be captured from below it."""
+        text = """XGID=-b--D-D-C--AeC---b-db-----:0:0:1:00:0:0:1:0:10
+
+X:Player 1   O:Player 2
+Score is X:0 O:0. Unlimited Game, Jacoby
+Pip count  X: 114  O: 163 X-O: 0-0
+Cube: 1
+X on roll, cube action
+
+Analyzed in XG Roller+
+Player Winning Chances:   72.38% (G:17.48% B:0.93%)
+Opponent Winning Chances: 27.62% (G:3.19% B:0.08%)
+
+Cubeless Equities: No Double=+0.599, Double=+1.187
+
+Cubeful Equities:
+       No double:     +0.911 (-0.080)
+       Double/Take:   +0.991
+       Double/Pass:   +1.000 (+0.009)
+
+Best Cube action: Double / Take
+
+another test
+
+eXtreme Gammon Version: 2.19.211.pre-release"""
+
+        decisions = XGTextParser.parse_string(text)
+        assert len(decisions) == 1
+        assert decisions[0].decision_type == DecisionType.CUBE_ACTION
+        assert decisions[0].note == "another test"
+
+    def test_parse_too_good_cube_with_percentage_take_and_note(self):
+        """'Too good' cube decisions emit 'Percentage of wrong TAKE' (not pass)
+        as the optional follow-up. The note must be captured from below it."""
+        text = """XGID=-bBBCCA-----e----b-db-----:0:0:1:00:0:0:0:0:10
+
+X:Player 1   O:Player 2
+Score is X:0 O:0. Unlimited Game
+Pip count  X: 43  O: 163 X-O: 0-0
+Cube: 1
+X on roll, cube action
+
+Analyzed in XG Roller+
+Player Winning Chances:   81.44% (G:64.14% B:12.49%)
+Opponent Winning Chances: 18.56% (G:0.00% B:0.00%)
+
+Cubeless Equities: No Double=+1.395, Double=+2.787
+
+Cubeful Equities:
+       No double:     +1.438
+       Double/Take:   +2.653 (+1.215)
+       Double/Pass:   +1.000 (-0.438)
+
+Best Cube action: Too good to double / Pass
+Percentage of wrong take needed to make the double decision right: 26.5%
+
+another test
+
+eXtreme Gammon Version: 2.19.211.pre-release"""
+
+        decisions = XGTextParser.parse_string(text)
+        assert len(decisions) == 1
+        assert decisions[0].decision_type == DecisionType.CUBE_ACTION
+        assert decisions[0].note == "another test"
+
+    def test_parse_bearoff_checker_play_with_short_note(self):
+        """Bear-off move analysis (5/Off, 4/2 notation) with a short trailing
+        note must capture the note correctly."""
+        text = """XGID=-bBBCCA-----e----b-db-----:0:0:1:52:0:0:0:0:10
+
+X:Player 1   O:Player 2
+Score is X:0 O:0. Unlimited Game
+Pip count  X: 43  O: 163 X-O: 0-0
+Cube: 1
+X to play 52
+
+    1. 3-ply       6/4 5/Off                    eq:+1.605
+      Player:   84.22% (G:68.39% B:16.20%)
+      Opponent: 15.78% (G:0.00% B:0.00%)
+
+    2. 3-ply       5/Off 4/2                    eq:+1.144 (-0.461)
+      Player:   70.69% (G:53.18% B:9.58%)
+      Opponent: 29.31% (G:0.00% B:0.00%)
+
+    3. 2-ply       5/3 5/Off                    eq:+0.889 (-0.716)
+      Player:   66.35% (G:44.27% B:6.11%)
+      Opponent: 33.65% (G:0.00% B:0.00%)
+
+    4. 2-ply       5/Off 2/Off                  eq:+0.677 (-0.928)
+      Player:   58.45% (G:37.50% B:5.46%)
+      Opponent: 41.55% (G:0.00% B:0.00%)
+
+
+TEST
+
+eXtreme Gammon Version: 2.19.211.pre-release"""
+
+        decisions = XGTextParser.parse_string(text)
+        assert len(decisions) == 1
+        assert decisions[0].decision_type == DecisionType.CHECKER_PLAY
+        assert decisions[0].note == "TEST"
+
+    def test_parse_no_note_returns_none(self):
+        """When the analysis has no trailing free-text note, Decision.note
+        must be None — analysis terminator lines (Best Cube action,
+        Opponent: NN%, Percentage of wrong ...) must not be misread as notes."""
+        move_no_note = """XGID=-b----E-C--AeD---bAdb---A-:0:0:1:54:0:0:0:0:8
+X:Player 1   O:Player 2
+Score is X:0 O:0. Unlimited Game
+Cube: 2
+X to play 54
+
+    1. 3-ply       13/4                         eq:+0.165
+      Player:   49.07% (G:13.31% B:0.11%)
+      Opponent: 50.93% (G:10.59% B:0.24%)
+
+eXtreme Gammon Version: 2.10"""
+
+        cube_no_note = """XGID=--BBbBB-----aE----Be-c-bb-:1:-1:-1:00:0:0:0:0:8
+X:Player 1   O:Player 2
+Score is X:0 O:0. Unlimited Game
+Cube: 2, X own cube
+X on roll, cube action
+
+Cubeful Equities:
+       No redouble:     +0.172
+       Redouble/Take:   -0.361 (-0.533)
+       Redouble/Pass:   +1.000 (+0.828)
+
+Best Cube action: No redouble / Take
+
+eXtreme Gammon Version: 2.10"""
+
+        cube_no_note_with_percentage = """XGID=-b----E-C--AeD---bAdb---A-:0:0:1:00:0:0:3:0:10
+X:Player 1   O:Player 2
+Score is X:0 O:0. Unlimited Game
+Cube: 1
+X on roll, cube action
+
+Cubeful Equities:
+       No double:     +0.057
+
+Best Cube action: No double / Beaver
+Percentage of wrong pass needed to make the double decision right: 39.8%
+
+eXtreme Gammon Version: 2.10"""
+
+        for label, text in [
+            ("move_no_note", move_no_note),
+            ("cube_no_note", cube_no_note),
+            ("cube_no_note_with_percentage", cube_no_note_with_percentage),
+        ]:
+            decisions = XGTextParser.parse_string(text)
+            assert len(decisions) == 1, f"{label}: expected 1 decision"
+            assert decisions[0].note is None, (
+                f"{label}: expected no note, got {decisions[0].note!r}"
+            )
+
     def test_parse_crawford_game(self):
         """Test parsing Crawford game match info."""
         text = """XGID=-b---CC-C---eD---c-e---AA-:0:0:1:66:4:1:1:5:10

@@ -265,67 +265,39 @@ class XGTextParser:
 
         return equities
 
+    # Last line of XG's analysis section. Anything between the last match of
+    # this pattern and the `eXtreme Gammon Version:` footer is the user's note.
+    # - Per-move "Opponent: NN%" — last line of each move alternative's stats.
+    # - "Best Cube action: ..." — terminator for cube decisions.
+    # - "Percentage of wrong (pass|take) ..." — optional follow-up to Best Cube action.
+    _ANALYSIS_TERMINATOR_RE = re.compile(
+        r'^\s*(?:Opponent:\s*\d.*|Best Cube action:.*|Percentage of wrong (?:pass|take).*)$',
+        re.MULTILINE | re.IGNORECASE,
+    )
+
     @staticmethod
     def _parse_comment(text: str) -> Optional[str]:
+        """Return the user's free-text note from the analysis section, if any.
+
+        XG always emits an `eXtreme Gammon Version:` footer. The note, if
+        present, sits between the last analysis terminator line and that
+        footer.
         """
-        Parse comments/notes from the analysis section.
-
-        Comments typically appear after the rollout analysis and include:
-        - Move statistics in bracket notation (e.g., "[21] 24/18 13/11")
-        - Expert commentary sections
-        - Everything up to the next position or end of file
-
-        Returns the comment text or None if no comment found.
-        """
-        # Comments start with move statistics in bracket notation like "[21] 24/18 13/11"
-        # This is the most reliable marker for the start of comments
-        comment_start_pattern = re.compile(r'^\s*\[\s*\d+\]', re.MULTILINE)
-        comment_start_match = comment_start_pattern.search(text)
-
-        if comment_start_match:
-            # Found move statistics - this is where comments begin
-            comment_text = text[comment_start_match.start():].strip()
-        else:
-            # No move statistics found, try alternative markers
-            # Look for end of rollout metadata or "Best Cube action:"
-            last_metadata_pos = 0
-
-            for pattern in [
-                r'^\s*Duration:.*$',
-                r'^\s*Confidence:.*$',
-                r'^\s*Search interval:.*$',
-                r'^\s*Moves:.*cube decisions:.*$',
-                r'^\s*\d+\s+Games rolled.*$',
-                r'^\s*¹.*$',  # Footnote markers
-                r'^\s*².*$',
-                r'^\s*Best Cube action:.*$',  # For cube decisions
-            ]:
-                matches = list(re.finditer(pattern, text, re.MULTILINE | re.IGNORECASE))
-                if matches:
-                    last_match_pos = matches[-1].end()
-                    if last_match_pos > last_metadata_pos:
-                        last_metadata_pos = last_match_pos
-
-            if last_metadata_pos > 0:
-                comment_text = text[last_metadata_pos:].strip()
-            else:
-                # No comments found
-                return None
-
-        # Remove the eXtreme Gammon version line at the end if present
-        # Pattern: "eXtreme Gammon Version: X.XX, MET: ..."
-        comment_text = re.sub(
-            r'\s*eXtreme Gammon Version:.*$',
-            '',
-            comment_text,
-            flags=re.MULTILINE | re.IGNORECASE
-        ).strip()
-
-        # Return None if comment is empty or too short to be meaningful
-        if not comment_text or len(comment_text) < 10:
+        version_match = re.search(
+            r'^\s*eXtreme Gammon Version:.*$',
+            text,
+            re.MULTILINE | re.IGNORECASE,
+        )
+        if not version_match:
             return None
 
-        return comment_text
+        prefix = text[:version_match.start()]
+        terminators = list(XGTextParser._ANALYSIS_TERMINATOR_RE.finditer(prefix))
+        if not terminators:
+            return None
+
+        note = prefix[terminators[-1].end():].strip()
+        return note or None
 
     @staticmethod
     def _parse_move_winning_chances(move_text: str) -> dict:
