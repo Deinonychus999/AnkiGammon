@@ -263,7 +263,7 @@ class ExportWorker(QThread):
                 )
                 cube_matrix_steps = (decision.match_length - 1) ** 2 if has_cube_score_matrix else 0
                 move_matrix_steps = 4 if has_move_score_matrix else 0
-                total_substeps = 2 + cube_matrix_steps + move_matrix_steps
+                total_substeps = max(1, cube_matrix_steps + move_matrix_steps)
 
                 current_substep = [0]
 
@@ -416,7 +416,7 @@ class ExportWorker(QThread):
                     )
                     cube_matrix_steps = (decision.match_length - 1) ** 2 if has_cube_score_matrix else 0
                     move_matrix_steps = 4 if has_move_score_matrix else 0  # 4 score types analyzed
-                    total_substeps = 2 + cube_matrix_steps + move_matrix_steps  # render + matrices + generate card
+                    total_substeps = max(1, cube_matrix_steps + move_matrix_steps)
 
                     current_substep = [0]
                     current_card_index = card_index  # Capture for closure

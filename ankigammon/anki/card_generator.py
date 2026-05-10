@@ -224,10 +224,7 @@ class CardGenerator:
             else:
                 result_svg = None
         else:
-            # Render all move results for interactive visualization and/or preview
-            if self.progress_callback:
-                self.progress_callback(f"Rendering board positions...")
-
+            # Render all move results for interactive visualization and/or preview.
             # Front previews follow the user's show_pip_count setting,
             # back-card interactive renders always show pip count.
             if preview_enabled:
@@ -262,8 +259,6 @@ class CardGenerator:
             )
 
         # Generate card back
-        if self.progress_callback:
-            self.progress_callback("Generating card content...")
         back_html = self._generate_back(
             decision, position_svg_back, result_svg, candidates, shuffled_candidates,
             answer_index, self.show_options, move_result_svgs
