@@ -123,8 +123,11 @@ class GNUBGParser:
         # Pattern for gnubg move lines (supports European locale with comma decimal separator)
         # Matches: "    1. Cubeful 4-ply    21/16 21/15                  Eq.:  -0.411"
         #          "    2. Cubeful 4-ply    9/4 9/3                      Eq.:  -0.437 ( -0.025)"
+        # Captures the "Cubeful N-ply" prefix in its own group so we can
+        # surface the ply count as Move.analysis_level — matches the
+        # behavior of the match-file parser.
         move_pattern = re.compile(
-            r'^\s*(\d+)\.\s+(?:Cubeful\s+\d+-ply\s+)?(.*?)\s+Eq\.?:\s*([+-]?\d+[.,]\d+)(?:\s*\(\s*([+-]?\d+[.,]\d+)\))?',
+            r'^\s*(\d+)\.\s+(?:Cubeful\s+(\d+)-ply\s+)?(.*?)\s+Eq\.?:\s*([+-]?\d+[.,]\d+)(?:\s*\(\s*([+-]?\d+[.,]\d+)\))?',
             re.IGNORECASE
         )
 
@@ -138,9 +141,11 @@ class GNUBGParser:
             match = move_pattern.match(line)
             if match:
                 rank = int(match.group(1))
-                notation = match.group(2).strip()
-                equity = GNUBGParser._parse_locale_float(match.group(3))
-                error_str = match.group(4)
+                ply_str = match.group(2)
+                notation = match.group(3).strip()
+                equity = GNUBGParser._parse_locale_float(match.group(4))
+                error_str = match.group(5)
+                analysis_level = f"{ply_str}-ply" if ply_str else None
 
                 error = GNUBGParser._parse_locale_float(error_str) if error_str else 0.0
                 abs_error = abs(error)
@@ -184,7 +189,8 @@ class GNUBGParser:
                     opponent_win_pct=opponent_win,
                     opponent_gammon_pct=opponent_gammon,
                     opponent_backgammon_pct=opponent_backgammon,
-                    cubeless_equity=cubeless_eq if player_win is not None else None
+                    cubeless_equity=cubeless_eq if player_win is not None else None,
+                    analysis_level=analysis_level,
                 ))
 
         # If no moves found, try alternative pattern

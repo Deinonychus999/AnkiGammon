@@ -597,10 +597,17 @@ class CardGenerator:
                 key=lambda m: cube_order_map.get(m.xg_notation if m.xg_notation else m.notation, 99)
             )
         else:
-            # Sort checker plays by error magnitude
+            # Sort checker plays first by analysis tier (descending — higher
+            # tier shown first) and then by error magnitude within tier. This
+            # keeps a noisy lower-tier eval from sliding above a deeper eval
+            # in the displayed ranking just because its raw equity happens
+            # to look favorable.
             sorted_candidates = sorted(
                 analysis_moves,
-                key=lambda m: abs(m.error) if m.error is not None else 999.0
+                key=lambda m: (
+                    -m.analysis_tier_rank(),
+                    abs(m.error) if m.error is not None else 999.0,
+                )
             )
 
         # Get best equity for calculating signed errors
@@ -651,6 +658,14 @@ class CardGenerator:
             # Add played indicator if this move was played
             played_indicator = ' <span class="played-indicator">← Played</span>' if move.was_played else ""
 
+            # Subtle analysis-tier badge. Set when the parser knows the per-move
+            # evaluation depth (e.g. "4-ply", "Rollout", "Screening"). Lets the
+            # user spot moves whose equity is from a weaker analysis tier.
+            level_badge = (
+                f' <span class="analysis-level">{move.analysis_level}</span>'
+                if move.analysis_level else ""
+            )
+
             # Prepare W/G/B data attributes
             wgb_attrs = ""
             if move.player_win_pct is not None:
@@ -693,7 +708,7 @@ class CardGenerator:
                 table_rows.append(f"""
 <tr class="{row_class}" {row_attrs}>
     <td{td_error_attr}>
-        <div class="move-notation">{display_notation}{played_indicator}</div>{wgb_inline_html}
+        <div class="move-notation">{display_notation}{played_indicator}{level_badge}</div>{wgb_inline_html}
     </td>
     {equity_cell}
     <td{td_error_attr}>{error_str}</td>
@@ -703,7 +718,7 @@ class CardGenerator:
 <tr class="{row_class}" {row_attrs}>
     <td{td_error_attr}>{display_rank}</td>
     <td{td_error_attr}>
-        <div class="move-notation">{display_notation}{played_indicator}</div>{wgb_inline_html}
+        <div class="move-notation">{display_notation}{played_indicator}{level_badge}</div>{wgb_inline_html}
     </td>
     {equity_cell}
     <td{td_error_attr}>{error_str}</td>

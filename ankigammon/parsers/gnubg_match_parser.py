@@ -1095,14 +1095,15 @@ class GNUBGMatchParser:
 
             # Parse move line (supports both . and , as decimal separators for European locales)
             move_match = re.match(
-                r'\s*\*?\s*(\d+)\.\s+Cubeful\s+\d+-ply\s+(.+?)\s+Eq\.:\s+([+-]?\d+[.,]\d+)(?:\s+\(\s*([+-]?\d+[.,]\d+)\s*\))?',
+                r'\s*\*?\s*(\d+)\.\s+Cubeful\s+(\d+)-ply\s+(.+?)\s+Eq\.:\s+([+-]?\d+[.,]\d+)(?:\s+\(\s*([+-]?\d+[.,]\d+)\s*\))?',
                 line
             )
             if move_match:
                 rank = int(move_match.group(1))
-                notation = move_match.group(2).strip()
-                equity = GNUBGMatchParser._parse_locale_float(move_match.group(3))
-                move_error = GNUBGMatchParser._parse_locale_float(move_match.group(4)) if move_match.group(4) else 0.0
+                ply = int(move_match.group(2))
+                notation = move_match.group(3).strip()
+                equity = GNUBGMatchParser._parse_locale_float(move_match.group(4))
+                move_error = GNUBGMatchParser._parse_locale_float(move_match.group(5)) if move_match.group(5) else 0.0
 
                 was_played = (move_played and notation == move_played)
 
@@ -1123,7 +1124,8 @@ class GNUBGMatchParser:
                     equity=equity,
                     error=abs(move_error),
                     rank=rank,
-                    was_played=was_played
+                    was_played=was_played,
+                    analysis_level=f"{ply}-ply",
                 )
 
                 # Add probabilities if found (multiply by 100 to convert to percentage)

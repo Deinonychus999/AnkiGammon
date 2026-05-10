@@ -486,10 +486,21 @@ class XGTextParser:
         moves = []
 
         # Find all move entries
-        # Pattern: rank. [engine] notation eq:[equity] [(error)]
-        # Note: XG exports may use comma or period as decimal separator depending on locale
+        # Pattern: rank. <engine> notation eq:<equity> [(error)]
+        # The engine label is one of:
+        #   "Rollout"(+optional superscript/digit suffix),
+        #   "Book"(+optional superscript/digit suffix — XG distinguishes
+        #     multiple book sources by superscripts but they all collapse
+        #     to "Book" for our purposes),
+        #   "XG Roller"/"XG Roller+"/"XG Roller++",
+        #   "<N>-ply".
+        # Anchoring on this explicit alternation (instead of a greedy/lazy
+        # character class) lets us capture the engine for `analysis_level`
+        # while cleanly separating it from the move notation that follows.
+        # Note: XG exports may use comma or period as decimal separator depending on locale.
         move_pattern = re.compile(
-            r'^\s*(\d+)\.\s+(?:[\w\s+-]+?)\s+(.*?)\s+eq:\s*([+-]?\d+[.,]\d+)(?:\s*\(([+-]\d+[.,]\d+)\))?',
+            r'^\s*(\d+)\.\s+(Rollout\S*|Book\S*|XG\s+Roller\+*|\d+-ply)\s+(.*?)\s+eq:\s*'
+            r'([+-]?\d+[.,]\d+)(?:\s*\(([+-]\d+[.,]\d+)\))?',
             re.MULTILINE | re.IGNORECASE
         )
 
@@ -499,9 +510,10 @@ class XGTextParser:
 
         for i, match in enumerate(move_matches):
             rank = int(match.group(1))
-            notation = match.group(2).strip()
-            equity = XGTextParser._normalize_decimal(match.group(3))
-            error_str = match.group(4)
+            engine_label = XGTextParser._normalize_engine_label(match.group(2))
+            notation = match.group(3).strip()
+            equity = XGTextParser._normalize_decimal(match.group(4))
+            error_str = match.group(5)
 
             # Parse error if present
             if error_str:
@@ -538,6 +550,7 @@ class XGTextParser:
                 opponent_win_pct=winning_chances.get('opponent_win_pct'),
                 opponent_gammon_pct=winning_chances.get('opponent_gammon_pct'),
                 opponent_backgammon_pct=winning_chances.get('opponent_backgammon_pct'),
+                analysis_level=engine_label,
             )
             # Note: cubeless_equity will be calculated after Decision is created
             # when we have access to match context (match_length, scores)
@@ -777,6 +790,44 @@ class XGTextParser:
         moves.sort(key=lambda m: m.rank)
 
         return moves
+
+    @staticmethod
+    def _extract_engine_label(notation: str) -> Optional[str]:
+        """Pull the engine/depth label off the front of a raw notation, if any.
+
+        Kept around as a defensive helper for cases where notation still has
+        the prefix attached (e.g. from `_parse_moves_fallback`). The main move
+        regex captures the engine into its own group instead.
+        """
+        # `\b` won't fire between `+` and a space (both non-word), so anchor
+        # with whitespace/end-of-string to keep "++" on "XG Roller++".
+        m = re.match(
+            r'^(XG\s+Roller\+*|Rollout\S*|Book\S*|\d+-ply)(?=\s|$)',
+            notation,
+            re.IGNORECASE,
+        )
+        if not m:
+            return None
+        return XGTextParser._normalize_engine_label(m.group(1))
+
+    @staticmethod
+    def _normalize_engine_label(label: str) -> Optional[str]:
+        """Normalize an engine prefix to its canonical UI label.
+
+        XG numbers multiple rollout / book configs with unicode superscripts
+        or trailing digits (e.g. "Rollout¹", "Rollout²", "Book¹", "Book4").
+        Collapse all of them to "Rollout" / "Book" so the UI shows one
+        canonical label per tier — the per-config footnote details live in
+        the XG file's text export anyway and aren't useful on the back card.
+        """
+        if not label:
+            return None
+        clean = re.sub(r'\s+', ' ', label.strip())
+        if re.match(r'^Rollout', clean, re.IGNORECASE):
+            return "Rollout"
+        if re.match(r'^Book', clean, re.IGNORECASE):
+            return "Book"
+        return clean
 
     @staticmethod
     def _clean_move_notation(notation: str) -> str:

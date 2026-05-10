@@ -105,8 +105,12 @@ def parse_xgid(xgid: str) -> Tuple[Position, dict]:
         # Player to roll or double (no dice shown)
         pass
     elif dice_str in ['D', 'B', 'R']:
-        # Cube action pending
-        metadata['decision_type'] = 'cube_action'
+        # Cube action pending. Store the DecisionType enum (not a string)
+        # so callers like `GNUBGAnalyzer._determine_decision_type` and the
+        # GnuBG comparison report can use `.value` / direct equality checks
+        # without an isinstance branch.
+        from ankigammon.models import DecisionType
+        metadata['decision_type'] = DecisionType.CUBE_ACTION
     elif len(dice_str) == 2 and dice_str.isdigit():
         # Rolled dice
         d1 = int(dice_str[0])

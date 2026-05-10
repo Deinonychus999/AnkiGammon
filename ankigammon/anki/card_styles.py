@@ -332,6 +332,17 @@ CARD_CSS = """
     margin-left: 6px;
 }
 
+/* Per-move analysis tier badge (e.g. "Rollout", "4-ply", "Screening") */
+.analysis-level {
+    font-size: 0.72em;
+    color: var(--text-fg);
+    opacity: 0.55;
+    font-style: italic;
+    font-weight: normal;
+    margin-left: 8px;
+    white-space: nowrap;
+}
+
 /* Winning Chances Display */
 .winning-chances {
     margin: 20px auto;

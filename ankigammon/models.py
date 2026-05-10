@@ -263,6 +263,10 @@ class Move:
     resulting_position: Optional[Position] = None  # Position after applying this move
     from_xg_analysis: bool = True  # Whether from XG's analysis (True) or synthetically generated (False)
     was_played: bool = False  # Whether this move was actually played in the game
+    # Engine-reported analysis tier for this individual move (e.g. "Rollout", "4-ply", "2-ply",
+    # "Screening"). XG can analyze different candidate moves at different depths within a single
+    # position; capturing per-move tier lets the UI flag moves whose equity is less reliable.
+    analysis_level: Optional[str] = None
     # Winning chances percentages
     player_win_pct: Optional[float] = None  # Player winning percentage (e.g., 52.68)
     player_gammon_pct: Optional[float] = None  # Player gammon percentage (e.g., 14.35)
@@ -343,6 +347,46 @@ class Move:
             return f"{self.notation} (Equity: {self.equity:.3f})"
         else:
             return f"{self.notation} (Equity: {self.equity:.3f}, Error: {self.error:.3f})"
+
+    def analysis_tier_rank(self) -> int:
+        """Quality rank of this move's analysis tier; higher = better.
+
+        Used to group candidate moves by analysis depth in the back-card
+        table so a 1-ply screening eval never sits above a 4-ply eval just
+        because its noisy equity happened to look small. Within a tier, the
+        caller still sorts by equity/error.
+
+        Ordering (high to low):
+            Rollout > Book > XG Roller++ > XG Roller+ > XG Roller >
+            N-ply (by N, with "3-ply red" treated as ~3-ply) > unknown.
+
+        Book entries are XG's pre-rolled-out opening-book analyses, so they
+        are treated as roughly equivalent to a fresh rollout for ranking.
+        """
+        label = self.analysis_level
+        if not label:
+            return -1
+        if label == "Rollout":
+            return 100
+        if label == "Book":
+            return 95
+        if label == "XG Roller++":
+            return 90
+        if label == "XG Roller+":
+            return 89
+        if label == "XG Roller":
+            return 88
+        if label == "3-ply red":
+            # Reduced-search 3-ply (XG's "3-ply red"). Rank alongside full
+            # 3-ply; secondary equity-error sort breaks ties between them.
+            return 3
+        import re as _re
+        m = _re.match(r'^(\d+)-ply$', label)
+        if m:
+            return int(m.group(1))
+        # Unknown labels (e.g. "Level 42" raw fallback) sort below known tiers
+        # but above completely-unlabeled moves.
+        return 0
 
 
 @dataclass

@@ -33,6 +33,38 @@ class ParseError(Exception):
 class XGBinaryParser:
     """Parser for eXtreme Gammon binary (.xg) files"""
 
+    # XG's EvalLevelRecord.Level values map to these labels per the official
+    # XG file-format docs at https://www.extremegammon.com/xgformat.aspx
+    # ("PLAYERLEVEL TABLE"). The low band (0-6) is N-ply lookahead, 0-indexed
+    # in the file but 1-indexed in XG's UI/text export — Level=3 surfaces as
+    # "4-ply". Level 12 is the "3-ply red" reduced-search variant. Level 100
+    # is a full rollout (RolloutIndexM[i] >= 0 also flags those slots).
+    # Levels 998 and 999 are pre-rolled-out opening book entries (V2 and V1
+    # respectively); XG's text export labels them "Book¹", "Book²", … by
+    # source but the binary collapses every book to one of these two
+    # versions, so we surface a single "Book" label. Levels 1000-1002 are
+    # XG's truncation-rollout heuristics ("XG Roller" family). See
+    # scripts/xg_dump_levels.py for the corroborating data.
+    _XG_LEVEL_LABELS = {
+        12: "3-ply red",
+        100: "Rollout",
+        998: "Book",      # Opening Book V2
+        999: "Book",      # Opening Book V1
+        1000: "XG Roller",
+        1001: "XG Roller+",
+        1002: "XG Roller++",
+    }
+
+    @staticmethod
+    def _format_xg_analysis_level(level: int, rolled_out: bool) -> str:
+        if rolled_out:
+            return "Rollout"
+        if level in XGBinaryParser._XG_LEVEL_LABELS:
+            return XGBinaryParser._XG_LEVEL_LABELS[level]
+        if 0 <= level <= 6:
+            return f"{level + 1}-ply"
+        return f"Level {level}"
+
     @staticmethod
     def extract_player_names(file_path: str) -> Tuple[Optional[str], Optional[str]]:
         """
@@ -468,19 +500,18 @@ class XGBinaryParser:
 
             # XG analyzes top candidates at the requested ply (e.g. ++ / 4-ply)
             # and leaves the rest at a lower screening ply. It can also roll
-            # out an arbitrary subset. Mixing tiers in one ranked list yields
-            # misleading errors (a noisy 1-ply equity can outrank a deeply
-            # analyzed move). Keep only slots in the best tier: rollouts
-            # always outrank non-rollouts (rolled-out slots have their own
-            # level=100 marker, but the rolled_out flag dominates the tuple
-            # comparison), then EvalLevel.Level breaks ties.
+            # out an arbitrary subset. We keep all candidate slots so the user
+            # sees as many moves as `max_moves` requests, and tag each with
+            # its analysis tier so the UI can flag moves whose equity comes
+            # from a weaker evaluation. Sorting still follows XG's ranking;
+            # the tier label is informational.
             rollout_idxs = (move_entry.RolloutIndexM
                             if getattr(move_entry, 'RolloutIndexM', None)
                             else None)
             eval_levels = (data_moves.EvalLevel
                            if getattr(data_moves, 'EvalLevel', None)
                            else None)
-            slot_tiers = []
+            slot_levels = []
             for i in range(n_moves):
                 # XG stores -1 in RolloutIndexM for slots without a rollout;
                 # any non-negative value is a valid index into temp.xgr.
@@ -489,18 +520,9 @@ class XGBinaryParser:
                 level = (eval_levels[i].Level
                          if eval_levels and i < len(eval_levels)
                          else 0)
-                slot_tiers.append((1 if rolled_out else 0, level))
-            best_tier = max(slot_tiers) if slot_tiers else (0, 0)
-            dropped = sum(1 for t in slot_tiers if t != best_tier)
-            if dropped:
-                logger.info(
-                    f"Filtered {dropped}/{n_moves} candidate moves with weaker "
-                    f"analysis than best tier {best_tier} (rollout, EvalLevel)"
-                )
+                slot_levels.append(XGBinaryParser._format_xg_analysis_level(level, rolled_out))
 
             for i in range(n_moves):
-                if slot_tiers[i] != best_tier:
-                    continue
                 # Parse move notation with compound move combination and hit detection
                 notation = XGBinaryParser._convert_move_notation(
                     data_moves.Moves[i],
@@ -551,7 +573,8 @@ class XGBinaryParser:
                     player_backgammon_pct=player_backgammon_pct,
                     opponent_win_pct=opponent_win_pct,
                     opponent_gammon_pct=opponent_gammon_pct,
-                    opponent_backgammon_pct=opponent_backgammon_pct
+                    opponent_backgammon_pct=opponent_backgammon_pct,
+                    analysis_level=slot_levels[i] if i < len(slot_levels) else None,
                 )
                 # Calculate cubeless equity with match context
                 if on_roll == Player.O:
