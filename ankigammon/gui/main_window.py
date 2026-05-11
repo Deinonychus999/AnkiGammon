@@ -27,6 +27,7 @@ from ankigammon.gui.dialogs.update_dialog import UpdateDialog, CheckingUpdateDia
 from ankigammon.gui.update_checker import VersionCheckerThread
 from ankigammon.gui.resources import get_resource_path
 from ankigammon.gui import silent_messagebox
+from ankigammon.utils.subprocess_env import external_subprocess_env
 
 
 class MatchAnalysisWorker(QThread):
@@ -1881,6 +1882,7 @@ class MainWindow(QMainWindow):
                             'stdout': subprocess.PIPE,
                             'stderr': subprocess.PIPE,
                             'text': True,
+                            'env': external_subprocess_env(),
                         }
                         if sys.platform == 'win32':
                             kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
@@ -1892,7 +1894,9 @@ class MainWindow(QMainWindow):
                         )
 
                         if gnubg_result.returncode != 0:
-                            raise RuntimeError(f"GnuBG failed: {gnubg_result.stderr}")
+                            err = (gnubg_result.stderr or "").strip()
+                            detail = err if err else f"exit {gnubg_result.returncode}, no output (likely library path issue)"
+                            raise RuntimeError(f"GnuBG failed: {detail}")
 
                         # Parse the exported match file to get position
                         with open(mat_path, 'r') as f:

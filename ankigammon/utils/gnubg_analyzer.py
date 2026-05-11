@@ -18,6 +18,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from ankigammon.models import Decision, DecisionType, Move
 from ankigammon.utils.xgid import parse_xgid
 from ankigammon.utils.analyzer_base import BackgammonAnalyzer
+from ankigammon.utils.subprocess_env import external_subprocess_env
 
 
 class GNUBGAnalyzer(BackgammonAnalyzer):
@@ -255,6 +256,7 @@ class GNUBGAnalyzer(BackgammonAnalyzer):
                 'stdout': subprocess.PIPE,
                 'stderr': subprocess.PIPE,
                 'text': True,
+                'env': external_subprocess_env(),
             }
             if sys.platform == 'win32':
                 kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
@@ -506,6 +508,7 @@ class GNUBGAnalyzer(BackgammonAnalyzer):
             'capture_output': True,
             'text': True,
             'timeout': 120,
+            'env': external_subprocess_env(),
         }
         if sys.platform == 'win32':
             kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW

@@ -19,6 +19,7 @@ from PySide6.QtCore import Qt, Signal, QThread
 
 from ankigammon.settings import Settings
 from ankigammon.renderer.color_schemes import list_schemes
+from ankigammon.utils.subprocess_env import external_subprocess_env
 
 
 class GnuBGValidationWorker(QThread):
@@ -62,7 +63,8 @@ class GnuBGValidationWorker(QThread):
             kwargs = {
                 'capture_output': True,
                 'text': True,
-                'timeout': 15
+                'timeout': 15,
+                'env': external_subprocess_env(),
             }
             if sys.platform == 'win32':
                 kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
@@ -87,8 +89,22 @@ class GnuBGValidationWorker(QThread):
                         "Valid GnuBG executable",
                         "valid"
                     )
+            elif not output.strip():
+                # Process exited non-zero with no output — almost always a
+                # dynamic-linker failure (e.g. AppImage's LD_LIBRARY_PATH
+                # leaking into the child). Surface enough detail for the
+                # user to diagnose instead of the misleading "Not GNU
+                # Backgammon" verdict.
+                self.validation_complete.emit(
+                    f"Failed to launch (exit {result.returncode}); check libraries",
+                    "warning"
+                )
             else:
-                self.validation_complete.emit("Not GNU Backgammon", "warning")
+                snippet = output.strip().splitlines()[0][:80]
+                self.validation_complete.emit(
+                    f"Not GNU Backgammon: {snippet}",
+                    "warning"
+                )
 
         except subprocess.TimeoutExpired:
             self.validation_complete.emit("Validation timeout", "warning")
