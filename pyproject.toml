@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ankigammon"
-version = "1.6.0"
+version = "1.6.1"
 description = "Convert eXtreme Gammon backgammon analysis into Anki flashcards"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -66,12 +66,12 @@ ankigammon = [
 ]
 
 # Version bumping configuration
-# Usage: bump-my-version patch|minor|major
-# Pre-release: bump-my-version bump --new-version 1.4.0b1
-# Next beta:   bump-my-version bump pre_n  (→ 1.4.0b2)
-# Release:     bump-my-version bump --new-version 1.4.0
+# Release:     bump-my-version bump patch|minor|major  (→ 1.6.1, 1.7.0, 2.0.0)
+# Pre-release: bump-my-version bump --new-version 1.7.0b1
+# Next beta:   bump-my-version bump pre_n  (→ 1.7.0b2)
+# Promote:     bump-my-version bump pre_l  (b → rc → release)
 [tool.bumpversion]
-current_version = "1.6.0"
+current_version = "1.6.1"
 commit = true
 tag = true
 tag_name = "v{new_version}"
@@ -83,6 +83,11 @@ serialize = [
 ]
 
 [tool.bumpversion.parts.pre_l]
+# first_value = "release" so patch/minor/major bumps reset pre_l to "release"
+# (which serializes empty via optional_value) instead of defaulting to "a"
+# and producing an unwanted alpha like 1.6.1a1. Pre-releases still go through
+# the explicit `bump --new-version 1.7.0b1` path documented above.
+first_value = "release"
 optional_value = "release"
 values = ["a", "b", "rc", "release"]
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.6.1] - 2026-05-11
+
+### Fixed
+- GnuBG detection now works in the Linux AppImage build. The AppImage's bundled library path was leaking into the GnuBG subprocess, causing the validator to report "Not GNU Backgammon" and SGF imports to fail silently (most visibly affecting Fedora users).
+- GnuBG validation now shows a clearer error message when the executable fails to launch (previously it always reported "Not GNU Backgammon", even for unrelated launch failures).
+
 ## [1.6.0] - 2026-05-10
 
 ### Added
