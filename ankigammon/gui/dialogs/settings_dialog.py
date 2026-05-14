@@ -452,19 +452,22 @@ class SettingsDialog(QDialog):
         self.xg_widgets.extend([self.lbl_xg_path, self.txt_xg_path, btn_browse_xg])
         self._xg_browse_btn = btn_browse_xg
 
-        # XG analysis level
+        # XG analysis level — built-ins plus any custom profiles the user
+        # defined inside XG (read from the registry, safe no-op off-Windows).
         self.cmb_xg_level = QComboBox()
-        self.cmb_xg_level.addItems([
+        builtin_levels = [
             "Very Quick", "Fast", "Deep", "Thorough", "World Class", "Extensive"
-        ])
+        ]
+        self.cmb_xg_level.addItems(builtin_levels)
+        try:
+            from ankigammon.utils.xg_auto.registry import read_custom_analysis_levels
+            custom_levels = read_custom_analysis_levels()
+        except Exception:
+            custom_levels = []
+        if custom_levels:
+            self.cmb_xg_level.insertSeparator(self.cmb_xg_level.count())
+            self.cmb_xg_level.addItems(custom_levels)
         self.cmb_xg_level.setCursor(Qt.PointingHandCursor)
-        self.cmb_xg_level.setToolTip(
-            "eXtreme Gammon analysis level:\n"
-            "• Very Quick / Fast: Quick evaluations\n"
-            "• Deep / Thorough: Good balance of speed and accuracy\n"
-            "• World Class: High accuracy (recommended)\n"
-            "• Extensive: Maximum accuracy (very slow)"
-        )
         self.lbl_xg_level = QLabel("Analysis Level:")
         form.addRow(self.lbl_xg_level, self.cmb_xg_level)
         self.xg_widgets.extend([self.lbl_xg_level, self.cmb_xg_level])
@@ -685,12 +688,21 @@ class SettingsDialog(QDialog):
         # XG
         if self.settings.xg_exe_path:
             self.txt_xg_path.setText(self.settings.xg_exe_path)
-        xg_level_map = {
-            "very quick": 0, "fast": 1, "deep": 2,
-            "thorough": 3, "world class": 4, "extensive": 5
-        }
-        xg_level_index = xg_level_map.get(self.settings.xg_analysis_level.lower(), 4)
-        self.cmb_xg_level.setCurrentIndex(xg_level_index)
+        # Match the saved level by item text (case-insensitive). Default
+        # to "World Class" if the saved name isn't in the dropdown — e.g.
+        # the user previously selected a custom profile that's since been
+        # renamed or deleted in XG.
+        saved_level = (self.settings.xg_analysis_level or "world class").strip().lower()
+        match_idx = next(
+            (i for i in range(self.cmb_xg_level.count())
+             if self.cmb_xg_level.itemText(i).strip().lower() == saved_level),
+            None,
+        )
+        if match_idx is None:
+            match_idx = self.cmb_xg_level.findText("World Class", Qt.MatchFixedString)
+            if match_idx < 0:
+                match_idx = 0
+        self.cmb_xg_level.setCurrentIndex(match_idx)
 
         # Shared
         self.chk_generate_score_matrix.setChecked(self.settings.generate_score_matrix)
@@ -816,8 +828,17 @@ class SettingsDialog(QDialog):
         self.settings.gnubg_path = self.txt_gnubg_path.text() or None
         self.settings.gnubg_analysis_ply = self.cmb_gnubg_ply.currentIndex()
         self.settings.xg_exe_path = self.txt_xg_path.text() or None
-        xg_levels = ["very quick", "fast", "deep", "thorough", "world class", "extensive"]
-        self.settings.xg_analysis_level = xg_levels[self.cmb_xg_level.currentIndex()]
+        # Store the literal dropdown text so custom profile names round-trip.
+        # Built-ins are saved lowercased for backward compatibility with
+        # existing settings files; custom profile names preserve their case.
+        selected_text = self.cmb_xg_level.currentText().strip()
+        builtin_levels = {
+            "very quick", "fast", "deep", "thorough", "world class", "extensive"
+        }
+        if selected_text.lower() in builtin_levels:
+            self.settings.xg_analysis_level = selected_text.lower()
+        else:
+            self.settings.xg_analysis_level = selected_text
         self.settings.generate_score_matrix = self.chk_generate_score_matrix.isChecked()
         self.settings.score_matrix_max_size = int(self.cmb_matrix_max_size.currentData())
         self.settings.generate_move_score_matrix = self.chk_generate_move_score_matrix.isChecked()

@@ -294,16 +294,18 @@ class XGAutomator:
     )
     _REJECT_BUTTONS = _BTN_CANCEL | _BTN_NO | _BTN_CLOSE | _BTN_HELP
 
-    # XG analysis level indices (in the TComboBox dropdown)
-    ANALYSIS_LEVELS = {
-        "none": 0,
-        "very quick": 1,
-        "fast": 2,
-        "deep": 3,
-        "thorough": 4,
-        "world class": 5,
-        "extensive": 6,
-    }
+    # Built-in XG analysis levels, in dropdown order. Custom profiles
+    # (registry slots 1..5) are appended by XG after these and are
+    # discovered at runtime via CB_GETLBTEXT rather than indexed.
+    BUILTIN_ANALYSIS_LEVELS = (
+        "none",
+        "very quick",
+        "fast",
+        "deep",
+        "thorough",
+        "world class",
+        "extensive",
+    )
 
     def __init__(
         self,
@@ -1119,18 +1121,11 @@ class XGAutomator:
         if self.headless:
             user32.ShowWindow(dlg_hwnd, 0)  # SW_HIDE
 
-        # Set analysis level if configured
+        # Set analysis level if configured (matched by name against the
+        # live dropdown items, which include both built-ins and custom
+        # profiles XG loaded from its registry).
         if self.analysis_level:
-            level_idx = self.ANALYSIS_LEVELS.get(
-                self.analysis_level.lower()
-            )
-            if level_idx is not None:
-                self._set_analysis_level(dlg_hwnd, level_idx)
-            else:
-                log.warning(
-                    "Unknown analysis level %r, using default",
-                    self.analysis_level,
-                )
+            self._set_analysis_level(dlg_hwnd, self.analysis_level)
 
         # Tick "Override Previous Analyze" checkbox
         self._tick_checkbox(dlg_hwnd, "Override Previous Analyze")
@@ -1178,9 +1173,19 @@ class XGAutomator:
         else:
             log.debug("Checkbox already checked: %s", cb_text)
 
-    def _set_analysis_level(self, dlg_hwnd: int, level_idx: int) -> None:
-        """Set both player ComboBoxes in the analysis dialog to a level."""
+    def _set_analysis_level(self, dlg_hwnd: int, level_name: str) -> None:
+        """Set both player ComboBoxes to the analysis level with this name.
+
+        Resolves the dropdown index at runtime by scraping items via
+        CB_GETLBTEXT and matching case-insensitively. This works for both
+        built-in levels and user-defined custom profiles, and is robust
+        against XG version changes that shift the built-in count.
+        """
         CB_SETCURSEL = 0x014E
+        CB_GETCOUNT = 0x0146
+        CB_GETLBTEXTLEN = 0x0149
+        CB_GETLBTEXT = 0x0148
+
         combos = []
 
         def _enum_cb(hwnd, _lparam):
@@ -1191,19 +1196,62 @@ class XGAutomator:
             return True
 
         user32.EnumChildWindows(dlg_hwnd, WNDENUMPROC(_enum_cb), 0)
+        if not combos:
+            log.warning("No TComboBox found in analysis dialog")
+            return
+
+        target = level_name.strip().lower()
+        # Resolve the index from the first combo; XG keeps both player
+        # combos in sync structurally so the index applies to both.
+        # Note: XG's TComboBox stores each item as a colon-delimited
+        # "<DisplayName>:<param1>:<param2>:..." string and renders only
+        # the first token visually via owner-draw. Match against that
+        # first token, not the whole text.
+        items = self._read_combo_items(combos[0], CB_GETCOUNT,
+                                       CB_GETLBTEXTLEN, CB_GETLBTEXT)
+        display_names = [text.split(":", 1)[0].strip() for text in items]
+        log.debug("Analysis dropdown items: %s", display_names)
+        match_idx = next(
+            (i for i, name in enumerate(display_names) if name.lower() == target),
+            None,
+        )
+
+        if match_idx is None:
+            log.warning(
+                "Analysis level %r not found in dropdown (available: %s); "
+                "leaving XG default",
+                level_name,
+                display_names,
+            )
+            return
 
         for combo_hwnd in combos:
-            SendMessageW(combo_hwnd, CB_SETCURSEL, level_idx, 0)
+            SendMessageW(combo_hwnd, CB_SETCURSEL, match_idx, 0)
 
-        level_name = next(
-            (k for k, v in self.ANALYSIS_LEVELS.items() if v == level_idx),
-            str(level_idx),
-        )
         log.info(
-            "Set analysis level to %r for %d player(s)",
-            level_name,
-            len(combos),
+            "Set analysis level to %r (index %d) for %d player(s)",
+            display_names[match_idx], match_idx, len(combos),
         )
+
+    @staticmethod
+    def _read_combo_items(
+        combo_hwnd: int,
+        cb_getcount: int,
+        cb_getlbtextlen: int,
+        cb_getlbtext: int,
+    ) -> list[str]:
+        """Read all items of a combobox via CB_GETLBTEXT."""
+        count = SendMessageW(combo_hwnd, cb_getcount, 0, 0)
+        items: list[str] = []
+        for i in range(count):
+            length = SendMessageW(combo_hwnd, cb_getlbtextlen, i, 0)
+            if length < 0:
+                items.append("")
+                continue
+            buf = ctypes.create_unicode_buffer(length + 1)
+            SendMessageW(combo_hwnd, cb_getlbtext, i, ctypes.addressof(buf))
+            items.append(buf.value)
+        return items
 
     def _wait_for_analysis(self) -> None:
         """Wait for analysis completion via UI polling.
