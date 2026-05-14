@@ -148,6 +148,7 @@ class SettingsDialog(QDialog):
         self.original_settings.gnubg_path = settings.gnubg_path
         self.original_settings.gnubg_analysis_ply = settings.gnubg_analysis_ply
         self.original_settings.generate_score_matrix = settings.generate_score_matrix
+        self.original_settings.score_matrix_max_size = settings.score_matrix_max_size
         self.original_settings.max_moves = settings.max_moves
         self.original_settings.analyzer_type = settings.analyzer_type
         self.original_settings.xg_exe_path = settings.xg_exe_path
@@ -501,6 +502,37 @@ class SettingsDialog(QDialog):
         matrix_layout.addStretch()
         form.addRow(matrix_layout)
 
+        # Score matrix max size (child of the matrix checkbox above — indented to show hierarchy)
+        matrix_size_layout = QHBoxLayout()
+        matrix_size_layout.addSpacing(20)  # Indent to show hierarchy
+        self.lbl_matrix_max_size = QLabel("Score matrix max size:")
+        matrix_size_layout.addWidget(self.lbl_matrix_max_size)
+        matrix_size_layout.addSpacing(8)
+        self.cmb_matrix_max_size = QComboBox()
+        self.cmb_matrix_max_size.setCursor(Qt.PointingHandCursor)
+        self.cmb_matrix_max_size.setMaximumWidth(175)
+        for label, value in [
+            ("Auto (match length)", 0),
+            ("3 pts", 3),
+            ("5 pts", 5),
+            ("7 pts", 7),
+            ("9 pts", 9),
+            ("11 pts", 11),
+            ("13 pts", 13),
+            ("15 pts", 15),
+        ]:
+            self.cmb_matrix_max_size.addItem(label, value)
+        self.cmb_matrix_max_size.setToolTip(
+            "Limit the score matrix size to save time on long matches.\n"
+            "'Auto' uses your match length, or a 7-point view for unlimited games."
+        )
+        matrix_size_layout.addWidget(self.cmb_matrix_max_size)
+        matrix_size_layout.addStretch()
+        form.addRow(matrix_size_layout)
+
+        # Grey out the max-size control when the matrix checkbox is off
+        self.chk_generate_score_matrix.toggled.connect(self._on_score_matrix_toggled)
+
         # Move score matrix generation (checker play)
         move_matrix_layout = QHBoxLayout()
         self.chk_generate_move_score_matrix = QCheckBox("Generate move analysis by score for checker play")
@@ -662,6 +694,10 @@ class SettingsDialog(QDialog):
 
         # Shared
         self.chk_generate_score_matrix.setChecked(self.settings.generate_score_matrix)
+        # Restore matrix max-size selection (fall back to "Auto" if value is unknown)
+        max_size_index = self.cmb_matrix_max_size.findData(self.settings.score_matrix_max_size)
+        self.cmb_matrix_max_size.setCurrentIndex(max_size_index if max_size_index >= 0 else 0)
+        self._on_score_matrix_toggled(self.chk_generate_score_matrix.isChecked())
         self.chk_generate_move_score_matrix.setChecked(self.settings.generate_move_score_matrix)
 
         # Trigger visibility update
@@ -727,6 +763,15 @@ class SettingsDialog(QDialog):
         self.lbl_gnubg_status_text.setText(status_text)
         self.lbl_gnubg_status_text.setStyleSheet("")
 
+    def _on_score_matrix_toggled(self, checked: bool):
+        """Grey out the matrix max-size control when matrix generation is off."""
+        self.cmb_matrix_max_size.setEnabled(checked)
+        self.lbl_matrix_max_size.setEnabled(checked)
+        if checked:
+            self.lbl_matrix_max_size.setStyleSheet("")
+        else:
+            self.lbl_matrix_max_size.setStyleSheet("color: #6c7086;")
+
     def _on_show_options_toggled_preview(self, checked: bool):
         """Enable/disable preview checkbox based on show options checkbox."""
         self.chk_preview_moves.setEnabled(checked)
@@ -774,6 +819,7 @@ class SettingsDialog(QDialog):
         xg_levels = ["very quick", "fast", "deep", "thorough", "world class", "extensive"]
         self.settings.xg_analysis_level = xg_levels[self.cmb_xg_level.currentIndex()]
         self.settings.generate_score_matrix = self.chk_generate_score_matrix.isChecked()
+        self.settings.score_matrix_max_size = int(self.cmb_matrix_max_size.currentData())
         self.settings.generate_move_score_matrix = self.chk_generate_move_score_matrix.isChecked()
 
         # Emit signal

@@ -28,6 +28,7 @@ class Settings:
         "gnubg_path": None,
         "gnubg_analysis_ply": 3,
         "generate_score_matrix": False,
+        "score_matrix_max_size": 0,  # 0 = auto (match length for matches, 7-pt projection for unlimited)
         "generate_move_score_matrix": False,
         "split_cube_decisions": False,
         "board_orientation": "counter-clockwise",
@@ -240,6 +241,23 @@ class Settings:
     def generate_score_matrix(self, value: bool) -> None:
         """Set whether to generate score matrix for cube decisions."""
         self.set("generate_score_matrix", value)
+
+    @property
+    def score_matrix_max_size(self) -> int:
+        """Cap on score matrix dimensions in points.
+
+        0 = auto: use actual match_length for match games, fall back to a 7-point
+        hypothetical projection for unlimited games. A positive value N caps the
+        matrix to N points (taking min(match_length, N) for matches, and using N
+        directly as the hypothetical match length for unlimited games).
+        """
+        return self._settings.get("score_matrix_max_size", 0)
+
+    @score_matrix_max_size.setter
+    def score_matrix_max_size(self, value: int) -> None:
+        if value < 0:
+            raise ValueError("score_matrix_max_size must be >= 0")
+        self.set("score_matrix_max_size", value)
 
     @property
     def generate_move_score_matrix(self) -> bool:

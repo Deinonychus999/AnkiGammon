@@ -1,6 +1,7 @@
 """Generate Anki card content from XG decisions."""
 
 import json
+import logging
 import random
 import string
 import html
@@ -13,6 +14,8 @@ from ankigammon.renderer.animation_controller import AnimationController
 from ankigammon.utils.move_parser import MoveParser
 from ankigammon.settings import get_settings
 from ankigammon.anki.decision_serialize import decision_to_json
+
+logger = logging.getLogger(__name__)
 
 
 class CardGenerator:
@@ -850,9 +853,10 @@ class CardGenerator:
     </div>
 """
 
-        # Generate score matrix for cube decisions if enabled
+        # Generate score matrix for cube decisions if enabled (works for both
+        # match play and unlimited games — the latter gets a hypothetical projection)
         score_matrix_html = ''
-        if is_cube_decision and decision.match_length > 0 and self.settings.generate_score_matrix:
+        if is_cube_decision and self.settings.generate_score_matrix:
             score_matrix_html = self._generate_score_matrix_html(decision)
             if score_matrix_html:
                 score_matrix_html = f"\n{score_matrix_html}"
@@ -1797,19 +1801,51 @@ class CardGenerator:
                 return ""
 
         try:
-            from ankigammon.analysis.score_matrix import generate_score_matrix, format_matrix_as_html
+            from ankigammon.analysis.score_matrix import (
+                generate_score_matrix,
+                format_matrix_as_html,
+                resolve_effective_match_length,
+            )
 
-            # Calculate away scores
-            current_player_away = decision.match_length - (
-                decision.score_o if decision.on_roll == Player.O else decision.score_x
-            )
-            current_opponent_away = decision.match_length - (
-                decision.score_x if decision.on_roll == Player.O else decision.score_o
-            )
+            max_size = getattr(self.settings, 'score_matrix_max_size', 0)
+            effective_ml = resolve_effective_match_length(decision.match_length, max_size)
+            is_projection = decision.match_length == 0
+
+            # generate_score_matrix requires match_length >= 2; this guards 1-point
+            # matches (decision.match_length == 1) — silently disabled here rather
+            # than raised downstream, since a 1pt match has no cube action to study.
+            if effective_ml < 2:
+                return ""
+
+            # Current-cell highlight only makes sense for real match games, and only
+            # when the live away coordinates fall inside the (possibly capped) matrix.
+            # When they don't, surface a caption so the reader knows the matrix
+            # doesn't cover their actual current position.
+            current_player_away = None
+            current_opponent_away = None
+            caption = None
+            if not is_projection:
+                player_away = decision.match_length - (
+                    decision.score_o if decision.on_roll == Player.O else decision.score_x
+                )
+                opponent_away = decision.match_length - (
+                    decision.score_x if decision.on_roll == Player.O else decision.score_o
+                )
+                # min_away mirrors generate_score_matrix's cube-live floor
+                min_away = decision.cube_value + 1
+                if (min_away <= player_away <= effective_ml and
+                        min_away <= opponent_away <= effective_ml):
+                    current_player_away = player_away
+                    current_opponent_away = opponent_away
+                else:
+                    caption = (
+                        f"Current score ({player_away}-away / {opponent_away}-away) "
+                        "is outside the displayed range."
+                    )
 
             matrix = generate_score_matrix(
                 xgid=decision.xgid,
-                match_length=decision.match_length,
+                match_length=effective_ml,
                 analyzer=self._get_analyzer(),
                 progress_callback=self.progress_callback,
                 cancellation_callback=self.cancellation_callback,
@@ -1823,13 +1859,17 @@ class CardGenerator:
                 current_opponent_away=current_opponent_away,
                 analysis_label=self._analysis_label(),
                 cube_value=decision.cube_value,
-                cube_owner=decision.cube_owner
+                cube_owner=decision.cube_owner,
+                caption=caption,
             )
 
             return matrix_html
 
-        except Exception as e:
-            print(f"Warning: Failed to generate score matrix: {e}")
+        except InterruptedError:
+            # Cancellation must propagate so the export worker can stop cleanly
+            raise
+        except Exception:
+            logger.exception("Failed to generate score matrix for xgid=%r", decision.xgid)
             return ""
 
     def _generate_move_score_matrix_html(self, decision: Decision) -> str:

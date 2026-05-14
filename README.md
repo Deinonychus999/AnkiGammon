@@ -238,6 +238,7 @@ Open Settings with **Ctrl+,** to configure:
 - **eXtreme Gammon Path**: Configure path to `eXtremeGammon2.exe` (Windows only, experimental)
 - **XG Analysis Level**: Set XG depth (Very Quick → Extensive, default: World Class)
 - **Score Matrix**: Generate cube decision matrix for all match scores (optional, time-consuming)
+- **Score Matrix Max Size**: Cap the matrix size in points to save time on long matches; with "Auto" it uses the match length, or a 7-point view for unlimited (money) games
 - **Move Score Matrix**: Generate move analysis at different match contexts - Neutral, DMP, Gammon-Save, Gammon-Go (optional, time-consuming)
 
 ## Troubleshooting

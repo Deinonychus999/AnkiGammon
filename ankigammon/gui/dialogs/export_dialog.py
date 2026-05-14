@@ -13,6 +13,7 @@ from PySide6.QtCore import Qt, QThread, Signal, Slot
 from ankigammon.models import Decision
 from ankigammon.anki.ankiconnect import AnkiConnect
 from ankigammon.anki.apkg_exporter import ApkgExporter, StableNote, _deterministic_id
+from ankigammon.analysis.score_matrix import resolve_effective_match_length
 from ankigammon.anki.card_generator import CardGenerator
 from ankigammon.anki.deck_utils import find_duplicate_xgids
 from ankigammon.gui import silent_messagebox
@@ -251,7 +252,6 @@ class ExportWorker(QThread):
                 )
                 has_cube_score_matrix = (
                     decision.decision_type.name == 'CUBE_ACTION' and
-                    decision.match_length > 0 and
                     self.settings.get('generate_score_matrix', False) and
                     analyzer_available
                 )
@@ -261,7 +261,11 @@ class ExportWorker(QThread):
                     self.settings.get('generate_move_score_matrix', False) and
                     analyzer_available
                 )
-                cube_matrix_steps = (decision.match_length - 1) ** 2 if has_cube_score_matrix else 0
+                cube_effective_ml = resolve_effective_match_length(
+                    decision.match_length,
+                    self.settings.get('score_matrix_max_size', 0),
+                ) if has_cube_score_matrix else 0
+                cube_matrix_steps = (cube_effective_ml - 1) ** 2 if cube_effective_ml >= 2 else 0
                 move_matrix_steps = 4 if has_move_score_matrix else 0
                 total_substeps = max(1, cube_matrix_steps + move_matrix_steps)
 
@@ -404,7 +408,6 @@ class ExportWorker(QThread):
                     )
                     has_cube_score_matrix = (
                         decision.decision_type.name == 'CUBE_ACTION' and
-                        decision.match_length > 0 and
                         self.settings.get('generate_score_matrix', False) and
                         apkg_analyzer_available
                     )
@@ -414,7 +417,11 @@ class ExportWorker(QThread):
                         self.settings.get('generate_move_score_matrix', False) and
                         apkg_analyzer_available
                     )
-                    cube_matrix_steps = (decision.match_length - 1) ** 2 if has_cube_score_matrix else 0
+                    cube_effective_ml = resolve_effective_match_length(
+                        decision.match_length,
+                        self.settings.get('score_matrix_max_size', 0),
+                    ) if has_cube_score_matrix else 0
+                    cube_matrix_steps = (cube_effective_ml - 1) ** 2 if cube_effective_ml >= 2 else 0
                     move_matrix_steps = 4 if has_move_score_matrix else 0  # 4 score types analyzed
                     total_substeps = max(1, cube_matrix_steps + move_matrix_steps)
 

@@ -109,6 +109,24 @@ class ScoreMatrixCell:
         return min(displayed_errors) < threshold
 
 
+def resolve_effective_match_length(match_length: int, max_size: int) -> int:
+    """Compute the matrix's effective match length from the source position and
+    the user's ``score_matrix_max_size`` setting.
+
+    Match games are capped to ``max_size`` when it's positive, otherwise the full
+    match length is used. Unlimited games (source ``match_length == 0``) use
+    ``max_size`` directly, falling back to a 7-point projection when ``max_size``
+    is 0 (the "Auto" setting).
+
+    Returns the computed effective match length. Values < 2 (possible only when
+    the source ``match_length`` is 1) should be treated by callers as a signal
+    to skip the matrix — ``generate_score_matrix`` itself rejects them.
+    """
+    if match_length > 0:
+        return min(match_length, max_size) if max_size > 0 else match_length
+    return max_size if max_size > 0 else 7
+
+
 def generate_score_matrix(
     xgid: str,
     match_length: int,
@@ -129,9 +147,16 @@ def generate_score_matrix(
     if the cube is at 2 and doubling would make it 4, the matrix starts at 4-away
     (since at 3-away or closer, the cube at 2 is already dead and can't be doubled).
 
+    The caller decides the effective match length. To cap a long match, pass a
+    smaller match_length than the source XGID's actual match length. To project
+    an unlimited (money) position into a hypothetical match, pass an XGID with
+    match_length=0 and the desired match_length argument.
+
     Args:
         xgid: XGID position string (cube decision)
-        match_length: Match length (e.g., 7 for 7-point match)
+        match_length: Effective match length for the matrix (>= 2). May differ
+            from the source XGID's match length (e.g. for caps or hypothetical
+            projection from unlimited).
         analyzer: BackgammonAnalyzer instance to use for analysis
         progress_callback: Optional callback(message: str) for progress updates
         cancellation_callback: Optional callback() that returns True if cancelled
@@ -163,6 +188,17 @@ def generate_score_matrix(
     # Parse original XGID to get position and metadata
     position, metadata = parse_xgid(xgid)
     on_roll = metadata.get('on_roll')
+    source_match_length = metadata.get('match_length', 0)
+
+    # The crawford_jacoby field is overloaded: in match XGIDs bit 0 is the
+    # Crawford flag; in unlimited XGIDs it encodes Jacoby/Beavers. When the
+    # source is unlimited but we're synthesising match XGIDs, the source's
+    # Jacoby/Beavers bits would be reinterpreted as Crawford and corrupt the
+    # analysis — so force 0 for projected matches.
+    if source_match_length == 0:
+        synthetic_crawford_jacoby = 0
+    else:
+        synthetic_crawford_jacoby = metadata.get('crawford_jacoby', 0)
 
     # If cube_owner not provided, extract from XGID
     if cube_owner is None:
@@ -222,7 +258,7 @@ def generate_score_matrix(
                 score_x=score_x,
                 score_o=score_o,
                 match_length=match_length,
-                crawford_jacoby=metadata.get('crawford_jacoby', 0),
+                crawford_jacoby=synthetic_crawford_jacoby,
                 max_cube=metadata.get('max_cube', 256)
             )
 
@@ -352,7 +388,8 @@ def format_matrix_as_html(
     ply_level: Optional[int] = None,
     cube_value: int = 1,
     cube_owner: Optional['CubeState'] = None,
-    analysis_label: Optional[str] = None
+    analysis_label: Optional[str] = None,
+    caption: Optional[str] = None,
 ) -> str:
     """
     Format score matrix as HTML table.
@@ -366,6 +403,8 @@ def format_matrix_as_html(
         cube_value: Current cube value (for title generation)
         cube_owner: Current cube owner (for title generation)
         analysis_label: Display label for analysis depth (e.g., "2-ply" or "World Class")
+        caption: Optional note rendered below the matrix (e.g., to warn the
+            reader when the live current score falls outside the displayed range).
 
     Returns:
         HTML string with styled table
@@ -438,6 +477,12 @@ def format_matrix_as_html(
         html += '</tr>\n'
 
     html += '</table>\n'
+    if caption:
+        html += (
+            f'<p class="matrix-caption" '
+            f'style="font-size: 12px; color: #a6adc8; margin: 6px 0 0;">'
+            f'{caption}</p>\n'
+        )
     html += '</div>\n'
 
     return html
