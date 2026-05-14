@@ -188,17 +188,18 @@ def generate_score_matrix(
     # Parse original XGID to get position and metadata
     position, metadata = parse_xgid(xgid)
     on_roll = metadata.get('on_roll')
-    source_match_length = metadata.get('match_length', 0)
 
-    # The crawford_jacoby field is overloaded: in match XGIDs bit 0 is the
-    # Crawford flag; in unlimited XGIDs it encodes Jacoby/Beavers. When the
-    # source is unlimited but we're synthesising match XGIDs, the source's
-    # Jacoby/Beavers bits would be reinterpreted as Crawford and corrupt the
-    # analysis — so force 0 for projected matches.
-    if source_match_length == 0:
-        synthetic_crawford_jacoby = 0
-    else:
-        synthetic_crawford_jacoby = metadata.get('crawford_jacoby', 0)
+    # `crawford_jacoby` is always 0 in synthesised matrix cells:
+    #   - The matrix's away range starts at min_away = cube_value + 1 (>= 2),
+    #     so no synthesised cell has a player at 1-away. Crawford (which only
+    #     applies at 1-away) therefore can never legitimately fire in any cell,
+    #     regardless of whether the source position was itself a Crawford game.
+    #   - For unlimited (money) sources, the bitfield encodes Jacoby/Beavers
+    #     rather than Crawford. Propagating it into synthesised match XGIDs
+    #     would be reinterpreted as a spurious Crawford flag and corrupt the
+    #     analysis.
+    # Either way the safe value is 0.
+    synthetic_crawford_jacoby = 0
 
     # If cube_owner not provided, extract from XGID
     if cube_owner is None:
