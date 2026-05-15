@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.6.2] - 2026-05-15
+
+### Added
+- Custom analysis profiles defined in eXtreme Gammon 2 now appear in the level dropdown alongside the built-in levels.
+
+### Improved
+- Score matrix dialog now handles unlimited (money) games and caps the matrix size to keep large matches usable.
+- Windows release zips are now named `ankigammon-windows-<version>.zip`, so successive downloads no longer pile up as `ankigammon-windows(1).zip`, `(2).zip`, etc. in your Downloads folder.
+
+### Fixed
+- Crawford flag is no longer carried over into individual score matrix cells, which could distort cube equity for those cells.
+
 ## [1.6.1] - 2026-05-11
 
 ### Fixed
