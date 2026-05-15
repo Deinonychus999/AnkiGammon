@@ -28,7 +28,7 @@ A graphical application for converting backgammon positions into Anki flashcards
 Download pre-built executables from [GitHub Releases](https://github.com/Deinonychus999/AnkiGammon/releases):
 
 **Windows:**
-1. Download `ankigammon-windows.zip` from the latest release
+1. Download `ankigammon-windows-<version>.zip` from the latest release
 2. Extract the ZIP file
 3. Double-click `ankigammon.exe`
 4. **Windows SmartScreen Warning:** Click "More info" → "Run anyway"

@@ -129,8 +129,9 @@ class VersionChecker:
         """
         # Determine platform-specific filename
         if sys.platform == 'win32':
-            # Windows: ankigammon-windows.zip
-            filename = 'ankigammon-windows.zip'
+            # Windows: ankigammon-windows-<version>.zip
+            version = release_data.get('tag_name', '').lstrip('v')
+            filename = f'ankigammon-windows-{version}.zip'
         elif sys.platform == 'darwin':
             # macOS: AnkiGammon-macOS.dmg
             filename = 'AnkiGammon-macOS.dmg'

@@ -33,14 +33,19 @@ jobs:
 
       - name: Create ZIP archive
         run: |
+          $version = "${{ github.ref_name }}" -replace '^v', ''
           cd dist
-          Compress-Archive -Path ankigammon.exe -DestinationPath ankigammon-windows.zip
+          Compress-Archive -Path ankigammon.exe -DestinationPath "ankigammon-windows-$version.zip"
+          # Also publish under the legacy unversioned name so the in-app
+          # updater in <=v1.6.1 (which hardcodes 'ankigammon-windows.zip')
+          # keeps working. Safe to drop once v1.6.1 users have moved on.
+          Copy-Item "ankigammon-windows-$version.zip" "ankigammon-windows.zip"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ankigammon-windows
-          path: dist/ankigammon-windows.zip
+          path: dist/ankigammon-windows*.zip
           retention-days: 7
 
   build-macos:
@@ -251,7 +256,7 @@ jobs:
           body: ${{ steps.prerelease.outputs.is_prerelease == 'true' && format('Pre-release {0}', github.ref_name) || steps.changelog.outputs.changes }}
           prerelease: ${{ steps.prerelease.outputs.is_prerelease == 'true' }}
           files: |
-            ankigammon-windows.zip
+            ankigammon-windows*.zip
             AnkiGammon-macOS.dmg
             AnkiGammon-x86_64.AppImage
         env:
