@@ -118,6 +118,18 @@ def generate_move_score_matrix(
 
     on_roll = metadata.get('on_roll', Player.O)
 
+    # Preserve the original position's cube (value + owner) for every score
+    # context instead of forcing a centered 1-cube. Forcing a centered cube
+    # collapses the only column with a *live* cube (Neutral: 7-pt, 0-0,
+    # non-Crawford): for a position past the opponent's cash point, the
+    # opponent has an immediate double/pass, so gnubg's cubeful equity for
+    # every legal checker play caps at the doubled-out value (-1.000), tying
+    # all moves and hiding the real differences. The other columns are
+    # unaffected because their cube is dead (DMP = 1-pt match; G-Save/G-Go =
+    # Crawford game). See issue #48.
+    orig_cube_value = metadata.get('cube_value', 1)
+    orig_cube_owner = metadata.get('cube_owner', CubeState.CENTERED)
+
     # Build list of modified XGIDs for each score config
     position_ids = []
     for config in SCORE_CONFIGS:
@@ -135,8 +147,8 @@ def generate_move_score_matrix(
 
         modified_xgid = encode_xgid(
             position=position,
-            cube_value=1,  # Cube at 1 (centered) for these score contexts
-            cube_owner=CubeState.CENTERED,
+            cube_value=orig_cube_value,
+            cube_owner=orig_cube_owner,
             dice=dice,
             on_roll=on_roll,
             score_x=score_x,
