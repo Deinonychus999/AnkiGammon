@@ -304,6 +304,36 @@ class DeckTreeWidget(QTreeWidget):
                 self.scrollToItem(found)
                 return
 
+    def select_decision(self, decision: Decision) -> bool:
+        """Find a position item by decision identity, expand its ancestors, and select it.
+
+        setCurrentItem fires currentItemChanged synchronously, so the
+        position_selected signal is emitted via _on_selection_changed.
+
+        Returns True if the decision was found and selected, False otherwise.
+        """
+        def _walk(item: QTreeWidgetItem) -> Optional[PositionTreeItem]:
+            if isinstance(item, PositionTreeItem) and item.decision is decision:
+                return item
+            for i in range(item.childCount()):
+                found = _walk(item.child(i))
+                if found:
+                    return found
+            return None
+
+        for i in range(self.topLevelItemCount()):
+            found = _walk(self.topLevelItem(i))
+            if found:
+                # Expand all ancestors so the item is visible
+                parent = found.parent()
+                while parent:
+                    parent.setExpanded(True)
+                    parent = parent.parent()
+                self.setCurrentItem(found)
+                self.scrollToItem(found)
+                return True
+        return False
+
     def _ensure_parent_chain(self, path: str, node_map: dict) -> 'DeckTreeItem':
         """Ensure all ancestor nodes exist, creating virtual ones as needed.
 

@@ -705,6 +705,17 @@ class MainWindow(QMainWindow):
 
         # Rebuild tree to show new positions
         self.deck_tree.rebuild_tree()
+        self._show_first_imported(decisions)
+
+    def _show_first_imported(self, decisions: List[Decision]):
+        """Auto-display the first imported position if nothing is shown yet.
+
+        Selecting the position in the deck tree emits position_selected,
+        which drives show_decision. Skipped when a position is already
+        selected so imports don't yank the user's current view.
+        """
+        if decisions and self.deck_tree.get_selected_decision() is None:
+            self.deck_tree.select_decision(decisions[0])
 
     def _check_empty_state(self):
         """Update UI state when positions may have changed."""
@@ -747,6 +758,7 @@ class MainWindow(QMainWindow):
 
         # Update deck tree
         self.deck_tree.rebuild_tree()
+        self._show_first_imported(decisions)
 
     def show_decision(self, decision: Decision):
         """Display a decision in the preview pane."""
@@ -1995,9 +2007,14 @@ class MainWindow(QMainWindow):
                 active_deck = self.deck_tree.get_active_deck_name()
             self.deck_manager.add_decisions(decisions, active_deck)
             self.deck_tree.rebuild_tree()
+            # Capture before deck selection below replaces the current item
+            had_selection = self.deck_tree.get_selected_decision() is not None
             # Expand and scroll to the target deck so the user sees the result
             if self._import_target_deck:
                 self.deck_tree._expand_and_select_deck(self._import_target_deck)
+            # Auto-display the first imported position if nothing was shown yet
+            if decisions and not had_selection:
+                self.deck_tree.select_decision(decisions[0])
             self.btn_export.setEnabled(True)
 
             # Show success message (or accumulate for batch)
