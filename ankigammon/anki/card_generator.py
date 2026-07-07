@@ -78,6 +78,10 @@ class CardGenerator:
         self.progress_callback = progress_callback
         self.cancellation_callback = cancellation_callback
 
+        # Non-fatal problems collected while generating cards, so export
+        # flows can surface them instead of failing or staying silent.
+        self.generation_warnings: List[str] = []
+
     def _get_analyzer(self):
         """Return the shared analyzer, lazily creating one if needed."""
         if self._analyzer is None:
@@ -864,6 +868,14 @@ class CardGenerator:
             if move_matrix_html:
                 move_matrix_html = f"\n{move_matrix_html}"
 
+        # Generate move cube matrix (checker play at all cube positions) if
+        # enabled; only rendered when the best move actually differs
+        cube_matrix_html = ''
+        if not is_cube_decision and self.settings.generate_move_cube_matrix:
+            cube_matrix_html = self._generate_move_cube_matrix_html(decision)
+            if cube_matrix_html:
+                cube_matrix_html = f"\n{cube_matrix_html}"
+
         # Generate note HTML if note exists
         note_html = self._generate_note_html(decision)
 
@@ -873,7 +885,7 @@ class CardGenerator:
     <div class="metadata">{metadata}</div>
 {answer_html}
 {note_html}
-{analysis_and_chances}{score_matrix_html}{move_matrix_html}
+{analysis_and_chances}{score_matrix_html}{move_matrix_html}{cube_matrix_html}
     {self._generate_source_info(decision)}
 </div>
 """
@@ -1922,6 +1934,84 @@ class CardGenerator:
 
         except Exception as e:
             print(f"Warning: Failed to generate move score matrix: {e}")
+            return ""
+
+    def _generate_move_cube_matrix_html(self, decision: Decision) -> str:
+        """
+        Generate move cube matrix HTML for checker play decisions (issue #50).
+
+        Re-analyzes the position at 3 cube positions (Neutral / Player /
+        Opponent) and returns a collapsed spoiler with the comparison table,
+        but only when the best move actually differs between cube positions.
+
+        Args:
+            decision: The checker play decision
+
+        Returns:
+            HTML string with the spoiler, or empty string if unavailable
+            or the best move is identical at all three cube positions
+        """
+        # Check analyzer availability
+        analyzer_type = getattr(self.settings, 'analyzer_type', 'gnubg')
+        if analyzer_type == "xg":
+            if not self.settings.is_xg_available():
+                return ""
+        else:
+            if not self.settings.is_gnubg_available():
+                return ""
+
+        # Only for checker play decisions
+        if decision.decision_type != DecisionType.CHECKER_PLAY:
+            return ""
+
+        # Skip if no dice (shouldn't happen for checker play)
+        if not decision.dice:
+            return ""
+
+        # The cube is dead in Crawford games and 1-point matches; owned-cube
+        # variants would be illegal/meaningless states there
+        if decision.crawford:
+            return ""
+        if decision.match_length == 1:
+            return ""
+
+        try:
+            from ankigammon.analysis.move_cube_matrix import (
+                generate_move_cube_matrix,
+                best_move_differs,
+                format_move_cube_matrix_as_html
+            )
+
+            columns = generate_move_cube_matrix(
+                xgid=decision.xgid,
+                analyzer=self._get_analyzer(),
+                max_moves=self.settings.max_moves,
+                progress_callback=self.progress_callback,
+                cancellation_callback=self.cancellation_callback
+            )
+
+            # Per issue #50: nothing is added when the best move is the same
+            # at all three cube positions
+            if not best_move_differs(columns):
+                return ""
+
+            return format_move_cube_matrix_as_html(
+                columns=columns,
+                analysis_label=self._analysis_label()
+            )
+
+        except InterruptedError:
+            # Cancellation must propagate so the export worker can stop cleanly
+            raise
+        except Exception:
+            # A missing spoiler normally means "the best move is the same at
+            # all cube positions", so an analysis failure must not be silent:
+            # record it for the export summary.
+            logger.exception("Failed to generate move cube matrix for xgid=%r", decision.xgid)
+            self.generation_warnings.append(
+                f"Cube-position analysis failed for {decision.xgid} "
+                "(card exported without the cube comparison)"
+            )
             return ""
 
     def _generate_note_html(self, decision: Decision) -> str:

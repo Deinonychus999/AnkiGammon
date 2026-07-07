@@ -207,6 +207,7 @@ Each position becomes one Anki card:
 - Explanation (if added)
 - Score matrix showing optimal cube actions across all match scores (if enabled)
 - Move score matrix showing top moves at different match contexts (if enabled)
+- Cube position spoiler — a collapsed section revealing how the best move changes when the cube is centered, owned by you, or owned by your opponent; only shown when the best move actually differs (if enabled)
 
 ## Customization Options
 
@@ -240,6 +241,7 @@ Open Settings with **Ctrl+,** to configure:
 - **Score Matrix**: Generate cube decision matrix for all match scores (optional, time-consuming)
 - **Score Matrix Max Size**: Cap the matrix size in points to save time on long matches; with "Auto" it uses the match length, or a 7-point view for unlimited (money) games
 - **Move Score Matrix**: Generate move analysis at different match contexts - Neutral, DMP, Gammon-Save, Gammon-Go (optional, time-consuming)
+- **Analyze Checker Plays at All Cube Positions**: Re-analyze each checker play with the cube centered, owned by the player, and owned by the opponent (3 extra analyses per position). A collapsed spoiler is added to the card back only when the best move differs between cube positions. Owned-cube variants use a 2-cube unless the cube is already owned. Works for match play and unlimited games; skipped in Crawford games and 1-point matches where the cube is dead (optional, time-consuming)
 
 ## Troubleshooting
 

@@ -187,6 +187,13 @@ class RegenerateWorker(QThread):
         msg = f"Successfully re-rendered {updated} card(s)"
         if errors:
             msg += f" ({errors} failed)"
+        if card_gen.generation_warnings:
+            msg += (
+                f". {len(card_gen.generation_warnings)} card(s) rendered "
+                "without optional analysis (see log for details)"
+            )
+            for warning in card_gen.generation_warnings:
+                self.status_message.emit(f"Warning: {warning}")
         if legacy_skipped:
             msg += (
                 f". Skipped {legacy_skipped} legacy card(s) without saved "
@@ -294,6 +301,13 @@ class RegenerateWorker(QThread):
         msg = f"Successfully regenerated {updated} card(s) in Anki"
         if errors > 0:
             msg += f" ({errors} failed)"
+        if card_gen.generation_warnings:
+            msg += (
+                f". {len(card_gen.generation_warnings)} card(s) rendered "
+                "without optional analysis (see log for details)"
+            )
+            for warning in card_gen.generation_warnings:
+                self.status_message.emit(f"Warning: {warning}")
         self.finished.emit(True, msg)
 
 

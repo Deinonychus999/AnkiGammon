@@ -30,6 +30,7 @@ class Settings:
         "generate_score_matrix": False,
         "score_matrix_max_size": 0,  # 0 = auto (match length for matches, 7-pt projection for unlimited)
         "generate_move_score_matrix": False,
+        "generate_move_cube_matrix": False,
         "split_cube_decisions": False,
         "board_orientation": "counter-clockwise",
         "last_apkg_directory": None,
@@ -268,6 +269,16 @@ class Settings:
     def generate_move_score_matrix(self, value: bool) -> None:
         """Set whether to generate move score matrix for checker play decisions."""
         self.set("generate_move_score_matrix", value)
+
+    @property
+    def generate_move_cube_matrix(self) -> bool:
+        """Get whether to generate move cube matrix for checker play decisions."""
+        return self._settings.get("generate_move_cube_matrix", False)
+
+    @generate_move_cube_matrix.setter
+    def generate_move_cube_matrix(self, value: bool) -> None:
+        """Set whether to generate move cube matrix for checker play decisions."""
+        self.set("generate_move_cube_matrix", value)
 
     @property
     def split_cube_decisions(self) -> bool:

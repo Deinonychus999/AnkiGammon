@@ -24,6 +24,20 @@ from ankigammon.utils.analyzer_base import create_analyzer
 from PySide6.QtWidgets import QMessageBox
 
 
+def _append_warnings(message: str, card_gen: CardGenerator) -> str:
+    """Append non-fatal card-generation warnings to an export summary.
+
+    Without this, a failed optional analysis (e.g. the cube-position
+    matrix) would be indistinguishable from its legitimate "nothing to
+    show" outcome.
+    """
+    warnings = card_gen.generation_warnings
+    if not warnings:
+        return message
+    details = "\n".join(f"  - {w}" for w in warnings)
+    return f"{message}\nWarning(s):\n{details}"
+
+
 class AnalysisWorker(QThread):
     """
     Background thread for GnuBG analysis of positions.
@@ -261,13 +275,22 @@ class ExportWorker(QThread):
                     self.settings.get('generate_move_score_matrix', False) and
                     analyzer_available
                 )
+                has_move_cube_matrix = (
+                    decision.decision_type.name == 'CHECKER_PLAY' and
+                    decision.dice and
+                    self.settings.get('generate_move_cube_matrix', False) and
+                    analyzer_available and
+                    not decision.crawford and
+                    decision.match_length != 1
+                )
                 cube_effective_ml = resolve_effective_match_length(
                     decision.match_length,
                     self.settings.get('score_matrix_max_size', 0),
                 ) if has_cube_score_matrix else 0
                 cube_matrix_steps = (cube_effective_ml - 1) ** 2 if cube_effective_ml >= 2 else 0
                 move_matrix_steps = 4 if has_move_score_matrix else 0
-                total_substeps = max(1, cube_matrix_steps + move_matrix_steps)
+                cube_variant_steps = 3 if has_move_cube_matrix else 0
+                total_substeps = max(1, cube_matrix_steps + move_matrix_steps + cube_variant_steps)
 
                 current_substep = [0]
 
@@ -325,13 +348,13 @@ class ExportWorker(QThread):
 
         unique_xgids = len({d.xgid for d in self.all_decisions if d.xgid})
         if unique_xgids and unique_xgids < total:
-            self.finished.emit(
-                True,
+            message = (
                 f"Exported {unique_xgids} unique card(s) to Anki "
                 f"({total - unique_xgids} duplicate(s) merged by XGID)"
             )
         else:
-            self.finished.emit(True, f"Successfully exported {total} card(s) to Anki")
+            message = f"Successfully exported {total} card(s) to Anki"
+        self.finished.emit(True, _append_warnings(message, card_gen))
 
     def _export_apkg(self):
         """Export to APKG file."""
@@ -417,13 +440,22 @@ class ExportWorker(QThread):
                         self.settings.get('generate_move_score_matrix', False) and
                         apkg_analyzer_available
                     )
+                    has_move_cube_matrix = (
+                        decision.decision_type.name == 'CHECKER_PLAY' and
+                        decision.dice and
+                        self.settings.get('generate_move_cube_matrix', False) and
+                        apkg_analyzer_available and
+                        not decision.crawford and
+                        decision.match_length != 1
+                    )
                     cube_effective_ml = resolve_effective_match_length(
                         decision.match_length,
                         self.settings.get('score_matrix_max_size', 0),
                     ) if has_cube_score_matrix else 0
                     cube_matrix_steps = (cube_effective_ml - 1) ** 2 if cube_effective_ml >= 2 else 0
                     move_matrix_steps = 4 if has_move_score_matrix else 0  # 4 score types analyzed
-                    total_substeps = max(1, cube_matrix_steps + move_matrix_steps)
+                    cube_variant_steps = 3 if has_move_cube_matrix else 0  # 3 cube positions analyzed
+                    total_substeps = max(1, cube_matrix_steps + move_matrix_steps + cube_variant_steps)
 
                     current_substep = [0]
                     current_card_index = card_index  # Capture for closure
@@ -483,14 +515,14 @@ class ExportWorker(QThread):
             unique_xgids = len({d.xgid for d in self.all_decisions if d.xgid})
             total = len(self.all_decisions)
             if unique_xgids and unique_xgids < total:
-                self.finished.emit(
-                    True,
+                message = (
                     f"Created {self.output_path} with {unique_xgids} unique "
                     f"card(s) ({total - unique_xgids} duplicate(s) will be "
                     f"merged by Anki on import)"
                 )
             else:
-                self.finished.emit(True, f"Successfully created {self.output_path}")
+                message = f"Successfully created {self.output_path}"
+            self.finished.emit(True, _append_warnings(message, card_gen))
         except Exception as e:
             self.finished.emit(False, f"APKG export failed: {str(e)}")
 

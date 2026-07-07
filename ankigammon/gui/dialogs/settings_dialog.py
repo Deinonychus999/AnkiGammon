@@ -553,6 +553,26 @@ class SettingsDialog(QDialog):
         move_matrix_layout.addStretch()
         form.addRow(move_matrix_layout)
 
+        # Move cube matrix generation (checker play at all cube positions)
+        cube_matrix_layout = QHBoxLayout()
+        self.chk_generate_move_cube_matrix = QCheckBox("Analyze checker plays at all cube positions")
+        self.chk_generate_move_cube_matrix.setCursor(Qt.PointingHandCursor)
+        self.chk_generate_move_cube_matrix.setStyleSheet("font-size: 14px;")
+        self.chk_generate_move_cube_matrix.setToolTip(
+            "Re-analyzes each checker play with the cube centered, owned by the\n"
+            "player on roll, and owned by the opponent (3 extra analyses per card).\n"
+            "Owned-cube variants use a 2-cube unless the cube is already owned.\n"
+            "A collapsed spoiler is added to the card back only when the best\n"
+            "move differs between cube positions.\n"
+            "This is time-consuming and can significantly slow down analysis."
+        )
+        cube_matrix_layout.addWidget(self.chk_generate_move_cube_matrix)
+        cube_matrix_warning = QLabel("(time-consuming)")
+        cube_matrix_warning.setStyleSheet("font-size: 11px; color: #a6adc8; margin-left: 8px;")
+        cube_matrix_layout.addWidget(cube_matrix_warning)
+        cube_matrix_layout.addStretch()
+        form.addRow(cube_matrix_layout)
+
         return group
 
     def _on_analyzer_type_changed(self, index: int):
@@ -711,6 +731,7 @@ class SettingsDialog(QDialog):
         self.cmb_matrix_max_size.setCurrentIndex(max_size_index if max_size_index >= 0 else 0)
         self._on_score_matrix_toggled(self.chk_generate_score_matrix.isChecked())
         self.chk_generate_move_score_matrix.setChecked(self.settings.generate_move_score_matrix)
+        self.chk_generate_move_cube_matrix.setChecked(self.settings.generate_move_cube_matrix)
 
         # Trigger visibility update
         self._on_analyzer_type_changed(analyzer_index)
@@ -842,6 +863,7 @@ class SettingsDialog(QDialog):
         self.settings.generate_score_matrix = self.chk_generate_score_matrix.isChecked()
         self.settings.score_matrix_max_size = int(self.cmb_matrix_max_size.currentData())
         self.settings.generate_move_score_matrix = self.chk_generate_move_score_matrix.isChecked()
+        self.settings.generate_move_cube_matrix = self.chk_generate_move_cube_matrix.isChecked()
 
         # Emit signal
         self.settings_changed.emit(self.settings)

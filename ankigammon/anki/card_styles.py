@@ -1601,9 +1601,11 @@ button.animate-btn:disabled {
     }
 }
 
-/* Hide move score matrix on very small landscape screens */
+/* Hide move score matrix (and the cube matrix spoiler, summary included)
+   on very small landscape screens */
 @media screen and (orientation: landscape) and (max-height: 450px) {
-    .move-score-matrix {
+    .move-score-matrix,
+    .cube-matrix-details {
         display: none;
     }
 }
@@ -1631,6 +1633,44 @@ button.animate-btn:disabled {
     .move-score-matrix-table .equity-error {
         font-size: 9px;
     }
+}
+
+/* ===================================================================
+   MOVE CUBE MATRIX SPOILER (issue #50)
+   Collapsible section revealing that the best checker play differs at
+   a different cube position. Reuses .move-score-matrix table styles.
+   =================================================================== */
+
+.cube-matrix-details {
+    margin-top: 12px;
+    border-top: 1px solid var(--border);
+    padding-top: 8px;
+    text-align: center;
+}
+
+.cube-matrix-details summary {
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    color: #888;
+    user-select: none;
+    list-style: none;
+}
+
+.cube-matrix-details summary::-webkit-details-marker {
+    display: none;
+}
+
+.cube-matrix-details summary::before {
+    content: "▸ ";
+}
+
+.cube-matrix-details[open] summary::before {
+    content: "▾ ";
+}
+
+.cube-matrix-details summary:hover {
+    color: #4da6ff;
 }
 
 /* ===================================================================
