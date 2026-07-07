@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+- Minor-error (yellow) and blunder (red) rows in the card analysis table are now readable in Anki's light mode; night mode keeps the brighter palette. AnkiConnect users get the fix automatically on their next export, while previously exported APKG decks keep the old styling until re-imported.
+
 ## [1.6.2] - 2026-05-15
 
 ### Added

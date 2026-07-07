@@ -13,6 +13,7 @@ from ankigammon.renderer.svg_board_renderer import SVGBoardRenderer
 from ankigammon.renderer.animation_controller import AnimationController
 from ankigammon.utils.move_parser import MoveParser
 from ankigammon.settings import get_settings
+from ankigammon.anki.card_styles import get_error_css_class
 from ankigammon.anki.decision_serialize import decision_to_json
 
 logger = logging.getLogger(__name__)
@@ -651,12 +652,7 @@ class CardGenerator:
                 abs_error = abs(display_error) if display_error else 0.0
 
             # Color-code row by error magnitude
-            if abs_error >= 0.020 and abs_error <= 0.080:
-                error_class = "error-minor"
-            elif abs_error > 0.080:
-                error_class = "error-blunder"
-            else:
-                error_class = ""
+            error_class = get_error_css_class(abs_error)
 
             # Add played indicator if this move was played
             played_indicator = ' <span class="played-indicator">← Played</span>' if move.was_played else ""

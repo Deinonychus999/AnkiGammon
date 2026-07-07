@@ -3,6 +3,26 @@
 # Model name for AnkiGammon cards
 MODEL_NAME = "AnkiGammon"
 
+# Equity-error severity thresholds, shared by the Top Moves Analysis table
+# and the move score matrix so their coloring can never drift apart.
+ERROR_MINOR_THRESHOLD = 0.020
+ERROR_BLUNDER_THRESHOLD = 0.080
+
+
+def get_error_css_class(abs_error: float) -> str:
+    """Return the CSS class for an absolute equity error.
+
+    Single source of truth for error-severity coloring: errors above
+    ERROR_BLUNDER_THRESHOLD are blunders, errors from ERROR_MINOR_THRESHOLD
+    up to and including ERROR_BLUNDER_THRESHOLD are minor, anything smaller
+    gets no class (default text color).
+    """
+    if abs_error > ERROR_BLUNDER_THRESHOLD:
+        return "error-blunder"
+    if abs_error >= ERROR_MINOR_THRESHOLD:
+        return "error-minor"
+    return ""
+
 # CSS for card styling with dark mode support
 CARD_CSS = """
 .card {
@@ -567,24 +587,40 @@ CARD_CSS = """
     font-weight: bold;
 }
 
-.moves-table tr.best-move td {
+/* Best-move rows share the severity-palette convention: darker green for
+   light mode (readable on the pale green row background), brighter green
+   in night mode via the override below. */
+.moves-table tr.best-move td,
+.move-score-matrix-table tr.rank-1 td {
+    color: #1b5e20;
+}
+
+.night_mode .moves-table tr.best-move td,
+.night_mode .move-score-matrix-table tr.rank-1 td {
     color: #66bb6a;
 }
 
-/* Error magnitude coloring in analysis table */
-.moves-table td.error-minor {
-    color: #fdd835;
+/* Error magnitude coloring, shared by the analysis table and the move
+   score matrix (see get_error_css_class). Light-mode colors are darkened
+   for readability on white (WCAG AA); night mode keeps the brighter
+   palette via the overrides below. */
+.moves-table td.error-minor,
+.move-score-matrix-table td.error-minor {
+    color: #a16207;
 }
 
-.moves-table td.error-blunder {
-    color: #ef5350;
+.moves-table td.error-blunder,
+.move-score-matrix-table td.error-blunder {
+    color: #c62828;
 }
 
-.night_mode .moves-table td.error-minor {
+.night_mode .moves-table td.error-minor,
+.night_mode .move-score-matrix-table td.error-minor {
     color: #ffee58;
 }
 
-.night_mode .moves-table td.error-blunder {
+.night_mode .moves-table td.error-blunder,
+.night_mode .move-score-matrix-table td.error-blunder {
     color: #ef5350;
 }
 
@@ -1491,13 +1527,6 @@ button.animate-btn:disabled {
     font-size: 12px;
 }
 
-.move-score-matrix-table .equity {
-    color: #4caf50;
-}
-
-.move-score-matrix-table .error {
-    color: #888;
-}
 
 .move-score-matrix-table .no-move {
     color: #666;
@@ -1529,10 +1558,6 @@ button.animate-btn:disabled {
 
 .night_mode .move-score-matrix-table tr.rank-1 td {
     background-color: rgba(76, 175, 80, 0.25);
-}
-
-.night_mode .move-score-matrix-table .error {
-    color: #aaa;
 }
 
 .night_mode .move-score-matrix-table .no-move {

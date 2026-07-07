@@ -257,6 +257,9 @@ def format_move_matrix_as_html(
     if not columns:
         return ""
 
+    # Shared severity thresholds with the Top Moves Analysis table
+    from ankigammon.anki.card_styles import get_error_css_class
+
     # Start table
     html = '<div class="move-score-matrix">\n'
 
@@ -308,7 +311,10 @@ def format_move_matrix_as_html(
                     error_val = -abs(move.error) if move.error != 0 else 0
                     equity_display = f'<span class="error">{error_val:.3f}</span>'
 
-                html += '<td>'
+                # Color-code the cell by error magnitude, matching the
+                # Top Moves Analysis table (rank 1 has error 0 -> no class)
+                error_class = get_error_css_class(move.error)
+                html += f'<td class="{error_class}">' if error_class else '<td>'
                 html += f'<div class="move-notation">{move.notation}</div>'
                 html += f'<div class="equity-error">{equity_display}</div>'
                 html += '</td>\n'
