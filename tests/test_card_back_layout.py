@@ -20,10 +20,9 @@ from ankigammon.anki.card_generator import CardGenerator
 from ankigammon.models import DecisionType
 from ankigammon.parsers.xg_binary_parser import XGBinaryParser
 
-MATCH_FILE = os.path.join(
-    os.path.dirname(__file__), "..", "match_files",
-    "2025-11-02#49733 Csaba Daday-Lorenzo Pacini.xg",
-)
+# Anonymized analyzed match (see scripts/anonymize_xg.py), tracked in-repo.
+SAMPLE_MATCH_FILE = os.path.join(
+    os.path.dirname(__file__), "data", "sample_match.xg")
 
 
 class _AncestryParser(HTMLParser):
@@ -80,8 +79,7 @@ def _parse(back_html: str) -> _AncestryParser:
 
 @pytest.fixture(scope="module")
 def decisions():
-    parser = XGBinaryParser()
-    return parser.parse_file(MATCH_FILE)
+    return XGBinaryParser.parse_file(SAMPLE_MATCH_FILE)
 
 
 @pytest.fixture(scope="module")

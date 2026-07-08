@@ -694,7 +694,7 @@ def default_gnubg_cases() -> List[GnubgCase]:
             ply=2,
         ),
         GnubgCase(
-            # Real position pulled from the Csaba match — both sides hold
+            # Real position pulled from an analyzed match — both sides hold
             # advanced anchors, classic holding-game tension.
             label="Midgame: holding game (real position from match)",
             xgid="XGID=abaB-BC-B--AcB-a-c-dA---B-:1:-1:-1:21:1:0:0:7:8",
@@ -714,7 +714,7 @@ def default_gnubg_cases() -> List[GnubgCase]:
         ),
         # --- Cube decisions ------------------------------------------------
         # XGID dice field "00" means "no dice rolled — cube action pending".
-        # Real positions from the Csaba and USBGF matches.
+        # Real positions from analyzed matches.
         GnubgCase(
             label="Cube: initial double, 7pt match (centered cube)",
             xgid="XGID=-a--a-E-C---dE--ac-e----B-:0:0:1:00:0:0:0:7:8",
@@ -726,6 +726,20 @@ def default_gnubg_cases() -> List[GnubgCase]:
             ply=3,
         ),
     ]
+
+
+def anonymize_match_filenames(html: str, file_paths: list) -> str:
+    """Replace match_files/ basenames with match-NN.xg in the report.
+
+    Personal match files carry player names in their filenames, and the
+    report is committed to docs/ — the names must not leak into it. The
+    filenames appear both in section headings and in the source-info
+    lines CardGenerator bakes into each card, so a post-pass over the
+    assembled HTML catches every occurrence.
+    """
+    for i, fp in enumerate(sorted(file_paths), start=1):
+        html = html.replace(fp.name, f"match-{i:02d}.xg")
+    return html
 
 
 def main() -> None:
@@ -747,6 +761,7 @@ def main() -> None:
         print(f"  - GnuBG {case.ply}-ply: {case.label}")
 
     html = build_report(file_paths + xgp_paths, gnubg_cases=gnubg_cases)
+    html = anonymize_match_filenames(html, file_paths)
 
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT_PATH.write_text(html, encoding="utf-8")

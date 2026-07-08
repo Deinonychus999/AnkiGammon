@@ -21,9 +21,10 @@ from ankigammon.parsers.xg_binary_parser import XGBinaryParser
 from ankigammon.parsers.xg_text_parser import XGTextParser
 
 
-MATCH_FILE_DIR = os.path.join(os.path.dirname(__file__), "..", "match_files")
-USERS_PROBLEM_FILE = os.path.join(
-    MATCH_FILE_DIR, "2025-11-02#49733 Csaba Daday-Lorenzo Pacini.xg"
+# Anonymized copy of the match from the GitHub issue (see
+# scripts/anonymize_xg.py); tracked in the repo so this runs everywhere.
+SAMPLE_MATCH_FILE = os.path.join(
+    os.path.dirname(__file__), "data", "sample_match.xg"
 )
 XGP_SAMPLE_DIR = os.path.join(os.path.dirname(__file__), "..", "xg_dump", "xgp")
 
@@ -131,14 +132,10 @@ class TestAnalysisTierRank:
 # End-to-end: parsing a real .xg file populates analysis_level on every move
 # ---------------------------------------------------------------------------
 
-@pytest.mark.skipif(
-    not os.path.exists(USERS_PROBLEM_FILE),
-    reason="real .xg sample not available in this checkout",
-)
 class TestXGBinaryParserAnalysisLevel:
     @pytest.fixture(scope="class")
     def decisions(self):
-        return XGBinaryParser.parse_file(USERS_PROBLEM_FILE)
+        return XGBinaryParser.parse_file(SAMPLE_MATCH_FILE)
 
     def test_every_candidate_move_has_a_label(self, decisions):
         # Regression: the prior tier-filter used to silently drop lower-tier
@@ -368,7 +365,7 @@ class TestXGTextEngineLabel:
 
     def test_parses_opening_book_entries(self):
         # Real text export of the very first move (43 roll opening) of the
-        # Csaba match: rank 1 is 4-ply engine analysis, ranks 2-5 are
+        # sample match: rank 1 is 4-ply engine analysis, ranks 2-5 are
         # opening-book entries differentiated by superscript or trailing
         # digit ("Book¹", "Book²", "Book³", "Book4"). All four book entries
         # must collapse to the canonical "Book" label.

@@ -162,7 +162,7 @@ class GNUBGMatchParser:
         Parse match metadata from header.
 
         Format:
-            The score (after 0 games) is: chrhaase 0, Deinonychus 0 (match to 7 points)
+            The score (after 0 games) is: player_one 0, player_two 0 (match to 7 points)
 
         Returns:
             Dictionary with player names and match length
@@ -205,7 +205,7 @@ class GNUBGMatchParser:
             line = lines[i]
 
             # Look for move number header with dice roll
-            # Format: "Move number 1:  Deinonychus to play 64"
+            # Format: "Move number 1:  player_two to play 64"
             move_match = re.match(r'Move number (\d+):\s+(.+?) to play (\d)(\d)', line)
             if move_match:
                 try:
@@ -229,8 +229,8 @@ class GNUBGMatchParser:
                     logger.warning(f"Failed to parse position at line {i}: {e}")
 
             # Also look for cube-only moves (no dice roll)
-            # Format: "Move number 24:  De_Luci on roll, cube decision?"
-            # Format: "Move number 25:  De_Luci doubles to 2"
+            # Format: "Move number 24:  player_one on roll, cube decision?"
+            # Format: "Move number 25:  player_one doubles to 2"
             cube_only_match = re.match(r'Move number (\d+):\s+(.+?)(?:\s+on roll,\s+cube decision\?|\s+doubles)', line)
             if cube_only_match:
                 try:
@@ -607,8 +607,8 @@ class GNUBGMatchParser:
         Parse standalone cube decision (cube-only move with no checker play).
 
         These moves have formats like:
-        - "Move number 24:  De_Luci on roll, cube decision?"
-        - "Move number 25:  De_Luci doubles to 2"
+        - "Move number 24:  player_one on roll, cube decision?"
+        - "Move number 25:  player_one doubles to 2"
 
         Args:
             lines: All lines from file
@@ -1047,7 +1047,7 @@ class GNUBGMatchParser:
         )
 
         # Find the move that was played (marked with *)
-        # Format: "* Deinonychus moves 24/18 13/9"
+        # Format: "* player_two moves 24/18 13/9"
         move_played = None
         for offset in range(1, 40):
             if start_idx + offset >= len(lines):
