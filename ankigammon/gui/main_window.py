@@ -288,9 +288,18 @@ class MainWindow(QMainWindow):
         </body>
         </html>
         """
+        # Serialize preview loads: setHtml while a previous load is still in
+        # flight (e.g. auto-displaying the first import while the deferred
+        # welcome page is still spawning Chromium) leaves the compositor
+        # showing the stale page, or painting at a wrong scale until the
+        # window is minimized/restored.
+        self._preview_load_in_flight = False
+        self._pending_preview_html = None
+        self.preview.loadFinished.connect(self._on_preview_load_finished)
+
         # Defer setHtml until after the window paints — Chromium subprocess
         # spawn (~500ms) would otherwise block first paint of the main window.
-        QTimer.singleShot(0, lambda: self.preview.setHtml(self.welcome_html))
+        QTimer.singleShot(0, lambda: self._set_preview_html(self.welcome_html))
         layout.addWidget(self.preview, stretch=2)
 
         # Status bar
@@ -545,8 +554,7 @@ class MainWindow(QMainWindow):
         has_positions = not self.deck_manager.is_empty
         self.btn_export.setEnabled(has_positions)
         if not has_positions:
-            self.preview.setHtml(self.welcome_html)
-            self.preview.update()
+            self._set_preview_html(self.welcome_html)
 
     def _on_deck_structure_changed(self):
         """Handle deck create/rename/delete — save deck names to settings."""
@@ -707,6 +715,28 @@ class MainWindow(QMainWindow):
         self.deck_tree.rebuild_tree()
         self._show_first_imported(decisions)
 
+    def _set_preview_html(self, html: str):
+        """Load HTML into the preview, one load at a time.
+
+        If a load is already in flight, the HTML is queued and applied on
+        loadFinished (only the most recent request is kept). Calling
+        setHtml mid-load makes QWebEngineView keep compositing the old
+        page or paint the new one at a wrong scale.
+        """
+        if self._preview_load_in_flight:
+            self._pending_preview_html = html
+            return
+        self._preview_load_in_flight = True
+        self.preview.setHtml(html)
+
+    def _on_preview_load_finished(self, ok: bool):
+        self._preview_load_in_flight = False
+        if self._pending_preview_html is not None:
+            pending, self._pending_preview_html = self._pending_preview_html, None
+            self._set_preview_html(pending)
+        else:
+            self.preview.update()  # Force repaint to avoid black screen issue
+
     def _show_first_imported(self, decisions: List[Decision]):
         """Auto-display the first imported position if nothing is shown yet.
 
@@ -721,8 +751,7 @@ class MainWindow(QMainWindow):
         """Update UI state when positions may have changed."""
         if self.deck_manager.is_empty:
             self.btn_export.setEnabled(False)
-            self.preview.setHtml(self.welcome_html)
-            self.preview.update()
+            self._set_preview_html(self.welcome_html)
 
     @Slot()
     def on_clear_all_clicked(self):
@@ -746,8 +775,7 @@ class MainWindow(QMainWindow):
             self.btn_export.setEnabled(False)
 
             # Show welcome screen
-            self.preview.setHtml(self.welcome_html)
-            self.preview.update()  # Force repaint to avoid black screen issue
+            self._set_preview_html(self.welcome_html)
 
     @Slot(list)
     def on_decisions_loaded(self, decisions):
@@ -844,8 +872,7 @@ class MainWindow(QMainWindow):
         </html>
         """
 
-        self.preview.setHtml(html)
-        self.preview.update()  # Force repaint to avoid black screen issue
+        self._set_preview_html(html)
 
     @Slot()
     def on_settings_clicked(self):
@@ -919,8 +946,7 @@ class MainWindow(QMainWindow):
         self.btn_export.setEnabled(False)
 
         # Show welcome screen
-        self.preview.setHtml(self.welcome_html)
-        self.preview.update()  # Force repaint to avoid black screen issue
+        self._set_preview_html(self.welcome_html)
 
     @Slot(str)
     def change_color_scheme(self, scheme: str):
