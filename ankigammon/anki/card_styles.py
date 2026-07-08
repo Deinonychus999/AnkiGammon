@@ -1869,4 +1869,114 @@ button.animate-btn:disabled {
         font-size: 9px;
     }
 }
+
+/* Wide-screen two-column back layout (issue #49): board left, answer +
+   note + analysis right, matrices and source info full-width below.
+   Contract:
+   - Every rule is gated on the .two-col marker via :has(), because this
+     stylesheet is pushed onto ALL existing notes (updateModelStyling) —
+     old notes' frozen HTML lacks the marker and must render unchanged.
+     Clients without :has() (discontinued Qt5 builds, stale WebViews)
+     simply keep the stacked layout.
+   - min-height 600.02px keeps this mutually exclusive with the landscape
+     phone blocks above (max-height 600px/450px); the fractional value
+     avoids a dead zone at fractional zoomed viewport heights.
+   - LAYOUT ONLY: color/background declarations added here would silently
+     beat the earlier .night_mode overrides by sheet order. */
+@media screen and (min-width: 1200px) and (min-height: 600.02px) {
+    .card:has(.card-back.two-col) {
+        max-width: 1360px;
+    }
+
+    .card:has(.card-back.two-col) .card-back.two-col {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(340px, 440px);
+        column-gap: 24px;
+        align-items: start;
+    }
+
+    .card:has(.card-back.two-col) .back-main {
+        grid-column: 1;
+        min-width: 0;
+    }
+
+    .card:has(.card-back.two-col) .back-side {
+        grid-column: 2;
+        min-width: 0;
+    }
+
+    .card:has(.card-back.two-col) .card-back.two-col > .score-matrix,
+    .card:has(.card-back.two-col) .card-back.two-col > .move-score-matrix,
+    .card:has(.card-back.two-col) .card-back.two-col > .cube-matrix-details,
+    .card:has(.card-back.two-col) .card-back.two-col > .source-info {
+        grid-column: 1 / -1;
+    }
+
+    /* All three board wrapper variants — the base border rule does not
+       cover .position-svg-animated */
+    .card:has(.card-back.two-col) .back-main .position-svg svg,
+    .card:has(.card-back.two-col) .back-main .position-svg-container svg,
+    .card:has(.card-back.two-col) .back-main .position-svg-animated svg {
+        max-width: 100%;
+        height: auto;
+    }
+
+    /* Cube cards: stack the action table over the winning-chances box in
+       the sidebar (mirrors the <=615px mobile block) */
+    .card:has(.card-back.two-col) .back-side .analysis-container {
+        flex-direction: column;
+        align-items: center;
+        gap: 15px;
+    }
+
+    /* Checker tables can exceed the sidebar width: compact and scroll */
+    .card:has(.card-back.two-col) .back-side .analysis,
+    .card:has(.card-back.two-col) .back-side .analysis-section {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* Reserve the gutter the revert icon occupies (absolutely positioned
+       36px right of its row), so selecting a move doesn't manufacture a
+       horizontal scrollbar in the sidebar */
+    .card:has(.card-back.two-col) .back-side .analysis {
+        padding-right: 36px;
+    }
+
+    /* Tooltips are laid out even while hidden (opacity 0) and would add
+       scrollable overflow past the sidebar's right edge; anchor them to
+       their trigger's right side so the box extends inward instead */
+    .card:has(.card-back.two-col) .back-side [data-tip]::before {
+        left: auto;
+        right: -4px;
+        transform: translateY(4px);
+    }
+
+    .card:has(.card-back.two-col) .back-side [data-tip]:hover::before {
+        transform: translateY(0);
+    }
+
+    .card:has(.card-back.two-col) .back-side .moves-table {
+        font-size: 14px;
+    }
+
+    .card:has(.card-back.two-col) .back-side .moves-table th,
+    .card:has(.card-back.two-col) .back-side .moves-table td {
+        padding: 6px 8px;
+    }
+
+    .card:has(.card-back.two-col) .back-side .move-wgb-inline {
+        font-size: 11px;
+    }
+}
 """
+
+
+def get_card_css() -> str:
+    """Return the note-type CSS for both export paths.
+
+    Kept as an accessor (rather than exposing CARD_CSS directly at the
+    call sites) so settings-driven CSS can be reintroduced without
+    touching the exporters again.
+    """
+    return CARD_CSS

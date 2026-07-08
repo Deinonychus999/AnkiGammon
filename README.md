@@ -209,6 +209,8 @@ Each position becomes one Anki card:
 - Move score matrix showing top moves at different match contexts (if enabled)
 - Cube position spoiler — a collapsed section revealing how the best move changes when the cube is centered, owned by you, or owned by your opponent; only shown when the best move actually differs (if enabled)
 
+On wide screens (1200px and up) the card back automatically lays the answer, your notes, and the analysis table out beside the board, so everything is visible without scrolling; on narrow screens the classic stacked layout is used. Cards exported before this feature keep the stacked layout until re-exported or regenerated ("Regenerate cards" via AnkiConnect).
+
 ## Customization Options
 
 Open Settings with **Ctrl+,** to configure:

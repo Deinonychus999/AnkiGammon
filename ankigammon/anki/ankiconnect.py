@@ -3,7 +3,7 @@
 import requests
 from typing import Any, List, Optional, Tuple
 
-from ankigammon.anki.card_styles import MODEL_NAME, CARD_CSS
+from ankigammon.anki.card_styles import MODEL_NAME, get_card_css
 
 # Historic note-type names. AnkiConnect has no rename action, so when
 # MODEL_NAME changes (commit 6a61037 renamed "XG Backgammon Decision" ->
@@ -150,7 +150,7 @@ class AnkiConnect:
 
         if active is not None:
             self._active_model_name = active
-            self.invoke('updateModelStyling', model={'name': active, 'css': CARD_CSS})
+            self.invoke('updateModelStyling', model={'name': active, 'css': get_card_css()})
             # Migrate older models that are missing fields added in later versions
             field_names = self.invoke('modelFieldNames', modelName=active)
             if 'XGID' not in field_names:
@@ -170,7 +170,7 @@ class AnkiConnect:
         model = {
             'modelName': MODEL_NAME,
             'inOrderFields': ['XGID', 'Front', 'Back', 'AnalysisData'],
-            'css': CARD_CSS,
+            'css': get_card_css(),
             'cardTemplates': [
                 {
                     'Name': 'Card 1',

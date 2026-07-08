@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Improved
+- On wide screens (1200px and up) the card back now lays the answer, notes, and analysis table out beside the board, so everything is visible without scrolling. Narrow screens keep the classic stacked layout. Cards exported before this change keep the stacked layout until re-exported or regenerated.
+
 ### Fixed
 - Minor-error (yellow) and blunder (red) rows in the card analysis table are now readable in Anki's light mode; night mode keeps the brighter palette. AnkiConnect users get the fix automatically on their next export, while previously exported APKG decks keep the old styling until re-imported.
 - Checkers on the bar are now clearly visible: the bar is drawn in the board surface color in the Classic, Forest, Ocean, Desert, and Sunset schemes, so bar checkers read exactly like checkers anywhere else on the board.

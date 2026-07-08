@@ -8,7 +8,7 @@ from typing import List
 
 from ankigammon.models import Decision
 from ankigammon.anki.card_generator import CardGenerator
-from ankigammon.anki.card_styles import MODEL_NAME, CARD_CSS
+from ankigammon.anki.card_styles import MODEL_NAME, get_card_css
 from ankigammon.settings import get_settings
 
 
@@ -94,7 +94,7 @@ class ApkgExporter:
                     'afmt': '{{Back}}',
                 },
             ],
-            css=CARD_CSS,
+            css=get_card_css(),
             sort_field_index=0  # XGID is the sort field
         )
 

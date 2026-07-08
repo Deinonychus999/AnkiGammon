@@ -879,13 +879,22 @@ class CardGenerator:
         # Generate note HTML if note exists
         note_html = self._generate_note_html(decision)
 
+        # The two-col marker plus the .back-main/.back-side wrappers enable
+        # the wide-screen grid layout in CARD_CSS (gated on :has(.two-col),
+        # so notes exported before this markup existed keep the stacked
+        # layout). On narrow viewports the wrappers are plain block elements
+        # and render identically to the historical flat column.
         html = f"""
-<div class="card-back">
+<div class="card-back two-col">
+    <div class="back-main">
 {position_viewer_html}
-    <div class="metadata">{metadata}</div>
+        <div class="metadata">{metadata}</div>
+    </div>
+    <div class="back-side">
 {answer_html}
+{analysis_and_chances}
 {note_html}
-{analysis_and_chances}{score_matrix_html}{move_matrix_html}{cube_matrix_html}
+    </div>{score_matrix_html}{move_matrix_html}{cube_matrix_html}
     {self._generate_source_info(decision)}
 </div>
 """
