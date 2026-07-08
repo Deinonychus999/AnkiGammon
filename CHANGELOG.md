@@ -1,13 +1,20 @@
 # Changelog
 
-## [Unreleased]
+## [1.7.0] - 2026-07-08
+
+### Added
+- Optional analysis of each checker play across all three cube positions (centered, yours, opponent's); when the best move differs, the card back shows a collapsible comparison. Off by default.
 
 ### Improved
-- On wide screens (1200px and up) the card back now lays the answer, notes, and analysis table out beside the board, so everything is visible without scrolling. Narrow screens keep the classic stacked layout. Cards exported before this change keep the stacked layout until re-exported or regenerated.
+- On wide screens (1200px+) the card back now places the answer, notes, and analysis beside the board instead of stacking everything below it.
+- The first imported position is shown automatically instead of staying on the welcome screen.
+- Move score matrix moves are color-coded by error severity (green/yellow/red) to match the Top Moves table.
 
 ### Fixed
-- Minor-error (yellow) and blunder (red) rows in the card analysis table are now readable in Anki's light mode; night mode keeps the brighter palette. AnkiConnect users get the fix automatically on their next export, while previously exported APKG decks keep the old styling until re-imported.
-- Checkers on the bar are now clearly visible: the bar is drawn in the board surface color in the Classic, Forest, Ocean, Desert, and Sunset schemes, so bar checkers read exactly like checkers anywhere else on the board.
+- Yellow and red analysis-table rows are now readable in Anki's light mode.
+- Checkers on the bar are now clearly visible in every board theme.
+- The move score matrix's Neutral column no longer ignores the position's cube ownership.
+- The board preview no longer appears stale or zoomed in right after an import.
 
 ## [1.6.2] - 2026-05-15
 
