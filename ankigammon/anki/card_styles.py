@@ -624,6 +624,27 @@ CARD_CSS = """
     color: #ef5350;
 }
 
+/* In the dense matrix grid the darkened text colors alone are hard to
+   tell apart, so a background tint carries the severity as well (the
+   rank-1 row already reads by its green tint). The Top Moves table
+   keeps plain text colors: its row backgrounds encode MCQ answer
+   feedback and must not be painted over. */
+.move-score-matrix-table td.error-minor {
+    background-color: rgba(253, 216, 53, 0.22);
+}
+
+.move-score-matrix-table td.error-blunder {
+    background-color: rgba(239, 83, 80, 0.14);
+}
+
+.night_mode .move-score-matrix-table td.error-minor {
+    background-color: rgba(253, 216, 53, 0.10);
+}
+
+.night_mode .move-score-matrix-table td.error-blunder {
+    background-color: rgba(239, 83, 80, 0.12);
+}
+
 .move-row {
     cursor: pointer;
     transition: background-color 0.2s ease;

@@ -56,12 +56,22 @@ def test_all_error_color_rules_present():
     assert set(colors.keys()) == expected_keys
 
 
+# Matrix cells add severity background tints; the text must stay readable
+# on them. Values are the canvas blended with the rgba tints in CARD_CSS.
+LIGHT_TINTED_CELL = {"minor": "#fff6d3", "blunder": "#fde7e7"}
+DARK_TINTED_CELL = {"minor": "#413d2d", "blunder": "#433130"}
+
+
 @pytest.mark.parametrize("severity", ["minor", "blunder"])
 def test_error_colors_readable_light_mode(severity):
-    """Light-mode error colors must meet WCAG AA (4.5:1) on a white canvas."""
+    """Light-mode error colors must meet WCAG AA (4.5:1) on the white
+    canvas and on the matrix's tinted severity cells."""
     color = _extract_error_colors()[(False, severity)]
-    ratio = contrast_ratio(color, LIGHT_CANVAS)
-    assert ratio >= 4.5, f"light-mode error-{severity} {color} is {ratio:.2f}:1 on white"
+    for background in (LIGHT_CANVAS, LIGHT_TINTED_CELL[severity]):
+        ratio = contrast_ratio(color, background)
+        assert ratio >= 4.5, (
+            f"light-mode error-{severity} {color} is {ratio:.2f}:1 on {background}"
+        )
 
 
 BEST_MOVE_COLOR_PATTERN = re.compile(
@@ -118,5 +128,8 @@ def test_error_colors_readable_night_mode(severity):
     a regression to a genuinely unreadable dark-mode value.
     """
     color = _extract_error_colors()[(True, severity)]
-    ratio = contrast_ratio(color, DARK_CANVAS)
-    assert ratio >= 3.0, f"night-mode error-{severity} {color} is {ratio:.2f}:1 on dark"
+    for background in (DARK_CANVAS, DARK_TINTED_CELL[severity]):
+        ratio = contrast_ratio(color, background)
+        assert ratio >= 3.0, (
+            f"night-mode error-{severity} {color} is {ratio:.2f}:1 on {background}"
+        )
