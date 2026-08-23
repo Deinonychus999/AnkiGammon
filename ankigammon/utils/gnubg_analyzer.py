@@ -220,7 +220,8 @@ class GNUBGAnalyzer(BackgammonAnalyzer):
             "set lang en",  # See _create_command_file
             "set automatic game off",
             "set automatic roll off",
-            "set output matchpc off",  # Use equity instead of MWC for analysis
+            "set output matchpc off",
+            "set output mwc off",  # See _create_command_file
             f"set analysis chequerplay evaluation plies {self.analysis_ply}",
             f"set analysis cubedecision evaluation plies {self.analysis_ply}",
             f"set export moves number {max_moves}",
@@ -477,12 +478,13 @@ class GNUBGAnalyzer(BackgammonAnalyzer):
             f"set analysis chequerplay evaluation plies {self.analysis_ply}",
             f"set analysis cubedecision evaluation plies {self.analysis_ply}",
             "set output matchpc off",
+            # Match play only: with MWC on, moves are labelled "MWC:" instead
+            # of "Eq.:" and cube equities come back as percentages, which read
+            # as plausible equities. Unlimited games are unaffected, which is
+            # why this only ever broke match positions.
+            "set output mwc off",
+            "hint",
         ]
-
-        if decision_type == DecisionType.CHECKER_PLAY:
-            commands.append("hint")
-        else:
-            commands.append("hint")
 
         fd, temp_path = tempfile.mkstemp(suffix=".txt", prefix="gnubg_commands_")
         try:

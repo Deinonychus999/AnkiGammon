@@ -21,6 +21,7 @@ from ankigammon.renderer.svg_board_renderer import SVGBoardRenderer
 from ankigammon.renderer.color_schemes import SCHEMES
 from ankigammon.settings import Settings
 from ankigammon.utils.analyzer_base import create_analyzer
+from ankigammon.utils.analysis_debug import record_failed_analysis
 from PySide6.QtWidgets import QMessageBox
 
 
@@ -122,6 +123,7 @@ class AnalysisWorker(QThread):
                     )
                 except Exception as e:
                     failures.append((decision.xgid, str(e)))
+                    record_failed_analysis(decision.xgid, raw_output, e)
                     self.status_message.emit(
                         f"Skipping position {decision.xgid}: {e}"
                     )

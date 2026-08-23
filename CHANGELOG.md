@@ -1,5 +1,13 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+- Match-play positions could not be analyzed with GnuBG when GnuBG is set to show equity as MWC. Checker plays failed with "No moves found in gnubg output" because the engine labels moves "MWC:" instead of "Eq.:", and cube decisions were worse: they produced cards whose equities were really match-winning-chance percentages (45.85 in place of -0.4585). Unlimited games were unaffected, since MWC applies to match play only. Equities are now requested explicitly for every analysis - position IDs and .txt/.mat/.sgf match imports alike - and a percentage is never read as an equity again.
+- When GnuBG returns nothing usable, the error now quotes what GnuBG actually said instead of only "No moves found".
+- A position ID that cannot be parsed now says why - a GNU BG ID with a Match ID that is not 12 characters names that as the problem - instead of a bare "Could not parse any valid positions from input". Valid IDs mixed with bad ones are imported, with the skipped lines listed.
+- Create Bug Report now includes the GnuBG version and the raw engine reply behind any position that failed to analyze, so a failure report identifies its own cause.
+
 ## [1.8.0] - 2026-08-23
 
 ### Added

@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, QThread, Signal, Slot
 
+from ankigammon.utils.analysis_debug import record_failed_analysis
 from ankigammon.anki.ankiconnect import AnkiConnect
 from ankigammon.anki.card_styles import MODEL_NAME
 from ankigammon.anki.decision_serialize import decision_from_json
@@ -268,6 +269,7 @@ class RegenerateWorker(QThread):
             try:
                 decision = analyzer.parse_analysis(raw_output, xgid, decision_type)
             except Exception as e:
+                record_failed_analysis(xgid, raw_output, e)
                 self.status_message.emit(f"Warning: Skipping {xgid}: {e}")
                 continue
             decision.source_description = f"Regenerated with {engine_desc}"

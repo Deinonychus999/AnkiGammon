@@ -50,7 +50,9 @@ class GNUBGParser:
             moves = GNUBGParser._parse_cube_decision(gnubg_output, cube_value)
 
         if not moves:
-            raise ValueError(f"No moves found in gnubg output for {decision_type.value}")
+            raise ValueError(
+                GNUBGParser._describe_empty_analysis(gnubg_output, decision_type)
+            )
 
         # Extract winning chances from metadata or output
         winning_chances = GNUBGParser._parse_winning_chances(gnubg_output)
@@ -97,6 +99,41 @@ class GNUBGParser:
         decision.jacoby = bool(metadata.get('jacoby', False))
 
         return decision
+
+    @staticmethod
+    def _describe_empty_analysis(text: str, decision_type: DecisionType) -> str:
+        """Explain why gnubg's output held no moves, quoting what it did say."""
+        base = f"No moves found in gnubg output for {decision_type.value}"
+
+        # gnubg is configured to report match winning chances, which it does
+        # for match play only - hence "unlimited games work, matches do not".
+        if 'MWC:' in text or re.search(
+            r'^\s*\d+\. .*\d[.,]\d+\s*%', text, re.MULTILINE
+        ):
+            return (
+                f"{base} - gnubg reported match winning chances instead of "
+                f"equities. Turn off Settings > Options > Display > "
+                f"'Show equity as MWC' in GnuBG, or update AnkiGammon."
+            )
+
+        # A move list was asked for and a cube analysis came back: gnubg had
+        # no dice, so "set xgid"/"set dice" did not take effect.
+        if decision_type == DecisionType.CHECKER_PLAY and 'Cubeful equities' in text:
+            return (
+                f"{base} - gnubg analyzed it as a cube decision, so the roll "
+                f"never reached it. Check that GnuBG is up to date."
+            )
+
+        lines = [line.strip() for line in text.splitlines() if line.strip()]
+        # Board diagrams and the banner drown out the one line that matters.
+        noise = ('|', '+', 'GNU Backgammon', 'Copyright', 'This ', 'Will not')
+        said = [
+            line for line in lines[-12:]
+            if not line.startswith(noise) and 'evaluation.' not in line
+        ]
+        if said:
+            return f"{base} - gnubg said: {' | '.join(said[-3:])[:300]}"
+        return base
 
     @staticmethod
     def _parse_checker_play(text: str) -> List[Move]:
@@ -292,8 +329,10 @@ class GNUBGParser:
         # "1. No double           +0.172" or "1. No double           +0,172"
         # "2. Double, take        -0.361  (-0.533)"
         # "3. Double, pass        +1.000  (+0.828)"
+        # The lookahead keeps MWC output ("1. No double  45.85%") from
+        # being read as an equity of +45.85; see _describe_empty_analysis.
         pattern = re.compile(
-            r'^\s*\d+\.\s*(No (?:re)?double|(?:Re)?[Dd]ouble,?\s*(?:take|pass|drop))\s*([+-]?\d+[.,]\d+)(?:\s*\(([+-]\d+[.,]\d+)\))?',
+            r'^\s*\d+\.\s*(No (?:re)?double|(?:Re)?[Dd]ouble,?\s*(?:take|pass|drop))\s*([+-]?\d+[.,]\d+)(?![\d%])(?:\s*\(([+-]\d+[.,]\d+)\))?',
             re.MULTILINE | re.IGNORECASE
         )
 

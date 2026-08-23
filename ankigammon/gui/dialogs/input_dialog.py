@@ -509,13 +509,29 @@ class InputDialog(QDialog):
         try:
             decisions = self._parse_input(text, result.format)
 
+            rejected = getattr(self, 'rejected_position_ids', [])
+
             if not decisions:
+                detail = "\n\n".join(
+                    self._describe_rejected_id(line) for line in rejected[:5]
+                )
                 silent_messagebox.warning(
                     self,
                     "Parse Failed",
                     "Could not parse any valid positions from input."
+                    + (f"\n\n{detail}" if detail else "")
                 )
                 return
+
+            if rejected:
+                detail = "\n\n".join(
+                    self._describe_rejected_id(line) for line in rejected[:5]
+                )
+                silent_messagebox.warning(
+                    self,
+                    "Some Positions Skipped",
+                    f"{len(rejected)} line(s) could not be parsed:\n\n{detail}"
+                )
 
             # Add to pending list
             for decision in decisions:
@@ -564,14 +580,32 @@ class InputDialog(QDialog):
             # Split by lines
             lines = [line.strip() for line in text.split('\n') if line.strip()]
 
+            self.rejected_position_ids = []
             for line in lines:
                 decision = self._parse_position_id(line)
                 if decision:
                     decisions.append(decision)
+                else:
+                    self.rejected_position_ids.append(line)
 
             return decisions
 
         return []
+
+    @staticmethod
+    def _describe_rejected_id(position_id: str) -> str:
+        """Say why a position ID was rejected, not just that it was."""
+        shown = position_id if len(position_id) <= 60 else position_id[:57] + "..."
+        parts = position_id.split(':')
+        # A 14-character Position ID means the user meant a GNU BG ID, so the
+        # Match ID half is what to point at.
+        if len(parts) == 2 and len(parts[0]) == 14 and len(parts[1]) != 12:
+            return (
+                f"{shown}\nGNU BG IDs need a 12-character Match ID; "
+                f"this one has {len(parts[1])}. Copy it again from GnuBG "
+                f"(Edit > Copy ID to Clipboard > GNU Backgammon ID)."
+            )
+        return f"{shown}\nNot a valid XGID, GNU BG ID, or OGID."
 
     def _parse_position_id(self, position_id: str) -> Decision:
         """Parse a single position ID (XGID, GNUID, or OGID) into a Decision."""

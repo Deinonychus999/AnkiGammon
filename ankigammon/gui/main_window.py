@@ -28,6 +28,7 @@ from ankigammon.gui.update_checker import VersionCheckerThread
 from ankigammon.gui.resources import get_resource_path
 from ankigammon.gui import silent_messagebox
 from ankigammon.utils.subprocess_env import external_subprocess_env
+from ankigammon.utils.analysis_debug import DEBUG_FILENAME
 
 
 class MatchAnalysisWorker(QThread):
@@ -998,6 +999,27 @@ class MainWindow(QMainWindow):
             """
         )
 
+    def _gnubg_version(self) -> str:
+        """First line of "gnubg --version"; the engine build matters."""
+        if not self.settings.gnubg_path:
+            return '(not configured)'
+        try:
+            kwargs = {
+                'capture_output': True,
+                'text': True,
+                'timeout': 15,
+                'env': external_subprocess_env(),
+            }
+            if sys.platform == 'win32':
+                kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+            result = subprocess.run(
+                [self.settings.gnubg_path, '--version'], **kwargs
+            )
+            output = (result.stdout or result.stderr or '').strip()
+            return output.splitlines()[0] if output else '(no output)'
+        except Exception as e:
+            return f'(failed to query: {e})'
+
     @Slot()
     def send_diagnostic_logs(self):
         """Collect diagnostic logs and system info into a ZIP file."""
@@ -1041,6 +1063,11 @@ class MainWindow(QMainWindow):
                 if gnubg_debug.exists():
                     zf.write(str(gnubg_debug), "debug_gnubg_output.txt")
 
+                # Engine replies that could not be parsed
+                failed_analysis = config_dir / DEBUG_FILENAME
+                if failed_analysis.exists():
+                    zf.write(str(failed_analysis), DEBUG_FILENAME)
+
                 # System information
                 from PySide6 import __version__ as pyside_version
 
@@ -1053,6 +1080,7 @@ class MainWindow(QMainWindow):
                     f"Machine: {platform.machine()}",
                     f"Analyzer Type: {self.settings.analyzer_type}",
                     f"GnuBG Path: {self.settings.gnubg_path or '(not configured)'}",
+                    f"GnuBG Version: {self._gnubg_version()}",
                     f"XG Path: {self.settings.xg_exe_path or '(not configured)'}",
                     f"XG Analysis Level: {self.settings.xg_analysis_level}",
                 ]
