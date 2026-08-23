@@ -912,6 +912,9 @@ class CardGenerator:
         if has_cubeless:
             html += self._generate_equity_toggle_script()
 
+        if 'matrix-value-toggle' in score_matrix_html:
+            html += self._generate_score_matrix_toggle_script()
+
         return html
 
     def _generate_move_animation_data(
@@ -1715,6 +1718,29 @@ class CardGenerator:
         });
         cell.addEventListener('mouseenter', addHover);
         cell.addEventListener('mouseleave', removeHover);
+    });
+})();
+</script>
+"""
+
+    def _generate_score_matrix_toggle_script(self) -> str:
+        """Generate JavaScript for the score matrix errors/equities toggle."""
+        return """
+<script>
+(function() {
+    var matrix = document.querySelector('.score-matrix.has-equities');
+    if (!matrix) return;
+
+    function flip(e) {
+        e.stopPropagation();
+        matrix.classList.toggle('showing-equities');
+    }
+
+    var toggle = matrix.querySelector('.matrix-value-toggle');
+    if (toggle) toggle.addEventListener('click', flip);
+
+    matrix.querySelectorAll('.score-matrix-table td').forEach(function(cell) {
+        cell.addEventListener('click', flip);
     });
 })();
 </script>

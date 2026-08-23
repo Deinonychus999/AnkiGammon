@@ -205,7 +205,7 @@ Each position becomes one Anki card:
 - Source position ID with copy button for easy sharing
 - Source attribution (analysis source and ply level)
 - Explanation (if added)
-- Score matrix showing optimal cube actions across all match scores (if enabled)
+- Score matrix showing optimal cube actions across all match scores, with a click to switch the cells between error costs and the No-Double / Double-Take cubeful equities (if enabled)
 - Move score matrix showing top moves at different match contexts (if enabled)
 - Cube position spoiler — a collapsed section revealing how the best move changes when the cube is centered, owned by you, or owned by your opponent; only shown when the best move actually differs (if enabled)
 

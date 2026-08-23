@@ -22,6 +22,26 @@ class ScoreMatrixCell:
     error_no_double: Optional[float]  # Error if don't double
     error_double: Optional[float]  # Error if double/take
     error_pass: Optional[float]  # Error if pass
+    # Cubeful equities of the three cube actions; both engines normalise
+    # double/pass to +1.000, so it carries no per-cell information.
+    equity_no_double: Optional[float] = None
+    equity_double_take: Optional[float] = None
+    equity_double_pass: Optional[float] = None
+
+    def format_equities(self) -> str:
+        """
+        Format the no-double and double/take cubeful equities for display.
+
+        Double/pass is omitted: at a fixed +1.000 it adds nothing, and these
+        two values already pin down both the correct action and every error.
+
+        Returns:
+            String like "+0.412/+0.556", or "—" if either is unavailable
+        """
+        if self.equity_no_double is None or self.equity_double_take is None:
+            return "—"
+
+        return f"{self.equity_no_double:+.3f}/{self.equity_double_take:+.3f}"
 
     def format_errors(self) -> str:
         """
@@ -372,7 +392,10 @@ def generate_score_matrix(
                 best_action=best_action_simplified,
                 error_no_double=error_no_double,
                 error_double=error_double,
-                error_pass=error_pass
+                error_pass=error_pass,
+                equity_no_double=no_double_eq,
+                equity_double_take=double_take_eq,
+                equity_double_pass=double_pass_eq
             )
             row.append(cell)
 
@@ -408,12 +431,21 @@ def format_matrix_as_html(
             reader when the live current score falls outside the displayed range).
 
     Returns:
-        HTML string with styled table
+        HTML string with styled table. Cells carry the error pair and, when
+        every cell has them, the no-double/double-take cubeful equity pair as
+        well; the card's toggle script swaps which one is visible.
     """
     if not matrix or not matrix[0]:
         return ""
 
     matrix_size = len(matrix)
+
+    # The equity view (and its toggle) is only offered when every displayed
+    # value would be real; a partly-populated matrix would flip to dashes.
+    has_equities = all(
+        cell.equity_no_double is not None and cell.equity_double_take is not None
+        for row in matrix for cell in row
+    )
 
     # Import CubeState for comparison
     from ankigammon.models import CubeState
@@ -422,7 +454,8 @@ def format_matrix_as_html(
     min_away = matrix[0][0].player_away if matrix and matrix[0] else cube_value + 1
 
     # Start table
-    html = '<div class="score-matrix">\n'
+    matrix_class = "score-matrix has-equities" if has_equities else "score-matrix"
+    html = f'<div class="{matrix_class}">\n'
 
     # Build title based on cube state
     if cube_owner == CubeState.CENTERED or cube_owner is None:
@@ -435,6 +468,15 @@ def format_matrix_as_html(
     if label:
         title += f' <span class="ply-indicator">({label})</span>'
     html += f'<h3>{title}</h3>\n'
+
+    if has_equities:
+        html += (
+            '<div class="matrix-value-toggle">'
+            '<span class="mv-errors">Errors</span>'
+            '<span class="mv-sep"> · </span>'
+            '<span class="mv-equities">ND/DT equities</span>'
+            '</div>\n'
+        )
 
     html += '<table class="score-matrix-table">\n'
 
@@ -473,6 +515,8 @@ def format_matrix_as_html(
                 html += f'<td class="{action_class}{current_class}{low_error_class}">'
                 html += f'<div class="action">{cell.best_action}</div>'
                 html += f'<div class="errors">{formatted_errors}</div>'
+                if has_equities:
+                    html += f'<div class="equities">{cell.format_equities()}</div>'
                 html += '</td>'
 
         html += '</tr>\n'

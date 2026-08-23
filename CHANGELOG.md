@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Added
+- Cube score matrix cells can now show the No-Double and Double/Take cubeful equities instead of the two error costs — click the "Errors · ND/DT equities" label under the matrix title (or any cell) to switch the whole matrix.
+
 ### Fixed
 - Exporting a position where the roll has no legal play (dancing against a closed board) no longer fails with "Analysis failed: No moves found in gnubg output for checker_play"; GnuBG-analyzed positions now show "Cannot move", matching eXtreme Gammon.
 - A position that still cannot be analyzed is now skipped with a warning instead of cancelling the export of every other position in the batch.

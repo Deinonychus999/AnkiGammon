@@ -1390,13 +1390,53 @@ button.animate-btn:disabled {
     margin-bottom: 4px;
 }
 
-.score-matrix-table .errors {
+.score-matrix-table .errors,
+.score-matrix-table .equities {
     font-size: 11px;
     color: #666;
 }
 
-.night_mode .score-matrix-table .errors {
+.night_mode .score-matrix-table .errors,
+.night_mode .score-matrix-table .equities {
     color: #aaa;
+}
+
+/* Errors/equities toggle: the equity view is opt-in, one click on the label
+   or on any cell swaps every cell at once. */
+.score-matrix .equities {
+    display: none;
+}
+
+.score-matrix.showing-equities .errors {
+    display: none;
+}
+
+.score-matrix.showing-equities .equities {
+    display: block;
+}
+
+.score-matrix.has-equities .score-matrix-table td {
+    cursor: pointer;
+}
+
+.matrix-value-toggle {
+    font-size: 12px;
+    color: #888;
+    margin: -10px 0 12px;
+    cursor: pointer;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+.matrix-value-toggle .mv-errors,
+.score-matrix.showing-equities .matrix-value-toggle .mv-equities {
+    font-weight: bold;
+    color: var(--text-fg);
+}
+
+.score-matrix.showing-equities .matrix-value-toggle .mv-errors {
+    font-weight: normal;
+    color: inherit;
 }
 
 /* Dark mode adjustments */
@@ -1468,8 +1508,14 @@ button.animate-btn:disabled {
         margin-bottom: 2px;
     }
 
-    .score-matrix-table .errors {
+    .score-matrix-table .errors,
+    .score-matrix-table .equities {
         font-size: 10px;
+    }
+
+    .matrix-value-toggle {
+        font-size: 10px;
+        margin: -6px 0 8px;
     }
 }
 
