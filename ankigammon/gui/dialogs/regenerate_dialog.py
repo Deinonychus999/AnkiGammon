@@ -263,7 +263,13 @@ class RegenerateWorker(QThread):
 
         xgid_to_decision = {}
         for xgid, (raw_output, decision_type) in zip(unique_xgids, analysis_results):
-            decision = analyzer.parse_analysis(raw_output, xgid, decision_type)
+            # An unparseable position leaves its xgid unmapped; the per-note
+            # loop below reports it and keeps the rest of the batch going.
+            try:
+                decision = analyzer.parse_analysis(raw_output, xgid, decision_type)
+            except Exception as e:
+                self.status_message.emit(f"Warning: Skipping {xgid}: {e}")
+                continue
             decision.source_description = f"Regenerated with {engine_desc}"
             xgid_to_decision[xgid] = decision
 

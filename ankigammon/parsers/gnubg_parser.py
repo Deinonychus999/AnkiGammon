@@ -117,6 +117,20 @@ class GNUBGParser:
         Returns:
             List of Move objects sorted by rank
         """
+        # A blocked roll makes gnubg print this instead of a move list; XG
+        # spells the same outcome "Cannot move", so match that notation.
+        if 'There are no legal moves' in text:
+            return [Move(
+                notation="Cannot move",
+                equity=0.0,
+                rank=1,
+                error=0.0,
+                xg_error=0.0,
+                xg_notation="Cannot move",
+                xg_rank=1,
+                from_xg_analysis=True,
+            )]
+
         moves = []
         lines = text.split('\n')
 

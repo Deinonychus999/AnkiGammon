@@ -108,14 +108,24 @@ class AnalysisWorker(QThread):
                 return
 
             # Parse results and update decisions
+            failures = []
             for idx, (pos_idx, decision) in enumerate(positions_to_analyze):
                 raw_output, decision_type = analysis_results[idx]
 
-                analyzed_decision = analyzer.parse_analysis(
-                    raw_output,
-                    decision.xgid,
-                    decision_type
-                )
+                # One unparseable position must not discard a whole batch of
+                # finished analysis; it is dropped from the export instead.
+                try:
+                    analyzed_decision = analyzer.parse_analysis(
+                        raw_output,
+                        decision.xgid,
+                        decision_type
+                    )
+                except Exception as e:
+                    failures.append((decision.xgid, str(e)))
+                    self.status_message.emit(
+                        f"Skipping position {decision.xgid}: {e}"
+                    )
+                    continue
 
                 # Preserve user-added metadata from original decision
                 analyzed_decision.note = decision.note
@@ -138,7 +148,15 @@ class AnalysisWorker(QThread):
 
                 analyzed_decisions[pos_idx] = analyzed_decision
 
-            self.finished.emit(True, f"Analyzed {total} position(s)", analyzed_decisions)
+            analyzed = total - len(failures)
+            if not analyzed:
+                self.finished.emit(False, failures[0][1], self.decisions)
+                return
+
+            message = f"Analyzed {analyzed} position(s)"
+            if failures:
+                message += f" ({len(failures)} skipped: {failures[0][1]})"
+            self.finished.emit(True, message, analyzed_decisions)
 
         except Exception as e:
             self.finished.emit(False, f"Analysis failed: {str(e)}", self.decisions)
@@ -799,12 +817,23 @@ class ExportDialog(QDialog):
             # Rebuild grouped_decisions with the analyzed Decision objects.
             # parse_analysis() creates NEW Decision objects, so the old
             # references in grouped_decisions must be replaced.
-            self.all_decisions = analyzed_decisions
             idx = 0
-            for deck_name in self.grouped_decisions:
+            for deck_name in list(self.grouped_decisions):
                 count = len(self.grouped_decisions[deck_name])
-                self.grouped_decisions[deck_name] = analyzed_decisions[idx:idx + count]
+                # Positions the analyzer could not parse still carry no
+                # candidate moves; card generation would raise on them.
+                kept = [
+                    d for d in analyzed_decisions[idx:idx + count]
+                    if d.candidate_moves
+                ]
                 idx += count
+                if kept:
+                    self.grouped_decisions[deck_name] = kept
+                else:
+                    del self.grouped_decisions[deck_name]
+            self.all_decisions = [
+                d for decs in self.grouped_decisions.values() for d in decs
+            ]
             self.status_label.setText(f"{message} - Starting export...")
             # Proceed with export
             self._start_export_worker()

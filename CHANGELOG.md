@@ -1,5 +1,12 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+- Exporting a position where the roll has no legal play (dancing against a closed board) no longer fails with "Analysis failed: No moves found in gnubg output for checker_play"; GnuBG-analyzed positions now show "Cannot move", matching eXtreme Gammon.
+- A position that still cannot be analyzed is now skipped with a warning instead of cancelling the export of every other position in the batch.
+- GnuBG is now asked for English output, so an installation set to another language no longer risks unparseable analysis (its equities are formatted as `-0,111` and, on some builds, its labels are translated).
+
 ## [1.7.0] - 2026-07-08
 
 ### Added

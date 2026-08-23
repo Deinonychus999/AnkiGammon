@@ -217,6 +217,7 @@ class GNUBGAnalyzer(BackgammonAnalyzer):
             import_cmd = f"import mat {mat_path_str}"
 
         commands = [
+            "set lang en",  # See _create_command_file
             "set automatic game off",
             "set automatic roll off",
             "set output matchpc off",  # Use equity instead of MWC for analysis
@@ -465,6 +466,11 @@ class GNUBGAnalyzer(BackgammonAnalyzer):
             set_command = f"set gnubgid {position_id}"
 
         commands = [
+            # Every parser here matches gnubg's English labels and both
+            # decimal separators; a localized install otherwise formats
+            # equities as "-0,111" and, where its message catalogs bind,
+            # translates "Cubeful"/"Eq.:" out of reach of the patterns.
+            "set lang en",
             "set automatic game off",
             "set automatic roll off",
             set_command,
