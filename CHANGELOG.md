@@ -1,12 +1,17 @@
 # Changelog
 
-## [Unreleased]
+## [1.8.1] - 2026-08-23
 
 ### Fixed
-- Match-play positions could not be analyzed with GnuBG when GnuBG is set to show equity as MWC. Checker plays failed with "No moves found in gnubg output" because the engine labels moves "MWC:" instead of "Eq.:", and cube decisions were worse: they produced cards whose equities were really match-winning-chance percentages (45.85 in place of -0.4585). Unlimited games were unaffected, since MWC applies to match play only. Equities are now requested explicitly for every analysis - position IDs and .txt/.mat/.sgf match imports alike - and a percentage is never read as an equity again.
-- When GnuBG returns nothing usable, the error now quotes what GnuBG actually said instead of only "No moves found".
-- A position ID that cannot be parsed now says why - a GNU BG ID with a Match ID that is not 12 characters names that as the problem - instead of a bare "Could not parse any valid positions from input". Valid IDs mixed with bad ones are imported, with the skipped lines listed.
-- Create Bug Report now includes the GnuBG version and the raw engine reply behind any position that failed to analyze, so a failure report identifies its own cause.
+- Regenerating cards no longer deletes the notes you wrote on them.
+- Comments on positions eXtreme Gammon has not analyzed are no longer lost when you paste them in. Only positions XG had already analyzed kept their comment.
+- A note that mentions another position by XGID no longer disappears.
+- eXtreme Gammon 2 no longer stays running in the background once AnkiGammon is done with it. One you opened yourself is left alone.
+- An eXtreme Gammon custom level named after a built-in one (a custom "Deep") could never be selected, so analysis quietly ran at the built-in level. It is no longer offered, and Settings tells you to rename it.
+- Match-play positions can now be analyzed with GnuBG set to show equity as MWC. Checker plays failed outright, and cube decisions produced cards whose equities were really MWC percentages (45.85 in place of -0.4585). Unlimited games were unaffected.
+- When GnuBG returns nothing usable, the error now quotes what GnuBG actually said.
+- A position ID that cannot be parsed now says why, and valid IDs pasted alongside bad ones are still imported.
+- Create Bug Report now includes the GnuBG version and the engine's reply for any position that failed to analyze.
 
 ## [1.8.0] - 2026-08-23
 
