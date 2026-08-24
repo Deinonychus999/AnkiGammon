@@ -454,23 +454,43 @@ class SettingsDialog(QDialog):
 
         # XG analysis level — built-ins plus any custom profiles the user
         # defined inside XG (read from the registry, safe no-op off-Windows).
+        from ankigammon.utils.xg_auto.registry import (
+            BUILTIN_ANALYSIS_LEVELS,
+            merge_analysis_levels,
+            read_custom_analysis_levels,
+        )
+
         self.cmb_xg_level = QComboBox()
-        builtin_levels = [
-            "Very Quick", "Fast", "Deep", "Thorough", "World Class", "Extensive"
-        ]
-        self.cmb_xg_level.addItems(builtin_levels)
         try:
-            from ankigammon.utils.xg_auto.registry import read_custom_analysis_levels
             custom_levels = read_custom_analysis_levels()
         except Exception:
             custom_levels = []
-        if custom_levels:
+        levels, colliding = merge_analysis_levels(custom_levels)
+
+        builtin_count = len(BUILTIN_ANALYSIS_LEVELS)
+        self.cmb_xg_level.addItems(levels[:builtin_count])
+        if len(levels) > builtin_count:
             self.cmb_xg_level.insertSeparator(self.cmb_xg_level.count())
-            self.cmb_xg_level.addItems(custom_levels)
+            self.cmb_xg_level.addItems(levels[builtin_count:])
         self.cmb_xg_level.setCursor(Qt.PointingHandCursor)
         self.lbl_xg_level = QLabel("Analysis Level:")
         form.addRow(self.lbl_xg_level, self.cmb_xg_level)
         self.xg_widgets.extend([self.lbl_xg_level, self.cmb_xg_level])
+
+        # A custom profile named after a built-in is unreachable, and silently
+        # analyzing at the built-in level is what made issue #57 so hard to
+        # spot — so name the clash instead of hiding it.
+        self.lbl_xg_level_warning = QLabel()
+        self.lbl_xg_level_warning.setWordWrap(True)
+        self.lbl_xg_level_warning.setStyleSheet("color: #f9e2af; font-size: 12px;")
+        if colliding:
+            names = ", ".join(f'"{name}"' for name in colliding)
+            self.lbl_xg_level_warning.setText(
+                f"XG custom profile(s) {names} reuse a built-in level name and "
+                "cannot be selected. Rename them in XG to use them here."
+            )
+        self.lbl_xg_level_warning.hide()
+        form.addRow("", self.lbl_xg_level_warning)
 
         # XG status display
         xg_status_layout = QHBoxLayout()
@@ -585,6 +605,11 @@ class SettingsDialog(QDialog):
 
         for widget in self.xg_widgets:
             widget.setVisible(is_xg)
+
+        # Only surfaces when there is actually a name clash to report.
+        self.lbl_xg_level_warning.setVisible(
+            is_xg and bool(self.lbl_xg_level_warning.text())
+        )
 
         # Update status for the visible engine
         if is_gnubg:

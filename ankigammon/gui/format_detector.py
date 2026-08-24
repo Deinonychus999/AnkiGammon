@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from ankigammon.settings import Settings
+from ankigammon.parsers.xg_text_parser import POSITION_ID_LINE_RE
 
 
 class InputFormat(Enum):
@@ -291,12 +292,12 @@ class FormatDetector:
         """
         positions = []
 
-        sections = re.split(r'(XGID=[^\n]+|^[0-9a-p]+:[0-9a-p]+:[A-Z0-9]{3}[^\n]*|^[A-Za-z0-9+/]{14}:[A-Za-z0-9+/]{12})', text, flags=re.MULTILINE)
+        sections = POSITION_ID_LINE_RE.split(text)
 
         current_pos = ""
         for i, section in enumerate(sections):
-            if (section.startswith('XGID=') or
-                re.match(r'^[0-9a-p]+:[0-9a-p]+:[A-Z0-9]{3}', section) or
+            if (section.strip().startswith('XGID=') or
+                re.match(r'^[0-9a-p]+:[0-9a-p]+:[NWBnwb][0-9][A-Za-z]', section) or
                 re.match(r'^[A-Za-z0-9+/]{14}:[A-Za-z0-9+/]{12}$', section)):
                 if current_pos:
                     positions.append(current_pos.strip())
@@ -319,7 +320,7 @@ class FormatDetector:
         if line.startswith('XGID='):
             return True
 
-        if re.match(r'^[0-9a-p]+:[0-9a-p]+:[A-Z0-9]{3}', line):
+        if re.match(r'^[0-9a-p]+:[0-9a-p]+:[NWBnwb][0-9][A-Za-z]', line):
             return True
 
         if re.match(r'^[A-Za-z0-9+/]{14}:[A-Za-z0-9+/]{12}$', line):
@@ -335,7 +336,7 @@ class FormatDetector:
             (type, preview) tuple
         """
         has_xgid = 'XGID=' in text
-        has_ogid = bool(re.match(r'^[0-9a-p]+:[0-9a-p]+:[A-Z0-9]{3}', text.strip()))
+        has_ogid = bool(re.match(r'^[0-9a-p]+:[0-9a-p]+:[NWBnwb][0-9][A-Za-z]', text.strip()))
         has_gnuid = bool(re.match(r'^[A-Za-z0-9+/=]+:[A-Za-z0-9+/=]+$', text.strip()))
 
         has_checker_play = bool(re.search(r'\beq:', text, re.IGNORECASE))

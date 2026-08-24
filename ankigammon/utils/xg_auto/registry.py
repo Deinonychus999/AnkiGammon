@@ -13,11 +13,52 @@ registry; they must be merged with whatever this module returns.
 
 import logging
 import sys
-from typing import List
+from typing import List, Tuple
 
 log = logging.getLogger(__name__)
 
 _REG_PATH = r"Software\GameSite 2000\eXtreme Gammon 2\Analzye"
+
+# Shown in AnkiGammon's dropdown, in XG's own dropdown order. XG's "None"
+# is omitted: selecting it would mean not analyzing at all.
+BUILTIN_ANALYSIS_LEVELS = (
+    "Very Quick",
+    "Fast",
+    "Deep",
+    "Thorough",
+    "World Class",
+    "Extensive",
+)
+
+
+def merge_analysis_levels(
+    custom_levels: List[str],
+) -> Tuple[List[str], List[str]]:
+    """Combine built-in and custom level names, dropping unusable duplicates.
+
+    A level is selected inside XG by matching its display name against XG's
+    dropdown, which lists the built-ins before the registry profiles. A
+    custom profile that reuses a built-in name is therefore unreachable —
+    the built-in always matches first — so offering it would promise an
+    analysis level AnkiGammon cannot actually select (GitHub issue #57).
+
+    Returns (levels_to_offer, colliding_names_to_warn_about).
+    """
+    levels = list(BUILTIN_ANALYSIS_LEVELS)
+    seen = {name.lower() for name in levels}
+    collisions: List[str] = []
+
+    for raw in custom_levels:
+        name = (raw or "").strip()
+        if not name:
+            continue
+        if name.lower() in seen:
+            collisions.append(name)
+            continue
+        seen.add(name.lower())
+        levels.append(name)
+
+    return levels, collisions
 
 
 def read_custom_analysis_levels() -> List[str]:

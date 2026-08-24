@@ -21,6 +21,7 @@ from ankigammon.renderer.svg_board_renderer import SVGBoardRenderer
 from ankigammon.renderer.color_schemes import SCHEMES
 from ankigammon.settings import Settings
 from ankigammon.utils.analyzer_base import create_analyzer
+from ankigammon.anki.decision_serialize import carry_user_metadata
 from ankigammon.utils.analysis_debug import record_failed_analysis
 from PySide6.QtWidgets import QMessageBox
 
@@ -129,13 +130,7 @@ class AnalysisWorker(QThread):
                     )
                     continue
 
-                # Preserve user-added metadata from original decision
-                analyzed_decision.note = decision.note
-                analyzed_decision.source_file = decision.source_file
-                analyzed_decision.game_number = decision.game_number
-                analyzed_decision.move_number = decision.move_number
-                analyzed_decision.position_image_path = decision.position_image_path
-                analyzed_decision.original_position_format = decision.original_position_format
+                carry_user_metadata(decision, analyzed_decision)
 
                 # Set source description
                 analyzer_type = getattr(self.settings, 'analyzer_type', 'gnubg')

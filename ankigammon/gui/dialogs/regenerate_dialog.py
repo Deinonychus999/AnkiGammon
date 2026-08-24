@@ -12,6 +12,7 @@ Two modes:
   This replaces any rollout data with the engine's standard analysis.
 """
 
+from dataclasses import replace
 from pathlib import Path
 from typing import List, Optional
 
@@ -25,7 +26,7 @@ from PySide6.QtCore import Qt, QThread, Signal, Slot
 from ankigammon.utils.analysis_debug import record_failed_analysis
 from ankigammon.anki.ankiconnect import AnkiConnect
 from ankigammon.anki.card_styles import MODEL_NAME
-from ankigammon.anki.decision_serialize import decision_from_json
+from ankigammon.anki.decision_serialize import carry_user_metadata, decision_from_json
 from ankigammon.settings import Settings
 
 
@@ -52,6 +53,7 @@ class RegenerateWorker(QThread):
         self.settings = settings
         self.mode = mode
         self._cancelled = False
+        self._analyzer = None
 
     def cancel(self):
         """Request cancellation."""
@@ -68,6 +70,15 @@ class RegenerateWorker(QThread):
             self.finished.emit(False, "Regeneration cancelled by user")
         except Exception as e:
             self.finished.emit(False, f"Regeneration failed: {str(e)}")
+        finally:
+            # For XG this closes the process AnkiGammon launched; leaving it
+            # running is what stranded xg2 in the background after shutdown.
+            if self._analyzer is not None:
+                try:
+                    self._analyzer.terminate()
+                except Exception:
+                    pass
+                self._analyzer = None
 
     def _connect_and_load_notes(self, client: AnkiConnect) -> Optional[List[dict]]:
         """Connect to Anki and return notes_info for all ankigammon-tagged notes.
@@ -202,6 +213,23 @@ class RegenerateWorker(QThread):
             )
         self.finished.emit(True, msg)
 
+    def _restore_user_metadata(self, decision, blob: str, note_id: int) -> None:
+        """Carry the note and source info from a card's saved blob onto its
+        freshly analyzed Decision.
+
+        A card written before AnalysisData existed, or one whose blob is
+        unreadable, simply has nothing to restore — that must not cost the
+        user the rest of the regeneration.
+        """
+        if not blob:
+            return
+        try:
+            carry_user_metadata(decision_from_json(blob), decision)
+        except Exception as e:
+            self.status_message.emit(
+                f"Warning: Could not read saved note for note {note_id}: {e}"
+            )
+
     def _do_reanalyze(self):
         """Re-analyze positions, then re-render. Mirrors the legacy behavior."""
         from ankigammon.utils.analyzer_base import create_analyzer
@@ -211,13 +239,17 @@ class RegenerateWorker(QThread):
         if notes_data is None:
             return
 
+        # The saved blob rides along: re-analysis produces a Decision built
+        # from engine output alone, so the user's note lives nowhere else and
+        # would be overwritten in both Back and AnalysisData (issue #58).
         note_xgid_pairs: List[tuple] = []
         for note_data in notes_data:
             note_id = note_data['noteId']
-            xgid_field = note_data.get('fields', {}).get('XGID', {})
-            xgid = xgid_field.get('value', '').strip()
+            fields = note_data.get('fields', {})
+            xgid = fields.get('XGID', {}).get('value', '').strip()
+            blob = fields.get('AnalysisData', {}).get('value', '').strip()
             if xgid:
-                note_xgid_pairs.append((note_id, xgid))
+                note_xgid_pairs.append((note_id, xgid, blob))
 
         if not note_xgid_pairs:
             self.finished.emit(True, "No notes with XGID values found. Cannot regenerate.")
@@ -227,13 +259,13 @@ class RegenerateWorker(QThread):
         self.status_message.emit(f"Found {total} note(s) with positions to regenerate.")
 
         # Deduplicate XGIDs for efficient analysis
-        unique_xgids = list(dict.fromkeys(xgid for _, xgid in note_xgid_pairs))
+        unique_xgids = list(dict.fromkeys(xgid for _, xgid, _ in note_xgid_pairs))
 
         if self._cancelled:
             self.finished.emit(False, "Cancelled by user")
             return
 
-        analyzer = create_analyzer(self.settings)
+        analyzer = self._analyzer = create_analyzer(self.settings)
 
         def analysis_progress(completed: int, total_positions: int):
             if self._cancelled:
@@ -279,7 +311,7 @@ class RegenerateWorker(QThread):
 
         updated = 0
         errors = 0
-        for i, (note_id, xgid) in enumerate(note_xgid_pairs):
+        for i, (note_id, xgid, blob) in enumerate(note_xgid_pairs):
             if self._cancelled:
                 self.finished.emit(False, f"Cancelled after updating {updated} card(s)")
                 return
@@ -288,7 +320,10 @@ class RegenerateWorker(QThread):
             self.status_message.emit(f"Regenerating card {i + 1}/{total}...")
 
             try:
-                decision = xgid_to_decision[xgid]
+                # Copy first: notes sharing an XGID share one analysis result
+                # but each carry their own annotations.
+                decision = replace(xgid_to_decision[xgid])
+                self._restore_user_metadata(decision, blob, note_id)
                 card_data = card_gen.generate_card(decision)
                 # Re-analyze path overwrites AnalysisData with the fresh blob
                 client.update_note_fields(

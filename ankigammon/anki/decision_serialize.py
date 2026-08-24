@@ -24,6 +24,25 @@ from ankigammon.models import (
 
 SCHEMA_VERSION = 1
 
+# Fields no analyzer can reproduce: the user typed them, or they describe where
+# the position came from. Re-analysis builds a Decision from engine output
+# alone, so these have to be carried across explicitly or they are lost.
+USER_METADATA_FIELDS = (
+    "note",
+    "source_file",
+    "game_number",
+    "move_number",
+    "position_image_path",
+    "original_position_format",
+)
+
+
+def carry_user_metadata(source: Decision, target: Decision) -> Decision:
+    """Copy the user's annotations from source onto target, and return target."""
+    for name in USER_METADATA_FIELDS:
+        setattr(target, name, getattr(source, name))
+    return target
+
 
 def _to_jsonable(value: Any) -> Any:
     """Recursively convert asdict() output to JSON-safe primitives.

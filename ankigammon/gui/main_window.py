@@ -141,6 +141,16 @@ class MatchAnalysisWorker(QThread):
                 error_msg = f"Failed to import match file:\n\n{str(e)}"
                 self.finished.emit(False, error_msg, [], 0)
 
+        finally:
+            # For XG this closes the process AnkiGammon launched; leaving it
+            # running is what stranded xg2 in the background after shutdown.
+            if self._analyzer is not None:
+                try:
+                    self._analyzer.terminate()
+                except Exception:
+                    logger.debug("Analyzer cleanup failed", exc_info=True)
+                self._analyzer = None
+
 
 class MainWindow(QMainWindow):
     """Main application window for AnkiGammon."""

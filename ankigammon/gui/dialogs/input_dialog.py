@@ -561,6 +561,9 @@ class InputDialog(QDialog):
 
     def _parse_input(self, text: str, format_type: InputFormat) -> List[Decision]:
         """Parse input text into Decision objects."""
+        # Reset per-paste so a previous paste's rejects aren't reported again.
+        self.rejected_position_ids = []
+
         if format_type == InputFormat.FULL_ANALYSIS:
             # Use XGTextParser for full analysis
             decisions = XGTextParser.parse_string(text)
@@ -574,23 +577,66 @@ class InputDialog(QDialog):
             )
 
         elif format_type == InputFormat.POSITION_IDS:
-            # Try parsing as position IDs (XGID, GNUID, or OGID)
-            decisions = []
-
-            # Split by lines
-            lines = [line.strip() for line in text.split('\n') if line.strip()]
-
-            self.rejected_position_ids = []
-            for line in lines:
-                decision = self._parse_position_id(line)
-                if decision:
-                    decisions.append(decision)
-                else:
-                    self.rejected_position_ids.append(line)
-
-            return decisions
+            return self._parse_position_id_lines(text)
 
         return []
+
+    def _parse_position_id_lines(self, text: str) -> List[Decision]:
+        """Parse pasted position IDs, keeping any prose pasted with them.
+
+        A bare ID has none of the structure XGTextParser reads a note out of,
+        so free-text lines are attached to the position they sit with: prose
+        follows its position, except before the first ID where it leads one.
+        """
+        decisions: List[Decision] = []
+        pending: List[str] = []
+        current: Optional[Decision] = None
+
+        def attach(target: Optional[Decision]) -> None:
+            note = '\n'.join(pending).strip()
+            pending.clear()
+            if note and target is not None:
+                target.note = f"{target.note}\n{note}" if target.note else note
+
+        for line in (raw.strip() for raw in text.split('\n')):
+            if not line:
+                continue
+
+            decision = self._parse_position_id(line)
+            if decision is not None:
+                attach(current if current is not None else decision)
+                decisions.append(decision)
+                current = decision
+            elif self._looks_like_position_id(line):
+                self.rejected_position_ids.append(line)
+            else:
+                pending.append(line)
+
+        attach(current)
+        return decisions
+
+    # A GNU BG Position ID is always exactly this long; a truncated Match ID
+    # after it is the common paste error worth naming.
+    _GNUID_POSITION_ID_LEN = 14
+
+    @staticmethod
+    def _looks_like_position_id(line: str) -> bool:
+        """Tell a mistyped ID from a note, so prose isn't reported as an error.
+
+        Deliberately narrow: a line misread as an ID is only reported, but a
+        line misread as prose would hide a real paste error.
+        """
+        if line.upper().startswith('XGID='):
+            return True
+        if any(ch.isspace() for ch in line):
+            return False
+        parts = line.split(':')
+        # An OGID carries three or more fields; a GNU BG ID has one colon after
+        # a fixed-length half. Short prose like "ND:+0.05" matches neither.
+        return len(parts) > 2 or (
+            len(parts) == 2
+            and len(parts[0]) == InputDialog._GNUID_POSITION_ID_LEN
+        )
 
     @staticmethod
     def _describe_rejected_id(position_id: str) -> str:

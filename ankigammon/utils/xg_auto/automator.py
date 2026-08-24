@@ -333,6 +333,10 @@ class XGAutomator:
         self._xg_base_title: str = ""
         self._memory = None   # Optional[XGMemoryReader]
         self._current_file: Path | None = None
+        # Only an XG we started is ours to close; one the user already had
+        # open must survive disconnect.
+        self._launched_xg: bool = False
+        self._xg_process: subprocess.Popen | None = None
         # Persistent set of window handles that have no buttons and should
         # be skipped in dialog dismissal (e.g. GameDLg, Message, etc.)
         self._skip_hwnds: set[int] = set()
@@ -401,7 +405,8 @@ class XGAutomator:
         except ElementNotFoundError:
             if self.xg_path and self.xg_path.exists():
                 log.info("Launching XG: %s", self.xg_path)
-                subprocess.Popen([str(self.xg_path)])
+                self._xg_process = subprocess.Popen([str(self.xg_path)])
+                self._launched_xg = True
                 self.app = Application(backend=self.backend).connect(
                     class_name=CLASS_NAME, timeout=30
                 )
@@ -547,7 +552,8 @@ class XGAutomator:
         si = subprocess.STARTUPINFO()
         si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
         si.wShowWindow = 0  # SW_HIDE
-        subprocess.Popen([str(self.xg_path)], startupinfo=si)
+        self._xg_process = subprocess.Popen([str(self.xg_path)], startupinfo=si)
+        self._launched_xg = True
 
         # Wait for a NEW XG window (not one of the pre-existing ones)
         hwnd = 0
@@ -647,15 +653,55 @@ class XGAutomator:
             log.warning("Memory reader setup failed: %s", e)
             self._memory = None
 
+    # WM_CLOSE is a request XG can decline: a buttonless startup dialog is
+    # skipped rather than dismissed in GUI mode, and it blocks the main window
+    # from ever processing the close. Waiting this long, then killing the
+    # process we ourselves launched, is what actually stops XG being left
+    # running in the background.
+    _XG_EXIT_GRACE_SECONDS = 8.0
+
+    def _reap_launched_process(self) -> None:
+        """Make sure an XG process we launched is really gone."""
+        proc = self._xg_process
+        if proc is None:
+            return
+        self._xg_process = None
+        try:
+            proc.wait(timeout=self._XG_EXIT_GRACE_SECONDS)
+            log.info("XG exited cleanly (pid=%d).", proc.pid)
+            return
+        except subprocess.TimeoutExpired:
+            pass
+        except Exception:
+            log.debug("Error waiting on XG process", exc_info=True)
+            return
+
+        log.warning(
+            "XG (pid=%d) ignored WM_CLOSE after %.0fs — terminating the "
+            "instance we launched.", proc.pid, self._XG_EXIT_GRACE_SECONDS,
+        )
+        try:
+            proc.kill()
+            proc.wait(timeout=5)
+        except Exception:
+            log.warning("Failed to terminate XG pid=%d", proc.pid, exc_info=True)
+
     def disconnect(self) -> None:
-        """Clean up optional subsystems."""
-        if self.headless and self._hwnd:
-            # Close XG entirely — no reason to leave a hidden process running
+        """Close the XG we started, if any, and clean up optional subsystems.
+
+        Headless mode always launches its own hidden instance. GUI mode only
+        launches when no XG was running, so an instance the user opened
+        themselves is left alone.
+        """
+        if self._hwnd and (self.headless or self._launched_xg):
             PostMessageW(self._hwnd, WM_CLOSE, 0, 0)
             time.sleep(1.0)
             # Dismiss any "save changes?" dialogs
             self._dismiss_unexpected_dialogs(accept=False)
-            log.info("XG closed (headless cleanup).")
+            log.info("XG closed (%s cleanup).", "headless" if self.headless else "GUI")
+            self._hwnd = 0
+            self._launched_xg = False
+        self._reap_launched_process()
         if self._memory:
             try:
                 self._memory.detach()
@@ -1173,6 +1219,20 @@ class XGAutomator:
         else:
             log.debug("Checkbox already checked: %s", cb_text)
 
+    def _enum_combo_boxes(self, dlg_hwnd: int) -> list:
+        """Return the handles of every TComboBox in a dialog, in Z order."""
+        combos: list = []
+
+        def _enum_cb(hwnd, _lparam):
+            cls = ctypes.create_unicode_buffer(64)
+            user32.GetClassNameW(hwnd, cls, 64)
+            if cls.value == "TComboBox":
+                combos.append(hwnd)
+            return True
+
+        user32.EnumChildWindows(dlg_hwnd, WNDENUMPROC(_enum_cb), 0)
+        return combos
+
     def _set_analysis_level(self, dlg_hwnd: int, level_name: str) -> None:
         """Set both player ComboBoxes to the analysis level with this name.
 
@@ -1186,16 +1246,7 @@ class XGAutomator:
         CB_GETLBTEXTLEN = 0x0149
         CB_GETLBTEXT = 0x0148
 
-        combos = []
-
-        def _enum_cb(hwnd, _lparam):
-            cls = ctypes.create_unicode_buffer(64)
-            user32.GetClassNameW(hwnd, cls, 64)
-            if cls.value == "TComboBox":
-                combos.append(hwnd)
-            return True
-
-        user32.EnumChildWindows(dlg_hwnd, WNDENUMPROC(_enum_cb), 0)
+        combos = self._enum_combo_boxes(dlg_hwnd)
         if not combos:
             log.warning("No TComboBox found in analysis dialog")
             return
@@ -1211,10 +1262,19 @@ class XGAutomator:
                                        CB_GETLBTEXTLEN, CB_GETLBTEXT)
         display_names = [text.split(":", 1)[0].strip() for text in items]
         log.debug("Analysis dropdown items: %s", display_names)
-        match_idx = next(
-            (i for i, name in enumerate(display_names) if name.lower() == target),
-            None,
-        )
+        matches = [i for i, name in enumerate(display_names) if name.lower() == target]
+        match_idx = matches[0] if matches else None
+
+        if len(matches) > 1:
+            # XG lists built-ins before registry profiles, so the built-in wins
+            # and a custom profile sharing its name can never be selected
+            # (GitHub issue #57). Name alone cannot tell them apart.
+            log.warning(
+                "Analysis level %r matches more than one entry in XG's dropdown "
+                "(indices %s) — using the first, which is XG's built-in level. "
+                "Rename the custom profile in XG to select it.",
+                level_name, matches,
+            )
 
         if match_idx is None:
             log.warning(

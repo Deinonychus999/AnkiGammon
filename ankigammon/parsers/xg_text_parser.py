@@ -15,6 +15,19 @@ from ankigammon.utils.ogid import parse_ogid
 from ankigammon.utils.gnuid import parse_gnuid
 
 
+# A position ID opens a new block only when it opens a line. `XGID=` was
+# unanchored, so a note reading "compare with XGID=..." split the export and
+# the note was lost — reported as "an '=' in the note confuses ag". The OGID
+# cube field is spelled out (owner NWB, log2 value, action NOTP; see
+# utils/ogid.py) because [A-Z0-9]{3} also matched ordinary prose.
+POSITION_ID_LINE_RE = re.compile(
+    r'(^[ \t]*XGID=[^\n]+'
+    r'|^[0-9a-p]+:[0-9a-p]+:[NWBnwb][0-9][A-Za-z][^\n]*'
+    r'|^[A-Za-z0-9+/]{14}:[A-Za-z0-9+/]{12})',
+    re.MULTILINE,
+)
+
+
 class XGTextParser:
     """Parse XG text export format."""
 
@@ -63,9 +76,7 @@ class XGTextParser:
         """
         decisions = []
 
-        # Split into sections by XGID, OGID, or GNUID patterns
-        # Pattern matches XGID=, OGID (base-26 format), or GNUID (base64 format)
-        sections = re.split(r'(XGID=[^\n]+|^[0-9a-p]+:[0-9a-p]+:[A-Z0-9]{3}[^\n]*|^[A-Za-z0-9+/]{14}:[A-Za-z0-9+/]{12})', content, flags=re.MULTILINE)
+        sections = POSITION_ID_LINE_RE.split(content)
 
         for i in range(1, len(sections), 2):
             if i + 1 >= len(sections):
@@ -270,8 +281,13 @@ class XGTextParser:
     # - Per-move "Opponent: NN%" — last line of each move alternative's stats.
     # - "Best Cube action: ..." — terminator for cube decisions.
     # - "Percentage of wrong (pass|take) ..." — optional follow-up to Best Cube action.
+    # The percentage is required: XG always prints one here, and without it a
+    # note opening "Opponent: 3 pips better" was mistaken for a terminator and
+    # swallowed.
     _ANALYSIS_TERMINATOR_RE = re.compile(
-        r'^\s*(?:Opponent:\s*\d.*|Best Cube action:.*|Percentage of wrong (?:pass|take).*)$',
+        r'^\s*(?:Opponent:\s*\d+(?:[.,]\d+)?%.*'
+        r'|Best Cube action:.*'
+        r'|Percentage of wrong (?:pass|take).*)$',
         re.MULTILINE | re.IGNORECASE,
     )
 
