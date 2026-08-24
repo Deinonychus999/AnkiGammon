@@ -291,13 +291,26 @@ class XGTextParser:
         re.MULTILINE | re.IGNORECASE,
     )
 
+    # Last line of the header block, used when there is no analysis section at
+    # all. XG exports a position it has not analyzed as header + board +
+    # footer, so without these a note on an unanalyzed position had no
+    # terminator to sit after and was dropped. Wording verified against XG
+    # 2.19: "X to play 52" and "X on roll, cube action".
+    _HEADER_TERMINATOR_RE = re.compile(
+        r'^\s*(?:[XO] to play\s+\d+.*'
+        r'|[XO] on roll, cube action.*'
+        r'|Cube offered at\s+\d+.*'
+        r'|Cube:\s*\d+.*)$',
+        re.MULTILINE | re.IGNORECASE,
+    )
+
     @staticmethod
     def _parse_comment(text: str) -> Optional[str]:
-        """Return the user's free-text note from the analysis section, if any.
+        """Return the user's free-text note, if any.
 
-        XG always emits an `eXtreme Gammon Version:` footer. The note, if
-        present, sits between the last analysis terminator line and that
-        footer.
+        XG always emits an `eXtreme Gammon Version:` footer. The note sits
+        between the end of the analysis and that footer — or, for a position
+        XG has not analyzed, between the end of the header and the footer.
         """
         version_match = re.search(
             r'^\s*eXtreme Gammon Version:.*$',
@@ -309,6 +322,8 @@ class XGTextParser:
 
         prefix = text[:version_match.start()]
         terminators = list(XGTextParser._ANALYSIS_TERMINATOR_RE.finditer(prefix))
+        if not terminators:
+            terminators = list(XGTextParser._HEADER_TERMINATOR_RE.finditer(prefix))
         if not terminators:
             return None
 

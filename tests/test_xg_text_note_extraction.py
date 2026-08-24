@@ -98,6 +98,119 @@ class TestOrdinaryNotesStillWork:
         assert decisions[0].note is None
 
 
+# Exactly what XG 2.19 puts on the clipboard for a position it has NOT
+# analyzed: header, board, footer, and no move list or cube-action block.
+# Captured from the real application.
+UNANALYZED_CHECKER = """XGID=-b----E-C--AeD---bAdb---A-:0:0:1:52:0:0:3:0:10
+
+X:Player 1   O:Player 2
+Score is X:0 O:0. Unlimited Game, Jacoby Beaver
+Pip count  X: 159  O: 163 X-O: 0-0
+Cube: 1
+X to play 52
+{NOTE}
+eXtreme Gammon Version: 2.19.211.pre-release
+"""
+
+UNANALYZED_CUBE = """XGID=-b----E-C--AeD---bAdb---A-:0:0:1:00:0:0:3:0:10
+
+X:Player 1   O:Player 2
+Score is X:0 O:0. Unlimited Game, Jacoby Beaver
+Pip count  X: 159  O: 163 X-O: 0-0
+Cube: 1
+X on roll, cube action
+{NOTE}
+eXtreme Gammon Version: 2.19.211.pre-release
+"""
+
+
+class TestUnanalyzedExports:
+    """"The comments show up when the position imported is analyzed and not
+    when the position is unanalyzed."
+
+    An unanalyzed export has no `Opponent: NN%` or `Best Cube action:` line,
+    so the analysis-terminator search found nothing and the note was dropped.
+    The header's last line has to serve as the terminator instead.
+    """
+
+    def test_note_on_an_unanalyzed_checker_play_is_kept(self):
+        text = UNANALYZED_CHECKER.replace("{NOTE}", "\nWhen ahead in the race, race!\n")
+        decisions = XGTextParser.parse_string(text)
+
+        assert len(decisions) == 1
+        assert decisions[0].note == "When ahead in the race, race!"
+
+    def test_note_on_an_unanalyzed_cube_decision_is_kept(self):
+        text = UNANALYZED_CUBE.replace("{NOTE}", "\nToo good to double.\n")
+        decisions = XGTextParser.parse_string(text)
+
+        assert len(decisions) == 1
+        assert decisions[0].note == "Too good to double."
+
+    def test_unanalyzed_export_without_a_note_yields_none(self):
+        """The header must not leak into the note when there is no comment."""
+        text = UNANALYZED_CHECKER.replace("{NOTE}", "\n")
+        decisions = XGTextParser.parse_string(text)
+
+        assert len(decisions) == 1
+        assert decisions[0].note is None
+
+    def test_multi_line_note_on_an_unanalyzed_export(self):
+        text = UNANALYZED_CHECKER.replace("{NOTE}", "\nfirst line\nsecond line\n")
+        decisions = XGTextParser.parse_string(text)
+
+        assert decisions[0].note == "first line\nsecond line"
+
+    def test_header_lines_never_appear_in_the_note(self):
+        text = UNANALYZED_CHECKER.replace("{NOTE}", "\nmy comment\n")
+        note = XGTextParser.parse_string(text)[0].note
+
+        for leaked in ("Pip count", "Cube:", "to play", "Score is", "Player 1"):
+            assert leaked not in note
+
+    def test_analyzed_export_still_prefers_the_analysis_terminator(self):
+        """A note that quotes a header line must not re-anchor an analyzed export."""
+        note = "better than X to play 52 alternatives"
+        decisions = _parse_with_note(note)
+
+        assert decisions[0].note == note
+
+    def test_verbatim_unanalyzed_export_with_board_and_comment(self):
+        """A full clipboard export, board diagram and all, exactly as XG writes it."""
+        text = """XGID=-b----E-C---eE---c-e----B-:0:0:1:63:0:0:3:0:10
+
+X:Player 1   O:Player 2
+Score is X:0 O:0. Unlimited Game, Jacoby Beaver
+ +13-14-15-16-17-18------19-20-21-22-23-24-+
+ | X           O    |   | O              X |
+ | X           O    |   | O              X |
+ | X           O    |   | O                |
+ | X                |   | O                |
+ | X                |   | O                |
+ |                  |BAR|                  |
+ | O                |   | X                |
+ | O                |   | X                |
+ | O           X    |   | X                |
+ | O           X    |   | X              O |
+ | O           X    |   | X              O |
+ +12-11-10--9--8--7-------6--5--4--3--2--1-+
+Pip count  X: 167  O: 167 X-O: 0-0
+Cube: 1
+X to play 63
+
+
+FSFDSSDF
+
+eXtreme Gammon Version: 2.19.211.pre-release
+"""
+        decisions = XGTextParser.parse_string(text)
+
+        assert len(decisions) == 1
+        assert decisions[0].note == "FSFDSSDF"
+        assert decisions[0].dice == (6, 3)
+        assert not decisions[0].candidate_moves, "AnkiGammon must still analyze it"
+
+
 class TestRealPositionIdsStillSplit:
     """The tightened patterns must not stop recognising genuine position IDs."""
 

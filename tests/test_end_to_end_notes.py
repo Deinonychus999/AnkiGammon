@@ -189,6 +189,48 @@ class TestPastedFullAnalysisWithComment:
         assert "race lead = 4 pips" in notes[0][2]
 
 
+class TestUnanalyzedExportWithComment:
+    """The reported case: "comments show up when the position imported is
+    analyzed and not when the position is unanalyzed".
+
+    Header/footer wording captured from real XG 2.19. The position carries no
+    analysis, so AnkiGammon runs the engine itself - and the comment has to
+    survive that.
+    """
+
+    UNANALYZED = """XGID=-b----E-C--AeD---bAdb---A-:0:0:1:52:0:0:3:0:10
+
+X:Player 1   O:Player 2
+Score is X:0 O:0. Unlimited Game, Jacoby Beaver
+Pip count  X: 159  O: 163 X-O: 0-0
+Cube: 1
+X to play 52
+
+When ahead in the race, race!
+
+eXtreme Gammon Version: 2.19.211.pre-release
+"""
+
+    def test_comment_reaches_the_card_after_ankigammon_analyzes_it(
+        self, qapp, settings, tmp_path
+    ):
+        comment = "When ahead in the race, race!"
+
+        detected = FormatDetector(settings).detect(self.UNANALYZED)
+        decisions = XGTextParser.parse_string(self.UNANALYZED)
+        assert len(decisions) == 1
+        assert decisions[0].note == comment, "the export's comment was dropped"
+        assert not decisions[0].candidate_moves, "should still need analysis"
+
+        analyzed = _analyze(decisions, settings)
+        assert analyzed[0].candidate_moves, "engine returned no moves"
+
+        notes = _export(analyzed, tmp_path, "unanalyzed.apkg")
+        assert len(notes) == 1
+        assert comment in notes[0][2]
+        assert decision_from_json(notes[0][3]).note == comment
+
+
 class TestRegenerateAgainstRealAnalysis:
     """Issue #58 with a real engine and the real CardGenerator behind it.
 
