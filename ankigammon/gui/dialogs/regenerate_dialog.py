@@ -5,8 +5,9 @@ Two modes:
 
 * Re-render only (default): reads the saved Decision (AnalysisData field)
   from each note, re-renders with the current cosmetic settings, and writes
-  back the new HTML. Never invokes the analyzer, so rollouts and other
-  high-precision analyses are preserved.
+  back the new HTML. Never re-analyzes the position, so rollouts and other
+  high-precision analyses are preserved. Score matrices are not stored in
+  the blob, so an engine is still started to rebuild those.
 
 * Re-analyze: queries the analyzer for fresh results before re-rendering.
   This replaces any rollout data with the engine's standard analysis.
@@ -54,6 +55,7 @@ class RegenerateWorker(QThread):
         self.mode = mode
         self._cancelled = False
         self._analyzer = None
+        self._card_gen = None
 
     def cancel(self):
         """Request cancellation."""
@@ -71,14 +73,28 @@ class RegenerateWorker(QThread):
         except Exception as e:
             self.finished.emit(False, f"Regeneration failed: {str(e)}")
         finally:
-            # For XG this closes the process AnkiGammon launched; leaving it
-            # running is what stranded xg2 in the background after shutdown.
-            if self._analyzer is not None:
-                try:
-                    self._analyzer.terminate()
-                except Exception:
-                    pass
-                self._analyzer = None
+            self._terminate_engines()
+
+    def _terminate_engines(self) -> None:
+        """Shut down every engine this run started, each exactly once.
+
+        For XG this closes the process AnkiGammon launched; leaving one
+        running is what stranded xg2 in the background. A re-render never
+        creates an analyzer of its own unless a score matrix needs one, and
+        that one is the CardGenerator's, not the worker's.
+        """
+        engines = []
+        for candidate in (self._analyzer, getattr(self._card_gen, '_analyzer', None)):
+            if candidate is not None and not any(candidate is e for e in engines):
+                engines.append(candidate)
+        self._analyzer = None
+        self._card_gen = None
+
+        for engine in engines:
+            try:
+                engine.terminate()
+            except Exception:
+                pass
 
     def _connect_and_load_notes(self, client: AnkiConnect) -> Optional[List[dict]]:
         """Connect to Anki and return notes_info for all ankigammon-tagged notes.
@@ -109,8 +125,14 @@ class RegenerateWorker(QThread):
         self.status_message.emit(f"Reading {len(all_note_ids)} note(s)...")
         return client.notes_info(all_note_ids)
 
-    def _build_card_generator(self):
-        """Create a CardGenerator configured from current settings."""
+    def _build_card_generator(self, analyzer=None):
+        """Create a CardGenerator configured from current settings.
+
+        Score matrices need an engine, so a CardGenerator without one builds
+        its own. Passing the analyzer already in use keeps that to a single
+        connection: a second headless XG kills the first as a stale instance,
+        which silently drops the matrix from the card.
+        """
         from ankigammon.anki.card_generator import CardGenerator
         from ankigammon.renderer.svg_board_renderer import SVGBoardRenderer
         from ankigammon.renderer.color_schemes import SCHEMES
@@ -123,12 +145,14 @@ class RegenerateWorker(QThread):
             orientation=self.settings.board_orientation
         )
         output_dir = Path.home() / '.ankigammon' / 'cards'
-        return CardGenerator(
+        self._card_gen = CardGenerator(
             output_dir=output_dir,
             show_options=self.settings.show_options,
             interactive_moves=self.settings.interactive_moves,
             renderer=renderer,
+            analyzer=analyzer,
         )
+        return self._card_gen
 
     def _do_render_only(self):
         """Re-render cards using the saved Decision (no analyzer involved)."""
@@ -307,7 +331,7 @@ class RegenerateWorker(QThread):
             decision.source_description = f"Regenerated with {engine_desc}"
             xgid_to_decision[xgid] = decision
 
-        card_gen = self._build_card_generator()
+        card_gen = self._build_card_generator(analyzer=analyzer)
 
         updated = 0
         errors = 0

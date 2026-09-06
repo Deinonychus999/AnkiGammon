@@ -1,5 +1,14 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+- Cube cards analyzed with eXtreme Gammon always had the correct answer as option A.
+- Regenerating cards no longer starts a second copy of eXtreme Gammon and leaves it running.
+- A score matrix that fails to build is now reported instead of the card quietly losing its table.
+- eXtreme Gammon's version is now read from the program itself rather than its window title, which could be read too early and send menu commands astray.
+- An eXtreme Gammon file dialog timeout now reports what XG was showing, so it can be diagnosed.
+
 ## [1.8.1] - 2026-08-23
 
 ### Fixed

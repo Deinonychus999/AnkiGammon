@@ -235,6 +235,79 @@ XG_PROFILES: dict[str, XGCommandProfile] = {
 XGCmd = XG_PROFILES["2.10"]
 
 
+class _VS_FIXEDFILEINFO(ctypes.Structure):
+    _fields_ = [
+        ("dwSignature", wt.DWORD), ("dwStrucVersion", wt.DWORD),
+        ("dwFileVersionMS", wt.DWORD), ("dwFileVersionLS", wt.DWORD),
+        ("dwProductVersionMS", wt.DWORD), ("dwProductVersionLS", wt.DWORD),
+        ("dwFileFlagsMask", wt.DWORD), ("dwFileFlags", wt.DWORD),
+        ("dwFileOS", wt.DWORD), ("dwFileType", wt.DWORD),
+        ("dwFileSubtype", wt.DWORD), ("dwFileDateMS", wt.DWORD),
+        ("dwFileDateLS", wt.DWORD),
+    ]
+
+
+_PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+kernel32.QueryFullProcessImageNameW.argtypes = [
+    wt.HANDLE, wt.DWORD, wt.LPWSTR, ctypes.POINTER(wt.DWORD)
+]
+kernel32.QueryFullProcessImageNameW.restype = wt.BOOL
+
+
+def _read_file_version(path: Path) -> Optional[str]:
+    """An executable's FileVersion as "a.b.c.d", or None if it carries none."""
+    try:
+        version_dll = ctypes.windll.version
+        path_str = str(path)
+        size = version_dll.GetFileVersionInfoSizeW(path_str, None)
+        if not size:
+            return None
+        buf = ctypes.create_string_buffer(size)
+        if not version_dll.GetFileVersionInfoW(path_str, 0, size, buf):
+            return None
+        ptr = ctypes.c_void_p()
+        length = wt.UINT()
+        if not version_dll.VerQueryValueW(
+            buf, "\\", ctypes.byref(ptr), ctypes.byref(length)
+        ) or not ptr.value:
+            return None
+        fixed = ctypes.cast(ptr, ctypes.POINTER(_VS_FIXEDFILEINFO)).contents
+        return "%d.%d.%d.%d" % (
+            fixed.dwFileVersionMS >> 16, fixed.dwFileVersionMS & 0xFFFF,
+            fixed.dwFileVersionLS >> 16, fixed.dwFileVersionLS & 0xFFFF,
+        )
+    except Exception:
+        log.debug("Could not read a version resource from %s", path, exc_info=True)
+        return None
+
+
+def _exe_path_for_hwnd(hwnd: int) -> Optional[Path]:
+    """Full path of the executable that owns a window, or None."""
+    try:
+        pid = wt.DWORD()
+        user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+        if not pid.value:
+            return None
+        handle = kernel32.OpenProcess(
+            _PROCESS_QUERY_LIMITED_INFORMATION, False, pid.value
+        )
+        if not handle:
+            return None
+        try:
+            size = wt.DWORD(1024)
+            buf = ctypes.create_unicode_buffer(size.value)
+            if not kernel32.QueryFullProcessImageNameW(
+                handle, 0, buf, ctypes.byref(size)
+            ):
+                return None
+            return Path(buf.value) if buf.value else None
+        finally:
+            kernel32.CloseHandle(handle)
+    except Exception:
+        log.debug("Could not resolve the executable for hwnd=0x%08X", hwnd, exc_info=True)
+        return None
+
+
 class XGAutomationError(Exception):
     """Raised when a UI automation step fails."""
 
@@ -349,12 +422,20 @@ class XGAutomator:
         return self._cmd
 
     def _detect_xg_version(self) -> XGCommandProfile:
-        """Detect XG version from window title and return the matching profile.
+        """Detect XG's version and return the matching command profile.
 
-        Retries briefly if the title doesn't contain a version number yet
-        (XG shows a placeholder title like "eXtreme Gammon IDE" during init).
-        Falls back to 2.10 if detection fails after retries.
+        The executable's version resource is authoritative: it is fixed
+        before XG starts, whereas the window title only carries the version
+        once initialisation completes. Reading the title for 6s and then
+        silently assuming 2.10 handed 2.19 installs menu IDs that landed on
+        nothing — no file dialog ever appeared and the import timed out.
+
+        The title loop still runs, but only to capture the base title, which
+        must be the versioned one or position-load waits return early. It
+        decides the profile only when the executable could not.
         """
+        exe_profile = self._profile_from_exe()
+
         for attempt in range(6):
             title = ctypes.create_unicode_buffer(256)
             user32.GetWindowTextW(self._hwnd, title, 256)
@@ -362,6 +443,13 @@ class XGAutomator:
             for version_key, profile in XG_PROFILES.items():
                 if f"eXtreme Gammon {version_key}" in title.value:
                     self._xg_base_title = title.value
+                    if exe_profile is not None and exe_profile is not profile:
+                        log.warning(
+                            "Executable reports XG %s but the title says %s "
+                            "(%r); using the executable's profile",
+                            exe_profile.version, version_key, title.value,
+                        )
+                        return exe_profile
                     log.info(
                         "Detected XG version %s (title: %r)",
                         version_key, title.value,
@@ -373,10 +461,41 @@ class XGAutomator:
 
         # Store whatever title we have as the base title
         self._xg_base_title = title.value
+        if exe_profile is not None:
+            log.info(
+                "Detected XG version %s from the executable; title %r never "
+                "carried a version", exe_profile.version, title.value,
+            )
+            return exe_profile
         log.warning(
             "Unknown XG version from title %r — using 2.10 profile", title.value
         )
         return XG_PROFILES["2.10"]
+
+    def _profile_from_exe(self) -> Optional[XGCommandProfile]:
+        """Command profile from the executable's version resource, or None.
+
+        Uses the path we launched, else the running process's own path, so an
+        XG the user opened themselves is covered too.
+        """
+        path = None
+        if self.xg_path and Path(self.xg_path).exists():
+            path = self.xg_path
+        if path is None:
+            path = _exe_path_for_hwnd(self._hwnd)
+        if path is None:
+            return None
+        version = _read_file_version(path)
+        if not version:
+            return None
+        profile = XG_PROFILES.get(".".join(version.split(".")[:2]))
+        if profile is None:
+            log.warning(
+                "XG executable reports version %s, which has no command "
+                "profile (known: %s); falling back to the window title",
+                version, ", ".join(XG_PROFILES),
+            )
+        return profile
 
     # ------------------------------------------------------------------
     # Connection
@@ -1562,6 +1681,9 @@ class XGAutomator:
         notifications while the window is technically visible. SW_HIDE
         is applied only after the confirmation attempt.
         """
+        # A handle freed by a closed startup dialog must be forgotten before
+        # the file dialog can be created with that same handle.
+        self._prune_dead_skip_hwnds()
         self.send_command(cmd_id)
 
         deadline = time.time() + 10.0
@@ -1592,9 +1714,72 @@ class XGAutomator:
                 return
             time.sleep(0.3)
 
-        raise XGAutomationError(
-            f"Headless file {dialog_type} timed out for {filepath}"
+        detail = self._describe_windows_for_timeout()
+        log.warning(
+            "Headless file %s timed out for %s — %s", dialog_type, filepath, detail
         )
+        raise XGAutomationError(
+            f"Headless file {dialog_type} timed out for {filepath} [{detail}]"
+        )
+
+    def _prune_dead_skip_hwnds(self, hwnds: Optional[set] = None) -> None:
+        """Forget skipped dialogs whose windows no longer exist.
+
+        Windows recycles handles, so a dead entry left in the set could
+        shadow a later dialog — the file dialog included — that happens to
+        reuse it.
+        """
+        target = self._skip_hwnds if hwnds is None else hwnds
+        dead = {h for h in target if not user32.IsWindow(h)}
+        if dead:
+            log.debug("Dropping %d dead hwnd(s) from the skip set", len(dead))
+            target.difference_update(dead)
+
+    def _describe_windows_for_timeout(self) -> str:
+        """One line of state for a file-dialog timeout.
+
+        Profile, main title, skip set, and every top-level window in XG's
+        process. Never raises: the timeout it decorates is the error that
+        matters.
+        """
+        try:
+            pid = wt.DWORD()
+            user32.GetWindowThreadProcessId(self._hwnd, ctypes.byref(pid))
+            xg_pid = pid.value
+            main = ctypes.create_unicode_buffer(256)
+            user32.GetWindowTextW(self._hwnd, main, 256)
+            dead = sum(1 for h in self._skip_hwnds if not user32.IsWindow(h))
+            rows = []
+
+            def _enum_cb(hwnd, _lparam):
+                p = wt.DWORD()
+                user32.GetWindowThreadProcessId(hwnd, ctypes.byref(p))
+                if p.value != xg_pid:
+                    return True
+                cls = ctypes.create_unicode_buffer(64)
+                user32.GetClassNameW(hwnd, cls, 64)
+                title = ctypes.create_unicode_buffer(256)
+                user32.GetWindowTextW(hwnd, title, 256)
+                has_edit = bool(
+                    user32.GetDlgItem(hwnd, 0x047C)
+                    or self._find_child_by_class(hwnd, ["Edit", "TEdit"])
+                )
+                rows.append("0x%X %s %s%s%s %r" % (
+                    int(hwnd), cls.value,
+                    "visible" if user32.IsWindowVisible(hwnd) else "hidden",
+                    " edit" if has_edit else "",
+                    " skipped" if int(hwnd) in self._skip_hwnds else "",
+                    title.value[:40],
+                ))
+                return True
+
+            user32.EnumWindows(WNDENUMPROC(_enum_cb), 0)
+            return "profile=%s title=%r skip=%d (%d dead); %d window(s): %s" % (
+                self.cmd.version, main.value, len(self._skip_hwnds), dead,
+                len(rows), "; ".join(rows) or "none",
+            )
+        except Exception as exc:
+            return "diagnostics unavailable: %r" % (exc,)
 
     def _find_file_dialog_win32(self) -> int:
         """Find an open file dialog belonging to XG's process.
@@ -1602,6 +1787,7 @@ class XGAutomator:
         Validates the dialog has an Edit control (filename input) to
         distinguish real file dialogs from message boxes (both use #32770).
         """
+        self._prune_dead_skip_hwnds()
         pid = wt.DWORD()
         user32.GetWindowThreadProcessId(self._hwnd, ctypes.byref(pid))
         xg_pid = pid.value
@@ -2244,6 +2430,8 @@ class XGAutomator:
         """
         found = [0]
         headless = self.headless
+        if skip:
+            self._prune_dead_skip_hwnds(skip)
         skip_set = skip or set()
         skip_classes = self._SKIP_CLASSES
 

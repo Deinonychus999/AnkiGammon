@@ -1912,7 +1912,15 @@ class CardGenerator:
             # Cancellation must propagate so the export worker can stop cleanly
             raise
         except Exception:
+            # Returning "" writes the card back with no matrix at all. On a
+            # regenerate that silently destroys a table the card already had,
+            # so the failure has to reach the run summary rather than only
+            # the log.
             logger.exception("Failed to generate score matrix for xgid=%r", decision.xgid)
+            self.generation_warnings.append(
+                f"Score matrix failed for {decision.xgid} "
+                "(card written without its table)"
+            )
             return ""
 
     def _generate_move_score_matrix_html(self, decision: Decision) -> str:

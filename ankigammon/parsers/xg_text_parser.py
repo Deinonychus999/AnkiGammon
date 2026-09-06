@@ -595,12 +595,15 @@ class XGTextParser:
         if not moves:
             moves = XGTextParser._parse_cube_decision(text)
 
-        # Calculate errors if not already set
+        # Calculate errors if not already set. Anchored on the rank-1 move
+        # rather than the first one: cube options are emitted in action order,
+        # so the best action is not necessarily first, and its legitimate
+        # zero error would otherwise be overwritten.
         if moves and len(moves) > 1:
-            best_equity = moves[0].equity
-            for move in moves[1:]:
-                if move.error == 0.0:
-                    move.error = abs(best_equity - move.equity)
+            best_move = next((m for m in moves if m.rank == 1), moves[0])
+            for move in moves:
+                if move is not best_move and move.error == 0.0:
+                    move.error = abs(best_move.equity - move.equity)
 
         return moves
 
@@ -817,8 +820,13 @@ class XGTextParser:
                 if move.rank != 1:
                     move.error = abs(best_equity - move.equity)
 
-        # Sort by rank for output
-        moves.sort(key=lambda m: m.rank)
+        # Emit in the canonical action order rather than best-first. The five
+        # cube actions are presented as a fixed set (the MCQ deliberately does
+        # not shuffle them), so ranking them here put the correct answer in
+        # slot A on every XG-analyzed cube card — GitHub issue #59. GnuBG's
+        # parser already emits this order.
+        canonical_index = {option: i for i, option in enumerate(all_options)}
+        moves.sort(key=lambda m: canonical_index.get(m.notation, len(all_options)))
 
         return moves
 
