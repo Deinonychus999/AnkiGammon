@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [1.8.2] - 2026-09-06
 
 ### Fixed
 - Cube cards analyzed with eXtreme Gammon always had the correct answer as option A.
