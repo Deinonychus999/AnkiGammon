@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [1.8.3] - 2026-09-07
 
 ### Added
 - Regenerate can be limited to cards that are missing a score matrix or cube comparison.
