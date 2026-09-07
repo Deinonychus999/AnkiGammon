@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+- Exporting a card that already carried its analysis could leave eXtreme Gammon running afterwards when a score matrix was built for it.
+- The regenerate progress log now counts positions from 1 instead of showing "0/5".
+
 ## [1.8.3] - 2026-09-07
 
 ### Added

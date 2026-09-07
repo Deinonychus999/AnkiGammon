@@ -378,9 +378,16 @@ class RegenerateWorker(QThread):
             if self._cancelled:
                 return
             self.progress.emit(completed, total_positions * 2)
-            self.status_message.emit(
-                f"Analyzing position {completed}/{total_positions}..."
-            )
+            # The engine reports how many are done; the user reads which one
+            # is in progress, so "0/5" looked like nothing was happening.
+            if completed < total_positions:
+                self.status_message.emit(
+                    f"Analyzing position {completed + 1}/{total_positions}..."
+                )
+            else:
+                self.status_message.emit(
+                    f"Analyzed {total_positions}/{total_positions} position(s)."
+                )
 
         self.status_message.emit(
             f"Analyzing {len(unique_xgids)} unique position(s)..."

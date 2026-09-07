@@ -191,6 +191,7 @@ class ExportWorker(QThread):
         self.import_mode = import_mode
         self._cancelled = False
         self._analyzer = analyzer
+        self._card_gen = None
 
     def cancel(self):
         """Request cancellation of the export."""
@@ -205,6 +206,26 @@ class ExportWorker(QThread):
                 self._export_apkg()
         except Exception as e:
             self.finished.emit(False, f"Export failed: {str(e)}")
+        finally:
+            self._terminate_own_engine()
+
+    def _terminate_own_engine(self) -> None:
+        """Shut down an engine the card generator started for this export.
+
+        With nothing to analyze there is no AnalysisWorker, so no analyzer is
+        handed in and the score matrix lazily launches its own XG. The
+        dialog's cleanup only knows the analysis worker's engine, so that one
+        was left running (reported in #59 after adding a single card). A
+        shared engine is the dialog's to close, not ours.
+        """
+        own = getattr(self._card_gen, '_analyzer', None)
+        self._card_gen = None
+        if own is None or own is self._analyzer:
+            return
+        try:
+            own.terminate()
+        except Exception:
+            pass
 
     def _export_ankiconnect(self):
         """Export via AnkiConnect."""
@@ -259,6 +280,7 @@ class ExportWorker(QThread):
             cancellation_callback=lambda: self._cancelled,
             analyzer=self._analyzer,
         )
+        self._card_gen = card_gen
 
         for deck_name, deck_decisions in export_groups.items():
             for decision in deck_decisions:
@@ -425,6 +447,7 @@ class ExportWorker(QThread):
                 cancellation_callback=lambda: self._cancelled,
                 analyzer=self._analyzer,
             )
+            self._card_gen = card_gen
 
             for deck_name, deck_decisions in export_groups.items():
                 deck = decks_dict[deck_name]
