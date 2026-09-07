@@ -15,6 +15,10 @@ from ankigammon.utils.move_parser import MoveParser
 from ankigammon.settings import get_settings
 from ankigammon.anki.card_styles import get_error_css_class
 from ankigammon.anki.decision_serialize import decision_to_json
+from ankigammon.anki.optional_analysis import (
+    CUBE_COMPARISON_FAILED_MARKER,
+    CUBE_COMPARISON_SAME_MARKER,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -2033,10 +2037,11 @@ class CardGenerator:
                 cancellation_callback=self.cancellation_callback
             )
 
-            # Per issue #50: nothing is added when the best move is the same
-            # at all three cube positions
+            # Per issue #50: nothing visible is added when the best move is
+            # the same at all three cube positions. The marker lets a later
+            # regenerate tell "checked, identical" from "never checked".
             if not best_move_differs(columns):
-                return ""
+                return CUBE_COMPARISON_SAME_MARKER
 
             return format_move_cube_matrix_as_html(
                 columns=columns,
@@ -2055,7 +2060,7 @@ class CardGenerator:
                 f"Cube-position analysis failed for {decision.xgid} "
                 "(card exported without the cube comparison)"
             )
-            return ""
+            return CUBE_COMPARISON_FAILED_MARKER
 
     def _generate_note_html(self, decision: Decision) -> str:
         """Generate note HTML if a note exists."""

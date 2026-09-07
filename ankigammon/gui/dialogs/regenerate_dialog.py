@@ -20,7 +20,7 @@ from typing import List, Optional
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QLabel, QProgressBar,
     QPushButton, QTextEdit, QDialogButtonBox,
-    QRadioButton, QButtonGroup, QFrame
+    QRadioButton, QButtonGroup, QFrame, QCheckBox
 )
 from PySide6.QtCore import Qt, QThread, Signal, Slot
 
@@ -28,6 +28,12 @@ from ankigammon.utils.analysis_debug import record_failed_analysis
 from ankigammon.anki.ankiconnect import AnkiConnect
 from ankigammon.anki.card_styles import MODEL_NAME
 from ankigammon.anki.decision_serialize import carry_user_metadata, decision_from_json
+from ankigammon.anki.optional_analysis import (
+    is_cube_xgid,
+    lost_optional_blocks,
+    missing_optional_blocks,
+)
+from ankigammon.models import DecisionType
 from ankigammon.settings import Settings
 
 
@@ -49,10 +55,11 @@ class RegenerateWorker(QThread):
     status_message = Signal(str)
     finished = Signal(bool, str)
 
-    def __init__(self, settings: Settings, mode: str):
+    def __init__(self, settings: Settings, mode: str, only_missing: bool = False):
         super().__init__()
         self.settings = settings
         self.mode = mode
+        self.only_missing = only_missing
         self._cancelled = False
         self._analyzer = None
         self._card_gen = None
@@ -123,7 +130,69 @@ class RegenerateWorker(QThread):
             return None
 
         self.status_message.emit(f"Reading {len(all_note_ids)} note(s)...")
-        return client.notes_info(all_note_ids)
+        notes_data = client.notes_info(all_note_ids)
+
+        if self.only_missing:
+            notes_data = self._notes_missing_optional_analysis(notes_data)
+            if not notes_data:
+                self.finished.emit(True, "No cards are missing optional analysis.")
+                return None
+            self.status_message.emit(
+                f"{len(notes_data)} of {len(all_note_ids)} card(s) are missing "
+                "optional analysis."
+            )
+        return notes_data
+
+    def _notes_missing_optional_analysis(self, notes_data: List[dict]) -> List[dict]:
+        """Notes whose card lacks a block the current settings call for.
+
+        Card type and match length come from the saved blob; a legacy card
+        without one is typed from its XGID. A card that cannot be typed at
+        all is left alone rather than regenerated on a guess.
+        """
+        selected = []
+        for note_data in notes_data:
+            fields = note_data.get('fields', {})
+            back = fields.get('Back', {}).get('value', '')
+            blob = fields.get('AnalysisData', {}).get('value', '').strip()
+            xgid = fields.get('XGID', {}).get('value', '').strip()
+
+            is_cube, match_length = None, None
+            if blob:
+                try:
+                    saved = decision_from_json(blob)
+                    is_cube = saved.decision_type == DecisionType.CUBE_ACTION
+                    match_length = saved.match_length
+                except Exception:
+                    pass
+            if is_cube is None:
+                is_cube = is_cube_xgid(xgid)
+            if is_cube is None:
+                continue
+
+            if missing_optional_blocks(back, is_cube, self.settings, match_length):
+                selected.append(note_data)
+        return selected
+
+    def _keeps_previous_card(
+        self, card_gen, warnings_before: int, old_back: str, new_back: str, note_id: int
+    ) -> bool:
+        """True when the card must be left as it is.
+
+        An optional block the card already had failed to rebuild this run.
+        Writing the new render would trade a table the user has for nothing,
+        which is what a regenerate did before this check existed.
+        """
+        if len(card_gen.generation_warnings) == warnings_before:
+            return False
+        lost = lost_optional_blocks(old_back, new_back)
+        if not lost:
+            return False
+        self.status_message.emit(
+            f"Kept note {note_id} unchanged: its {', '.join(lost)} failed to "
+            "rebuild and the card already had it"
+        )
+        return True
 
     def _build_card_generator(self, analyzer=None):
         """Create a CardGenerator configured from current settings.
@@ -170,8 +239,9 @@ class RegenerateWorker(QThread):
             note_id = note_data['noteId']
             fields = note_data.get('fields', {})
             blob = fields.get('AnalysisData', {}).get('value', '').strip()
+            old_back = fields.get('Back', {}).get('value', '')
             if blob:
-                rerender_targets.append((note_id, blob))
+                rerender_targets.append((note_id, blob, old_back))
             else:
                 legacy_skipped += 1
 
@@ -192,7 +262,8 @@ class RegenerateWorker(QThread):
 
         updated = 0
         errors = 0
-        for i, (note_id, blob) in enumerate(rerender_targets):
+        kept = 0
+        for i, (note_id, blob, old_back) in enumerate(rerender_targets):
             if self._cancelled:
                 self.finished.emit(False, f"Cancelled after re-rendering {updated} card(s)")
                 return
@@ -202,7 +273,13 @@ class RegenerateWorker(QThread):
 
             try:
                 decision = decision_from_json(blob)
+                warnings_before = len(card_gen.generation_warnings)
                 card_data = card_gen.generate_card(decision)
+                if self._keeps_previous_card(
+                    card_gen, warnings_before, old_back, card_data['back'], note_id
+                ):
+                    kept += 1
+                    continue
                 # Pass analysis_data=None: AnalysisData is unchanged because
                 # we deserialized FROM it. Only Front/Back/XGID need updating.
                 client.update_note_fields(
@@ -223,6 +300,11 @@ class RegenerateWorker(QThread):
         msg = f"Successfully re-rendered {updated} card(s)"
         if errors:
             msg += f" ({errors} failed)"
+        if kept:
+            msg += (
+                f". Kept {kept} card(s) unchanged because their optional "
+                "analysis failed this run"
+            )
         if card_gen.generation_warnings:
             msg += (
                 f". {len(card_gen.generation_warnings)} card(s) rendered "
@@ -272,8 +354,9 @@ class RegenerateWorker(QThread):
             fields = note_data.get('fields', {})
             xgid = fields.get('XGID', {}).get('value', '').strip()
             blob = fields.get('AnalysisData', {}).get('value', '').strip()
+            old_back = fields.get('Back', {}).get('value', '')
             if xgid:
-                note_xgid_pairs.append((note_id, xgid, blob))
+                note_xgid_pairs.append((note_id, xgid, blob, old_back))
 
         if not note_xgid_pairs:
             self.finished.emit(True, "No notes with XGID values found. Cannot regenerate.")
@@ -283,7 +366,7 @@ class RegenerateWorker(QThread):
         self.status_message.emit(f"Found {total} note(s) with positions to regenerate.")
 
         # Deduplicate XGIDs for efficient analysis
-        unique_xgids = list(dict.fromkeys(xgid for _, xgid, _ in note_xgid_pairs))
+        unique_xgids = list(dict.fromkeys(xgid for _, xgid, _, _ in note_xgid_pairs))
 
         if self._cancelled:
             self.finished.emit(False, "Cancelled by user")
@@ -335,7 +418,8 @@ class RegenerateWorker(QThread):
 
         updated = 0
         errors = 0
-        for i, (note_id, xgid, blob) in enumerate(note_xgid_pairs):
+        kept = 0
+        for i, (note_id, xgid, blob, old_back) in enumerate(note_xgid_pairs):
             if self._cancelled:
                 self.finished.emit(False, f"Cancelled after updating {updated} card(s)")
                 return
@@ -348,7 +432,13 @@ class RegenerateWorker(QThread):
                 # but each carry their own annotations.
                 decision = replace(xgid_to_decision[xgid])
                 self._restore_user_metadata(decision, blob, note_id)
+                warnings_before = len(card_gen.generation_warnings)
                 card_data = card_gen.generate_card(decision)
+                if self._keeps_previous_card(
+                    card_gen, warnings_before, old_back, card_data['back'], note_id
+                ):
+                    kept += 1
+                    continue
                 # Re-analyze path overwrites AnalysisData with the fresh blob
                 client.update_note_fields(
                     note_id,
@@ -368,6 +458,11 @@ class RegenerateWorker(QThread):
         msg = f"Successfully regenerated {updated} card(s) in Anki"
         if errors > 0:
             msg += f" ({errors} failed)"
+        if kept:
+            msg += (
+                f". Kept {kept} card(s) unchanged because their optional "
+                "analysis failed this run"
+            )
         if card_gen.generation_warnings:
             msg += (
                 f". {len(card_gen.generation_warnings)} card(s) rendered "
@@ -439,6 +534,19 @@ class RegenerateDialog(QDialog):
         mode_layout.addWidget(render_desc)
         mode_layout.addWidget(self.radio_reanalyze)
         mode_layout.addWidget(reanalyze_desc)
+
+        self.chk_only_missing = QCheckBox(
+            "Only cards missing a score matrix or cube comparison"
+        )
+        self.chk_only_missing.setStyleSheet(
+            "font-weight: 600; color: #cdd6f4; margin-top: 6px;"
+        )
+        self.chk_only_missing.setToolTip(
+            "Skips cards that already carry every optional block your settings "
+            "ask for. A missing cube-position comparison can only be detected on "
+            "cards made from this version on."
+        )
+        mode_layout.addWidget(self.chk_only_missing)
 
         layout.addWidget(mode_frame)
 
@@ -521,10 +629,13 @@ class RegenerateDialog(QDialog):
         # Lock the mode selection while running
         self.radio_render_only.setEnabled(False)
         self.radio_reanalyze.setEnabled(False)
+        self.chk_only_missing.setEnabled(False)
         self.btn_regenerate.setEnabled(False)
         self.status_label.setText("Starting regeneration...")
 
-        self.worker = RegenerateWorker(self.settings, mode)
+        self.worker = RegenerateWorker(
+            self.settings, mode, only_missing=self.chk_only_missing.isChecked()
+        )
         self.worker.progress.connect(self.on_progress)
         self.worker.status_message.connect(self.on_status_message)
         self.worker.finished.connect(self.on_finished)

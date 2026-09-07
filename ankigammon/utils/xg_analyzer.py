@@ -69,7 +69,10 @@ class XGAnalyzer(BackgammonAnalyzer):
     def _ensure_connected(self) -> None:
         """Lazily connect to XG, creating the automator if needed."""
         if self._connected and self._automator is not None:
-            return
+            if self._automator.is_alive():
+                return
+            logger.warning("eXtreme Gammon is no longer running; relaunching it")
+            self.terminate()
 
         try:
             from ankigammon.utils.xg_auto.automator import XGAutomator
@@ -251,9 +254,50 @@ class XGAnalyzer(BackgammonAnalyzer):
         )
 
     def analyze_position(self, position_id: str) -> Tuple[str, DecisionType]:
-        """Analyze a single position via XG.
+        """Analyze a single position via XG, relaunching it once if it exited.
 
-        Flow:
+        A user's diagnostic log showed XG exiting mid-run; every later position
+        then spent its timeout failing against the dead handle and every
+        remaining card lost its score matrix. The retry is gated on XG actually
+        being gone, so an error from a live XG still surfaces unchanged.
+        """
+        if position_id is None:
+            raise ValueError(
+                "position_id cannot be None. "
+                "Decision object must have xgid field populated."
+            )
+        try:
+            return self._analyze_position_once(position_id)
+        except Exception as exc:
+            from ankigammon.utils.xg_auto.automator import (
+                XGAutomationError,
+                XGNoMatchLoadedError,
+            )
+
+            if isinstance(exc, XGNoMatchLoadedError) and self._automator is not None:
+                # The import did not take, typically because a dialog was in
+                # the way. Clear it and import once more.
+                logger.warning(
+                    "No match was loaded for %s; clearing dialogs and "
+                    "re-importing once", position_id[:40],
+                )
+                self._automator._dismiss_unexpected_dialogs(accept=False)
+                return self._analyze_position_once(position_id)
+
+            if (not isinstance(exc, XGAutomationError)
+                    or self._automator is None
+                    or self._automator.is_alive()):
+                raise
+            logger.warning(
+                "eXtreme Gammon exited during %s; relaunching and retrying once",
+                position_id[:40],
+            )
+            self.terminate()
+            self._ensure_connected()
+            return self._analyze_position_once(position_id)
+
+    def _analyze_position_once(self, position_id: str) -> Tuple[str, DecisionType]:
+        """One pass of the flow:
         1. Import XGID via text file (avoids clipboard race conditions)
         2. Run full match analysis (handles dialog + completion polling)
         3. Export position analysis to clipboard (with validation/retry)
@@ -261,12 +305,6 @@ class XGAnalyzer(BackgammonAnalyzer):
         5. Return (text, decision_type)
         """
         import time
-
-        if position_id is None:
-            raise ValueError(
-                "position_id cannot be None. "
-                "Decision object must have xgid field populated."
-            )
 
         self._ensure_connected()
 

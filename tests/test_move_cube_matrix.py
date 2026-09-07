@@ -276,13 +276,18 @@ def _card_generator(analyzer, tmpdir):
 
 
 def test_card_generator_returns_empty_when_best_move_identical():
-    """Per issue #50: nothing on the card when all three best moves agree."""
+    """Per issue #50: nothing visible on the card when all three best moves
+    agree. An invisible marker records that the check ran, so a later
+    regenerate can tell "checked, identical" from "never checked"."""
+    from ankigammon.anki.optional_analysis import CUBE_COMPARISON_SAME_MARKER
+
     analyzer = _CaptureAnalyzer()  # identical canned best move everywhere
     with tempfile.TemporaryDirectory() as tmpdir:
         gen = _card_generator(analyzer, tmpdir)
         html = gen._generate_move_cube_matrix_html(_checker_decision())
 
-    assert html == ""
+    assert html == CUBE_COMPARISON_SAME_MARKER
+    assert "<details" not in html
     assert len(analyzer.seen_ids) == 3  # analysis ran, result was suppressed
 
 
@@ -309,11 +314,14 @@ def test_card_generator_records_warning_when_analysis_fails():
                                        cancellation_callback=None):
             raise RuntimeError("engine exploded")
 
+    from ankigammon.anki.optional_analysis import CUBE_COMPARISON_FAILED_MARKER
+
     with tempfile.TemporaryDirectory() as tmpdir:
         gen = _card_generator(_FailingAnalyzer(), tmpdir)
         html = gen._generate_move_cube_matrix_html(_checker_decision())
 
-    assert html == ""
+    assert html == CUBE_COMPARISON_FAILED_MARKER
+    assert "<details" not in html
     assert len(gen.generation_warnings) == 1
     assert "Cube-position analysis failed" in gen.generation_warnings[0]
 

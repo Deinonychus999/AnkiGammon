@@ -1,5 +1,18 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- Regenerate can be limited to cards that are missing a score matrix or cube comparison.
+
+### Fixed
+- A regenerate whose table fails to rebuild no longer replaces the card's existing table with nothing. The card is left as it was and the summary says so.
+- If eXtreme Gammon exits partway through a run, it is relaunched and the position retried, instead of every remaining card losing its score matrix.
+- Closing a position after analysis no longer answers Yes to eXtreme Gammon's "Save Game?" prompt, which could leave a save dialog in the way of the next analysis.
+- Analyzing when a position failed to load into eXtreme Gammon now fails within seconds and the position is imported again, instead of waiting ten minutes for an analysis that never started.
+- Importing a position right after eXtreme Gammon starts could lose the first characters of the file path in its Open dialog; the path is now re-entered until it reads back correctly.
+- A selected radio button no longer turns into a rounded square, and checkboxes now show a check mark.
+
 ## [1.8.2] - 2026-09-06
 
 ### Fixed

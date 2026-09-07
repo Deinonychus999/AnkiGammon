@@ -312,6 +312,16 @@ class XGAutomationError(Exception):
     """Raised when a UI automation step fails."""
 
 
+class XGNoMatchLoadedError(XGAutomationError):
+    """Analysis was requested while XG had no match open.
+
+    Distinguished from other failures because it is recoverable in place:
+    the import before it did not take, so a dialog sweep and one re-import
+    are the right response, whereas a blind retry of anything else would
+    hide real problems.
+    """
+
+
 class XGAutomator:
     """Drive eXtreme Gammon 2 through its GUI."""
 
@@ -513,6 +523,15 @@ class XGAutomator:
             self._connect_gui()
             # Initialize optional subsystems after connection
             self._setup_memory_reader()
+
+    def is_alive(self) -> bool:
+        """Whether the XG we are driving still has its main window.
+
+        A user's diagnostics showed XG exiting mid-run while the automator kept
+        posting to the dead handle; every later operation waited out its
+        timeout and failed.
+        """
+        return bool(self._hwnd) and bool(user32.IsWindow(self._hwnd))
 
     def _connect_gui(self) -> None:
         """Connect via pywinauto (normal GUI mode)."""
@@ -918,12 +937,17 @@ class XGAutomator:
         log.info("File opened: %s", filepath.name)
 
     def close_match(self) -> None:
-        """Close the current match (wID=94)."""
+        """Close the current match (wID=94) without saving it.
+
+        XG asks "Save Game?" on close. The default accept=True answered Yes to
+        a save we never want; a user's log showed the resulting Save dialog
+        leaking into the next position and preceding a 600s analysis wedge.
+        """
         if not self.headless:
             self.focus()
         self.send_command(self.cmd.CLOSE)
         time.sleep(0.5)
-        self._dismiss_unexpected_dialogs()
+        self._dismiss_unexpected_dialogs(accept=False)
 
     # ------------------------------------------------------------------
     # Clipboard & XGID import
@@ -1084,10 +1108,13 @@ class XGAutomator:
 
         return xgid
 
-    def _wait_for_position_loaded(self, timeout: float = 10.0) -> None:
-        """Wait for XG to finish loading a position after clipboard import.
+    def _wait_for_position_loaded(self, timeout: float = 10.0) -> bool:
+        """Wait for XG to finish loading a position after an import.
 
-        Polls for window title change and dismisses any error dialogs.
+        Polls for a window title change and dismisses any error dialogs.
+        Returns False if the title never changed. XG does not always retitle
+        after a clipboard import, so that is not treated as fatal here;
+        run_analysis() makes the final call from the menu state.
         """
         time.sleep(1.0)  # initial settle time for XG to process the command
 
@@ -1101,13 +1128,14 @@ class XGAutomator:
             user32.GetWindowTextW(self._hwnd, title, 256)
             if title.value and title.value != self._xg_base_title:
                 log.debug("Position loaded — title: %s", title.value)
-                return
+                return True
 
             time.sleep(0.5)
 
-        # Even if title didn't change, the position may still have loaded
-        # (XG doesn't always update the title for clipboard imports).
-        log.debug("Position load wait timed out — proceeding anyway.")
+        log.warning(
+            "Position load not confirmed: title unchanged after %.0fs", timeout
+        )
+        return False
 
     def save_as(self, output_path: Path) -> None:
         """Save the current match as .xg via File > Save As (wID=93)."""
@@ -1217,11 +1245,29 @@ class XGAutomator:
         if self.headless:
             self._dismiss_unexpected_dialogs(accept=True)
 
+        # Checked before Analyze is sent: this is the one moment when a
+        # disabled Close item unambiguously means "no match", not "analysis
+        # running". With nothing loaded XG greys out Analyze too, which the
+        # wait below would read as "started" and sit out its full timeout.
+        if not self._match_loaded():
+            raise XGNoMatchLoadedError(
+                "No match is loaded in eXtreme Gammon, so there is nothing to "
+                "analyze; the import before this did not take"
+            )
+
         self.send_command(self.cmd.ANALYZE_MATCH)
 
         # Handle the "Analyze Session" settings dialog
         time.sleep(1.5)
-        self._handle_analyze_session_dialog()
+        if self._handle_analyze_session_dialog() is False:
+            # Seen once in four days of a user's logs, right after a leaked
+            # Save dialog and followed by a 600s wait: the menus were disabled
+            # by a foreign modal, not by analysis. Clear it before waiting.
+            log.warning(
+                "Analyze Session dialog did not appear; sweeping dialogs "
+                "before waiting for analysis"
+            )
+            self._dismiss_unexpected_dialogs(accept=False)
 
         # Wait for analysis to complete
         self._wait_for_analysis()
@@ -1231,11 +1277,29 @@ class XGAutomator:
         self._dismiss_unexpected_dialogs(accept=False)
         log.info("Analysis complete.")
 
-    def _handle_analyze_session_dialog(self) -> None:
+    def _match_loaded(self) -> bool:
+        """Whether XG has a match open to analyze.
+
+        Either signal is enough: a title that gained a suffix (XG appends
+        " *" or the match name), or the Close item being enabled. XG does not
+        always retitle after an import, so the title alone is not trusted.
+        """
+        title = ctypes.create_unicode_buffer(256)
+        user32.GetWindowTextW(self._hwnd, title, 256)
+        # XG leaves a trailing space on the title after closing a match, so
+        # compare stripped or "no match" reads as a suffix.
+        base = self._xg_base_title.strip()
+        if base and title.value.strip() != base:
+            return True
+        return bool(self._check_menu_item_enabled(self.cmd.CLOSE))
+
+    def _handle_analyze_session_dialog(self) -> bool:
         """Set analysis level and click OK on the 'Analyze Session' dialog.
 
         If analysis_level is configured, sets both player ComboBoxes to that
-        level. Otherwise just clicks OK to accept defaults.
+        level. Otherwise just clicks OK to accept defaults. Returns False if
+        the dialog never appeared, which on every setup seen so far means
+        something else is in the way.
         """
         pid = wt.DWORD()
         user32.GetWindowThreadProcessId(self._hwnd, ctypes.byref(pid))
@@ -1276,7 +1340,7 @@ class XGAutomator:
 
         if not dlg_hwnd:
             log.debug("No Analyze Session dialog found")
-            return
+            return False
 
         title = ctypes.create_unicode_buffer(256)
         user32.GetWindowTextW(dlg_hwnd, title, 256)
@@ -1302,6 +1366,7 @@ class XGAutomator:
 
         self._click_button(_HwndWrap(dlg_hwnd), ["OK", "Ok"])
         time.sleep(0.5)
+        return True
 
     def _tick_checkbox(self, dlg_hwnd: int, label: str) -> None:
         """Ensure a checkbox in a dialog is checked (ticked).
@@ -1688,6 +1753,11 @@ class XGAutomator:
 
         deadline = time.time() + 10.0
         while time.time() < deadline:
+            if not self.is_alive():
+                raise XGAutomationError(
+                    "eXtreme Gammon is no longer running; cannot "
+                    f"{dialog_type} {filepath}"
+                )
             dlg_hwnd = self._find_file_dialog_win32()
             if dlg_hwnd:
                 ok = user32.SetWindowPos(
@@ -1892,24 +1962,41 @@ class XGAutomator:
                 )
             # Type path via WM_CHAR so the IFileDialog processes each
             # character and updates its internal COM state.
+            #
+            # Right after XG starts, the dialog is still initialising when
+            # we reach it and resets its edit box part-way through the
+            # typing, keeping only the characters that arrived afterwards
+            # ("Got: id_import.txt"). Confirming that leaves the dialog
+            # stuck and has been followed by XG exiting. So type, read
+            # back, and retype until the edit holds the whole path; the
+            # first round absorbs the initialisation time, so a ready
+            # dialog costs nothing extra.
             path_str = str(filepath)
-            for ch in path_str:
-                SendMessageW(edit_hwnd, self.WM_CHAR, ord(ch), 0)
-            # Read back the text to verify it was entered correctly
-            length = SendMessageW(edit_hwnd, WM_GETTEXTLENGTH, 0, 0)
-            verify_buf = ctypes.create_unicode_buffer(length + 1)
-            SendMessageW(
-                edit_hwnd, WM_GETTEXT, length + 1,
-                ctypes.addressof(verify_buf),
-            )
-            log.debug("File dialog text set (%d chars): %s",
-                       length, verify_buf.value)
-            if verify_buf.value != path_str:
-                log.warning(
-                    "Edit text mismatch after WM_CHAR! "
-                    "Got: %s  Expected: %s",
-                    verify_buf.value, path_str,
+            typed = ""
+            for attempt in range(3):
+                if attempt:
+                    time.sleep(0.5)
+                    SendMessageW(edit_hwnd, self.EM_SETSEL, 0, -1)
+                    SendMessageW(edit_hwnd, self.WM_CLEAR, 0, 0)
+                for ch in path_str:
+                    SendMessageW(edit_hwnd, self.WM_CHAR, ord(ch), 0)
+                length = SendMessageW(edit_hwnd, WM_GETTEXTLENGTH, 0, 0)
+                verify_buf = ctypes.create_unicode_buffer(length + 1)
+                SendMessageW(
+                    edit_hwnd, WM_GETTEXT, length + 1,
+                    ctypes.addressof(verify_buf),
                 )
+                typed = verify_buf.value
+                if typed == path_str:
+                    log.debug("File dialog text set (%d chars, attempt %d): %s",
+                              length, attempt + 1, typed)
+                    break
+                log.warning(
+                    "Edit text mismatch after WM_CHAR (attempt %d)! "
+                    "Got: %s  Expected: %s",
+                    attempt + 1, typed, path_str,
+                )
+            else:
                 # Last resort: force-set via WM_SETTEXT. This works
                 # because we confirm with Enter (reads Edit text), not
                 # BM_CLICK (reads IFileDialog COM state).
@@ -1918,7 +2005,7 @@ class XGAutomator:
                     edit_hwnd, self.WM_SETTEXT, 0,
                     ctypes.addressof(path_buf),
                 )
-                log.debug("Forced path via WM_SETTEXT fallback")
+                log.warning("Forced path via WM_SETTEXT after 3 typing attempts")
         else:
             log.warning("Could not find Edit control in file dialog")
 

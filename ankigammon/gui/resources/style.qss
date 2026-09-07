@@ -224,11 +224,13 @@ QCheckBox {
     color: #cdd6f4;
 }
 
+/* Same 2px border and 24px outer box as the radio so the two read as one
+   family; the check glyph is what says "on", not the fill alone. */
 QCheckBox::indicator {
     width: 20px;
     height: 20px;
     border-radius: 4px;
-    border: 3px solid #45475a;
+    border: 2px solid #45475a;
     background-color: #181825;
 }
 
@@ -238,12 +240,13 @@ QCheckBox::indicator:hover {
 
 QCheckBox::indicator:checked {
     background-color: #89b4fa;
-    border: 3px solid #45475a;
+    border-color: #89b4fa;
+    image: url(ankigammon/gui/resources/check.svg);
 }
 
 QCheckBox::indicator:checked:hover {
     background-color: #a0c8fc;
-    border-color: #89b4fa;
+    border-color: #a0c8fc;
 }
 
 /* Radio Buttons */
@@ -252,10 +255,13 @@ QRadioButton {
     color: #cdd6f4;
 }
 
+/* width/height are the content box; the border adds outside it, so the
+   radius is half of the 24px outer box. Checked changes colours only - a
+   thicker border on a fixed content size grew it into a rounded square. */
 QRadioButton::indicator {
     width: 20px;
     height: 20px;
-    border-radius: 10px;
+    border-radius: 12px;
     border: 2px solid #45475a;
     background-color: #181825;
 }
@@ -264,9 +270,20 @@ QRadioButton::indicator:hover {
     border-color: #89b4fa;
 }
 
+/* Ring and dot: the accent border, a dark gap, an accent dot. The gradient is
+   the only way QSS draws an inner dot without an image. */
 QRadioButton::indicator:checked {
-    background-color: #ffffff;
-    border: 5px solid #89b4fa;
+    border-color: #89b4fa;
+    background: qradialgradient(cx:0.5, cy:0.5, radius:0.5, fx:0.5, fy:0.5,
+                                stop:0 #89b4fa, stop:0.5 #89b4fa,
+                                stop:0.56 #181825, stop:1 #181825);
+}
+
+QRadioButton::indicator:checked:hover {
+    border-color: #a0c8fc;
+    background: qradialgradient(cx:0.5, cy:0.5, radius:0.5, fx:0.5, fy:0.5,
+                                stop:0 #a0c8fc, stop:0.5 #a0c8fc,
+                                stop:0.56 #181825, stop:1 #181825);
 }
 
 /* Progress Bar */
