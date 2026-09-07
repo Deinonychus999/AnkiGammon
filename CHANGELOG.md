@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [1.8.4] - 2026-09-07
 
 ### Fixed
 - Exporting a card that already carried its analysis could leave eXtreme Gammon running afterwards when a score matrix was built for it.

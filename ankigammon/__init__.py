@@ -1,6 +1,6 @@
 """AnkiGammon: Convert eXtreme Gammon analysis into Anki flashcards."""
 
-__version__ = "1.8.3"
+__version__ = "1.8.4"
 
 from ankigammon.models import Decision, Move, Position, CubeState
 
