@@ -1323,6 +1323,39 @@ button.animate-btn:disabled {
     overflow: hidden;
 }
 
+.score-matrix-unlimited {
+    margin-top: 10px;
+}
+
+.unlimited-jacoby-toggle {
+    font-size: 11px;
+    font-weight: normal;
+    color: #888;
+    cursor: pointer;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+.unlimited-jacoby-toggle .mj-off,
+.score-matrix-unlimited.showing-jacoby .unlimited-jacoby-toggle .mj-on {
+    font-weight: bold;
+    color: var(--text-fg);
+}
+
+.score-matrix-unlimited.showing-jacoby .unlimited-jacoby-toggle .mj-off {
+    font-weight: normal;
+    color: inherit;
+}
+
+.score-matrix-unlimited .unlimited-jacoby,
+.score-matrix-unlimited.showing-jacoby .unlimited-no-jacoby {
+    display: none;
+}
+
+.score-matrix-unlimited.showing-jacoby .unlimited-jacoby {
+    display: table-cell;
+}
+
 .score-matrix-table th {
     background-color: var(--canvas-elevated);
     color: var(--text-fg);

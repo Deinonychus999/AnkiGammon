@@ -93,7 +93,7 @@ class TestMatrixFailureIsReported:
     def test_success_records_nothing(self, card_gen):
         with mock.patch(
             "ankigammon.analysis.score_matrix.generate_score_matrix",
-            return_value=object(),
+            return_value=(object(), object()),
         ), mock.patch(
             "ankigammon.analysis.score_matrix.format_matrix_as_html",
             return_value="<table class=score-matrix-table></table>",

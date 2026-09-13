@@ -205,7 +205,7 @@ Each position becomes one Anki card:
 - Source position ID with copy button for easy sharing
 - Source attribution (analysis source and ply level)
 - Explanation (if added)
-- Score matrix showing optimal cube actions across all match scores, with a click to switch the cells between error costs and the No-Double / Double-Take cubeful equities (if enabled)
+- Score matrix showing optimal cube actions across all match scores, with a click to switch the cells between error costs and the No-Double / Double-Take cubeful equities. In match play an "Unlimited" row under the matrix shows the same position as an unlimited game (no beavers), so you can compare the match action with the unlimited one; click "no Jacoby · Jacoby" on the row to switch the Jacoby rule (if enabled)
 - Move score matrix showing top moves at different match contexts (if enabled)
 - Cube position spoiler — a collapsed section revealing how the best move changes when the cube is centered, owned by you, or owned by your opponent; only shown when the best move actually differs (if enabled)
 
@@ -240,7 +240,7 @@ Open Settings with **Ctrl+,** to configure:
 - **Analysis Ply**: Set GnuBG depth (0-4, default: 3)
 - **eXtreme Gammon Path**: Configure path to `eXtremeGammon2.exe` (Windows only, experimental)
 - **XG Analysis Level**: Set XG depth (Very Quick → Extensive, default: World Class)
-- **Score Matrix**: Generate cube decision matrix for all match scores (optional, time-consuming)
+- **Score Matrix**: Generate cube decision matrix for all match scores, plus an unlimited-game reference for match positions, without and with the Jacoby rule (two extra analyses per card, one for redoubles; no beavers) (optional, time-consuming)
 - **Score Matrix Max Size**: Cap the matrix size in points to save time on long matches; with "Auto" it uses the match length, or a 7-point view for unlimited (money) games
 - **Move Score Matrix**: Generate move analysis at different match contexts - Neutral, DMP, Gammon-Save, Gammon-Go (optional, time-consuming)
 - **Analyze Checker Plays at All Cube Positions**: Re-analyze each checker play with the cube centered, owned by the player, and owned by the opponent (3 extra analyses per position). A collapsed spoiler is added to the card back only when the best move differs between cube positions. Owned-cube variants use a 2-cube unless the cube is already owned. Works for match play and unlimited games; skipped in Crawford games and 1-point matches where the cube is dead (optional, time-consuming)

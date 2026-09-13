@@ -515,7 +515,9 @@ class SettingsDialog(QDialog):
         self.chk_generate_score_matrix.setCursor(Qt.PointingHandCursor)
         self.chk_generate_score_matrix.setStyleSheet("font-size: 14px;")
         self.chk_generate_score_matrix.setToolTip(
-            "Generates a detailed table showing winning chances at different match scores.\n"
+            "Generates a table of the best cube action at every match score.\n"
+            "Match positions also get the same position as an unlimited game\n"
+            "(no beavers), with a switch between no Jacoby and Jacoby.\n"
             "This is very time-consuming and can significantly slow down analysis."
         )
         matrix_layout.addWidget(self.chk_generate_score_matrix)
@@ -563,7 +565,7 @@ class SettingsDialog(QDialog):
         self.chk_generate_move_score_matrix.setStyleSheet("font-size: 14px;")
         self.chk_generate_move_score_matrix.setToolTip(
             "Generates a table showing top 3 moves at different match scores:\n"
-            "Neutral (money), DMP, Gammon-Save, and Gammon-Go.\n"
+            "Neutral (0-0 to 7), DMP, Gammon-Save, and Gammon-Go.\n"
             "This is time-consuming and can significantly slow down analysis."
         )
         move_matrix_layout.addWidget(self.chk_generate_move_score_matrix)

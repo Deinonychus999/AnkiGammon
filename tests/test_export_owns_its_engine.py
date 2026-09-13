@@ -67,7 +67,7 @@ def _run_export(settings, output, analyzer=None):
     worker.finished.connect(lambda ok, msg: result.update(ok=ok, msg=msg))
     with mock.patch("ankigammon.utils.analyzer_base.create_analyzer", side_effect=factory), \
          mock.patch("ankigammon.anki.card_generator.get_settings", return_value=settings), \
-         mock.patch("ankigammon.analysis.score_matrix.generate_score_matrix", return_value=object()), \
+         mock.patch("ankigammon.analysis.score_matrix.generate_score_matrix", return_value=(object(), object())), \
          mock.patch("ankigammon.analysis.score_matrix.format_matrix_as_html",
                     return_value='<table class="score-matrix-table"></table>'):
         worker.run()

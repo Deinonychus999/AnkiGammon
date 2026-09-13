@@ -145,7 +145,7 @@ def _run(mode, settings, spy_factory, notes=None):
 
     def fake_generate_score_matrix(**kwargs):
         matrix_calls.append(kwargs)
-        return object()
+        return object(), object()
 
     worker = RegenerateWorker(settings, mode)
     worker.finished.connect(lambda ok, msg: result.update(ok=ok, msg=msg))

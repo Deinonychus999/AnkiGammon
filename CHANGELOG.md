@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.9.0] - 2026-09-12
+
+### Added
+- Match cube cards show the same position as an unlimited game under the score matrix, with a click to switch the Jacoby rule.
+
+### Fixed
+- The move analysis by score tooltip no longer calls its Neutral column an unlimited game.
+- eXtreme Gammon no longer logs a false "analysis may not have started" warning when a position finishes quickly.
+
 ## [1.8.4] - 2026-09-07
 
 ### Fixed

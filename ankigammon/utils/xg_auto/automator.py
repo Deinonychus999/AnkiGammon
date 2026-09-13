@@ -1523,7 +1523,7 @@ class XGAutomator:
             time.sleep(0.5)
 
         if not analysis_started:
-            log.warning(
+            log.debug(
                 "Analyze menu item never became disabled — "
                 "analysis may not have started. Continuing to poll..."
             )

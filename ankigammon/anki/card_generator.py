@@ -18,6 +18,7 @@ from ankigammon.anki.decision_serialize import decision_to_json
 from ankigammon.anki.optional_analysis import (
     CUBE_COMPARISON_FAILED_MARKER,
     CUBE_COMPARISON_SAME_MARKER,
+    UNLIMITED_REFERENCE_FAILED_MARKER,
 )
 
 logger = logging.getLogger(__name__)
@@ -857,8 +858,8 @@ class CardGenerator:
     </div>
 """
 
-        # Generate score matrix for cube decisions if enabled (works for both
-        # match play and unlimited games — the latter gets a hypothetical projection)
+        # Generate score matrix for cube decisions if enabled (match play also
+        # gets an unlimited reference; unlimited games get a hypothetical projection)
         score_matrix_html = ''
         if is_cube_decision and self.settings.generate_score_matrix:
             score_matrix_html = self._generate_score_matrix_html(decision)
@@ -916,7 +917,7 @@ class CardGenerator:
         if has_cubeless:
             html += self._generate_equity_toggle_script()
 
-        if 'matrix-value-toggle' in score_matrix_html:
+        if 'matrix-value-toggle' in score_matrix_html or 'unlimited-jacoby-toggle' in score_matrix_html:
             html += self._generate_score_matrix_toggle_script()
 
         return html
@@ -1728,24 +1729,36 @@ class CardGenerator:
 """
 
     def _generate_score_matrix_toggle_script(self) -> str:
-        """Generate JavaScript for the score matrix errors/equities toggle."""
+        """Generate JavaScript for the score matrix errors/equities toggle and
+        the unlimited row's Jacoby switch."""
         return """
 <script>
 (function() {
-    var matrix = document.querySelector('.score-matrix.has-equities');
+    var matrix = document.querySelector('.score-matrix');
     if (!matrix) return;
 
-    function flip(e) {
-        e.stopPropagation();
-        matrix.classList.toggle('showing-equities');
+    if (matrix.classList.contains('has-equities')) {
+        var flip = function(e) {
+            e.stopPropagation();
+            matrix.classList.toggle('showing-equities');
+        };
+
+        var toggle = matrix.querySelector('.matrix-value-toggle');
+        if (toggle) toggle.addEventListener('click', flip);
+
+        matrix.querySelectorAll('.score-matrix-table td').forEach(function(cell) {
+            cell.addEventListener('click', flip);
+        });
     }
 
-    var toggle = matrix.querySelector('.matrix-value-toggle');
-    if (toggle) toggle.addEventListener('click', flip);
-
-    matrix.querySelectorAll('.score-matrix-table td').forEach(function(cell) {
-        cell.addEventListener('click', flip);
-    });
+    var unlimited = matrix.querySelector('.score-matrix-unlimited');
+    var jacobyToggle = unlimited && unlimited.querySelector('.unlimited-jacoby-toggle');
+    if (jacobyToggle) {
+        jacobyToggle.addEventListener('click', function(e) {
+            e.stopPropagation();
+            unlimited.classList.toggle('showing-jacoby');
+        });
+    }
 })();
 </script>
 """
@@ -1890,14 +1903,15 @@ class CardGenerator:
                         "is outside the displayed range."
                     )
 
-            matrix = generate_score_matrix(
+            matrix, unlimited = generate_score_matrix(
                 xgid=decision.xgid,
                 match_length=effective_ml,
                 analyzer=self._get_analyzer(),
                 progress_callback=self.progress_callback,
                 cancellation_callback=self.cancellation_callback,
                 cube_value=decision.cube_value,
-                cube_owner=decision.cube_owner
+                cube_owner=decision.cube_owner,
+                unlimited_reference=not is_projection,
             )
 
             matrix_html = format_matrix_as_html(
@@ -1908,7 +1922,15 @@ class CardGenerator:
                 cube_value=decision.cube_value,
                 cube_owner=decision.cube_owner,
                 caption=caption,
+                unlimited=unlimited,
             )
+
+            if not is_projection and unlimited is None:
+                self.generation_warnings.append(
+                    f"Unlimited reference failed for {decision.xgid} "
+                    "(card written without it)"
+                )
+                matrix_html += UNLIMITED_REFERENCE_FAILED_MARKER
 
             return matrix_html
 
@@ -1932,7 +1954,7 @@ class CardGenerator:
         Generate move score matrix HTML for checker play decisions.
 
         Shows top 3 moves at 4 different score contexts:
-        - Neutral (money)
+        - Neutral (0-0 to 7)
         - DMP (double match point)
         - Gammon-Save (player ahead, needs to save gammons)
         - Gammon-Go (player behind, wants gammons)

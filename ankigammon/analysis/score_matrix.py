@@ -7,7 +7,7 @@ in a match (e.g., 2a-2a through 7a-7a for a 7-point match).
 
 import logging
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -129,6 +129,15 @@ class ScoreMatrixCell:
         return min(displayed_errors) < threshold
 
 
+@dataclass
+class UnlimitedReference:
+    """The matrix's decision as an unlimited game, beavers off."""
+
+    no_jacoby: ScoreMatrixCell
+    # None once the cube has been turned: the Jacoby rule no longer applies.
+    jacoby: Optional[ScoreMatrixCell] = None
+
+
 def resolve_effective_match_length(match_length: int, max_size: int) -> int:
     """Compute the matrix's effective match length from the source position and
     the user's ``score_matrix_max_size`` setting.
@@ -147,6 +156,16 @@ def resolve_effective_match_length(match_length: int, max_size: int) -> int:
     return max_size if max_size > 0 else 7
 
 
+def count_score_matrix_analyses(match_length: int, max_size: int, cube_centered: bool) -> int:
+    """Engine analyses behind one cube card's matrix: every grid cell, plus
+    the unlimited reference when the source is a match (two with a centred cube)."""
+    effective = resolve_effective_match_length(match_length, max_size)
+    if effective < 2:
+        return 0
+    unlimited = (2 if cube_centered else 1) if match_length > 0 else 0
+    return (effective - 1) ** 2 + unlimited
+
+
 def generate_score_matrix(
     xgid: str,
     match_length: int,
@@ -156,10 +175,11 @@ def generate_score_matrix(
     use_parallel: bool = True,
     cube_value: int = 1,
     cube_owner: Optional['CubeState'] = None,
+    unlimited_reference: bool = False,
     # Legacy parameters for backward compatibility
     gnubg_path: Optional[str] = None,
     ply_level: int = 3,
-) -> List[List[ScoreMatrixCell]]:
+) -> Tuple[List[List[ScoreMatrixCell]], Optional[UnlimitedReference]]:
     """
     Generate a score matrix for all RELEVANT score combinations in a match.
 
@@ -183,12 +203,19 @@ def generate_score_matrix(
         use_parallel: Use parallel analysis (default: True, ~5-9x faster)
         cube_value: Current cube value before doubling (default: 1)
         cube_owner: Current cube owner (default: extracted from XGID)
+        unlimited_reference: Also analyze the position as an unlimited game, in
+            the same batch, and again under the Jacoby rule when the cube is
+            centred. Meant for match sources; an unlimited source needs no
+            reference.
         gnubg_path: DEPRECATED - use analyzer parameter instead
         ply_level: DEPRECATED - use analyzer parameter instead
 
     Returns:
-        2D list of ScoreMatrixCell objects, indexed as [row][col]
-        where row = player_away - min_away, col = opponent_away - min_away
+        (grid, unlimited). grid is a 2D list of ScoreMatrixCell objects, indexed
+        as [row][col] where row = player_away - min_away, col = opponent_away
+        - min_away. unlimited is an UnlimitedReference whose cells have both away
+        values 0, or None when not requested or when either unlimited analysis
+        did not parse.
 
     Raises:
         ValueError: If match_length < 2 or next_cube_value > match_length
@@ -198,7 +225,6 @@ def generate_score_matrix(
 
     from ankigammon.utils.xgid import parse_xgid, encode_xgid
     from ankigammon.models import Player, CubeState
-    from ankigammon.utils.analyzer_base import BackgammonAnalyzer
 
     # Legacy fallback: if analyzer not provided, create from gnubg_path
     if analyzer is None and gnubg_path is not None:
@@ -251,9 +277,9 @@ def generate_score_matrix(
     # Calculate total cells for progress
     total_cells = matrix_size * matrix_size
 
-    # Prepare all position IDs and coordinate mappings
+    # Prepare all position IDs and their progress labels
     position_ids = []
-    coord_list = []  # [(player_away, opponent_away), ...]
+    labels = []
 
     for player_away in range(min_away, match_length + 1):
         for opponent_away in range(min_away, match_length + 1):
@@ -284,11 +310,35 @@ def generate_score_matrix(
             )
 
             position_ids.append(modified_xgid)
-            coord_list.append((player_away, opponent_away))
+            labels.append(f"score {player_away}a-{opponent_away}a")
+
+    unlimited_variants = []
+    if unlimited_reference:
+        # Beavers off throughout, and no Jacoby first, so the unlimited cell
+        # differs from the match cells only in score. The Jacoby rule (bit 0)
+        # stops applying once the cube has been turned, so only a centred cube
+        # gets the second analysis.
+        unlimited_variants.append((0, "unlimited game"))
+        if cube_owner == CubeState.CENTERED:
+            unlimited_variants.append((1, "unlimited game with Jacoby"))
+    for crawford_jacoby, label in unlimited_variants:
+        position_ids.append(encode_xgid(
+            position=position,
+            cube_value=cube_value,
+            cube_owner=cube_owner,
+            dice=None,
+            on_roll=on_roll,
+            score_x=0,
+            score_o=0,
+            match_length=0,
+            crawford_jacoby=crawford_jacoby,
+            max_cube=metadata.get('max_cube', 256)
+        ))
+        labels.append(label)
 
     logger.info(
-        "Score matrix: %dx%d (%d cells), cube=%d, min_away=%d",
-        matrix_size, matrix_size, total_cells, cube_value, min_away
+        "Score matrix: %dx%d (%d cells), cube=%d, min_away=%d, unlimited=%s",
+        matrix_size, matrix_size, total_cells, cube_value, min_away, unlimited_reference
     )
 
     # Analyze all positions (parallel or sequential)
@@ -300,15 +350,12 @@ def generate_score_matrix(
                 raise InterruptedError("Score matrix generation cancelled by user")
 
             if completed < total:
-                p_away, o_away = coord_list[completed]
                 logger.debug(
-                    "Score matrix: analyzing cell %da-%da (%d/%d)",
-                    p_away, o_away, completed + 1, total
+                    "Score matrix: analyzing %s (%d/%d)", labels[completed], completed + 1, total
                 )
             if progress_callback and completed < total:
-                p_away, o_away = coord_list[completed]
                 progress_callback(
-                    f"Analyzing score {p_away}a-{o_away}a ({completed + 1}/{total})..."
+                    f"Analyzing {labels[completed]} ({completed + 1}/{total})..."
                 )
 
         analysis_results = analyzer.analyze_positions_parallel(
@@ -324,85 +371,89 @@ def generate_score_matrix(
             if cancellation_callback and cancellation_callback():
                 raise InterruptedError("Score matrix generation cancelled by user")
 
-            p_away, o_away = coord_list[idx]
             logger.debug(
-                "Score matrix: analyzing cell %da-%da (%d/%d)",
-                p_away, o_away, idx + 1, total_cells
+                "Score matrix: analyzing %s (%d/%d)", labels[idx], idx + 1, len(position_ids)
             )
             if progress_callback:
                 progress_callback(
-                    f"Analyzing score {p_away}a-{o_away}a ({idx + 1}/{total_cells})..."
+                    f"Analyzing {labels[idx]} ({idx + 1}/{len(position_ids)})..."
                 )
             analysis_results.append(analyzer.analyze_position(pos_id))
 
-    # Process results and build matrix
     matrix = []
     result_idx = 0
 
     for player_away in range(min_away, match_length + 1):
         row = []
         for opponent_away in range(min_away, match_length + 1):
-            # Get analysis result
-            output, decision_type = analysis_results[result_idx]
+            output, _ = analysis_results[result_idx]
+            row.append(_parse_cell(analyzer, output, player_away, opponent_away, labels[result_idx]))
             result_idx += 1
-
-            # Parse cube decision
-            moves = analyzer.parse_cube_decision(output)
-
-            if not moves:
-                raise ValueError(
-                    f"Could not parse cube decision at score {player_away}a-{opponent_away}a"
-                )
-
-            # Build equity map
-            equity_map = {m.notation: m.equity for m in moves}
-
-            # Find best move
-            best_move = next((m for m in moves if m.rank == 1), None)
-            if not best_move:
-                raise ValueError(
-                    f"Could not determine best cube action at score {player_away}a-{opponent_away}a"
-                )
-
-            # Get equities for the 3 main actions
-            no_double_eq = equity_map.get("No Double/Take", None)
-            double_take_eq = equity_map.get("Double/Take", equity_map.get("Redouble/Take", None))
-            double_pass_eq = equity_map.get("Double/Pass", equity_map.get("Redouble/Pass", None))
-
-            # Simplify best action notation
-            best_action_simplified = BackgammonAnalyzer.simplify_cube_notation(best_move.notation)
-
-            # Calculate errors for wrong decisions
-            best_equity = best_move.equity
-            error_no_double = None
-            error_double = None
-            error_pass = None
-
-            if no_double_eq is not None:
-                error_no_double = abs(best_equity - no_double_eq) if best_action_simplified != "N/T" else 0.0
-            if double_take_eq is not None:
-                error_double = abs(best_equity - double_take_eq) if best_action_simplified not in ["D/T", "TG/T"] else 0.0
-            if double_pass_eq is not None:
-                error_pass = abs(best_equity - double_pass_eq) if best_action_simplified != "D/P" else 0.0
-
-            # Create cell
-            cell = ScoreMatrixCell(
-                player_away=player_away,
-                opponent_away=opponent_away,
-                best_action=best_action_simplified,
-                error_no_double=error_no_double,
-                error_double=error_double,
-                error_pass=error_pass,
-                equity_no_double=no_double_eq,
-                equity_double_take=double_take_eq,
-                equity_double_pass=double_pass_eq
-            )
-            row.append(cell)
-
         matrix.append(row)
 
+    unlimited = None
+    if unlimited_variants:
+        try:
+            unlimited = UnlimitedReference(*[
+                _parse_cell(analyzer, output, 0, 0, label)
+                for (output, _), label in zip(analysis_results[total_cells:], labels[total_cells:])
+            ])
+        except ValueError as e:
+            logger.warning("Score matrix: %s for xgid=%r", e, xgid)
+
     logger.info("Score matrix complete: %dx%d (%d cells)", matrix_size, matrix_size, total_cells)
-    return matrix
+    return matrix, unlimited
+
+
+def _parse_cell(
+    analyzer: 'BackgammonAnalyzer',
+    output: str,
+    player_away: int,
+    opponent_away: int,
+    label: str,
+) -> ScoreMatrixCell:
+    """Build one cell from an engine's cube analysis; ValueError if there is none."""
+    from ankigammon.utils.analyzer_base import BackgammonAnalyzer
+
+    moves = analyzer.parse_cube_decision(output)
+    if not moves:
+        raise ValueError(f"Could not parse cube decision at {label}")
+
+    equity_map = {m.notation: m.equity for m in moves}
+
+    best_move = next((m for m in moves if m.rank == 1), None)
+    if not best_move:
+        raise ValueError(f"Could not determine best cube action at {label}")
+
+    no_double_eq = equity_map.get("No Double/Take", None)
+    double_take_eq = equity_map.get("Double/Take", equity_map.get("Redouble/Take", None))
+    double_pass_eq = equity_map.get("Double/Pass", equity_map.get("Redouble/Pass", None))
+
+    best_action_simplified = BackgammonAnalyzer.simplify_cube_notation(best_move.notation)
+
+    best_equity = best_move.equity
+    error_no_double = None
+    error_double = None
+    error_pass = None
+
+    if no_double_eq is not None:
+        error_no_double = abs(best_equity - no_double_eq) if best_action_simplified != "N/T" else 0.0
+    if double_take_eq is not None:
+        error_double = abs(best_equity - double_take_eq) if best_action_simplified not in ["D/T", "TG/T"] else 0.0
+    if double_pass_eq is not None:
+        error_pass = abs(best_equity - double_pass_eq) if best_action_simplified != "D/P" else 0.0
+
+    return ScoreMatrixCell(
+        player_away=player_away,
+        opponent_away=opponent_away,
+        best_action=best_action_simplified,
+        error_no_double=error_no_double,
+        error_double=error_double,
+        error_pass=error_pass,
+        equity_no_double=no_double_eq,
+        equity_double_take=double_take_eq,
+        equity_double_pass=double_pass_eq
+    )
 
 
 def format_matrix_as_html(
@@ -414,6 +465,7 @@ def format_matrix_as_html(
     cube_owner: Optional['CubeState'] = None,
     analysis_label: Optional[str] = None,
     caption: Optional[str] = None,
+    unlimited: Optional[UnlimitedReference] = None,
 ) -> str:
     """
     Format score matrix as HTML table.
@@ -429,6 +481,9 @@ def format_matrix_as_html(
         analysis_label: Display label for analysis depth (e.g., "2-ply" or "World Class")
         caption: Optional note rendered below the matrix (e.g., to warn the
             reader when the live current score falls outside the displayed range).
+        unlimited: The same decision as an unlimited game, rendered as a table
+            under the matrix. With a Jacoby cell, a label on the row switches
+            between the two.
 
     Returns:
         HTML string with styled table. Cells carry the error pair and, when
@@ -442,9 +497,12 @@ def format_matrix_as_html(
 
     # The equity view (and its toggle) is only offered when every displayed
     # value would be real; a partly-populated matrix would flip to dashes.
+    cells = [cell for row in matrix for cell in row]
+    if unlimited is not None:
+        cells += [cell for cell in (unlimited.no_jacoby, unlimited.jacoby) if cell is not None]
     has_equities = all(
         cell.equity_no_double is not None and cell.equity_double_take is not None
-        for row in matrix for cell in row
+        for cell in cells
     )
 
     # Import CubeState for comparison
@@ -501,23 +559,7 @@ def format_matrix_as_html(
                 current_opponent_away == opponent_away
             )
 
-            action_class = _get_action_css_class(cell.best_action)
-            current_class = " current-score" if is_current else ""
-            low_error_class = " low-error" if cell.has_low_errors() else ""
-            formatted_errors = cell.format_errors()
-
-            # Show only em dash when no alternatives available
-            if formatted_errors == "—":
-                html += f'<td class="action-no-alternatives{current_class}">'
-                html += f'<div class="action">—</div>'
-                html += '</td>'
-            else:
-                html += f'<td class="{action_class}{current_class}{low_error_class}">'
-                html += f'<div class="action">{cell.best_action}</div>'
-                html += f'<div class="errors">{formatted_errors}</div>'
-                if has_equities:
-                    html += f'<div class="equities">{cell.format_equities()}</div>'
-                html += '</td>'
+            html += _format_cell_html(cell, has_equities, is_current)
 
         html += '</tr>\n'
 
@@ -528,9 +570,47 @@ def format_matrix_as_html(
             f'style="font-size: 12px; color: #a6adc8; margin: 6px 0 0;">'
             f'{caption}</p>\n'
         )
+    if unlimited is not None:
+        html += '<table class="score-matrix-table score-matrix-unlimited"><tr>'
+        html += '<th title="No beavers">Unlimited'
+        if unlimited.jacoby is not None:
+            html += (
+                '<div class="unlimited-jacoby-toggle">'
+                '<span class="mj-off">no Jacoby</span>'
+                '<span class="mj-sep"> · </span>'
+                '<span class="mj-on">Jacoby</span>'
+                '</div>'
+            )
+        html += '</th>'
+        html += _format_cell_html(unlimited.no_jacoby, has_equities, extra_class="unlimited-no-jacoby")
+        if unlimited.jacoby is not None:
+            html += _format_cell_html(unlimited.jacoby, has_equities, extra_class="unlimited-jacoby")
+        html += '</tr></table>\n'
     html += '</div>\n'
 
     return html
+
+
+def _format_cell_html(
+    cell: ScoreMatrixCell, has_equities: bool, is_current: bool = False, extra_class: str = ""
+) -> str:
+    """Render one matrix cell as a <td>."""
+    current_class = " current-score" if is_current else ""
+    extra = f" {extra_class}" if extra_class else ""
+    formatted_errors = cell.format_errors()
+
+    # Show only em dash when no alternatives available
+    if formatted_errors == "—":
+        return f'<td class="action-no-alternatives{current_class}{extra}"><div class="action">—</div></td>'
+
+    action_class = _get_action_css_class(cell.best_action)
+    low_error_class = " low-error" if cell.has_low_errors() else ""
+    html = f'<td class="{action_class}{current_class}{low_error_class}{extra}">'
+    html += f'<div class="action">{cell.best_action}</div>'
+    html += f'<div class="errors">{formatted_errors}</div>'
+    if has_equities:
+        html += f'<div class="equities">{cell.format_equities()}</div>'
+    return html + '</td>'
 
 
 def _get_action_css_class(action: str) -> str:

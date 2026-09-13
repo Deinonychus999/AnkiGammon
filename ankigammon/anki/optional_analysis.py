@@ -6,7 +6,9 @@ whether a block is absent by choice or by failure. The two matrices are
 identified by their table class. The cube-position comparison is omitted by
 design when the best move is the same at every cube position, so it carries
 a marker for that case and another for failure; a card with neither predates
-the markers and is left alone.
+the markers and is left alone. The unlimited reference inside a match card's
+score matrix carries a failure marker for the same reason, since cards made
+before it existed lack it too.
 """
 
 from typing import List, Optional
@@ -16,11 +18,16 @@ MOVE_MATRIX_MARKER = "move-score-matrix-table"
 CUBE_COMPARISON_MARKER = "cube-matrix-details"
 CUBE_COMPARISON_SAME_MARKER = "<!-- cube-comparison: same -->"
 CUBE_COMPARISON_FAILED_MARKER = "<!-- cube-comparison: failed -->"
+# The whole class attribute: the Jacoby switch script names the class on its
+# own, and ships on cards that have no unlimited row.
+UNLIMITED_REFERENCE_MARKER = 'class="score-matrix-table score-matrix-unlimited"'
+UNLIMITED_REFERENCE_FAILED_MARKER = "<!-- unlimited-reference: failed -->"
 
 OPTIONAL_BLOCK_MARKERS = {
     CUBE_MATRIX_MARKER: "score matrix",
     MOVE_MATRIX_MARKER: "move score matrix",
     CUBE_COMPARISON_MARKER: "cube-position comparison",
+    UNLIMITED_REFERENCE_MARKER: "unlimited reference",
 }
 
 
@@ -41,8 +48,8 @@ def missing_optional_blocks(
     """Blocks the settings call for that the card does not have.
 
     A 1-point match has a dead cube, so nothing can be built for it and it is
-    never reported. The cube-position comparison is reported only when the
-    card itself says it failed.
+    never reported. The cube-position comparison and the unlimited reference are
+    reported only when the card itself says they failed.
     """
     if match_length == 1:
         return []
@@ -50,6 +57,8 @@ def missing_optional_blocks(
     if is_cube:
         if settings.generate_score_matrix and CUBE_MATRIX_MARKER not in back_html:
             missing.append(OPTIONAL_BLOCK_MARKERS[CUBE_MATRIX_MARKER])
+        if settings.generate_score_matrix and UNLIMITED_REFERENCE_FAILED_MARKER in back_html:
+            missing.append(OPTIONAL_BLOCK_MARKERS[UNLIMITED_REFERENCE_MARKER])
         return missing
     if settings.generate_move_score_matrix and MOVE_MATRIX_MARKER not in back_html:
         missing.append(OPTIONAL_BLOCK_MARKERS[MOVE_MATRIX_MARKER])

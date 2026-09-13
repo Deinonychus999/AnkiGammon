@@ -3,9 +3,10 @@
 Covers:
 - `resolve_effective_match_length`: the rule that turns the source match
   length and the user's `score_matrix_max_size` setting into the matrix's
-  effective dimensions. Feeds three call sites (`card_generator`,
-  `export_dialog` x2); a regression here silently produces wrong-sized
-  matrices or skewed progress-bar steps.
+  effective dimensions. Feeds `card_generator` and, through
+  `count_score_matrix_analyses`, both `export_dialog` progress bars; a
+  regression here silently produces wrong-sized matrices or skewed
+  progress-bar steps.
 - `format_matrix_as_html`'s caption rendering: surfaces a note when the
   user's live current score falls outside the (possibly capped) matrix —
   important UX safeguard against silently misleading a card reader.

@@ -79,7 +79,7 @@ def generate_move_score_matrix(
     Generate move score matrix for checker play decisions.
 
     Analyzes the position at 4 key score types:
-    - Neutral: Money game (match_length=0)
+    - Neutral: 0-0 to 7
     - DMP: 0-0 to 1 (Double Match Point)
     - Gammon-Save: 2-1 to 3 Crawford (player ahead, needs to save gammons)
     - Gammon-Go: 1-2 to 3 Crawford (player behind, wants gammons)
@@ -236,7 +236,7 @@ def format_move_matrix_as_html(
     Layout (4 columns x 3 rows):
     +----------+----------+----------+----------+
     | Neutral  |   DMP    | G-Save   |  G-Go    |
-    | (Money)  | (0-0/1)  | (2-1/3C) | (1-2/3C) |
+    | (0-0/7)  | (0-0/1)  | (2-1/3C) | (1-2/3C) |
     +----------+----------+----------+----------+
     | Move1    | Move1    | Move1    | Move1    | <- Rank 1 (highlighted)
     | +0.000   | +0.000   | +0.000   | +0.000   |

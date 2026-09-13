@@ -10,10 +10,10 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, QThread, Signal, Slot
 
-from ankigammon.models import Decision
+from ankigammon.models import CubeState, Decision
 from ankigammon.anki.ankiconnect import AnkiConnect
 from ankigammon.anki.apkg_exporter import ApkgExporter, StableNote, _deterministic_id
-from ankigammon.analysis.score_matrix import resolve_effective_match_length
+from ankigammon.analysis.score_matrix import count_score_matrix_analyses
 from ankigammon.anki.card_generator import CardGenerator
 from ankigammon.anki.deck_utils import find_duplicate_xgids
 from ankigammon.gui import silent_messagebox
@@ -320,11 +320,11 @@ class ExportWorker(QThread):
                     not decision.crawford and
                     decision.match_length != 1
                 )
-                cube_effective_ml = resolve_effective_match_length(
+                cube_matrix_steps = count_score_matrix_analyses(
                     decision.match_length,
                     self.settings.get('score_matrix_max_size', 0),
+                    decision.cube_owner == CubeState.CENTERED,
                 ) if has_cube_score_matrix else 0
-                cube_matrix_steps = (cube_effective_ml - 1) ** 2 if cube_effective_ml >= 2 else 0
                 move_matrix_steps = 4 if has_move_score_matrix else 0
                 cube_variant_steps = 3 if has_move_cube_matrix else 0
                 total_substeps = max(1, cube_matrix_steps + move_matrix_steps + cube_variant_steps)
@@ -486,11 +486,11 @@ class ExportWorker(QThread):
                         not decision.crawford and
                         decision.match_length != 1
                     )
-                    cube_effective_ml = resolve_effective_match_length(
+                    cube_matrix_steps = count_score_matrix_analyses(
                         decision.match_length,
                         self.settings.get('score_matrix_max_size', 0),
+                        decision.cube_owner == CubeState.CENTERED,
                     ) if has_cube_score_matrix else 0
-                    cube_matrix_steps = (cube_effective_ml - 1) ** 2 if cube_effective_ml >= 2 else 0
                     move_matrix_steps = 4 if has_move_score_matrix else 0  # 4 score types analyzed
                     cube_variant_steps = 3 if has_move_cube_matrix else 0  # 3 cube positions analyzed
                     total_substeps = max(1, cube_matrix_steps + move_matrix_steps + cube_variant_steps)
