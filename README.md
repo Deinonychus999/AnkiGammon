@@ -105,6 +105,8 @@ ankigammon  # Launches the GUI
 - **Ctrl+E** - Export cards
 - **Ctrl+,** - Settings
 - **Ctrl+Shift+D** - Sync decks from Anki
+- **Ctrl+Shift+O** - Open collection
+- **Ctrl+Shift+S** - Save collection
 - **Ctrl+Q** - Quit
 - **Delete/Backspace** - Remove selected positions
 
@@ -185,6 +187,32 @@ Both export methods support updating existing cards when you change settings (co
 - Cards are matched by their XGID position identifier
 - Re-exporting updates the card content while preserving your Anki review history
 - Useful for applying new color schemes or enabling features like move score matrices
+
+### Collection Files
+
+AnkiGammon remembers which file you imported into which deck, and the import filters you used (error thresholds, which player's mistakes). **File → Save Collection As...** (Ctrl+Shift+S) writes that list to a `.json` collection file.
+
+To rebuild your cards later, for a new AnkiGammon version, new settings, or after new rollouts in XG, use **File → Open Collection...** (Ctrl+Shift+O). Every file is imported again into its deck without prompts. Then export to Anki: existing cards are updated in place and keep their review history.
+
+- XG files (.xg, .xgp) keep the analysis and rollouts saved in them. Match files (.mat, .sgf) are analyzed again by the engine.
+- Files stored next to or below the collection file are saved with relative paths, so you can move the folder as a whole.
+- Moving or deleting single positions isn't recorded. Opening the collection re-imports whole files with their filters.
+- The file is plain JSON and can be edited by hand. A deck's entry can be a list of paths, and `players` and the thresholds are optional (they default to both players and your current import settings):
+
+```json
+{
+  "format": "ankigammon-collection",
+  "version": 1,
+  "decks": {
+    "AnkiGammon::Openings": ["matches/club-night.xg", "positions/opening.xgp"],
+    "AnkiGammon::Tournament": [
+      {"path": "D:/Backgammon/final.xg", "checker_threshold": 0.05, "cube_threshold": 0.08, "players": ["Frank"]}
+    ]
+  }
+}
+```
+
+The **Re-render cards only** mode of File → Regenerate Cards in Anki also keeps rollouts, because it reuses the analysis stored in each card. Use a collection when you want to pick up new analysis from your source files.
 
 ## Card Format
 

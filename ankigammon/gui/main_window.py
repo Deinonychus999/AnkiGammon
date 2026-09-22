@@ -11,11 +11,21 @@ from PySide6.QtGui import QAction, QKeySequence, QDesktopServices
 from PySide6.QtWebEngineWidgets import QWebEngineView
 import qtawesome as qta
 import base64
+import os
 import subprocess
 import sys
+from dataclasses import dataclass
+from pathlib import Path
 from typing import List, Optional, Tuple
 
 from ankigammon import __version__
+from ankigammon.collection import (
+    CollectionSource,
+    load_collection,
+    save_collection,
+    sources_from_dict,
+    sources_to_dict,
+)
 from ankigammon.settings import Settings
 from ankigammon.renderer.svg_board_renderer import SVGBoardRenderer
 from ankigammon.renderer.color_schemes import get_scheme
@@ -152,6 +162,16 @@ class MatchAnalysisWorker(QThread):
                 self._analyzer = None
 
 
+@dataclass
+class _QueuedImport:
+    """A file waiting to be imported. A collection entry carries its own deck
+    and filter options, so it imports without asking."""
+
+    path: str
+    deck: Optional[str] = None
+    options: Optional[dict] = None
+
+
 class MainWindow(QMainWindow):
     """Main application window for AnkiGammon."""
 
@@ -166,6 +186,13 @@ class MainWindow(QMainWindow):
         for deck_name in settings.saved_deck_names:
             if deck_name != settings.deck_name:
                 self.deck_manager.create_deck(deck_name)
+        try:
+            self.deck_manager.set_sources(sources_from_dict(settings.collection_sources))
+        except ValueError:
+            import logging
+            logging.getLogger(__name__).warning(
+                "Ignoring unreadable collection_sources in config", exc_info=True
+            )
         scheme = get_scheme(settings.color_scheme)
         if settings.swap_checker_colors:
             scheme = scheme.with_swapped_checkers()
@@ -175,7 +202,7 @@ class MainWindow(QMainWindow):
         )
         self.color_scheme_actions = {}  # Store references to color scheme menu actions
         self._gnubg_check_shown = False  # Track if we've shown GnuBG config dialog in current import batch
-        self._import_queue = []  # Queue for sequential file imports
+        self._import_queue: List[_QueuedImport] = []
         self._import_in_progress = False  # Track if an import is currently being processed
         self._batch_import_results = []  # Accumulate results from batch imports (for combined success message)
         self._in_batch_import = False  # Flag to track whether we are in a multi-file batch import
@@ -503,6 +530,18 @@ class MainWindow(QMainWindow):
 
         file_menu.addSeparator()
 
+        act_open_collection = QAction("Open &Collection...", self)
+        act_open_collection.setShortcut("Ctrl+Shift+O")
+        act_open_collection.triggered.connect(self.on_open_collection_clicked)
+        file_menu.addAction(act_open_collection)
+
+        act_save_collection = QAction("&Save Collection As...", self)
+        act_save_collection.setShortcut("Ctrl+Shift+S")
+        act_save_collection.triggered.connect(self.on_save_collection_clicked)
+        file_menu.addAction(act_save_collection)
+
+        file_menu.addSeparator()
+
         act_export = QAction("&Export to Anki...", self)
         act_export.setShortcut("Ctrl+E")
         act_export.triggered.connect(self.on_export_clicked)
@@ -602,6 +641,10 @@ class MainWindow(QMainWindow):
     def _on_deck_structure_changed(self):
         """Handle deck create/rename/delete — save deck names to settings."""
         self.settings.saved_deck_names = self.deck_manager.get_deck_names()
+        self._persist_collection_sources()
+
+    def _persist_collection_sources(self):
+        self.settings.collection_sources = sources_to_dict(self.deck_manager.get_sources())
 
     # -- Anki deck sync --
 
@@ -1304,6 +1347,72 @@ class MainWindow(QMainWindow):
         p2_match = bool(p2) and p2 in selected_lower
         return p2_match, p1_match
 
+    def _filter_from_options(
+        self,
+        file_path: str,
+        player1_name: Optional[str],
+        player2_name: Optional[str],
+        opts: dict
+    ) -> Optional[Tuple[float, float, bool, bool]]:
+        """
+        Resolve (checker_threshold, cube_threshold, include_player_x,
+        include_player_o) from preset batch or collection options.
+
+        selected_player_names of None keeps both players. Returns None, and
+        records the file as skipped, when neither of the file's players is
+        selected.
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+
+        names = opts['selected_player_names']
+        if names is None:
+            include_player_x = include_player_o = True
+        else:
+            include_player_x, include_player_o = self._resolve_player_flags(
+                player1_name, player2_name, names
+            )
+
+        if not (include_player_x or include_player_o):
+            reason = (
+                opts.get('unselected_reason', "neither player was selected in the batch dialog")
+                if (player1_name or player2_name)
+                else "could not extract player names"
+            )
+            logger.info(
+                f"Skipping {file_path}: {reason}. "
+                f"File players: {player1_name!r}, {player2_name!r}; "
+                f"selected: {names!r}"
+            )
+            self._batch_skipped_files.append((file_path, reason))
+            return None
+
+        return opts['checker_threshold'], opts['cube_threshold'], include_player_x, include_player_o
+
+    @staticmethod
+    def _source_for(
+        file_path: str,
+        filter_used: Optional[Tuple[float, float, bool, bool]],
+        player1_name: Optional[str] = None,
+        player2_name: Optional[str] = None
+    ) -> CollectionSource:
+        """Describe an import so opening the collection can repeat it."""
+        path = os.path.abspath(file_path)
+        if filter_used is None:
+            return CollectionSource(path=path)
+        checker_threshold, cube_threshold, include_player_x, include_player_o = filter_used
+        players = None
+        if not (include_player_x and include_player_o):
+            # Player.X is the file's player 2, Player.O its player 1
+            chosen = player2_name if include_player_x else player1_name
+            players = [chosen] if chosen else []
+        return CollectionSource(
+            path=path,
+            checker_threshold=checker_threshold,
+            cube_threshold=cube_threshold,
+            players=players,
+        )
+
     def _filter_decisions_by_import_options(
         self,
         decisions: list[Decision],
@@ -1439,7 +1548,7 @@ class MainWindow(QMainWindow):
 
         return filtered
 
-    def _import_match_file(self, file_path: str) -> Tuple[List[Decision], int]:
+    def _import_match_file(self, file_path: str, options: Optional[dict] = None):
         """
         Import match file with analysis via GnuBG.
 
@@ -1447,9 +1556,11 @@ class MainWindow(QMainWindow):
 
         Args:
             file_path: Path to match file (.mat or .sgf)
+            options: Preset filter options; asks the user when None
 
         Returns:
-            Tuple of (filtered_decisions, total_count) or (None, None) if cancelled/failed
+            Tuple of (filtered_decisions, total_count, collection_source), or
+            (None, None, None) if cancelled/failed
         """
         from PySide6.QtWidgets import QMessageBox, QProgressDialog
         from PySide6.QtCore import Qt
@@ -1480,7 +1591,7 @@ class MainWindow(QMainWindow):
                 )
                 if result == QMessageBox.StandardButton.Yes:
                     self.on_settings_clicked()
-            return None, None
+            return None, None, None
 
         # Extract player names based on file type
         from ankigammon.parsers.gnubg_match_parser import GNUBGMatchParser
@@ -1495,28 +1606,13 @@ class MainWindow(QMainWindow):
             # Extract from .mat file
             player1_name, player2_name = GNUBGMatchParser.extract_player_names_from_mat(file_path)
 
-        # Resolve filter options from batch state or by showing the dialog
-        if self._batch_import_options is not None:
-            opts = self._batch_import_options
-            checker_threshold = opts['checker_threshold']
-            cube_threshold = opts['cube_threshold']
-            include_player_x, include_player_o = self._resolve_player_flags(
-                player1_name, player2_name, opts['selected_player_names']
-            )
-            if not (include_player_x or include_player_o):
-                reason = (
-                    "neither player was selected in the batch dialog"
-                    if (player1_name or player2_name)
-                    else "could not extract player names"
-                )
-                logger.info(
-                    f"Skipping {file_path}: {reason}. "
-                    f"File players: {player1_name!r}, {player2_name!r}; "
-                    f"selected: {opts['selected_player_names']!r}"
-                )
-                self._batch_skipped_files.append((file_path, reason))
+        # Resolve filter options from preset options or by showing the dialog
+        if options is not None:
+            filter_used = self._filter_from_options(file_path, player1_name, player2_name, options)
+            if filter_used is None:
                 # None signals to the caller: don't add to deck, don't count in batch totals
-                return None, None
+                return None, None, None
+            checker_threshold, cube_threshold, include_player_x, include_player_o = filter_used
         else:
             # Single-file import: per-file dialog
             import_dialog = ImportOptionsDialog(
@@ -1528,9 +1624,10 @@ class MainWindow(QMainWindow):
 
             if not import_dialog.exec():
                 # User cancelled
-                return None, None
+                return None, None, None
 
             checker_threshold, cube_threshold, include_player_x, include_player_o = import_dialog.get_options()
+            filter_used = (checker_threshold, cube_threshold, include_player_x, include_player_o)
 
         # Create progress dialog with spinner
         progress = QProgressDialog(
@@ -1583,10 +1680,14 @@ class MainWindow(QMainWindow):
             # Wait for worker to finish cleanup
             if hasattr(self, '_analysis_worker'):
                 self._analysis_worker.wait(2000)
-            return None, None
+            return None, None, None
 
-        # Return results
-        return self._analysis_results
+        decisions, total_count = self._analysis_results
+        if decisions is None:
+            return None, None, None
+        return decisions, total_count, self._source_for(
+            file_path, filter_used, player1_name, player2_name
+        )
 
     @Slot(bool, str, list, int, object)
     def _on_analysis_finished(self, success: bool, message: str,
@@ -1618,6 +1719,133 @@ class MainWindow(QMainWindow):
             self._analysis_worker.deleteLater()
             del self._analysis_worker
 
+    def _collection_dialog_start(self) -> str:
+        last = self.settings.last_collection_path
+        if last:
+            return last
+        return str(Path.home() / "AnkiGammon Collection.json")
+
+    @Slot()
+    def on_open_collection_clicked(self):
+        """Re-import every file of a collection into its deck, without prompts."""
+        from PySide6.QtWidgets import QFileDialog
+
+        if self._import_in_progress or self._import_queue:
+            silent_messagebox.information(
+                self, "Import in Progress",
+                "Wait for the current import to finish before opening a collection."
+            )
+            return
+
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Open Collection",
+            self._collection_dialog_start(),
+            "AnkiGammon Collection (*.json);;All Files (*)"
+        )
+        if not path:
+            return
+
+        try:
+            sources = load_collection(path)
+        except (OSError, ValueError) as e:
+            silent_messagebox.critical(
+                self, "Open Collection Failed",
+                f"Could not read {Path(path).name}:\n\n{e}"
+            )
+            return
+
+        entries = [(deck, s) for deck, deck_sources in sources.items() for s in deck_sources]
+        if not entries:
+            silent_messagebox.information(
+                self, "Empty Collection", f"{Path(path).name} lists no files."
+            )
+            return
+
+        missing = [s.path for _, s in entries if not os.path.isfile(s.path)]
+        lines = [f"Import {len(entries)} file(s) into {len(sources)} deck(s)?"]
+        if missing:
+            lines.append(f"\n{len(missing)} file(s) could not be found and will be skipped.")
+        lines.append(
+            "\nMatch files (.mat, .sgf) are analyzed again by the engine; XG files "
+            "keep the analysis and rollouts saved in them.\n\n"
+            "Afterwards, export to Anki to update your existing cards."
+        )
+        reply = silent_messagebox.question(
+            self, "Open Collection", "\n".join(lines),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+
+        self.settings.last_collection_path = path
+        # The opened collection becomes what Save Collection writes, including
+        # entries whose files are missing right now.
+        self.deck_manager.set_sources(sources)
+        self.deck_tree.rebuild_tree()
+        self._on_deck_structure_changed()
+
+        self._gnubg_check_shown = False
+        self._in_batch_import = True
+        for deck, source in entries:
+            if source.path in missing:
+                self._batch_skipped_files.append((source.path, "file not found"))
+                continue
+            options = {
+                'checker_threshold': (
+                    source.checker_threshold if source.checker_threshold is not None
+                    else self.settings.import_checker_error_threshold
+                ),
+                'cube_threshold': (
+                    source.cube_threshold if source.cube_threshold is not None
+                    else self.settings.import_cube_error_threshold
+                ),
+                'selected_player_names': source.players,
+                'unselected_reason': "neither player is listed in the collection",
+            }
+            self._import_queue.append(_QueuedImport(source.path, deck.strip(), options))
+        self._process_import_queue()
+
+    @Slot()
+    def on_save_collection_clicked(self):
+        """Save which files were imported into which deck."""
+        from PySide6.QtWidgets import QFileDialog
+
+        sources = self.deck_manager.get_sources()
+        if not sources:
+            silent_messagebox.information(
+                self, "Nothing to Save",
+                "No files have been imported into your decks yet.\n\n"
+                "Import files into decks first; AnkiGammon remembers which file "
+                "went into which deck, and saves that as a collection."
+            )
+            return
+
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save Collection",
+            self._collection_dialog_start(),
+            "AnkiGammon Collection (*.json)"
+        )
+        if not path:
+            return
+
+        try:
+            save_collection(path, sources)
+        except OSError as e:
+            silent_messagebox.critical(
+                self, "Save Collection Failed", f"Could not save the collection:\n\n{e}"
+            )
+            return
+
+        self.settings.last_collection_path = path
+        file_count = sum(len(entries) for entries in sources.values())
+        silent_messagebox.information(
+            self, "Collection Saved",
+            f"Saved {file_count} file(s) in {len(sources)} deck(s) to:\n{path}"
+        )
+
     @Slot()
     def on_import_file_clicked(self):
         """Handle import file menu action."""
@@ -1648,7 +1876,7 @@ class MainWindow(QMainWindow):
                 return
 
         # Add to import queue and start processing
-        self._import_queue.extend(file_paths)
+        self._import_queue.extend(_QueuedImport(p) for p in file_paths)
         self._process_import_queue()
 
     def dragEnterEvent(self, event):
@@ -1777,7 +2005,7 @@ class MainWindow(QMainWindow):
                 return
 
         # Add files to import queue
-        self._import_queue.extend(file_paths)
+        self._import_queue.extend(_QueuedImport(p) for p in file_paths)
 
         # Start processing the queue
         self._process_import_queue()
@@ -1809,14 +2037,13 @@ class MainWindow(QMainWindow):
         # Mark as in progress
         self._import_in_progress = True
 
-        # Get next file from queue
-        file_path = self._import_queue.pop(0)
+        item = self._import_queue.pop(0)
 
         # Use QTimer to defer processing to avoid blocking the UI
         # This also ensures the dialog from the previous import has fully closed
         def process_file():
             try:
-                self._import_file(file_path)
+                self._import_file(item.path, item.deck, item.options)
             finally:
                 # Mark as not in progress and process next file
                 self._import_in_progress = False
@@ -1859,11 +2086,20 @@ class MainWindow(QMainWindow):
             "\n".join(lines)
         )
 
-    def _import_file(self, file_path: str):
+    def _import_file(
+        self,
+        file_path: str,
+        target_deck: Optional[str] = None,
+        options: Optional[dict] = None
+    ):
         """
         Import a file at the given path.
         This is a helper method that can be called from both the menu action
         and the drag-and-drop handler.
+
+        target_deck and options come from a collection entry; without them the
+        file goes to the drop target or active deck, filtered with the batch
+        options or the per-file dialog.
         """
         from ankigammon.gui.format_detector import FormatDetector, InputFormat
         from ankigammon.parsers.xg_binary_parser import XGBinaryParser
@@ -1882,9 +2118,13 @@ class MainWindow(QMainWindow):
 
             logger.info(f"Detected format: {result.format}, count: {result.count}")
 
+            if options is None:
+                options = self._batch_import_options
+
             # Parse based on format
             decisions = []
             total_count = 0  # Track total before filtering (for XG binary)
+            source = self._source_for(file_path, None)
 
             if result.format == InputFormat.XG_BINARY:
                 # Check if this is a position file (.xgp) or match file (.xg)
@@ -1900,28 +2140,13 @@ class MainWindow(QMainWindow):
                     # Extract player names from XG file
                     player1_name, player2_name = XGBinaryParser.extract_player_names(file_path)
 
-                    if self._batch_import_options is not None:
-                        # Reuse the options the user set earlier in the batch
-                        opts = self._batch_import_options
-                        checker_threshold = opts['checker_threshold']
-                        cube_threshold = opts['cube_threshold']
-                        include_player_x, include_player_o = self._resolve_player_flags(
-                            player1_name, player2_name, opts['selected_player_names']
+                    if options is not None:
+                        filter_used = self._filter_from_options(
+                            file_path, player1_name, player2_name, options
                         )
-
-                        if not (include_player_x or include_player_o):
-                            reason = (
-                                "neither player was selected in the batch dialog"
-                                if (player1_name or player2_name)
-                                else "could not extract player names"
-                            )
-                            logger.info(
-                                f"Skipping {file_path}: {reason}. "
-                                f"File players: {player1_name!r}, {player2_name!r}; "
-                                f"selected: {opts['selected_player_names']!r}"
-                            )
-                            self._batch_skipped_files.append((file_path, reason))
+                        if filter_used is None:
                             return
+                        checker_threshold, cube_threshold, include_player_x, include_player_o = filter_used
                         all_decisions = XGBinaryParser.parse_file(file_path)
                         total_count = len(all_decisions)
                         decisions = self._filter_decisions_by_import_options(
@@ -1931,7 +2156,7 @@ class MainWindow(QMainWindow):
                             include_player_x,
                             include_player_o
                         )
-                        logger.info(f"Filtered {len(decisions)} positions from {total_count} total (batch options)")
+                        logger.info(f"Filtered {len(decisions)} positions from {total_count} total (preset options)")
                     else:
                         # Single-file import: per-file dialog
                         import_dialog = ImportOptionsDialog(
@@ -1941,7 +2166,8 @@ class MainWindow(QMainWindow):
                             parent=self
                         )
                         if import_dialog.exec():
-                            checker_threshold, cube_threshold, include_player_x, include_player_o = import_dialog.get_options()
+                            filter_used = import_dialog.get_options()
+                            checker_threshold, cube_threshold, include_player_x, include_player_o = filter_used
                             all_decisions = XGBinaryParser.parse_file(file_path)
                             total_count = len(all_decisions)
                             decisions = self._filter_decisions_by_import_options(
@@ -1955,6 +2181,7 @@ class MainWindow(QMainWindow):
                         else:
                             # User cancelled
                             return
+                    source = self._source_for(file_path, filter_used, player1_name, player2_name)
 
             elif result.format == InputFormat.MATCH_FILE or result.format == InputFormat.SGF_FILE:
                 # Check if this is an SGF position file (vs a match file)
@@ -2083,7 +2310,7 @@ class MainWindow(QMainWindow):
                         return
                 else:
                     # Import match file with analysis
-                    decisions, total_count = self._import_match_file(file_path)
+                    decisions, total_count, source = self._import_match_file(file_path, options)
                     if decisions is None:
                         # User cancelled or error occurred
                         return
@@ -2092,22 +2319,33 @@ class MainWindow(QMainWindow):
                 silent_messagebox.warning(
                     self,
                     "Unknown Format",
-                    f"Could not detect file format.\n\nSupported formats:\n- XG files (.xg, .xgp)\n- Match files (.mat, .sgf)\n\n{result.details}"
+                    "Could not detect file format.\n\n"
+                    "Supported formats:\n"
+                    "- XG files (.xg, .xgp)\n"
+                    "- Match files (.mat, .txt)\n"
+                    "- SGF files (.sgf)\n"
+                    "- Text with XGID/OGID/GNUID position IDs or XG analysis\n\n"
+                    f"{result.details}"
                 )
                 return
 
-            # Add to target deck (from tree drop) or currently active deck
-            if self._import_target_deck:
-                active_deck = self._import_target_deck
-            else:
-                active_deck = self.deck_tree.get_active_deck_name()
+            # Add to the collection entry's deck, the drop target, or the active deck
+            target_deck = target_deck or self._import_target_deck
+            active_deck = target_deck or self.deck_tree.get_active_deck_name()
+            if not self.deck_manager.has_deck(active_deck):
+                active_deck = self.deck_manager.default_deck_name
+            for decision in decisions:
+                if decision.source_file is None:
+                    decision.source_file = source.path
             self.deck_manager.add_decisions(decisions, active_deck)
+            self.deck_manager.record_source(active_deck, source)
+            self._persist_collection_sources()
             self.deck_tree.rebuild_tree()
             # Capture before deck selection below replaces the current item
             had_selection = self.deck_tree.get_selected_decision() is not None
             # Expand and scroll to the target deck so the user sees the result
-            if self._import_target_deck:
-                self.deck_tree._expand_and_select_deck(self._import_target_deck)
+            if target_deck:
+                self.deck_tree._expand_and_select_deck(active_deck)
             # Auto-display the first imported position if nothing was shown yet
             if decisions and not had_selection:
                 self.deck_tree.select_decision(decisions[0])
@@ -2262,6 +2500,7 @@ class MainWindow(QMainWindow):
 
         # Persist deck names for next session
         self.settings.saved_deck_names = self.deck_manager.get_deck_names()
+        self._persist_collection_sources()
 
         # Stop any background threads before teardown so queued signals
         # cannot fire on receivers that QApplication is about to destroy.

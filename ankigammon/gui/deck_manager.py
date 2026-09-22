@@ -3,6 +3,7 @@
 from collections import OrderedDict
 from typing import Dict, List, Optional, Tuple
 
+from ankigammon.collection import CollectionSource, same_file
 from ankigammon.models import Decision
 
 
@@ -15,12 +16,17 @@ class DeckManager:
 
     Uses object identity (not equality) for decision operations to avoid
     expensive __eq__ on deeply nested dataclass objects.
+
+    Also remembers which source files were imported into each deck, so the
+    whole collection can be saved and rebuilt. Those records outlive the
+    positions: clearing positions after an export keeps them.
     """
 
     def __init__(self, default_deck_name: str):
         self.default_deck_name = default_deck_name
         self._decks: OrderedDict[str, List[Decision]] = OrderedDict()
         self._decks[default_deck_name] = []
+        self._sources: Dict[str, List[CollectionSource]] = {}
 
     # -- Deck operations --
 
@@ -48,6 +54,8 @@ class DeckManager:
             else:
                 new_decks[key] = value
         self._decks = new_decks
+        if old_name in self._sources:
+            self._sources[new_name] = self._sources.pop(old_name)
 
         # Update default name if it was the default deck
         if self.default_deck_name == old_name:
@@ -64,8 +72,11 @@ class DeckManager:
             return False
 
         decisions = self._decks[name]
+        sources = self._sources.pop(name, [])
         if move_to and move_to in self._decks and move_to != name:
             self._decks[move_to].extend(decisions)
+            for source in sources:
+                self.record_source(move_to, source)
 
         del self._decks[name]
 
@@ -204,3 +215,31 @@ class DeckManager:
         """Remove all decisions and all decks except the default."""
         self._decks.clear()
         self._decks[self.default_deck_name] = []
+        self._sources.clear()
+
+    # -- Collection sources --
+
+    def record_source(self, deck_name: str, source: CollectionSource) -> None:
+        """Remember a file imported into a deck; re-importing it replaces the entry."""
+        entries = self._sources.setdefault(deck_name, [])
+        for i, existing in enumerate(entries):
+            if same_file(existing.path, source.path):
+                entries[i] = source
+                return
+        entries.append(source)
+
+    def get_sources(self) -> Dict[str, List[CollectionSource]]:
+        """Recorded files per deck, in deck order, skipping decks without any."""
+        return {
+            name: list(self._sources[name])
+            for name in self._decks
+            if self._sources.get(name)
+        }
+
+    def set_sources(self, sources: Dict[str, List[CollectionSource]]) -> None:
+        """Replace all recorded files, creating any deck that doesn't exist yet."""
+        self.merge_deck_names(list(sources))
+        self._sources = {}
+        for deck_name, entries in sources.items():
+            for source in entries:
+                self.record_source(deck_name.strip(), source)
