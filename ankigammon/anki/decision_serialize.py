@@ -88,6 +88,7 @@ def _build_move(data: dict) -> Move:
         resulting_position=_build_position(rp) if rp else None,
         from_xg_analysis=data.get("from_xg_analysis", True),
         was_played=data.get("was_played", False),
+        analysis_level=data.get("analysis_level"),
         player_win_pct=data.get("player_win_pct"),
         player_gammon_pct=data.get("player_gammon_pct"),
         player_backgammon_pct=data.get("player_backgammon_pct"),

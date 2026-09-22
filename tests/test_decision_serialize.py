@@ -187,6 +187,27 @@ class TestDecisionRoundTrip:
         rebuilt = decision_from_json(decision_to_json(d))
         assert rebuilt.candidate_moves[0].resulting_position is None
 
+    def test_every_move_field_survives_roundtrip(self):
+        """Re-render rebuilds cards from this blob, so a dropped field silently
+        changes the card: losing analysis_level erased the "Rollout" labels."""
+        import dataclasses
+
+        move = _make_move("13/9", rank=2)
+        move.analysis_level = "Rollout"
+        move.from_xg_analysis = False
+        move.was_played = True
+        defaults = Move(notation="", equity=0.0)
+        unset = [
+            f.name for f in dataclasses.fields(Move)
+            if getattr(move, f.name) == getattr(defaults, f.name)
+        ]
+        assert unset == [], f"give these fields a non-default value: {unset}"
+
+        d = _make_decision()
+        d.candidate_moves = [move]
+        rebuilt = decision_from_json(decision_to_json(d)).candidate_moves[0]
+        assert dataclasses.asdict(rebuilt) == dataclasses.asdict(move)
+
     def test_empty_candidate_moves(self):
         d = _make_decision()
         d.candidate_moves = []
