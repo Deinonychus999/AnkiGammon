@@ -94,7 +94,7 @@ ankigammon  # Launches the GUI
    - **Import files**: Press Ctrl+O or drag-and-drop files (.xg, .xgp, .mat, .sgf, .txt)
      - For match files: Choose error threshold and which player's mistakes to import
      - Drop files directly onto a deck in the deck tree to import into that deck
-3. **Organize into decks** - Use the deck tree on the left to create named decks/subdecks and drag positions between them. The tree syncs with Anki via AnkiConnect (automatic on startup, or manually via File → Sync Decks from Anki, Ctrl+Shift+D).
+3. **Organize into decks** - Use the deck tree on the left to create named decks/subdecks and drag positions between them. Decks stay expanded or collapsed as you leave them across imports; use the expand/collapse-all buttons above the tree, or right-click a deck to expand or collapse its subdecks. The tree syncs with Anki via AnkiConnect (automatic on startup, or manually via File → Sync Decks from Anki, Ctrl+Shift+D).
 4. **Configure settings** - Choose color scheme, board orientation, and export method (Ctrl+,)
 5. **Generate cards** - Click "Generate Cards" (Ctrl+E) to create Anki flashcards
 

@@ -146,9 +146,7 @@ class DeckTreeWidget(QTreeWidget):
         Builds hierarchical tree structure from ::-separated deck names.
         Preserves expansion state and tries to re-select the previously selected item.
         """
-        # Remember state before rebuild
-        expanded_decks: set = set()
-        self._collect_expanded_state(expanded_decks)
+        expansion_state = self._collect_expansion_state()
 
         selected_decision = None
         selected_deck = None
@@ -206,17 +204,6 @@ class DeckTreeWidget(QTreeWidget):
                         and deck_name == selected_deck):
                     item_to_select = pos_item
 
-            # Restore expansion state.
-            # Expand if: previously expanded, has positions, or has child subdecks.
-            has_subdecks = any(
-                dn != deck_name and dn.startswith(deck_name + "::")
-                for dn in deck_names
-            )
-            if deck_name in expanded_decks or decisions or has_subdecks:
-                deck_item.setExpanded(True)
-            else:
-                deck_item.setExpanded(False)
-
             # If we had a deck selected, re-select it
             if selected_deck == deck_name and item_to_select is None and selected_decision is None:
                 item_to_select = deck_item
@@ -224,33 +211,74 @@ class DeckTreeWidget(QTreeWidget):
         # Update parent deck icons based on recursive position counts
         self._update_parent_icons()
 
-        # Restore selection
-        if item_to_select:
-            self.setCurrentItem(item_to_select)
-        elif self.topLevelItemCount() > 0:
-            first_deck = self.topLevelItem(0)
-            if first_deck.childCount() > 0:
-                first_child = first_deck.child(0)
-                if isinstance(first_child, PositionTreeItem):
-                    self.setCurrentItem(first_child)
-                else:
-                    self.setCurrentItem(first_deck)
-            else:
-                self.setCurrentItem(first_deck)
+        self._restore_expansion_state(expansion_state)
 
-    def _collect_expanded_state(self, expanded_decks: set) -> None:
-        """Recursively collect expanded deck names from the tree."""
+        if item_to_select is None and self.topLevelItemCount() > 0:
+            first_deck = self.topLevelItem(0)
+            first_child = first_deck.child(0) if first_deck.childCount() > 0 else None
+            if isinstance(first_child, PositionTreeItem):
+                item_to_select = first_child
+            else:
+                item_to_select = first_deck
+        if item_to_select:
+            self._set_current_item_keeping_collapsed(item_to_select)
+
+    def _iter_deck_items(self):
+        """Yield every DeckTreeItem in the tree, parents before children."""
         def _walk(item):
             if isinstance(item, DeckTreeItem):
-                if item.isExpanded():
-                    expanded_decks.add(item.deck_name)
+                yield item
                 for j in range(item.childCount()):
-                    child = item.child(j)
-                    if isinstance(child, DeckTreeItem):
-                        _walk(child)
+                    yield from _walk(item.child(j))
 
         for i in range(self.topLevelItemCount()):
-            _walk(self.topLevelItem(i))
+            yield from _walk(self.topLevelItem(i))
+
+    def _collect_expansion_state(self) -> dict:
+        """Map deck name -> expanded, for decks that currently have children.
+
+        Childless decks are left out: their isExpanded() is always False, so
+        recording it would keep a deck shut after its first import.
+        """
+        return {
+            item.deck_name: item.isExpanded()
+            for item in self._iter_deck_items()
+            if item.childCount() > 0
+        }
+
+    def _restore_expansion_state(self, expansion_state: dict) -> None:
+        """Reapply the user's expand/collapse choices; unseen decks open."""
+        for item in self._iter_deck_items():
+            item.setExpanded(expansion_state.get(item.deck_name, item.childCount() > 0))
+
+    def _set_current_item_keeping_collapsed(self, item: QTreeWidgetItem) -> None:
+        """Select an item without expanding its collapsed ancestors.
+
+        With autoScroll on, setCurrentItem() calls scrollTo(), which expands
+        every collapsed ancestor, undoing the user's collapse on each rebuild.
+        """
+        auto_scroll = self.hasAutoScroll()
+        self.setAutoScroll(False)
+        try:
+            self.setCurrentItem(item)
+        finally:
+            self.setAutoScroll(auto_scroll)
+
+        visible = item
+        parent = item.parent()
+        while parent:
+            if not parent.isExpanded():
+                visible = parent
+            parent = parent.parent()
+        self.scrollToItem(visible)
+
+    def set_expanded_recursive(self, item: QTreeWidgetItem, expanded: bool) -> None:
+        """Expand or collapse a deck and every deck nested under it."""
+        if not isinstance(item, DeckTreeItem):
+            return
+        item.setExpanded(expanded)
+        for i in range(item.childCount()):
+            self.set_expanded_recursive(item.child(i), expanded)
 
     def _update_parent_icons(self) -> None:
         """Update deck icons and counts so parents reflect all descendant positions.
@@ -355,7 +383,6 @@ class DeckTreeWidget(QTreeWidget):
 
             # Create virtual parent node (not a real deck in DeckManager)
             virtual_item = DeckTreeItem(current_path, 0, is_virtual=True)
-            virtual_item.setExpanded(True)
 
             if parent_item is not None:
                 parent_item.addChild(virtual_item)
@@ -543,6 +570,33 @@ class DeckTreeWidget(QTreeWidget):
         new_subdeck_action.triggered.connect(lambda: self._create_subdeck_dialog(deck_item))
         menu.addAction(new_subdeck_action)
 
+        subdecks = [
+            deck_item.child(i) for i in range(deck_item.childCount())
+            if isinstance(deck_item.child(i), DeckTreeItem)
+        ]
+        if subdecks:
+            menu.addSeparator()
+            expand_action = QAction(
+                qta.icon('fa6s.angles-down', color='#a6adc8'),
+                "Expand Subdecks",
+                self
+            )
+            expand_action.triggered.connect(
+                lambda: self.set_expanded_recursive(deck_item, True)
+            )
+            menu.addAction(expand_action)
+
+            collapse_action = QAction(
+                qta.icon('fa6s.angles-up', color='#a6adc8'),
+                "Collapse Subdecks",
+                self
+            )
+            def _collapse_subdecks():
+                for sub in subdecks:
+                    self.set_expanded_recursive(sub, False)
+            collapse_action.triggered.connect(_collapse_subdecks)
+            menu.addAction(collapse_action)
+
         # Virtual nodes (hierarchy-only) don't support rename/delete
         if deck_item.is_virtual:
             return
@@ -641,6 +695,24 @@ class DeckTreeWidget(QTreeWidget):
         )
         new_deck_action.triggered.connect(self.create_new_deck_dialog)
         menu.addAction(new_deck_action)
+
+        menu.addSeparator()
+
+        expand_all_action = QAction(
+            qta.icon('fa6s.angles-down', color='#a6adc8'),
+            "Expand All",
+            self
+        )
+        expand_all_action.triggered.connect(self.expandAll)
+        menu.addAction(expand_all_action)
+
+        collapse_all_action = QAction(
+            qta.icon('fa6s.angles-up', color='#a6adc8'),
+            "Collapse All",
+            self
+        )
+        collapse_all_action.triggered.connect(self.collapseAll)
+        menu.addAction(collapse_all_action)
 
         menu.addSeparator()
 

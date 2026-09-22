@@ -10,7 +10,7 @@ from PySide6.QtCore import Qt, QTimer, QRectF
 from PySide6.QtGui import QIcon, QPixmap, QPainter, QColor, QFont, QLinearGradient, QPainterPath, QPen
 
 from ankigammon.gui.main_window import MainWindow
-from ankigammon.gui.resources import get_resource_path
+from ankigammon.gui.resources import get_resource_path, load_stylesheet
 from ankigammon.settings import get_settings
 
 
@@ -212,11 +212,7 @@ def main():
         splash.show()
         app.processEvents()
 
-    # Load and apply stylesheet
-    style_path = get_resource_path("ankigammon/gui/resources/style.qss")
-    if style_path.exists():
-        with open(style_path, encoding='utf-8') as f:
-            app.setStyleSheet(f.read())
+    app.setStyleSheet(load_stylesheet())
 
     settings = get_settings()
     window = MainWindow(settings)

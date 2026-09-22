@@ -360,7 +360,7 @@ class MainWindow(QMainWindow):
         list_container_layout.setContentsMargins(0, 0, 0, 0)
         list_container_layout.setSpacing(0)
 
-        # Header row: New Deck + Clear All (initially hidden)
+        # Header row: New Deck, expand/collapse all, Clear All
         self.btn_new_deck = QPushButton("  New Deck")
         self.btn_new_deck.setIcon(qta.icon('fa6s.folder-plus', color='#a6adc8'))
         self.btn_new_deck.setIconSize(QSize(11, 11))
@@ -411,11 +411,41 @@ class MainWindow(QMainWindow):
             }
         """)
 
+        tree_toggle_style = """
+            QPushButton {
+                background-color: transparent;
+                border: none;
+                padding: 6px 8px;
+                border-radius: 4px;
+            }
+            QPushButton:hover:enabled {
+                background-color: rgba(137, 180, 250, 0.15);
+            }
+            QPushButton:pressed:enabled {
+                background-color: rgba(137, 180, 250, 0.25);
+            }
+        """
+        self.btn_expand_all = QPushButton()
+        self.btn_expand_all.setIcon(qta.icon('fa6s.angles-down', color='#a6adc8'))
+        self.btn_expand_all.setIconSize(QSize(11, 11))
+        self.btn_expand_all.setCursor(Qt.PointingHandCursor)
+        self.btn_expand_all.setToolTip("Expand all decks")
+        self.btn_expand_all.setStyleSheet(tree_toggle_style)
+
+        self.btn_collapse_all = QPushButton()
+        self.btn_collapse_all.setIcon(qta.icon('fa6s.angles-up', color='#a6adc8'))
+        self.btn_collapse_all.setIconSize(QSize(11, 11))
+        self.btn_collapse_all.setCursor(Qt.PointingHandCursor)
+        self.btn_collapse_all.setToolTip("Collapse all decks")
+        self.btn_collapse_all.setStyleSheet(tree_toggle_style)
+
         self.list_header_row = QWidget()
         header_layout = QHBoxLayout(self.list_header_row)
         header_layout.setContentsMargins(0, 0, 0, 4)
         header_layout.setSpacing(0)
         header_layout.addWidget(self.btn_new_deck)
+        header_layout.addWidget(self.btn_expand_all)
+        header_layout.addWidget(self.btn_collapse_all)
         header_layout.addStretch()
         header_layout.addWidget(self.btn_clear_all)
         list_container_layout.addWidget(self.list_header_row)
@@ -426,6 +456,8 @@ class MainWindow(QMainWindow):
         self.deck_tree.positions_changed.connect(self._on_positions_changed)
         self.deck_tree.deck_structure_changed.connect(self._on_deck_structure_changed)
         self.deck_tree.sync_from_anki_requested.connect(self._sync_decks_from_anki_manual)
+        self.btn_expand_all.clicked.connect(self.deck_tree.expandAll)
+        self.btn_collapse_all.clicked.connect(self.deck_tree.collapseAll)
         list_container_layout.addWidget(self.deck_tree, stretch=1)
 
         layout.addWidget(list_container, stretch=1)
