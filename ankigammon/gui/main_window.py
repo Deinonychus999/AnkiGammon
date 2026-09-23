@@ -16,15 +16,16 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from ankigammon import __version__
 from ankigammon.collection import (
     CollectionSource,
+    build_collection,
+    file_key,
     load_collection,
+    place_decisions,
     save_collection,
-    sources_from_dict,
-    sources_to_dict,
 )
 from ankigammon.settings import Settings
 from ankigammon.renderer.svg_board_renderer import SVGBoardRenderer
@@ -164,12 +165,12 @@ class MatchAnalysisWorker(QThread):
 
 @dataclass
 class _QueuedImport:
-    """A file waiting to be imported. A collection entry carries its own deck
-    and filter options, so it imports without asking."""
+    """A file waiting to be imported. A collection entry carries its filter
+    options and saved deck placement, so it imports without asking."""
 
     path: str
-    deck: Optional[str] = None
     options: Optional[dict] = None
+    placement: Optional[Dict[str, List[str]]] = None
 
 
 class MainWindow(QMainWindow):
@@ -186,13 +187,6 @@ class MainWindow(QMainWindow):
         for deck_name in settings.saved_deck_names:
             if deck_name != settings.deck_name:
                 self.deck_manager.create_deck(deck_name)
-        try:
-            self.deck_manager.set_sources(sources_from_dict(settings.collection_sources))
-        except ValueError:
-            import logging
-            logging.getLogger(__name__).warning(
-                "Ignoring unreadable collection_sources in config", exc_info=True
-            )
         scheme = get_scheme(settings.color_scheme)
         if settings.swap_checker_colors:
             scheme = scheme.with_swapped_checkers()
@@ -203,10 +197,12 @@ class MainWindow(QMainWindow):
         self.color_scheme_actions = {}  # Store references to color scheme menu actions
         self._gnubg_check_shown = False  # Track if we've shown GnuBG config dialog in current import batch
         self._import_queue: List[_QueuedImport] = []
+        self._import_filters: Dict[str, CollectionSource] = {}  # by file_key, for Save Collection
         self._import_in_progress = False  # Track if an import is currently being processed
         self._batch_import_results = []  # Accumulate results from batch imports (for combined success message)
         self._in_batch_import = False  # Flag to track whether we are in a multi-file batch import
         self._batch_import_options: Optional[dict] = None  # Cached ImportOptionsDialog choices for the current batch
+        self._batch_notes: List[str] = []
         self._batch_skipped_files: list = []  # (file_path, reason) tuples for files skipped during the current batch
         self._import_target_deck: Optional[str] = None  # Target deck for file drops on specific deck
         self._file_drag_deck_item: Optional[DeckTreeItem] = None  # Deck highlighted during file drag
@@ -535,7 +531,7 @@ class MainWindow(QMainWindow):
         act_open_collection.triggered.connect(self.on_open_collection_clicked)
         file_menu.addAction(act_open_collection)
 
-        act_save_collection = QAction("&Save Collection As...", self)
+        act_save_collection = QAction("&Save Collection...", self)
         act_save_collection.setShortcut("Ctrl+Shift+S")
         act_save_collection.triggered.connect(self.on_save_collection_clicked)
         file_menu.addAction(act_save_collection)
@@ -641,10 +637,6 @@ class MainWindow(QMainWindow):
     def _on_deck_structure_changed(self):
         """Handle deck create/rename/delete — save deck names to settings."""
         self.settings.saved_deck_names = self.deck_manager.get_deck_names()
-        self._persist_collection_sources()
-
-    def _persist_collection_sources(self):
-        self.settings.collection_sources = sources_to_dict(self.deck_manager.get_sources())
 
     # -- Anki deck sync --
 
@@ -1727,7 +1719,7 @@ class MainWindow(QMainWindow):
 
     @Slot()
     def on_open_collection_clicked(self):
-        """Re-import every file of a collection into its deck, without prompts."""
+        """Replace the loaded positions with a collection's, re-importing its files."""
         from PySide6.QtWidgets import QFileDialog
 
         if self._import_in_progress or self._import_queue:
@@ -1747,7 +1739,7 @@ class MainWindow(QMainWindow):
             return
 
         try:
-            sources = load_collection(path)
+            collection = load_collection(path)
         except (OSError, ValueError) as e:
             silent_messagebox.critical(
                 self, "Open Collection Failed",
@@ -1755,40 +1747,52 @@ class MainWindow(QMainWindow):
             )
             return
 
-        entries = [(deck, s) for deck, deck_sources in sources.items() for s in deck_sources]
-        if not entries:
+        if collection.position_count == 0:
             silent_messagebox.information(
-                self, "Empty Collection", f"{Path(path).name} lists no files."
+                self, "Empty Collection", f"{Path(path).name} contains no positions."
             )
             return
 
-        missing = [s.path for _, s in entries if not os.path.isfile(s.path)]
-        lines = [f"Import {len(entries)} file(s) into {len(sources)} deck(s)?"]
+        missing = {s.path for s in collection.files if not os.path.isfile(s.path)}
+        lines = [
+            f"Open {collection.position_count} position(s) in "
+            f"{len(collection.deck_names())} deck(s)?"
+        ]
+        if not self.deck_manager.is_empty:
+            lines.append(
+                f"\nThis replaces the {self.deck_manager.total_count} position(s) "
+                "currently in AnkiGammon."
+            )
         if missing:
-            lines.append(f"\n{len(missing)} file(s) could not be found and will be skipped.")
-        lines.append(
-            "\nMatch files (.mat, .sgf) are analyzed again by the engine; XG files "
-            "keep the analysis and rollouts saved in them.\n\n"
-            "Afterwards, export to Anki to update your existing cards."
-        )
+            lines.append(f"\n{len(missing)} source file(s) could not be found and will be skipped.")
+        if any(not s.path.lower().endswith(('.xg', '.xgp')) for s in collection.files):
+            lines.append("\nMatch files (.mat, .sgf) are analyzed again by the engine.")
         reply = silent_messagebox.question(
             self, "Open Collection", "\n".join(lines),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.Yes
+            default_button=(
+                QMessageBox.StandardButton.Yes if self.deck_manager.is_empty
+                else QMessageBox.StandardButton.No
+            )
         )
         if reply != QMessageBox.StandardButton.Yes:
             return
 
         self.settings.last_collection_path = path
-        # The opened collection becomes what Save Collection writes, including
-        # entries whose files are missing right now.
-        self.deck_manager.set_sources(sources)
+        self.deck_manager.clear_all()
+        self._import_filters = {}
+        self.deck_manager.merge_deck_names(collection.deck_names())
+        for deck, decisions in collection.positions.items():
+            self.deck_manager.add_decisions(decisions, deck)
         self.deck_tree.rebuild_tree()
         self._on_deck_structure_changed()
+        self._on_positions_changed()
 
         self._gnubg_check_shown = False
         self._in_batch_import = True
-        for deck, source in entries:
+        restored = sum(len(decisions) for decisions in collection.positions.values())
+        if restored:
+            self._batch_notes.append(f"Restored {restored} position(s) not imported from a file.")
+        for source in collection.files:
             if source.path in missing:
                 self._batch_skipped_files.append((source.path, "file not found"))
                 continue
@@ -1804,21 +1808,22 @@ class MainWindow(QMainWindow):
                 'selected_player_names': source.players,
                 'unselected_reason': "neither player is listed in the collection",
             }
-            self._import_queue.append(_QueuedImport(source.path, deck.strip(), options))
+            self._import_queue.append(_QueuedImport(source.path, options, source.placement))
         self._process_import_queue()
 
     @Slot()
     def on_save_collection_clicked(self):
-        """Save which files were imported into which deck."""
+        """Save the loaded positions, and the files they were imported from."""
         from PySide6.QtWidgets import QFileDialog
 
-        sources = self.deck_manager.get_sources()
-        if not sources:
+        collection = build_collection(self.deck_manager.get_grouped_decisions(), self._import_filters)
+        if collection.position_count == 0:
             silent_messagebox.information(
                 self, "Nothing to Save",
-                "No files have been imported into your decks yet.\n\n"
-                "Import files into decks first; AnkiGammon remembers which file "
-                "went into which deck, and saves that as a collection."
+                "No positions are loaded. Import files or add positions first.\n\n"
+                "The position list is cleared after each export unless you turn off "
+                "\"Clear position list after export\" in Settings, so save the "
+                "collection before exporting."
             )
             return
 
@@ -1832,7 +1837,7 @@ class MainWindow(QMainWindow):
             return
 
         try:
-            save_collection(path, sources)
+            save_collection(path, collection)
         except OSError as e:
             silent_messagebox.critical(
                 self, "Save Collection Failed", f"Could not save the collection:\n\n{e}"
@@ -1840,10 +1845,10 @@ class MainWindow(QMainWindow):
             return
 
         self.settings.last_collection_path = path
-        file_count = sum(len(entries) for entries in sources.values())
         silent_messagebox.information(
             self, "Collection Saved",
-            f"Saved {file_count} file(s) in {len(sources)} deck(s) to:\n{path}"
+            f"Saved {collection.position_count} position(s) in "
+            f"{len(collection.deck_names())} deck(s) to:\n{path}"
         )
 
     @Slot()
@@ -2043,7 +2048,7 @@ class MainWindow(QMainWindow):
         # This also ensures the dialog from the previous import has fully closed
         def process_file():
             try:
-                self._import_file(item.path, item.deck, item.options)
+                self._import_file(item.path, item.options, item.placement)
             finally:
                 # Mark as not in progress and process next file
                 self._import_in_progress = False
@@ -2056,13 +2061,14 @@ class MainWindow(QMainWindow):
         """Clear all batch-import bookkeeping. Called when the queue empties or aborts."""
         self._batch_import_results.clear()
         self._batch_skipped_files.clear()
+        self._batch_notes.clear()
         self._batch_import_options = None
         self._in_batch_import = False
 
     def _show_batch_import_results(self):
         """Show combined success message for batch imports."""
         # If nothing was imported and nothing was skipped, stay silent
-        if not self._batch_import_results and not self._batch_skipped_files:
+        if not (self._batch_import_results or self._batch_skipped_files or self._batch_notes):
             return
 
         total_positions = sum(self._batch_import_results)
@@ -2079,6 +2085,9 @@ class MainWindow(QMainWindow):
                 lines.append(f"  • {Path(path).name} — {reason}")
             if skipped_count > len(shown):
                 lines.append(f"  …and {skipped_count - len(shown)} more")
+        if self._batch_notes:
+            lines.append("")
+            lines.extend(self._batch_notes)
 
         silent_messagebox.information(
             self,
@@ -2089,17 +2098,18 @@ class MainWindow(QMainWindow):
     def _import_file(
         self,
         file_path: str,
-        target_deck: Optional[str] = None,
-        options: Optional[dict] = None
+        options: Optional[dict] = None,
+        placement: Optional[Dict[str, List[str]]] = None
     ):
         """
         Import a file at the given path.
         This is a helper method that can be called from both the menu action
         and the drag-and-drop handler.
 
-        target_deck and options come from a collection entry; without them the
-        file goes to the drop target or active deck, filtered with the batch
-        options or the per-file dialog.
+        options and placement come from a collection entry: its positions go
+        back to their saved decks. Without them the file goes to the drop
+        target or active deck, filtered with the batch options or the
+        per-file dialog.
         """
         from ankigammon.gui.format_detector import FormatDetector, InputFormat
         from ankigammon.parsers.xg_binary_parser import XGBinaryParser
@@ -2329,23 +2339,37 @@ class MainWindow(QMainWindow):
                 )
                 return
 
-            # Add to the collection entry's deck, the drop target, or the active deck
-            target_deck = target_deck or self._import_target_deck
-            active_deck = target_deck or self.deck_tree.get_active_deck_name()
-            if not self.deck_manager.has_deck(active_deck):
-                active_deck = self.deck_manager.default_deck_name
             for decision in decisions:
                 if decision.source_file is None:
                     decision.source_file = source.path
-            self.deck_manager.add_decisions(decisions, active_deck)
-            self.deck_manager.record_source(active_deck, source)
-            self._persist_collection_sources()
+            self._import_filters[file_key(source.path)] = source
+
+            target_deck = None
+            if placement is not None:
+                by_deck, unplaced, missing = place_decisions(decisions, placement)
+                logger.info(
+                    f"{file_path}: {unplaced} position(s) not in the collection left out, "
+                    f"{missing} saved position(s) not found"
+                )
+                if missing:
+                    self._batch_notes.append(
+                        f"{os.path.basename(file_path)}: {missing} saved position(s) no longer "
+                        "found (the file or its analysis may have changed)"
+                    )
+                for deck, placed in by_deck.items():
+                    self.deck_manager.add_decisions(placed, deck)
+                decisions = [d for placed in by_deck.values() for d in placed]
+            else:
+                # Add to target deck (from tree drop) or currently active deck
+                target_deck = self._import_target_deck
+                active_deck = target_deck or self.deck_tree.get_active_deck_name()
+                self.deck_manager.add_decisions(decisions, active_deck)
             self.deck_tree.rebuild_tree()
             # Capture before deck selection below replaces the current item
             had_selection = self.deck_tree.get_selected_decision() is not None
             # Expand and scroll to the target deck so the user sees the result
             if target_deck:
-                self.deck_tree._expand_and_select_deck(active_deck)
+                self.deck_tree._expand_and_select_deck(target_deck)
             # Auto-display the first imported position if nothing was shown yet
             if decisions and not had_selection:
                 self.deck_tree.select_decision(decisions[0])
@@ -2500,7 +2524,6 @@ class MainWindow(QMainWindow):
 
         # Persist deck names for next session
         self.settings.saved_deck_names = self.deck_manager.get_deck_names()
-        self._persist_collection_sources()
 
         # Stop any background threads before teardown so queued signals
         # cannot fire on receivers that QApplication is about to destroy.

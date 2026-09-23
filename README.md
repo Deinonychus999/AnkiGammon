@@ -190,27 +190,16 @@ Both export methods support updating existing cards when you change settings (co
 
 ### Collection Files
 
-AnkiGammon remembers which file you imported into which deck, and the import filters you used (error thresholds, which player's mistakes). **File → Save Collection As...** (Ctrl+Shift+S) writes that list to a `.json` collection file.
+A collection file saves the positions currently loaded in AnkiGammon, so you can rebuild your cards later for a new AnkiGammon version, new settings, or after new rollouts in XG.
 
-To rebuild your cards later, for a new AnkiGammon version, new settings, or after new rollouts in XG, use **File → Open Collection...** (Ctrl+Shift+O). Every file is imported again into its deck without prompts. Then export to Anki: existing cards are updated in place and keep their review history.
+- **File → Save Collection...** (Ctrl+Shift+S) writes the loaded positions to a `.json` file. Positions imported from a file are saved as a link to that file, with the import filters you used and the deck each position is in. Other positions (pasted analysis or position IDs) are saved whole.
+- **File → Open Collection...** (Ctrl+Shift+O) replaces the loaded positions after a warning. It re-imports each file with its filters and puts every position back into its saved deck. Then export to Anki: existing cards are updated in place and keep their review history.
 
+Notes:
 - XG files (.xg, .xgp) keep the analysis and rollouts saved in them. Match files (.mat, .sgf) are analyzed again by the engine.
+- Positions you moved between decks or deleted stay that way. If a file's analysis changed, positions that now fall under the error threshold are reported as not found, and newly qualifying positions are left out.
 - Files stored next to or below the collection file are saved with relative paths, so you can move the folder as a whole.
-- Moving or deleting single positions isn't recorded. Opening the collection re-imports whole files with their filters.
-- The file is plain JSON and can be edited by hand. A deck's entry can be a list of paths, and `players` and the thresholds are optional (they default to both players and your current import settings):
-
-```json
-{
-  "format": "ankigammon-collection",
-  "version": 1,
-  "decks": {
-    "AnkiGammon::Openings": ["matches/club-night.xg", "positions/opening.xgp"],
-    "AnkiGammon::Tournament": [
-      {"path": "D:/Backgammon/final.xg", "checker_threshold": 0.05, "cube_threshold": 0.08, "players": ["Frank"]}
-    ]
-  }
-}
-```
+- The position list is cleared after each export by default, so save the collection before exporting (or turn off "Clear position list after export" in Settings).
 
 The **Re-render cards only** mode of File → Regenerate Cards in Anki also keeps rollouts, because it reuses the analysis stored in each card. Use a collection when you want to pick up new analysis from your source files.
 

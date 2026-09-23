@@ -44,7 +44,6 @@ class Settings:
         "xg_exe_path": None,
         "xg_analysis_level": "world class",
         "saved_deck_names": [],
-        "collection_sources": {},
         "last_collection_path": None,
         "check_for_updates": True,
         "last_update_check": None,
@@ -455,16 +454,6 @@ class Settings:
         if not isinstance(value, list):
             value = []
         self.set("saved_deck_names", [n for n in value if isinstance(n, str) and n.strip()])
-
-    @property
-    def collection_sources(self) -> dict:
-        """Files imported into each deck, as {deck: [source dict]} with absolute paths."""
-        value = self._settings.get("collection_sources", {})
-        return value if isinstance(value, dict) else {}
-
-    @collection_sources.setter
-    def collection_sources(self, value: dict) -> None:
-        self.set("collection_sources", value if isinstance(value, dict) else {})
 
     @property
     def last_collection_path(self) -> Optional[str]:

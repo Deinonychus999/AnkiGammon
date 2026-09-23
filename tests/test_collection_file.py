@@ -1,5 +1,5 @@
-"""Collection files: saving which source file went into which deck, and
-rebuilding the decks from them with the same import filters."""
+"""Collection files: a snapshot of the loaded positions that re-imports source
+files (keeping their newest analysis) and restores every position's deck."""
 
 import json
 import os
@@ -8,19 +8,35 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from ankigammon.anki.decision_serialize import decision_to_json
 from ankigammon.collection import (
     FORMAT_NAME,
     FORMAT_VERSION,
+    Collection,
     CollectionSource,
+    build_collection,
+    file_key,
     load_collection,
+    place_decisions,
     save_collection,
-    sources_from_dict,
-    sources_to_dict,
 )
 from ankigammon.gui.deck_manager import DeckManager
+from ankigammon.models import Decision, DecisionType, Move, Player, Position
 from ankigammon.settings import Settings
 
 SAMPLE_XG = Path(__file__).parent / "data" / "sample_match.xg"
+
+
+def _decision(xgid, source_file=None):
+    return Decision(
+        position=Position(),
+        on_roll=Player.O,
+        dice=(3, 1),
+        xgid=xgid,
+        decision_type=DecisionType.CHECKER_PLAY,
+        candidate_moves=[Move(notation="8/5 6/5", equity=0.1, analysis_level="Rollout")],
+        source_file=source_file,
+    )
 
 
 def _write(path: Path, payload) -> Path:
@@ -28,68 +44,96 @@ def _write(path: Path, payload) -> Path:
     return path
 
 
-class TestCollectionFile:
-    def test_roundtrip_keeps_decks_files_and_filters(self, tmp_path):
-        inside = tmp_path / "matches" / "a.xg"
-        sources = {
-            "AnkiGammon::Openings": [
-                CollectionSource(str(inside), 0.05, 0.1, ["Frank"]),
-                CollectionSource(str(tmp_path / "b.xgp")),
-            ],
-            "AnkiGammon::Cube": [CollectionSource(str(inside), players=None)],
+class TestBuildCollection:
+    def test_file_positions_become_one_entry_placed_by_deck(self):
+        a = "/m/a.xg"
+        filters = {file_key(a): CollectionSource(a, 0.05, 0.1, ["Frank"])}
+        grouped = {
+            "D1": [_decision("X1", a), _decision("X2", a)],
+            "D2": [_decision("X3", a)],
         }
-        target = tmp_path / "collection.json"
-        save_collection(str(target), sources)
+        collection = build_collection(grouped, filters)
+        assert collection.files == [
+            CollectionSource(a, 0.05, 0.1, ["Frank"], {"D1": ["X1", "X2"], "D2": ["X3"]})
+        ]
+        assert collection.positions == {}
+        assert filters[file_key(a)].placement == {}, "the import record must not be mutated"
 
-        assert load_collection(str(target)) == {
-            deck: [
-                CollectionSource(os.path.normpath(s.path), s.checker_threshold, s.cube_threshold, s.players)
-                for s in entries
-            ]
-            for deck, entries in sources.items()
-        }
+    def test_positions_without_an_imported_file_are_kept_whole(self):
+        pasted = _decision("P1")
+        unknown_file = _decision("P2", "/m/never-imported.xg")
+        no_xgid = _decision(None, "/m/a.xg")
+        collection = build_collection(
+            {"D": [pasted, unknown_file, no_xgid]},
+            {file_key("/m/a.xg"): CollectionSource("/m/a.xg")},
+        )
+        assert collection.files == []
+        assert collection.positions == {"D": [pasted, unknown_file, no_xgid]}
+        assert collection.position_count == 3
+        assert collection.deck_names() == ["D"]
+
+
+class TestPlaceDecisions:
+    def test_positions_return_to_saved_decks_and_extras_are_left_out(self):
+        decisions = [_decision("X1"), _decision("X2"), _decision("X3"), _decision("NEW")]
+        placed, unplaced, missing = place_decisions(
+            decisions, {"D1": ["X1", "X3"], "D2": ["X2", "GONE"]}
+        )
+        assert {d: [x.xgid for x in v] for d, v in placed.items()} == {"D1": ["X1", "X3"], "D2": ["X2"]}
+        assert (unplaced, missing) == (1, 1)
+
+    def test_duplicate_xgids_are_matched_one_to_one(self):
+        placed, unplaced, missing = place_decisions(
+            [_decision("X"), _decision("X"), _decision("X")], {"D1": ["X"], "D2": ["X"]}
+        )
+        assert {d: len(v) for d, v in placed.items()} == {"D1": 1, "D2": 1}
+        assert (unplaced, missing) == (1, 0)
+
+
+class TestCollectionFile:
+    def test_roundtrip(self, tmp_path):
+        pasted = _decision("P1")
+        collection = Collection(
+            files=[CollectionSource(str(tmp_path / "m" / "a.xg"), 0.05, None, ["Frank"], {"D1": ["X1"]})],
+            positions={"D2": [pasted]},
+        )
+        target = tmp_path / "c.json"
+        save_collection(str(target), collection)
+
+        loaded = load_collection(str(target))
+        assert loaded.files == collection.files
+        assert [decision_to_json(d) for d in loaded.positions["D2"]] == [decision_to_json(pasted)]
+        assert loaded.positions["D2"][0].candidate_moves[0].analysis_level == "Rollout"
 
     def test_files_below_the_collection_are_stored_relative(self, tmp_path):
-        target = tmp_path / "collection.json"
-        save_collection(str(target), {"D": [CollectionSource(str(tmp_path / "matches" / "a.xg"))]})
-        assert json.loads(target.read_text())["decks"]["D"][0]["path"] == "matches/a.xg"
+        target = tmp_path / "c.json"
+        save_collection(str(target), Collection([CollectionSource(str(tmp_path / "m" / "a.xg"))]))
+        assert json.loads(target.read_text())["files"][0]["path"] == "m/a.xg"
 
     def test_files_elsewhere_stay_absolute(self, tmp_path):
-        target = tmp_path / "sub" / "collection.json"
+        target = tmp_path / "sub" / "c.json"
         target.parent.mkdir()
-        outside = tmp_path / "other" / "a.xg"
-        save_collection(str(target), {"D": [CollectionSource(str(outside))]})
-        stored = json.loads(target.read_text())["decks"]["D"][0]["path"]
-        assert Path(stored).is_absolute()
-        assert load_collection(str(target))["D"][0].path == os.path.normpath(str(outside))
+        outside = str(tmp_path / "other" / "a.xg")
+        save_collection(str(target), Collection([CollectionSource(outside)]))
+        assert Path(json.loads(target.read_text())["files"][0]["path"]).is_absolute()
+        assert load_collection(str(target)).files[0].path == outside
 
     def test_moving_collection_with_its_files_keeps_working(self, tmp_path):
         first = tmp_path / "one"
         first.mkdir()
-        save_collection(str(first / "c.json"), {"D": [CollectionSource(str(first / "a.xg"))]})
-        moved = tmp_path / "two"
-        first.rename(moved)
-        assert load_collection(str(moved / "c.json"))["D"][0].path == str(moved / "a.xg")
-
-    def test_hand_written_bare_paths_are_accepted(self, tmp_path):
-        target = _write(tmp_path / "c.json", {
-            "format": FORMAT_NAME, "version": 1,
-            "decks": {"AnkiGammon::Mine": ["a.xg", {"path": "b.mat", "players": ["Me"]}]},
-        })
-        loaded = load_collection(str(target))["AnkiGammon::Mine"]
-        assert loaded == [
-            CollectionSource(str(tmp_path / "a.xg")),
-            CollectionSource(str(tmp_path / "b.mat"), players=["Me"]),
-        ]
+        save_collection(str(first / "c.json"), Collection([CollectionSource(str(first / "a.xg"))]))
+        first.rename(tmp_path / "two")
+        assert load_collection(str(tmp_path / "two" / "c.json")).files[0].path == str(tmp_path / "two" / "a.xg")
 
     @pytest.mark.parametrize("payload, message", [
-        ({"decks": {}}, "Not an AnkiGammon collection"),
-        ({"format": FORMAT_NAME, "version": FORMAT_VERSION + 1, "decks": {}}, "newer"),
-        ({"format": FORMAT_NAME, "version": 1, "decks": []}, "must map"),
-        ({"format": FORMAT_NAME, "version": 1, "decks": {"D": "a.xg"}}, "must list"),
-        ({"format": FORMAT_NAME, "version": 1, "decks": {"D": [{"file": "a.xg"}]}}, "path"),
-        ({"format": FORMAT_NAME, "version": 1, "decks": {"D": [{"path": "a", "players": "Me"}]}}, "players"),
-        ({"format": FORMAT_NAME, "version": 1, "decks": {"D": [{"path": "a", "cube_threshold": "x"}]}}, "number"),
+        ({"files": []}, "Not an AnkiGammon collection"),
+        ({"format": FORMAT_NAME, "version": FORMAT_VERSION + 1}, "newer"),
+        ({"format": FORMAT_NAME, "version": 1, "files": {}}, "must be a list"),
+        ({"format": FORMAT_NAME, "version": 1, "files": [{"decks": {}}]}, "path"),
+        ({"format": FORMAT_NAME, "version": 1, "files": [{"path": "a"}]}, "XGIDs"),
+        ({"format": FORMAT_NAME, "version": 1, "files": [{"path": "a", "decks": {}, "players": "Me"}]}, "players"),
+        ({"format": FORMAT_NAME, "version": 1, "files": [{"path": "a", "decks": {}, "cube_threshold": "x"}]}, "number"),
+        ({"format": FORMAT_NAME, "version": 1, "positions": {"D": [{"version": 1, "decision": {}}]}}, "Malformed"),
     ])
     def test_invalid_files_are_rejected(self, tmp_path, payload, message):
         with pytest.raises(ValueError, match=message):
@@ -100,61 +144,6 @@ class TestCollectionFile:
         bad.write_text("{nope", encoding="utf-8")
         with pytest.raises(ValueError, match="JSON"):
             load_collection(str(bad))
-
-    def test_settings_form_roundtrips_with_absolute_paths(self, tmp_path):
-        sources = {"D": [CollectionSource(str(tmp_path / "a.xg"), 0.08, None, ["X"])]}
-        assert sources_from_dict(json.loads(json.dumps(sources_to_dict(sources)))) == sources
-
-
-class TestDeckManagerSources:
-    def test_reimporting_a_file_replaces_its_entry(self):
-        dm = DeckManager("A")
-        dm.record_source("A", CollectionSource("/m/a.xg", 0.1))
-        dm.record_source("A", CollectionSource("/m/a.xg", 0.05))
-        assert dm.get_sources() == {"A": [CollectionSource("/m/a.xg", 0.05)]}
-
-    def test_same_file_in_two_decks_is_kept_in_both(self):
-        dm = DeckManager("A")
-        dm.create_deck("B")
-        dm.record_source("A", CollectionSource("/m/a.xg"))
-        dm.record_source("B", CollectionSource("/m/a.xg"))
-        assert list(dm.get_sources()) == ["A", "B"]
-
-    def test_rename_carries_sources(self):
-        dm = DeckManager("A")
-        dm.create_deck("B")
-        dm.record_source("B", CollectionSource("/m/a.xg"))
-        dm.rename_deck("B", "C")
-        assert dm.get_sources() == {"C": [CollectionSource("/m/a.xg")]}
-
-    def test_delete_moving_positions_moves_sources(self):
-        dm = DeckManager("A")
-        dm.create_deck("B")
-        dm.record_source("B", CollectionSource("/m/a.xg"))
-        dm.delete_deck("B", move_to="A")
-        assert dm.get_sources() == {"A": [CollectionSource("/m/a.xg")]}
-
-    def test_delete_discarding_positions_forgets_sources(self):
-        dm = DeckManager("A")
-        dm.create_deck("B")
-        dm.record_source("B", CollectionSource("/m/a.xg"))
-        dm.delete_deck("B")
-        assert dm.get_sources() == {}
-
-    def test_clearing_positions_keeps_sources(self):
-        """Positions are cleared after every export by default; the collection
-        has to survive that or it could never be saved."""
-        dm = DeckManager("A")
-        dm.record_source("A", CollectionSource("/m/a.xg"))
-        dm.clear_all()
-        assert dm.get_sources() == {"A": [CollectionSource("/m/a.xg")]}
-
-    def test_set_sources_creates_missing_decks(self):
-        dm = DeckManager("A")
-        dm.record_source("A", CollectionSource("/m/old.xg"))
-        dm.set_sources({"A::New": [CollectionSource("/m/a.xg")]})
-        assert dm.has_deck("A::New")
-        assert dm.get_sources() == {"A::New": [CollectionSource("/m/a.xg")]}
 
 
 class _ImportHarness:
@@ -181,9 +170,16 @@ class _ImportHarness:
         self._in_batch_import = True
         self._batch_import_results = []
         self._batch_skipped_files = []
+        self._batch_notes = []
+        self._import_filters = {}
 
-    def _persist_collection_sources(self):
-        pass
+    def open_collection(self, collection: Collection):
+        """The part of on_open_collection_clicked after the dialogs."""
+        self.deck_manager.merge_deck_names(collection.deck_names())
+        for deck, decisions in collection.positions.items():
+            self.deck_manager.add_decisions(decisions, deck)
+        for s in collection.files:
+            self._import_file(s.path, _options(s.checker_threshold, s.cube_threshold, s.players), s.placement)
 
 
 @pytest.fixture
@@ -202,49 +198,64 @@ def _options(checker, cube, players, reason="not listed"):
     }
 
 
-class TestImportFromCollection:
-    def test_entry_imports_into_its_deck_with_its_filter(self, harness):
-        harness.deck_manager.create_deck("AnkiGammon::Two")
-        harness._import_file(str(SAMPLE_XG), "AnkiGammon::Two", _options(0.08, 0.08, ["Player Two"]))
+def _xgids_by_deck(dm: DeckManager):
+    return {name: sorted(d.xgid for d in dm.get_deck_decisions(name)) for name in dm.get_deck_names()}
 
-        decisions = harness.deck_manager.get_deck_decisions("AnkiGammon::Two")
+
+class TestImportAndReopen:
+    def test_import_records_its_filter_and_source_file(self, harness):
+        harness._import_file(str(SAMPLE_XG), _options(0.08, 0.08, ["Player Two"]))
+
+        decisions = harness.deck_manager.get_deck_decisions("AnkiGammon")
         assert decisions
-        assert harness.deck_manager.get_deck_decisions("AnkiGammon") == []
         # Player Two is the file's player 2, i.e. Player.X
-        from ankigammon.models import DecisionType, Player
         assert all(
             d.on_roll == Player.X for d in decisions if d.decision_type == DecisionType.CHECKER_PLAY
         )
         assert {d.source_file for d in decisions} == {os.path.abspath(SAMPLE_XG)}
-        assert harness.deck_manager.get_sources() == {
-            "AnkiGammon::Two": [CollectionSource(os.path.abspath(SAMPLE_XG), 0.08, 0.08, ["Player Two"])]
+        assert harness._import_filters == {
+            file_key(str(SAMPLE_XG)): CollectionSource(os.path.abspath(SAMPLE_XG), 0.08, 0.08, ["Player Two"])
         }
 
     def test_both_players_when_players_is_omitted(self, harness):
-        harness._import_file(str(SAMPLE_XG), "AnkiGammon", _options(0.08, 0.08, None))
-        from ankigammon.models import Player
+        harness._import_file(str(SAMPLE_XG), _options(0.08, 0.08, None))
         on_roll = {d.on_roll for d in harness.deck_manager.get_deck_decisions("AnkiGammon")}
         assert on_roll == {Player.X, Player.O}
-        assert harness.deck_manager.get_sources()["AnkiGammon"][0].players is None
 
-    def test_entry_with_unknown_player_is_skipped_with_reason(self, harness):
-        harness._import_file(str(SAMPLE_XG), "AnkiGammon", _options(0.08, 0.08, ["Nobody"]))
+    def test_unknown_player_is_skipped_with_reason(self, harness):
+        harness._import_file(str(SAMPLE_XG), _options(0.08, 0.08, ["Nobody"]))
         assert harness.deck_manager.is_empty
-        assert harness.deck_manager.get_sources() == {}
         assert harness._batch_skipped_files == [(str(SAMPLE_XG), "not listed")]
 
-    def test_saved_collection_rebuilds_the_same_positions(self, harness, tmp_path):
-        harness.deck_manager.create_deck("AnkiGammon::Mine")
-        harness._import_file(str(SAMPLE_XG), "AnkiGammon::Mine", _options(0.05, 0.1, ["Player One"]))
-        first = [d.xgid for d in harness.deck_manager.get_deck_decisions("AnkiGammon::Mine")]
+    def test_reopening_restores_moves_deletions_and_pasted_positions(self, harness, tmp_path):
+        dm = harness.deck_manager
+        harness._import_file(str(SAMPLE_XG), _options(0.05, 0.1, ["Player One"]))
+        imported = dm.get_deck_decisions("AnkiGammon")
+        assert len(imported) >= 3
+
+        dm.create_deck("AnkiGammon::Moved")
+        dm.move_decisions(imported[:2], "AnkiGammon::Moved")
+        dm.remove_decision("AnkiGammon", imported[2])
+        dm.add_decisions([_decision("XGID=pasted")], "AnkiGammon::Moved")
+        before = _xgids_by_deck(dm)
 
         target = tmp_path / "c.json"
-        save_collection(str(target), harness.deck_manager.get_sources())
+        save_collection(str(target), build_collection(dm.get_grouped_decisions(), harness._import_filters))
 
-        rebuilt = _ImportHarness(harness.settings)
-        for deck, entries in load_collection(str(target)).items():
-            rebuilt.deck_manager.create_deck(deck)
-            for s in entries:
-                rebuilt._import_file(s.path, deck, _options(s.checker_threshold, s.cube_threshold, s.players))
+        reopened = _ImportHarness(harness.settings)
+        reopened.open_collection(load_collection(str(target)))
 
-        assert [d.xgid for d in rebuilt.deck_manager.get_deck_decisions("AnkiGammon::Mine")] == first
+        assert _xgids_by_deck(reopened.deck_manager) == before
+        assert reopened._batch_notes == []
+        assert {d.source_file for d in reopened.deck_manager.get_deck_decisions("AnkiGammon")} == {
+            os.path.abspath(SAMPLE_XG)
+        }
+
+    def test_saved_positions_missing_from_the_file_are_reported(self, harness):
+        harness.open_collection(Collection([CollectionSource(
+            os.path.abspath(SAMPLE_XG), 0.05, 0.1, ["Player One"], {"AnkiGammon": ["XGID=not-in-file"]}
+        )]))
+        assert harness.deck_manager.is_empty
+        assert harness._batch_notes == [
+            "sample_match.xg: 1 saved position(s) no longer found (the file or its analysis may have changed)"
+        ]
