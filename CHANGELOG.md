@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.10.0] - 2026-09-23
+
+### Added
+- Collection files: File → Save Collection saves the loaded positions and their decks, and File → Open Collection rebuilds them later. Positions from XG files are re-imported from the file, so new rollouts are picked up and existing cards are updated on export.
+- The deck tree keeps decks expanded or collapsed as you left them across imports, and has buttons to expand or collapse all decks.
+
+### Fixed
+- Re-rendering cards with Regenerate no longer drops the "Rollout" and ply labels from the move analysis.
+
 ## [1.9.0] - 2026-09-12
 
 ### Added
