@@ -63,6 +63,7 @@ include = ["ankigammon*"]
 [tool.setuptools.package-data]
 ankigammon = [
     "gui/resources/*",
+    "data/*",
 ]
 
 # Version bumping configuration

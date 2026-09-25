@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+- Installing with `pip install ankigammon` now includes the bundled Kazaross XG2 match equity table, which match equity lookups need.
+
 ## [1.10.0] - 2026-09-23
 
 ### Added
