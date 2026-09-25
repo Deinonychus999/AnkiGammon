@@ -3,16 +3,14 @@
 import pytest
 
 from ankigammon.models import Position, Player, Decision, Move, DecisionType
-from ankigammon.settings import Settings
+from ankigammon.import_filter import ensure_played_move_in_candidates
 
 
 class TestPlayedMoveInjection:
     """Test that played moves are injected into top N candidates for MCQ display."""
 
     def setup_method(self):
-        """Set up test fixtures."""
-        self.settings = Settings()
-        self.settings.max_moves = 5  # Default to 5 for these tests
+        self.max_options = 5
 
     def test_played_move_already_in_top_5(self):
         """Test that nothing happens if played move is already in top N."""
@@ -39,22 +37,7 @@ class TestPlayedMoveInjection:
 
         played_move = moves[2]  # 3rd move
 
-        # Create a minimal MainWindow mock
-        class MainWindowMock:
-            def __init__(self, settings):
-                self.settings = settings
-
-            def _ensure_played_move_in_candidates(self, decision, played_move):
-                # Copy the implementation with configurable max_options
-                max_options = self.settings.max_moves
-                top_n = decision.candidate_moves[:max_options]
-                if played_move in top_n:
-                    return
-                decision.candidate_moves.remove(played_move)
-                decision.candidate_moves.insert(max_options - 1, played_move)
-
-        mock = MainWindowMock(self.settings)
-        mock._ensure_played_move_in_candidates(decision, played_move)
+        ensure_played_move_in_candidates(decision, played_move, self.max_options)
 
         # Verify: candidate_moves should be unchanged
         assert decision.candidate_moves[2] == played_move
@@ -86,25 +69,10 @@ class TestPlayedMoveInjection:
         played_move = moves[5]  # 6th move (blunder)
         original_5th = moves[4]  # Save reference BEFORE injection
 
-        # Create a minimal MainWindow mock
-        class MainWindowMock:
-            def __init__(self, settings):
-                self.settings = settings
-
-            def _ensure_played_move_in_candidates(self, decision, played_move):
-                # Copy the implementation with configurable max_options
-                max_options = self.settings.max_moves
-                top_n = decision.candidate_moves[:max_options]
-                if played_move in top_n:
-                    return
-                decision.candidate_moves.remove(played_move)
-                decision.candidate_moves.insert(max_options - 1, played_move)
-
-        mock = MainWindowMock(self.settings)
-        mock._ensure_played_move_in_candidates(decision, played_move)
+        ensure_played_move_in_candidates(decision, played_move, self.max_options)
 
         # Verify: played move should now be at position 4 (5th slot, with max_moves=5)
-        max_options = self.settings.max_moves
+        max_options = self.max_options
         assert decision.candidate_moves[max_options - 1] == played_move
         assert decision.candidate_moves[max_options - 1].was_played is True
         assert decision.candidate_moves[max_options - 1].notation == "24/21 24/18"
@@ -138,25 +106,10 @@ class TestPlayedMoveInjection:
 
         played_move = moves[9]  # Last move (worst blunder)
 
-        # Create a minimal MainWindow mock
-        class MainWindowMock:
-            def __init__(self, settings):
-                self.settings = settings
-
-            def _ensure_played_move_in_candidates(self, decision, played_move):
-                # Copy the implementation with configurable max_options
-                max_options = self.settings.max_moves
-                top_n = decision.candidate_moves[:max_options]
-                if played_move in top_n:
-                    return
-                decision.candidate_moves.remove(played_move)
-                decision.candidate_moves.insert(max_options - 1, played_move)
-
-        mock = MainWindowMock(self.settings)
-        mock._ensure_played_move_in_candidates(decision, played_move)
+        ensure_played_move_in_candidates(decision, played_move, self.max_options)
 
         # Verify: played move should now be at position N-1 (last slot)
-        max_options = self.settings.max_moves
+        max_options = self.max_options
         assert decision.candidate_moves[max_options - 1] == played_move
         assert decision.candidate_moves[max_options - 1].was_played is True
 
@@ -167,7 +120,7 @@ class TestPlayedMoveInjection:
     def test_played_move_with_custom_max_options(self):
         """Test that function respects custom max_moves setting."""
         # Test with max_moves = 3
-        self.settings.max_moves = 3
+        self.max_options = 3
         position = Position()
 
         # Create 6 moves where played move is 5th (outside top 3)
@@ -190,22 +143,7 @@ class TestPlayedMoveInjection:
 
         played_move = moves[4]  # 5th move (outside top 3)
 
-        # Create a minimal MainWindow mock
-        class MainWindowMock:
-            def __init__(self, settings):
-                self.settings = settings
-
-            def _ensure_played_move_in_candidates(self, decision, played_move):
-                # Copy the implementation with configurable max_options
-                max_options = self.settings.max_moves
-                top_n = decision.candidate_moves[:max_options]
-                if played_move in top_n:
-                    return
-                decision.candidate_moves.remove(played_move)
-                decision.candidate_moves.insert(max_options - 1, played_move)
-
-        mock = MainWindowMock(self.settings)
-        mock._ensure_played_move_in_candidates(decision, played_move)
+        ensure_played_move_in_candidates(decision, played_move, self.max_options)
 
         # Verify: played move should now be at position 2 (3rd slot, with max_moves=3)
         assert decision.candidate_moves[2] == played_move

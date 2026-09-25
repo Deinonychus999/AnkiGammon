@@ -31,6 +31,7 @@ from ankigammon.settings import Settings
 from ankigammon.renderer.svg_board_renderer import SVGBoardRenderer
 from ankigammon.renderer.color_schemes import get_scheme
 from ankigammon.models import Decision, Move
+from ankigammon.import_filter import ensure_played_move_in_candidates, filter_decisions
 from ankigammon.gui.widgets.deck_tree import DeckTreeWidget, DeckTreeItem, PositionTreeItem
 from ankigammon.gui.deck_manager import DeckManager
 from ankigammon.gui.dialogs import SettingsDialog, ExportDialog, InputDialog, ImportOptionsDialog, ShortcutsDialog
@@ -1187,29 +1188,7 @@ class MainWindow(QMainWindow):
             )
 
     def _ensure_played_move_in_candidates(self, decision: Decision, played_move: Move) -> None:
-        """
-        Ensure the played move is in the top N candidates for MCQ display.
-
-        If the played move is not in the top N analyzed moves (where N is max_moves),
-        insert it at position N-1 (last slot) to ensure it appears as an option.
-
-        Args:
-            decision: The decision object to modify
-            played_move: The move that was actually played
-        """
-        # Get the number of MCQ options from settings
-        max_options = self.settings.max_moves
-
-        # Check if played move is already in the top N candidates
-        top_n = decision.candidate_moves[:max_options]
-
-        # If played move is already in top N, nothing to do
-        if played_move in top_n:
-            return
-
-        # Move is not in top N - insert it at position N-1 (last slot)
-        decision.candidate_moves.remove(played_move)
-        decision.candidate_moves.insert(max_options - 1, played_move)
+        ensure_played_move_in_candidates(decision, played_move, self.settings.max_moves)
 
     def _prescan_player_names(self, file_paths: List[str]) -> Tuple[dict, int, List[str]]:
         """
@@ -1413,132 +1392,10 @@ class MainWindow(QMainWindow):
         include_player_x: bool,
         include_player_o: bool
     ) -> list[Decision]:
-        """
-        Filter decisions based on import options.
-
-        Args:
-            decisions: All parsed decisions
-            checker_threshold: Error threshold for checker play (positive value, e.g., 0.080)
-            cube_threshold: Error threshold for cube decisions (positive value, e.g., 0.080)
-            include_player_x: Include Player.X mistakes
-            include_player_o: Include Player.O mistakes
-
-        Returns:
-            Filtered list of decisions
-        """
-        from ankigammon.models import Player, DecisionType
-        import logging
-        logger = logging.getLogger(__name__)
-
-        filtered = []
-
-        cube_decisions_found = sum(1 for d in decisions if d.decision_type == DecisionType.CUBE_ACTION)
-        logger.debug(f"Filtering {len(decisions)} total decisions ({cube_decisions_found} cube decisions)")
-
-        for decision in decisions:
-            # Skip decisions with no moves
-            if not decision.candidate_moves:
-                continue
-
-            # Find the move that was actually played in the game
-            played_move = next((m for m in decision.candidate_moves if m.was_played), None)
-
-            # Skip if no move is marked as played
-            if not played_move:
-                continue
-
-            # Handle cube and checker play decisions differently
-            if decision.decision_type == DecisionType.CUBE_ACTION:
-                # Check which player made the error
-                attr = decision.get_cube_error_attribution()
-                doubler = attr['doubler']
-                responder = attr['responder']
-                doubler_error = attr['doubler_error']
-                responder_error = attr['responder_error']
-
-                logger.debug(f"Cube decision - doubler={doubler}, doubler_error={doubler_error}, responder={responder}, responder_error={responder_error}, cube_threshold={cube_threshold}")
-
-                # Determine which player(s) made errors above threshold
-                doubler_made_error = doubler_error is not None and abs(doubler_error) >= cube_threshold
-                responder_made_error = responder_error is not None and abs(responder_error) >= cube_threshold
-
-                logger.debug(f"doubler_made_error={doubler_made_error}, responder_made_error={responder_made_error}")
-
-                # Skip if no errors above threshold
-                if not doubler_made_error and not responder_made_error:
-                    logger.debug(f"Skipping cube decision - no errors above threshold")
-                    continue
-
-                # Check if we should include this decision based on player filter
-                include_decision = False
-
-                if doubler == Player.X and doubler_made_error and include_player_x:
-                    include_decision = True
-                if doubler == Player.O and doubler_made_error and include_player_o:
-                    include_decision = True
-                if responder == Player.X and responder_made_error and include_player_x:
-                    include_decision = True
-                if responder == Player.O and responder_made_error and include_player_o:
-                    include_decision = True
-
-                logger.debug(f"include_decision={include_decision} (include_player_x={include_player_x}, include_player_o={include_player_o})")
-
-                if include_decision:
-                    # Include the played move in MCQ candidates
-                    self._ensure_played_move_in_candidates(decision, played_move)
-
-                    # When the user filtered to a single player, tag which player
-                    # this decision was kept for. This drives split-cube card variants
-                    # (doubler-only / receiver-only) downstream in card_generator.
-                    # When both players are included we leave user_player=None so the
-                    # full 5-option card is generated.
-                    only_x = include_player_x and not include_player_o
-                    only_o = include_player_o and not include_player_x
-                    if only_x:
-                        # Side that erred determines variant (doubler vs responder)
-                        if doubler == Player.X and doubler_made_error:
-                            decision.user_player = Player.X
-                        elif responder == Player.X and responder_made_error:
-                            decision.user_player = Player.X
-                    elif only_o:
-                        if doubler == Player.O and doubler_made_error:
-                            decision.user_player = Player.O
-                        elif responder == Player.O and responder_made_error:
-                            decision.user_player = Player.O
-
-                    filtered.append(decision)
-                    logger.debug(f"Added cube decision to filtered list (user_player={decision.user_player})")
-            else:
-                # For checker play from XG binary files, use XG's authoritative ErrMove field
-                # Otherwise fall back to recalculated error
-                if decision.xg_error_move is not None:
-                    # Use XG's ErrMove field (already absolute value)
-                    error_magnitude = decision.xg_error_move
-                elif played_move.xg_error is not None:
-                    # Use XG text parser's calculated error
-                    error_magnitude = abs(played_move.xg_error)
-                else:
-                    # Use recalculated error (for other sources)
-                    error_magnitude = played_move.error
-
-                # Only include if error is at or above threshold
-                if error_magnitude < checker_threshold:
-                    continue
-
-                # Check player filter - error belongs to the player on roll
-                if decision.on_roll == Player.X and not include_player_x:
-                    continue
-                if decision.on_roll == Player.O and not include_player_o:
-                    continue
-
-                # Include the played move in MCQ candidates
-                self._ensure_played_move_in_candidates(decision, played_move)
-                filtered.append(decision)
-
-        cube_decisions_filtered = sum(1 for d in filtered if d.decision_type == DecisionType.CUBE_ACTION)
-        logger.debug(f"After filtering: {len(filtered)} decisions ({cube_decisions_filtered} cube decisions)")
-
-        return filtered
+        return filter_decisions(
+            decisions, checker_threshold, cube_threshold,
+            include_player_x, include_player_o, self.settings.max_moves,
+        )
 
     def _import_match_file(self, file_path: str, options: Optional[dict] = None):
         """
