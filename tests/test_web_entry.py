@@ -170,3 +170,196 @@ def test_empty_selection_exports_everything(session):
     loaded = json.loads(web.load_file(SAMPLE))
     notes = read_apkg_notes(web.export_apkg("[]", "Web entry test"))
     assert len(notes) == len(loaded["positions"])
+
+
+# ---------------------------------------------------------------------------
+# What the browser can and cannot import
+# ---------------------------------------------------------------------------
+
+def _run_isolated(code, tmp_path):
+    import subprocess
+    import sys
+    script = tmp_path / "probe.py"
+    script.write_text(code, encoding="utf-8")
+    return subprocess.run([sys.executable, str(script)], capture_output=True, text=True,
+                          cwd=str(Path(__file__).resolve().parent.parent))
+
+
+def test_browser_path_never_imports_desktop_only_modules(tmp_path):
+    """The website strips ankigammon/gui and utils/xg_auto from the wheel it
+    serves, so nothing the browser calls may import them."""
+    result = _run_isolated(f"""
+import json, sys, warnings
+warnings.filterwarnings("ignore")
+from ankigammon import web
+web.start({str(tmp_path / 'work')!r})
+web.read_player_names({SAMPLE!r})
+web.load_file({SAMPLE!r})
+web.configure(json.dumps({{"color_scheme": "ocean"}}))
+web.preview(0)
+web.export_apkg("[]", "probe")
+web.load_text({ANALYZED!r})
+banned = [m for m in sys.modules if m.startswith(("ankigammon.gui", "ankigammon.utils.xg_auto", "PySide6"))]
+print(banned)
+sys.exit(1 if banned else 0)
+""", tmp_path)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_anki_connect_client_loads_without_requests(tmp_path):
+    """requests is not installed in the browser; the client must import
+    it only where the desktop sends a request."""
+    result = _run_isolated("""
+import sys
+sys.modules["requests"] = None
+import ankigammon.anki.ankiconnect
+from ankigammon import web
+""", tmp_path)
+    assert result.returncode == 0, result.stderr[-800:]
+
+
+# ---------------------------------------------------------------------------
+# Send to Anki: the real AnkiConnect client over a swapped transport
+# ---------------------------------------------------------------------------
+
+class FakeAnki:
+    """Just enough of AnkiConnect's HTTP API, answering like the add-on."""
+
+    def __init__(self):
+        self.models = {}
+        self.decks = set()
+        self.notes = {}
+        self.cards = {}
+        self.actions = []
+        self.keys = []
+        self._next = 1000
+
+    def __call__(self, url, payload):
+        self.url = url
+        self.keys.append(payload.get("key"))
+        action, params = payload["action"], payload.get("params", {})
+        self.actions.append(action)
+        try:
+            return {"result": getattr(self, "do_" + action)(**params), "error": None}
+        except Exception as e:  # AnkiConnect reports failures in-band
+            return {"result": None, "error": str(e)}
+
+    def _id(self):
+        self._next += 1
+        return self._next
+
+    def do_modelNames(self):
+        return list(self.models)
+
+    def do_createModel(self, modelName, inOrderFields, css, cardTemplates):
+        self.models[modelName] = {"fields": list(inOrderFields), "css": css}
+
+    def do_updateModelStyling(self, model):
+        self.models[model["name"]]["css"] = model["css"]
+
+    def do_modelFieldNames(self, modelName):
+        return self.models[modelName]["fields"]
+
+    def do_createDeck(self, deck):
+        self.decks.add(deck)
+
+    def do_findNotes(self, query):
+        xgid = query.split('"XGID:', 1)[1].split('"', 1)[0].replace('\\"', '"')
+        return [nid for nid, n in self.notes.items() if n["fields"]["XGID"] == xgid]
+
+    def do_addNote(self, note):
+        if note["deckName"] not in self.decks:
+            raise ValueError(f"deck was not found: {note['deckName']}")
+        nid, cid = self._id(), self._id()
+        self.notes[nid] = {"fields": dict(note["fields"]), "tags": list(note["tags"]), "cards": [cid]}
+        self.cards[cid] = note["deckName"]
+        return nid
+
+    def do_updateNoteFields(self, note):
+        self.notes[note["id"]]["fields"].update(note["fields"])
+
+    def do_notesInfo(self, notes):
+        return [{"noteId": n, "tags": self.notes[n]["tags"], "cards": self.notes[n]["cards"]} for n in notes]
+
+    def do_removeTags(self, notes, tags):
+        for n in notes:
+            self.notes[n]["tags"] = [t for t in self.notes[n]["tags"] if t not in tags.split()]
+
+    def do_addTags(self, notes, tags):
+        for n in notes:
+            self.notes[n]["tags"] += tags.split()
+
+    def do_changeDeck(self, cards, deck):
+        for c in cards:
+            self.cards[c] = deck
+
+    def deck_of(self, nid):
+        return self.cards[self.notes[nid]["cards"][0]]
+
+
+def _send(fake, indices="[]", deck="Web send test", **kw):
+    return json.loads(web.send_to_anki(indices, deck, transport=fake, **kw))
+
+
+def test_first_send_adds_every_card_with_the_apkg_fields(session):
+    import random
+
+    loaded = json.loads(web.load_file(SAMPLE))
+    fake = FakeAnki()
+    random.seed(11)
+    summary = _send(fake, use_subdecks=True)
+    random.seed(11)
+    apkg = read_apkg_notes(web.export_apkg("[]", "Web send test", use_subdecks=True))
+
+    total = len(loaded["positions"])
+    assert (summary["total"], summary["added"], summary["updated"]) == (total, total, 0)
+    assert set(summary["decks"]) == {"Web send test::Checker Play", "Web send test::Cube Decisions"}
+    assert set(summary["decks"]) <= fake.decks
+    sent = sorted((n["fields"]["XGID"], n["fields"]["Front"], n["fields"]["Back"], n["fields"]["AnalysisData"])
+                  for n in fake.notes.values())
+    assert sent == sorted(tuple(f) for f in apkg)
+    assert "AnkiGammon" in fake.models
+
+
+def test_sending_again_updates_instead_of_duplicating(session):
+    web.load_file(SAMPLE)
+    fake = FakeAnki()
+    first = _send(fake)
+    second = _send(fake)
+    assert second["added"] == 0 and second["updated"] == first["total"]
+    assert len(fake.notes) == first["total"]
+
+
+def test_changing_the_deck_moves_existing_cards(session):
+    web.load_file(SAMPLE)
+    fake = FakeAnki()
+    _send(fake, deck="Old deck")
+    _send(fake, deck="New deck")
+    assert {fake.deck_of(n) for n in fake.notes} == {"New deck"}
+
+
+def test_selection_and_progress(session):
+    web.load_file(SAMPLE)
+    fake = FakeAnki()
+    seen = []
+    summary = _send(fake, indices="[0, 2]", progress=lambda done, total: seen.append((done, total)))
+    assert summary["total"] == 2 and len(fake.notes) == 2
+    assert seen == [(0, 2), (1, 2), (2, 2)]
+
+
+def test_api_key_travels_with_every_request(session):
+    web.load_file(SAMPLE)
+    fake = FakeAnki()
+    _send(fake, indices="[0]", api_key="s3cret", url="http://127.0.0.1:8766")
+    assert set(fake.keys) == {"s3cret"}
+    assert fake.url == "http://127.0.0.1:8766"
+
+
+def test_anki_errors_reach_the_page(session):
+    web.load_file(SAMPLE)
+
+    def broken(url, payload):
+        return {"result": None, "error": "collection is not available"}
+
+    with pytest.raises(Exception, match="collection is not available"):
+        _send(broken)

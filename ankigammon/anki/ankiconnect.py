@@ -1,6 +1,5 @@
 """Anki-Connect integration for direct note creation in Anki."""
 
-import requests
 from typing import Any, List, Optional, Tuple
 
 from ankigammon.anki.card_styles import MODEL_NAME, get_card_css
@@ -56,15 +55,23 @@ class AnkiConnect:
             'params': params
         }
 
+        result = self._post(payload)
+        if 'error' in result and result['error']:
+            raise Exception(f"Anki-Connect error: {result['error']}")
+        return result.get('result')
+
+    def _post(self, payload: dict) -> dict:
+        """Send one request and return AnkiConnect's decoded reply.
+
+        The browser version overrides this; requests is imported here
+        because it isn't installed there.
+        """
+        import requests
+
         try:
             response = requests.post(self.url, json=payload, timeout=5)
             response.raise_for_status()
-            result = response.json()
-
-            if 'error' in result and result['error']:
-                raise Exception(f"Anki-Connect error: {result['error']}")
-
-            return result.get('result')
+            return response.json()
 
         except requests.exceptions.ConnectionError as e:
             raise Exception(

@@ -2,7 +2,8 @@
 package unmodified under Pyodide.
 
 No analysis engine exists in the browser, so only input that already carries
-analysis is accepted: XG binary files (.xg, .xgp) and XG text export.
+analysis is accepted: XG binary files (.xg, .xgp) and XG text export. Cards
+leave as an .apkg download or go straight to a running Anki via AnkiConnect.
 
 Functions take and return JSON strings so the JavaScript side needs no
 knowledge of Python objects.
@@ -10,9 +11,10 @@ knowledge of Python objects.
 
 import json
 from pathlib import Path
-from typing import List, Optional
+from typing import Callable, List, Optional
 
 from ankigammon import settings as settings_module
+from ankigammon.anki.ankiconnect import AnkiConnect
 from ankigammon.import_filter import filter_decisions
 from ankigammon.models import Decision, DecisionType
 from ankigammon.settings import Settings
@@ -192,3 +194,98 @@ def export_apkg(indices_json: str, deck_name: str, show_options: bool = True,
         orientation=s.board_orientation,
         use_subdecks=use_subdecks,
     )
+
+
+def _xhr_post(url: str, payload: dict) -> dict:
+    """POST from the web worker with a synchronous XMLHttpRequest.
+
+    A plain-text body keeps it a CORS "simple" request: AnkiConnect answers
+    preflights only for origins it already allows, and it parses the body as
+    JSON whatever the content type.
+    """
+    from js import XMLHttpRequest
+
+    xhr = XMLHttpRequest.new()
+    xhr.open("POST", url, False)
+    try:
+        xhr.send(json.dumps(payload))
+    except Exception:
+        raise ConnectionError(
+            f"Could not reach Anki at {url}. Check that Anki is running with AnkiConnect "
+            "and that this site is allowed."
+        ) from None
+    if xhr.status != 200:
+        raise ConnectionError(f"AnkiConnect at {url} answered HTTP {xhr.status}.")
+    return json.loads(xhr.responseText)
+
+
+class _BrowserAnkiConnect(AnkiConnect):
+    """The desktop AnkiConnect client with the transport swapped, so model
+    setup, field migration and upsert-by-XGID behave exactly as on desktop."""
+
+    def __init__(self, url: str, deck_name: str, transport: Callable[[str, dict], dict],
+                 api_key: Optional[str] = None):
+        super().__init__(url=url, deck_name=deck_name)
+        self._transport = transport
+        self._api_key = api_key
+        self.added = 0
+
+    def _post(self, payload: dict) -> dict:
+        if self._api_key:
+            payload = {**payload, "key": self._api_key}
+        return self._transport(self.url, payload)
+
+    def add_note(self, *args, **kwargs) -> int:
+        note_id = super().add_note(*args, **kwargs)
+        self.added += 1
+        return note_id
+
+
+def send_to_anki(indices_json: str, deck_name: str, url: str = "http://127.0.0.1:8765",
+                 show_options: bool = True, interactive_moves: bool = True,
+                 use_subdecks: bool = False, api_key: str = "",
+                 progress: Optional[Callable[[int, int], None]] = None,
+                 transport: Optional[Callable[[str, dict], dict]] = None) -> str:
+    """Add or update the chosen positions in a running Anki through AnkiConnect,
+    matched by XGID like the desktop export. Returns
+    {"total", "added", "updated", "decks"}.
+
+    The page must have obtained permission first (AnkiConnect's
+    requestPermission from the main thread), since that call opens Anki's
+    dialog and the browser's local-network prompt.
+    """
+    from ankigammon.anki.deck_utils import group_decisions_by_deck
+
+    _settings()
+    indices = json.loads(indices_json)
+    chosen = [_decisions[i] for i in indices] if indices else list(_decisions)
+    if not chosen:
+        raise ValueError("No positions to send")
+    groups = group_decisions_by_deck(chosen, deck_name, use_subdecks)
+
+    client = _BrowserAnkiConnect(url, deck_name, transport or _xhr_post, api_key or None)
+    client.create_model()
+    for name in groups:
+        client.create_deck(name)
+
+    generator = _card_generator(show_options, interactive_moves)
+    total = len(chosen)
+    done = 0
+    for name, decisions in groups.items():
+        for decision in decisions:
+            if progress:
+                progress(done, total)
+            card = generator.generate_card(decision, card_id=f"card_{done}")
+            client.upsert_note(
+                front=card["front"],
+                back=card["back"],
+                tags=card.get("tags", []),
+                deck_name=name,
+                xgid=card.get("xgid", ""),
+                analysis_data=card.get("analysis_data", ""),
+            )
+            done += 1
+    if progress:
+        progress(done, total)
+    return json.dumps({"total": total, "added": client.added,
+                       "updated": total - client.added, "decks": list(groups)})
