@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.12.0] - 2026-09-25
+
+### Added
+- The browser version at [ankigammon.com/app](https://ankigammon.com/app/) can send cards straight to Anki running on your computer through AnkiConnect, in Chrome, Edge and Firefox. Like the desktop export, sending again updates the cards instead of duplicating them. It also loads faster on a first visit.
+
+### Fixed
+- Card text follows Anki's theme colors directly, instead of relying on a fallback newer Anki versions no longer guarantee. Existing cards pick this up the next time you export or re-import them.
+- The hint under the multiple-choice options is easier to read in light mode.
+
 ## [1.11.0] - 2026-09-25
 
 ### Added
