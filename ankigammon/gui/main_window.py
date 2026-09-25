@@ -1131,6 +1131,10 @@ class MainWindow(QMainWindow):
                     if log_path.exists():
                         zf.write(str(log_path), log_name)
 
+                fault_log = config_dir / "faulthandler.log"
+                if fault_log.exists():
+                    zf.write(str(fault_log), "faulthandler.log")
+
                 # Config file
                 config_path = config_dir / "config.json"
                 if config_path.exists():
