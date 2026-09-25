@@ -109,3 +109,16 @@ class TestExporterWiring:
         create_calls = [p for a, p in calls if a == "createModel"]
         assert len(create_calls) == 1
         assert WIDE_MEDIA_QUERY in create_calls[0]["css"]
+
+
+class TestAnkiThemeVariables:
+    """Anki 25.9 defines --fg, not --text-fg. A bare var(--text-fg) is invalid
+    there, so text color fell back to the page's color-scheme default and only
+    looked right by accident."""
+
+    def test_text_color_reads_fg_first(self):
+        bare = re.findall(r"(?<!var\(--fg, )var\(--text-fg\)", CARD_CSS)
+        assert not bare, f"{len(bare)} text color(s) still read only --text-fg"
+
+    def test_fallback_to_text_fg_kept_for_older_anki(self):
+        assert "var(--fg, var(--text-fg))" in CARD_CSS

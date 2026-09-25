@@ -118,6 +118,43 @@ def test_best_move_rules_cover_matrix_rank1():
         assert ".move-score-matrix-table tr.rank-1 td" in selector_block
 
 
+HINT_COLOR_PATTERN = re.compile(
+    r"(?P<night>\.night_mode\s+)?\.mcq-hint\s*\{[^}]*?color:\s*"
+    r"(?P<color>#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b)"
+)
+# Anki 25.9's light canvas; older versions rendered on white.
+ANKI_LIGHT_CANVAS = "#f5f5f5"
+
+
+def _six_digit(hex_color: str) -> str:
+    if len(hex_color) == 4:
+        return "#" + "".join(c * 2 for c in hex_color[1:])
+    return hex_color
+
+
+def _extract_hint_colors() -> dict:
+    return {
+        match.group("night") is not None: _six_digit(match.group("color").lower())
+        for match in HINT_COLOR_PATTERN.finditer(CARD_CSS)
+    }
+
+
+def test_hint_readable_light_mode():
+    """The hint under the choices was #999, 2.6:1 on Anki 25.9's canvas."""
+    colors = _extract_hint_colors()
+    assert False in colors, "light-mode .mcq-hint color rule not found"
+    for background in (LIGHT_CANVAS, ANKI_LIGHT_CANVAS):
+        ratio = contrast_ratio(colors[False], background)
+        assert ratio >= 4.5, f"hint {colors[False]} is {ratio:.2f}:1 on {background}"
+
+
+def test_hint_readable_night_mode():
+    colors = _extract_hint_colors()
+    color = colors.get(True, colors.get(False))
+    ratio = contrast_ratio(color, DARK_CANVAS)
+    assert ratio >= 4.5, f"night hint {color} is {ratio:.2f}:1 on {DARK_CANVAS}"
+
+
 @pytest.mark.parametrize("severity", ["minor", "blunder"])
 def test_error_colors_readable_night_mode(severity):
     """Night-mode error colors on Anki's dark canvas.

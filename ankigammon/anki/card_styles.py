@@ -29,7 +29,7 @@ CARD_CSS = """
     font-family: Arial, Helvetica, sans-serif;
     font-size: 16px;
     text-align: center;
-    color: var(--text-fg);
+    color: var(--fg, var(--text-fg));
     background-color: var(--canvas);
     max-width: 800px;
     margin: 0 auto;
@@ -198,7 +198,7 @@ CARD_CSS = """
 
 .metadata {
     font-size: 14px;
-    color: var(--text-fg);
+    color: var(--fg, var(--text-fg));
     margin: 10px 0;
     padding: 10px;
     background-color: var(--canvas-elevated);
@@ -212,7 +212,7 @@ CARD_CSS = """
 .question h3 {
     font-size: 20px;
     margin: 20px 0 10px;
-    color: var(--text-fg);
+    color: var(--fg, var(--text-fg));
 }
 
 .options {
@@ -284,7 +284,7 @@ CARD_CSS = """
     text-align: center;
     font-size: 14px;
     font-weight: bold;
-    color: var(--text-fg);
+    color: var(--fg, var(--text-fg));
     padding: 5px;
     margin-top: 5px;
     background-color: var(--canvas);
@@ -339,7 +339,7 @@ CARD_CSS = """
 }
 
 .note-content {
-    color: var(--text-fg);
+    color: var(--fg, var(--text-fg));
     font-size: 14px;
     line-height: 1.6;
     white-space: pre-wrap;
@@ -355,7 +355,7 @@ CARD_CSS = """
 /* Per-move analysis tier badge (e.g. "Rollout", "4-ply", "Screening") */
 .analysis-level {
     font-size: 0.72em;
-    color: var(--text-fg);
+    color: var(--fg, var(--text-fg));
     opacity: 0.55;
     font-style: italic;
     font-weight: normal;
@@ -377,7 +377,7 @@ CARD_CSS = """
 
 .winning-chances h4 {
     font-size: 18px;
-    color: var(--text-fg);
+    color: var(--fg, var(--text-fg));
     margin: 0 0 12px 0;
     text-align: center;
 }
@@ -401,7 +401,7 @@ CARD_CSS = """
 .chances-label {
     font-size: 15px;
     font-weight: 500;
-    color: var(--text-fg);
+    color: var(--fg, var(--text-fg));
     display: flex;
     align-items: center;
     gap: 6px;
@@ -473,7 +473,7 @@ CARD_CSS = """
 
 .equity-label {
     font-size: 14px;
-    color: var(--text-fg);
+    color: var(--fg, var(--text-fg));
     font-weight: 500;
 }
 
@@ -533,7 +533,7 @@ CARD_CSS = """
 
 .analysis h4 {
     font-size: 18px;
-    color: var(--text-fg);
+    color: var(--fg, var(--text-fg));
     margin-bottom: 10px;
     margin-top: 0;
 }
@@ -550,7 +550,7 @@ CARD_CSS = """
 .analysis-section h4,
 .chances-section h4 {
     font-size: 18px;
-    color: var(--text-fg);
+    color: var(--fg, var(--text-fg));
     margin: 0 0 10px 0;
     text-align: center;
 }
@@ -579,7 +579,7 @@ CARD_CSS = """
 .moves-table th {
     background-color: var(--canvas-elevated);
     font-weight: bold;
-    color: var(--text-fg);
+    color: var(--fg, var(--text-fg));
 }
 
 .moves-table tr.best-move {
@@ -774,7 +774,7 @@ CARD_CSS = """
     border: 1px solid var(--border);
     border-radius: 4px;
     font-size: 12px;
-    color: var(--text-fg);
+    color: var(--fg, var(--text-fg));
     text-align: left;
 }
 
@@ -806,7 +806,7 @@ CARD_CSS = """
     border: 1px solid var(--border);
     border-radius: 4px;
     cursor: pointer;
-    color: var(--text-fg);
+    color: var(--fg, var(--text-fg));
     opacity: 0.7;
     transition: opacity 0.2s, background-color 0.2s;
 }
@@ -836,7 +836,7 @@ CARD_CSS = """
 #position-status {
     font-size: 14px;
     font-weight: bold;
-    color: var(--text-fg);
+    color: var(--fg, var(--text-fg));
 }
 
 button.toggle-btn,
@@ -1033,9 +1033,13 @@ button.toggle-btn:active {
 .mcq-hint {
     margin-top: 12px;
     font-size: 12px;
-    color: #999;
+    color: #666666;
     font-style: italic;
     text-align: center;
+}
+
+.night_mode .mcq-hint {
+    color: #999999;
 }
 
 /* Submit button for preview mode */
@@ -1163,7 +1167,7 @@ button.mcq-submit-button:active {
 }
 
 .mcq-feedback-neutral .feedback-text {
-    color: var(--text-fg);
+    color: var(--fg, var(--text-fg));
 }
 
 /* Dark mode adjustments */
@@ -1303,7 +1307,7 @@ button.animate-btn:disabled {
 
 .score-matrix h3 {
     font-size: 18px;
-    color: var(--text-fg);
+    color: var(--fg, var(--text-fg));
     margin-bottom: 15px;
 }
 
@@ -1339,7 +1343,7 @@ button.animate-btn:disabled {
 .unlimited-jacoby-toggle .mj-off,
 .score-matrix-unlimited.showing-jacoby .unlimited-jacoby-toggle .mj-on {
     font-weight: bold;
-    color: var(--text-fg);
+    color: var(--fg, var(--text-fg));
 }
 
 .score-matrix-unlimited.showing-jacoby .unlimited-jacoby-toggle .mj-off {
@@ -1358,7 +1362,7 @@ button.animate-btn:disabled {
 
 .score-matrix-table th {
     background-color: var(--canvas-elevated);
-    color: var(--text-fg);
+    color: var(--fg, var(--text-fg));
     font-weight: bold;
     padding: 8px 12px;
     border: 1px solid var(--border);
@@ -1464,7 +1468,7 @@ button.animate-btn:disabled {
 .matrix-value-toggle .mv-errors,
 .score-matrix.showing-equities .matrix-value-toggle .mv-equities {
     font-weight: bold;
-    color: var(--text-fg);
+    color: var(--fg, var(--text-fg));
 }
 
 .score-matrix.showing-equities .matrix-value-toggle .mv-errors {
@@ -1571,7 +1575,7 @@ button.animate-btn:disabled {
 
 .move-score-matrix h3 {
     font-size: 18px;
-    color: var(--text-fg);
+    color: var(--fg, var(--text-fg));
     margin-bottom: 15px;
 }
 
@@ -1595,7 +1599,7 @@ button.animate-btn:disabled {
 
 .move-score-matrix-table thead th {
     background-color: var(--canvas-elevated);
-    color: var(--text-fg);
+    color: var(--fg, var(--text-fg));
     font-weight: bold;
     padding: 10px 14px;
     border: 1px solid var(--border);
