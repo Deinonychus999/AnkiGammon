@@ -135,24 +135,7 @@ class SettingsDialog(QDialog):
     def __init__(self, settings: Settings, parent: Optional[QDialog] = None):
         super().__init__(parent)
         self.settings = settings
-        self.original_settings = Settings()
-        self.original_settings.color_scheme = settings.color_scheme
-        self.original_settings.swap_checker_colors = settings.swap_checker_colors
-        self.original_settings.use_subdecks_by_type = settings.use_subdecks_by_type
-        self.original_settings.show_options = settings.show_options
-        self.original_settings.show_pip_count = settings.show_pip_count
-        self.original_settings.interactive_moves = settings.interactive_moves
-        self.original_settings.preview_moves_before_submit = settings.preview_moves_before_submit
-        self.original_settings.export_method = settings.export_method
-        self.original_settings.board_orientation = settings.board_orientation
-        self.original_settings.gnubg_path = settings.gnubg_path
-        self.original_settings.gnubg_analysis_ply = settings.gnubg_analysis_ply
-        self.original_settings.generate_score_matrix = settings.generate_score_matrix
-        self.original_settings.score_matrix_max_size = settings.score_matrix_max_size
-        self.original_settings.max_moves = settings.max_moves
-        self.original_settings.analyzer_type = settings.analyzer_type
-        self.original_settings.xg_exe_path = settings.xg_exe_path
-        self.original_settings.xg_analysis_level = settings.xg_analysis_level
+        self._subdecks_were_on = settings.use_subdecks_by_type
 
         # Validation worker
         self.validation_worker: Optional[GnuBGValidationWorker] = None
@@ -675,7 +658,7 @@ class SettingsDialog(QDialog):
     def _on_subdeck_toggled(self, _state):
         """Show info when enabling subdecks for the first time."""
         is_checked = self.chk_use_subdecks.isChecked()
-        if is_checked and not self.original_settings.use_subdecks_by_type:
+        if is_checked and not self._subdecks_were_on:
             QMessageBox.information(
                 self,
                 "Subdeck Organization",

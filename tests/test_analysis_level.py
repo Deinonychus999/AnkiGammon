@@ -203,8 +203,13 @@ class TestXGBinaryParserAnalysisLevel:
             f"expected both XG Roller+ and 4-ply candidates; got {levels}"
         )
 
+        from unittest import mock
+        from ankigammon.settings import Settings
+
         with tempfile.TemporaryDirectory() as tmp:
-            gen = CardGenerator(Path(tmp))
+            settings = Settings(config_path=Path(tmp) / "config.json")
+            with mock.patch("ankigammon.anki.card_generator.get_settings", return_value=settings):
+                gen = CardGenerator(Path(tmp))
             gen.settings.max_moves = 5
             card = gen.generate_card(target, 0)
             back = card.get("back", "")
