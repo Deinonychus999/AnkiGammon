@@ -1,8 +1,12 @@
 # Changelog
 
-## [Unreleased]
+## [1.11.0] - 2026-09-25
+
+### Added
+- AnkiGammon also runs in your browser at [ankigammon.com/app](https://ankigammon.com/app/), with nothing to install: drop an eXtreme Gammon .xg or .xgp file or paste XG analysis, pick the mistakes, preview the cards and download an .apkg deck. It makes the same cards as the desktop app, but has no analysis engine, so position IDs and .mat files still need the desktop app.
 
 ### Fixed
+- Help → Send Diagnostic Logs now includes the crash log.
 - Installing with `pip install ankigammon` now includes the bundled Kazaross XG2 match equity table, which match equity lookups need.
 
 ## [1.10.0] - 2026-09-23
