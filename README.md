@@ -192,6 +192,8 @@ Both export methods support updating existing cards when you change settings (co
 
 **File → Export to Trainer...** saves the loaded positions as a study pack (`.json`) for the [AnkiGammon trainer](https://ankigammon.com/train/), which runs in the browser on a computer or phone with no Anki and no account. Open the trainer, choose the file, and study: it asks for the best move or cube action, shows the analysis, and schedules reviews with FSRS. Everything stays on that device. On a phone, add the trainer to the Home Screen first, then send the file to the phone and open it from there. The trainer also opens AnkiGammon `.apkg` decks and the community decks.
 
+**File → Study in Trainer** skips the file on this computer: it opens the trainer in your browser and hands it the loaded positions directly. The positions go from AnkiGammon to the browser on this computer and nowhere else. Chrome, Edge and Firefox work; the first time, allow the browser to reach devices on your local network if it asks. Safari can't connect, so AnkiGammon offers to save the file instead.
+
 ### Collection Files
 
 A collection file saves the positions currently loaded in AnkiGammon, so you can rebuild your cards later for a new AnkiGammon version, new settings, or after new rollouts in XG.

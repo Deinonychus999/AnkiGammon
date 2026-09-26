@@ -544,6 +544,10 @@ class MainWindow(QMainWindow):
         act_export.triggered.connect(self.on_export_clicked)
         file_menu.addAction(act_export)
 
+        act_study_trainer = QAction("St&udy in Trainer", self)
+        act_study_trainer.triggered.connect(self.on_study_in_trainer_clicked)
+        file_menu.addAction(act_study_trainer)
+
         act_export_pack = QAction("Export to &Trainer...", self)
         act_export_pack.triggered.connect(self.on_export_pack_clicked)
         file_menu.addAction(act_export_pack)
@@ -1677,6 +1681,27 @@ class MainWindow(QMainWindow):
         self._process_import_queue()
 
     @Slot()
+    @Slot()
+    def on_study_in_trainer_clicked(self):
+        """Hand the loaded positions straight to the browser trainer on this computer."""
+        from ankigammon.gui.dialogs.trainer_handoff_dialog import TrainerHandoffDialog
+        from ankigammon.study_pack import build_pack
+
+        decisions = [d for group in self.deck_manager.get_grouped_decisions().values() for d in group]
+        pack = build_pack(decisions, self.settings.deck_name.split('::')[-1])
+        count = len(pack["positions"])
+        if not count:
+            silent_messagebox.information(
+                self, "Nothing to Study",
+                "No analyzed positions are loaded. Import files or add positions first."
+            )
+            return
+
+        dialog = TrainerHandoffDialog(self, pack, count)
+        dialog.exec()
+        if dialog.outcome == "save_file":
+            self.on_export_pack_clicked()
+
     @Slot()
     def on_export_pack_clicked(self):
         """Save the loaded positions as a study pack for the browser trainer."""
