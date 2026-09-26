@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.13.0] - 2026-09-25
+
+### Added
+- Study without Anki: the new trainer at [ankigammon.com/train](https://ankigammon.com/train/) runs in the browser on a computer or phone, with no account. It asks for the best move or cube action, shows the analysis, grades your answer and schedules reviews with FSRS, the same scheduler modern Anki uses. It works offline once added to your Home Screen.
+- File → Export to Trainer saves the loaded positions as a study pack to open in the trainer. The trainer also opens AnkiGammon .apkg decks and the community decks.
+
 ## [1.12.0] - 2026-09-25
 
 ### Added
