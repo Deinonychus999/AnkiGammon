@@ -121,6 +121,25 @@ def test_paste_without_analysis_explains_what_is_needed(session):
         web.load_text(UNANALYZED)
 
 
+@pytest.mark.parametrize("failed_load", ["paste", "file"])
+def test_failed_load_keeps_the_positions_the_page_still_shows(session, tmp_path, failed_load):
+    """The page keeps its list when a load fails, so exporting it must still
+    work; a paste without analysis used to empty the list first, and the
+    export then failed with 'list index out of range'."""
+    loaded = json.loads(web.load_file(SAMPLE))
+    with pytest.raises(ValueError):
+        if failed_load == "paste":
+            web.load_text(UNANALYZED)
+        else:
+            damaged = tmp_path / "damaged.xg"
+            damaged.write_bytes(bytes(range(256)) * 16)
+            web.load_file(str(damaged))
+
+    last = len(loaded["positions"]) - 1
+    [fields] = read_apkg_notes(web.export_apkg(f"[{last}]", "Web entry test"))
+    assert fields[0] == loaded["positions"][last]["xgid"]
+
+
 def test_unknown_card_setting_is_rejected(session):
     with pytest.raises(ValueError, match="Unknown card setting"):
         web.configure(json.dumps({"colour_scheme": "ocean"}))

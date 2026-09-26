@@ -142,12 +142,13 @@ def load_text(text: str) -> str:
     global _decisions
     _settings()
     parsed = XGTextParser.parse_string(text)
-    _decisions = [d for d in parsed if d.candidate_moves]
-    if not _decisions:
+    analyzed = [d for d in parsed if d.candidate_moves]
+    if not analyzed:
         raise ValueError(
             "No analyzed positions found. Paste the text XG copies with Ctrl+C "
             "after analyzing; bare position IDs need the desktop app."
         )
+    _decisions = analyzed
     return _loaded(len(parsed))
 
 
