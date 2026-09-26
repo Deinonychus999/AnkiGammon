@@ -30,21 +30,24 @@ def wait_for(qapp, condition, seconds=5):
         time.sleep(0.01)
 
 
-def fetch(url):
+def import_like_the_trainer(url):
     port, key = url.split("#desktop=")[1].split(".")
-    req = urllib.request.Request(f"http://127.0.0.1:{port}/pack/{key}",
-                                 headers={"Origin": "https://ankigammon.com"})
+    origin = {"Origin": "https://ankigammon.com"}
+    req = urllib.request.Request(f"http://127.0.0.1:{port}/pack/{key}", headers=origin)
     with urllib.request.urlopen(req, timeout=5) as response:
-        return json.loads(response.read())
+        pack = json.loads(response.read())
+    req = urllib.request.Request(f"http://127.0.0.1:{port}/done/{key}", headers=origin, method="POST")
+    urllib.request.urlopen(req, timeout=5).close()
+    return pack
 
 
-def test_dialog_closes_as_sent_once_the_trainer_fetches(qapp, opened):
+def test_dialog_closes_as_sent_once_the_trainer_confirms(qapp, opened):
     dialog = TrainerHandoffDialog(None, PACK, 1)
     dialog.show()
     assert opened == [dialog.handoff.url()]
 
     got = {}
-    threading.Thread(target=lambda: got.update(pack=fetch(opened[0]))).start()
+    threading.Thread(target=lambda: got.update(pack=import_like_the_trainer(opened[0]))).start()
     wait_for(qapp, lambda: not dialog.isVisible())
 
     assert got["pack"] == PACK

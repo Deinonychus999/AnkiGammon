@@ -35,12 +35,12 @@ SECONDARY_STYLE = """
 
 
 class TrainerHandoffDialog(QDialog):
-    """Opens the trainer and closes once it has fetched the pack.
+    """Opens the trainer and closes once it confirms the import.
 
     `outcome` is "sent", "save_file" or "cancelled" after exec().
     """
 
-    _fetched = Signal()
+    _delivered = Signal()
     _timed_out = Signal()
 
     def __init__(self, parent, pack: dict, count: int, timeout: float = TIMEOUT_SECONDS):
@@ -84,14 +84,14 @@ class TrainerHandoffDialog(QDialog):
         self.setLayout(layout)
 
         # The server calls back on its own thread; signals bring that to the GUI thread.
-        self._fetched.connect(self._on_fetched)
+        self._delivered.connect(self._on_delivered)
         self._timed_out.connect(self._on_timed_out)
-        self.handoff = PackHandoff(pack, on_fetched=self._fetched.emit,
+        self.handoff = PackHandoff(pack, on_delivered=self._delivered.emit,
                                    on_timeout=self._timed_out.emit, timeout=timeout)
         self.handoff.start()
         QDesktopServices.openUrl(QUrl(self.handoff.url()))
 
-    def _on_fetched(self) -> None:
+    def _on_delivered(self) -> None:
         self.outcome = "sent"
         self.accept()
 

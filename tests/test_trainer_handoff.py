@@ -26,13 +26,17 @@ def request(handoff, path=None, origin=SITE, method="GET"):
         return e.code, dict(e.headers), e.read()
 
 
+def receipt(handoff, key=None, origin=SITE):
+    return request(handoff, path=f"/done/{key or handoff.key}", origin=origin, method="POST")
+
+
 @pytest.fixture
 def served():
-    events = {"fetched": threading.Event(), "timeout": threading.Event()}
+    events = {"delivered": threading.Event(), "timeout": threading.Event()}
     handoffs = []
 
     def make(timeout=30):
-        h = PackHandoff(PACK, on_fetched=events["fetched"].set,
+        h = PackHandoff(PACK, on_delivered=events["delivered"].set,
                         on_timeout=events["timeout"].set, timeout=timeout)
         h.start()
         handoffs.append(h)
@@ -49,16 +53,35 @@ def test_url_matches_the_trainer_contract(served):
     assert re.fullmatch(r"https://ankigammon\.com/train/#desktop=\d{1,5}\.[0-9a-f]{32}", h.url())
 
 
-def test_trainer_gets_the_pack_once(served):
-    make, events = served
+def test_trainer_gets_the_pack(served):
+    make, _ = served
     h = make()
     status, headers, body = request(h)
     assert status == 200
     assert json.loads(body) == PACK
     assert headers["Access-Control-Allow-Origin"] == SITE
-    assert events["fetched"].wait(2)
 
-    # The server shuts down right after, so a second try is refused or 404s.
+
+def test_a_fetch_alone_is_not_delivery(served):
+    """Chrome lets the fetch through before the user answers its
+    local-network prompt, then holds the response: the page may never see it."""
+    make, events = served
+    h = make()
+    assert request(h)[0] == 200
+    assert not events["delivered"].wait(0.2)
+    assert request(h)[0] == 200
+
+
+def test_receipt_reports_delivery_and_ends_the_handoff(served):
+    make, events = served
+    h = make()
+    assert request(h)[0] == 200
+    status, headers, _ = receipt(h)
+    assert status == 204
+    assert headers["Access-Control-Allow-Origin"] == SITE
+    assert events["delivered"].wait(2)
+
+    # The server shuts down right after, so a later fetch is refused or 404s.
     try:
         again = request(h)[0]
     except (urllib.error.URLError, ConnectionError):
@@ -66,22 +89,23 @@ def test_trainer_gets_the_pack_once(served):
     assert again in (404, None)
 
 
-def test_a_wrong_key_does_not_use_up_the_pack(served):
+def test_a_wrong_key_neither_serves_nor_confirms(served):
     make, events = served
     h = make()
-    status, _, _ = request(h, path="/pack/" + "0" * 32)
-    assert status == 404
-    assert not events["fetched"].is_set()
+    assert request(h, path="/pack/" + "0" * 32)[0] == 404
+    assert receipt(h, key="0" * 32)[0] == 404
+    assert not events["delivered"].is_set()
     assert request(h)[0] == 200
 
 
-def test_other_websites_are_refused_and_the_pack_stays(served):
+def test_other_websites_are_refused(served):
     make, events = served
     h = make()
     status, headers, _ = request(h, origin="https://example.com")
     assert status == 403
     assert "Access-Control-Allow-Origin" not in headers
-    assert not events["fetched"].is_set()
+    assert receipt(h, origin="https://example.com")[0] == 403
+    assert not events["delivered"].is_set()
     assert request(h)[0] == 200
 
 
@@ -99,20 +123,22 @@ def test_chrome_private_network_preflight_is_answered(served):
     assert status == 204
     assert headers["Access-Control-Allow-Private-Network"] == "true"
     assert headers["Access-Control-Allow-Origin"] == SITE
-    assert not events["fetched"].is_set()
+    assert "POST" in headers["Access-Control-Allow-Methods"]
+    assert not events["delivered"].is_set()
 
 
-def test_unfetched_pack_times_out(served):
-    make, events = served
-    h = make(timeout=0.3)
-    assert events["timeout"].wait(3)
-    assert not events["fetched"].is_set()
-
-
-def test_fetched_pack_never_reports_a_timeout(served):
+def test_unconfirmed_pack_times_out_even_after_a_fetch(served):
     make, events = served
     h = make(timeout=0.3)
     assert request(h)[0] == 200
+    assert events["timeout"].wait(3)
+    assert not events["delivered"].is_set()
+
+
+def test_confirmed_pack_never_reports_a_timeout(served):
+    make, events = served
+    h = make(timeout=0.3)
+    assert receipt(h)[0] == 204
     assert not events["timeout"].wait(0.6)
 
 
@@ -121,4 +147,3 @@ def test_cancel_stops_serving_without_a_timeout(served):
     h = make(timeout=0.3)
     h.close()
     assert not events["timeout"].wait(0.6)
-

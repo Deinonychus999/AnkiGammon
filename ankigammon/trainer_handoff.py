@@ -1,11 +1,14 @@
 """Hand a study pack to the browser trainer running on this computer.
 
-The desktop app serves the pack once from 127.0.0.1 behind a random key and
-opens ankigammon.com/train/#desktop=<port>.<key>; the trainer fetches
-/pack/<key> and imports it. The key travels in the URL fragment, which the
-browser never sends to the website. Browsers that refuse to reach loopback
-from an https page (Safari) never fetch, so the caller offers the file
-export when `on_timeout` fires.
+The desktop app serves the pack from 127.0.0.1 behind a random key and opens
+ankigammon.com/train/#desktop=<port>.<key>. The trainer fetches /pack/<key>,
+imports it, then POSTs /done/<key>; only that receipt counts as delivered.
+Chrome lets the fetch reach this server before the user answers its
+local-network prompt and holds the response until they do, so a served
+fetch proves nothing. The key travels in the URL fragment, which the browser
+never sends to the website. Browsers that refuse to reach loopback from an
+https page (Safari) never confirm, so the caller offers the file export when
+`on_timeout` fires.
 """
 
 import json
@@ -29,14 +32,14 @@ def origin_allowed(origin: str) -> bool:
 
 
 class PackHandoff:
-    """Serves one pack, once, until it is fetched, closed, or times out."""
+    """Serves one pack until the trainer confirms it, it is closed, or it times out."""
 
-    def __init__(self, pack: dict, on_fetched: Optional[Callable[[], None]] = None,
+    def __init__(self, pack: dict, on_delivered: Optional[Callable[[], None]] = None,
                  on_timeout: Optional[Callable[[], None]] = None,
                  timeout: float = TIMEOUT_SECONDS) -> None:
         self.key = secrets.token_hex(16)
         self._body = json.dumps(pack, separators=(",", ":")).encode("utf-8")
-        self._on_fetched = on_fetched
+        self._on_delivered = on_delivered
         self._on_timeout = on_timeout
         self._timeout = timeout
         self._lock = threading.Lock()
@@ -57,7 +60,7 @@ class PackHandoff:
         self._server.daemon_threads = True
         self._port = self._server.server_address[1]
         threading.Thread(target=self._server.serve_forever, daemon=True).start()
-        self._timer = threading.Timer(self._timeout, self._expire)
+        self._timer = threading.Timer(self._timeout, self._finish, args=(self._on_timeout,))
         self._timer.daemon = True
         self._timer.start()
 
@@ -78,39 +81,43 @@ class PackHandoff:
         server.shutdown()
         server.server_close()
 
-    def _expire(self) -> None:
-        with self._lock:
-            if self._done:
-                return
-            self._done = True
-        self.close()
-        if self._on_timeout:
-            self._on_timeout()
-
-    def _claim(self) -> bool:
+    def _finish(self, callback: Optional[Callable[[], None]]) -> bool:
+        """Close once; only the first of receipt and timeout reports."""
         with self._lock:
             if self._done:
                 return False
             self._done = True
-            return True
+        self.close()
+        if callback:
+            callback()
+        return True
 
-    def _release(self) -> None:
+    def _open(self) -> bool:
         with self._lock:
-            self._done = False
+            return not self._done
 
     def _handler_class(self):
         handoff = self
 
         class Handler(BaseHTTPRequestHandler):
-            def _cors(self) -> bool:
+            def _refuse_origin(self) -> bool:
                 origin = self.headers.get("Origin")
-                if origin is None:
+                if origin is not None and not origin_allowed(origin):
+                    self.send_response(403)
+                    self.end_headers()
                     return True
-                if not origin_allowed(origin):
-                    return False
-                self.send_header("Access-Control-Allow-Origin", origin)
-                self.send_header("Vary", "Origin")
-                return True
+                return False
+
+            def _cors(self) -> None:
+                origin = self.headers.get("Origin")
+                if origin is not None:
+                    self.send_header("Access-Control-Allow-Origin", origin)
+                    self.send_header("Vary", "Origin")
+
+            def _not_found(self) -> None:
+                self.send_response(404)
+                self._cors()
+                self.end_headers()
 
             def do_OPTIONS(self) -> None:
                 origin = self.headers.get("Origin")
@@ -120,39 +127,36 @@ class PackHandoff:
                     return
                 self.send_response(204)
                 self._cors()
-                self.send_header("Access-Control-Allow-Methods", "GET")
+                self.send_header("Access-Control-Allow-Methods", "GET, POST")
                 self.send_header("Access-Control-Allow-Private-Network", "true")
                 self.send_header("Access-Control-Max-Age", "60")
                 self.end_headers()
 
             def do_GET(self) -> None:
-                origin = self.headers.get("Origin")
-                if origin is not None and not origin_allowed(origin):
-                    self.send_response(403)
-                    self.end_headers()
+                if self._refuse_origin():
                     return
-                if self.path != f"/pack/{handoff.key}" or not handoff._claim():
-                    self.send_response(404)
-                    self._cors()
-                    self.end_headers()
+                if self.path != f"/pack/{handoff.key}" or not handoff._open():
+                    self._not_found()
                     return
-                try:
-                    self.send_response(200)
-                    self._cors()
-                    self.send_header("Content-Type", "application/json")
-                    self.send_header("Content-Length", str(len(handoff._body)))
-                    self.send_header("Cache-Control", "no-store")
-                    self.end_headers()
-                    self.wfile.write(handoff._body)
-                    self.wfile.flush()
-                except OSError:
-                    # The tab went away mid-transfer. Released, the pack
-                    # still times out and the caller offers the file instead.
-                    handoff._release()
+                self.send_response(200)
+                self._cors()
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(handoff._body)))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                self.wfile.write(handoff._body)
+
+            def do_POST(self) -> None:
+                if self._refuse_origin():
                     return
-                handoff.close()
-                if handoff._on_fetched:
-                    handoff._on_fetched()
+                if self.path != f"/done/{handoff.key}" or not handoff._open():
+                    self._not_found()
+                    return
+                self.send_response(204)
+                self._cors()
+                self.end_headers()
+                self.wfile.flush()
+                handoff._finish(handoff._on_delivered)
 
             def log_message(self, format: str, *args) -> None:
                 pass
