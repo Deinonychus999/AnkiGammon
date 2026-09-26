@@ -188,6 +188,10 @@ Both export methods support updating existing cards when you change settings (co
 - Re-exporting updates the card content while preserving your Anki review history
 - Useful for applying new color schemes or enabling features like move score matrices
 
+### Studying Without Anki
+
+**File → Export to Trainer...** saves the loaded positions as a study pack (`.json`) for the [AnkiGammon trainer](https://ankigammon.com/train/), which runs in the browser on a computer or phone with no Anki and no account. Open the trainer, choose the file, and study: it asks for the best move or cube action, shows the analysis, and schedules reviews with FSRS. Everything stays on that device. On a phone, add the trainer to the Home Screen first, then send the file to the phone and open it from there. The trainer also opens AnkiGammon `.apkg` decks and the community decks.
+
 ### Collection Files
 
 A collection file saves the positions currently loaded in AnkiGammon, so you can rebuild your cards later for a new AnkiGammon version, new settings, or after new rollouts in XG.

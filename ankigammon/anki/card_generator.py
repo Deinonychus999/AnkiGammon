@@ -2166,20 +2166,8 @@ class CardGenerator:
 """
 
     def _generate_tags(self, decision: Decision) -> List[str]:
-        """Generate tags for the card."""
-        tags = ["ankigammon", "backgammon"]
-
-        tags.append(decision.decision_type.value)
-
-        if decision.match_length > 0:
-            tags.append(f"match_{decision.match_length}pt")
-        else:
-            tags.append("unlimited_game")
-
-        if decision.cube_value > 1:
-            tags.append(f"cube_{decision.cube_value}")
-
-        return tags
+        from ankigammon.study_pack import decision_tags
+        return decision_tags(decision)
 
     @staticmethod
     def _flip_position_for_pov(position):

@@ -196,6 +196,19 @@ def export_apkg(indices_json: str, deck_name: str, show_options: bool = True,
     )
 
 
+def export_pack(indices_json: str, deck_name: str) -> str:
+    """The chosen positions (all when `indices_json` is "[]") as a study pack
+    for the trainer, a JSON string."""
+    from ankigammon.study_pack import build_pack
+    _settings()
+    indices = json.loads(indices_json)
+    chosen = [_decisions[i] for i in indices] if indices else list(_decisions)
+    pack = build_pack(chosen, deck_name)
+    if not pack["positions"]:
+        raise ValueError("No positions to export")
+    return json.dumps(pack, separators=(",", ":"))
+
+
 def _xhr_post(url: str, payload: dict) -> dict:
     """POST from the web worker with a synchronous XMLHttpRequest.
 

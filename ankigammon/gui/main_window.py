@@ -544,6 +544,10 @@ class MainWindow(QMainWindow):
         act_export.triggered.connect(self.on_export_clicked)
         file_menu.addAction(act_export)
 
+        act_export_pack = QAction("Export to &Trainer...", self)
+        act_export_pack.triggered.connect(self.on_export_pack_clicked)
+        file_menu.addAction(act_export_pack)
+
         act_regenerate = QAction("&Regenerate Cards in Anki...", self)
         act_regenerate.setShortcut("Ctrl+R")
         act_regenerate.triggered.connect(self.on_regenerate_clicked)
@@ -1673,6 +1677,47 @@ class MainWindow(QMainWindow):
         self._process_import_queue()
 
     @Slot()
+    @Slot()
+    def on_export_pack_clicked(self):
+        """Save the loaded positions as a study pack for the browser trainer."""
+        from PySide6.QtWidgets import QFileDialog
+        from ankigammon.study_pack import write_pack
+
+        decisions = [d for group in self.deck_manager.get_grouped_decisions().values() for d in group]
+        if not decisions:
+            silent_messagebox.information(
+                self, "Nothing to Export",
+                "No positions are loaded. Import files or add positions first."
+            )
+            return
+
+        start_dir = Path(self.settings.last_collection_path).parent if self.settings.last_collection_path else Path.home()
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Export to Trainer",
+            str(start_dir / f"{self.settings.deck_name.split('::')[-1]}.json"),
+            "AnkiGammon Study Pack (*.json)"
+        )
+        if not path:
+            return
+
+        try:
+            count = write_pack(decisions, Path(path), Path(path).stem)
+        except OSError as e:
+            silent_messagebox.critical(self, "Export Failed", f"Could not save the study pack:\n\n{e}")
+            return
+
+        answer = silent_messagebox.question(
+            self, "Study Pack Saved",
+            f"Saved {count} position(s) to:\n{path}\n\n"
+            "To study them without Anki, open the trainer at ankigammon.com/train and "
+            "choose this file. On a phone, send the file to the phone first.\n\n"
+            "Open the trainer in your browser now?",
+            default_button=QMessageBox.StandardButton.Yes,
+        )
+        if answer == QMessageBox.StandardButton.Yes:
+            QDesktopServices.openUrl(QUrl("https://ankigammon.com/train/"))
+
     def on_save_collection_clicked(self):
         """Save the loaded positions, and the files they were imported from."""
         from PySide6.QtWidgets import QFileDialog
