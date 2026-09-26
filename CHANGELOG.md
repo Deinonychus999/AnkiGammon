@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.14.0] - 2026-09-25
+
+### Added
+- File → Study in Trainer opens the [trainer](https://ankigammon.com/train/) in your browser and hands it the loaded positions directly, with no file to save and pick. It works in Chrome, Edge and Firefox; the first time, allow the browser to reach devices on your local network. Safari can't connect, so AnkiGammon offers to save the file instead.
+
+### Changed
+- New logo: a small deck of cards topped by a die, on the app icon, the startup screen and the website.
+
+### Fixed
+- In the browser version, pasting XG text without analysis while a file was open no longer breaks exporting the positions still on screen.
+
 ## [1.13.0] - 2026-09-25
 
 ### Added
