@@ -1842,6 +1842,92 @@ class CardGenerator:
 '''
         return html
 
+    def _engine_available(self) -> bool:
+        if getattr(self.settings, 'analyzer_type', 'gnubg') == "xg":
+            return self.settings.is_xg_available()
+        return self.settings.is_gnubg_available()
+
+    def _compute_score_matrix(self, decision: Decision) -> Optional[dict]:
+        """The score matrix of a cube decision and where the live score sits in
+        it, or None when there is no engine or no matrix to draw.
+
+        Returns a dict with matrix, unlimited, current_player_away,
+        current_opponent_away, caption and is_projection. Engine errors
+        propagate.
+        """
+        if not self._engine_available():
+            return None
+
+        from ankigammon.analysis.score_matrix import (
+            generate_score_matrix,
+            resolve_effective_match_length,
+        )
+
+        max_size = getattr(self.settings, 'score_matrix_max_size', 0)
+        effective_ml = resolve_effective_match_length(decision.match_length, max_size)
+        is_projection = decision.match_length == 0
+
+        # generate_score_matrix requires match_length >= 2; this guards 1-point
+        # matches (decision.match_length == 1) — silently disabled here rather
+        # than raised downstream, since a 1pt match has no cube action to study.
+        if effective_ml < 2:
+            return None
+
+        # Current-cell highlight only makes sense for real match games, and only
+        # when the live away coordinates fall inside the (possibly capped) matrix.
+        # When they don't, surface a caption so the reader knows the matrix
+        # doesn't cover their actual current position.
+        current_player_away = None
+        current_opponent_away = None
+        caption = None
+        if not is_projection:
+            player_away = decision.match_length - (
+                decision.score_o if decision.on_roll == Player.O else decision.score_x
+            )
+            opponent_away = decision.match_length - (
+                decision.score_x if decision.on_roll == Player.O else decision.score_o
+            )
+            # min_away mirrors generate_score_matrix's cube-live floor
+            min_away = decision.cube_value + 1
+            if (min_away <= player_away <= effective_ml and
+                    min_away <= opponent_away <= effective_ml):
+                current_player_away = player_away
+                current_opponent_away = opponent_away
+            else:
+                caption = (
+                    f"Current score ({player_away}-away / {opponent_away}-away) "
+                    "is outside the displayed range."
+                )
+
+        matrix, unlimited = generate_score_matrix(
+            xgid=decision.xgid,
+            match_length=effective_ml,
+            analyzer=self._get_analyzer(),
+            progress_callback=self.progress_callback,
+            cancellation_callback=self.cancellation_callback,
+            cube_value=decision.cube_value,
+            cube_owner=decision.cube_owner,
+            unlimited_reference=not is_projection,
+        )
+        return {
+            'matrix': matrix,
+            'unlimited': unlimited,
+            'current_player_away': current_player_away,
+            'current_opponent_away': current_opponent_away,
+            'caption': caption,
+            'is_projection': is_projection,
+        }
+
+    def _warn_score_matrix(self, decision: Decision, result: dict) -> bool:
+        """Record a missing unlimited reference; True when it went missing."""
+        if not result['is_projection'] and result['unlimited'] is None:
+            self.generation_warnings.append(
+                f"Unlimited reference failed for {decision.xgid} "
+                "(card written without it)"
+            )
+            return True
+        return False
+
     def _generate_score_matrix_html(self, decision: Decision) -> str:
         """
         Generate score matrix HTML for cube decisions.
@@ -1852,84 +1938,25 @@ class CardGenerator:
         Returns:
             HTML string with score matrix, or empty string if unavailable
         """
-        analyzer_type = getattr(self.settings, 'analyzer_type', 'gnubg')
-        if analyzer_type == "xg":
-            if not self.settings.is_xg_available():
-                return ""
-        else:
-            if not self.settings.is_gnubg_available():
-                return ""
-
         try:
-            from ankigammon.analysis.score_matrix import (
-                generate_score_matrix,
-                format_matrix_as_html,
-                resolve_effective_match_length,
-            )
+            from ankigammon.analysis.score_matrix import format_matrix_as_html
 
-            max_size = getattr(self.settings, 'score_matrix_max_size', 0)
-            effective_ml = resolve_effective_match_length(decision.match_length, max_size)
-            is_projection = decision.match_length == 0
-
-            # generate_score_matrix requires match_length >= 2; this guards 1-point
-            # matches (decision.match_length == 1) — silently disabled here rather
-            # than raised downstream, since a 1pt match has no cube action to study.
-            if effective_ml < 2:
+            result = self._compute_score_matrix(decision)
+            if result is None:
                 return ""
-
-            # Current-cell highlight only makes sense for real match games, and only
-            # when the live away coordinates fall inside the (possibly capped) matrix.
-            # When they don't, surface a caption so the reader knows the matrix
-            # doesn't cover their actual current position.
-            current_player_away = None
-            current_opponent_away = None
-            caption = None
-            if not is_projection:
-                player_away = decision.match_length - (
-                    decision.score_o if decision.on_roll == Player.O else decision.score_x
-                )
-                opponent_away = decision.match_length - (
-                    decision.score_x if decision.on_roll == Player.O else decision.score_o
-                )
-                # min_away mirrors generate_score_matrix's cube-live floor
-                min_away = decision.cube_value + 1
-                if (min_away <= player_away <= effective_ml and
-                        min_away <= opponent_away <= effective_ml):
-                    current_player_away = player_away
-                    current_opponent_away = opponent_away
-                else:
-                    caption = (
-                        f"Current score ({player_away}-away / {opponent_away}-away) "
-                        "is outside the displayed range."
-                    )
-
-            matrix, unlimited = generate_score_matrix(
-                xgid=decision.xgid,
-                match_length=effective_ml,
-                analyzer=self._get_analyzer(),
-                progress_callback=self.progress_callback,
-                cancellation_callback=self.cancellation_callback,
-                cube_value=decision.cube_value,
-                cube_owner=decision.cube_owner,
-                unlimited_reference=not is_projection,
-            )
 
             matrix_html = format_matrix_as_html(
-                matrix=matrix,
-                current_player_away=current_player_away,
-                current_opponent_away=current_opponent_away,
+                matrix=result['matrix'],
+                current_player_away=result['current_player_away'],
+                current_opponent_away=result['current_opponent_away'],
                 analysis_label=self._analysis_label(),
                 cube_value=decision.cube_value,
                 cube_owner=decision.cube_owner,
-                caption=caption,
-                unlimited=unlimited,
+                caption=result['caption'],
+                unlimited=result['unlimited'],
             )
 
-            if not is_projection and unlimited is None:
-                self.generation_warnings.append(
-                    f"Unlimited reference failed for {decision.xgid} "
-                    "(card written without it)"
-                )
+            if self._warn_score_matrix(decision, result):
                 matrix_html += UNLIMITED_REFERENCE_FAILED_MARKER
 
             return matrix_html
@@ -1949,6 +1976,22 @@ class CardGenerator:
             )
             return ""
 
+    def _compute_move_score_matrix(self, decision: Decision):
+        """The top moves at the four score types, or None when there is no
+        engine or it isn't a checker play. Engine errors propagate."""
+        if not self._engine_available():
+            return None
+        if decision.decision_type != DecisionType.CHECKER_PLAY or not decision.dice:
+            return None
+        from ankigammon.analysis.move_score_matrix import generate_move_score_matrix
+        return generate_move_score_matrix(
+            xgid=decision.xgid,
+            analyzer=self._get_analyzer(),
+            max_moves=self.settings.max_moves,
+            progress_callback=self.progress_callback,
+            cancellation_callback=self.cancellation_callback
+        )
+
     def _generate_move_score_matrix_html(self, decision: Decision) -> str:
         """
         Generate move score matrix HTML for checker play decisions.
@@ -1965,36 +2008,12 @@ class CardGenerator:
         Returns:
             HTML string with move score matrix, or empty string if unavailable
         """
-        # Check analyzer availability
-        analyzer_type = getattr(self.settings, 'analyzer_type', 'gnubg')
-        if analyzer_type == "xg":
-            if not self.settings.is_xg_available():
-                return ""
-        else:
-            if not self.settings.is_gnubg_available():
-                return ""
-
-        # Only for checker play decisions
-        if decision.decision_type != DecisionType.CHECKER_PLAY:
-            return ""
-
-        # Skip if no dice (shouldn't happen for checker play)
-        if not decision.dice:
-            return ""
-
         try:
-            from ankigammon.analysis.move_score_matrix import (
-                generate_move_score_matrix,
-                format_move_matrix_as_html
-            )
+            from ankigammon.analysis.move_score_matrix import format_move_matrix_as_html
 
-            columns = generate_move_score_matrix(
-                xgid=decision.xgid,
-                analyzer=self._get_analyzer(),
-                max_moves=self.settings.max_moves,
-                progress_callback=self.progress_callback,
-                cancellation_callback=self.cancellation_callback
-            )
+            columns = self._compute_move_score_matrix(decision)
+            if columns is None:
+                return ""
 
             return format_move_matrix_as_html(
                 columns=columns,
@@ -2004,6 +2023,27 @@ class CardGenerator:
         except Exception as e:
             print(f"Warning: Failed to generate move score matrix: {e}")
             return ""
+
+    def _compute_move_cube_matrix(self, decision: Decision):
+        """The top moves at the three cube positions, or None when there is no
+        engine, it isn't a checker play, or the cube is dead. Engine errors
+        propagate."""
+        if not self._engine_available():
+            return None
+        if decision.decision_type != DecisionType.CHECKER_PLAY or not decision.dice:
+            return None
+        # The cube is dead in Crawford games and 1-point matches; owned-cube
+        # variants would be illegal/meaningless states there
+        if decision.crawford or decision.match_length == 1:
+            return None
+        from ankigammon.analysis.move_cube_matrix import generate_move_cube_matrix
+        return generate_move_cube_matrix(
+            xgid=decision.xgid,
+            analyzer=self._get_analyzer(),
+            max_moves=self.settings.max_moves,
+            progress_callback=self.progress_callback,
+            cancellation_callback=self.cancellation_callback
+        )
 
     def _generate_move_cube_matrix_html(self, decision: Decision) -> str:
         """
@@ -2020,44 +2060,15 @@ class CardGenerator:
             HTML string with the spoiler, or empty string if unavailable
             or the best move is identical at all three cube positions
         """
-        # Check analyzer availability
-        analyzer_type = getattr(self.settings, 'analyzer_type', 'gnubg')
-        if analyzer_type == "xg":
-            if not self.settings.is_xg_available():
-                return ""
-        else:
-            if not self.settings.is_gnubg_available():
-                return ""
-
-        # Only for checker play decisions
-        if decision.decision_type != DecisionType.CHECKER_PLAY:
-            return ""
-
-        # Skip if no dice (shouldn't happen for checker play)
-        if not decision.dice:
-            return ""
-
-        # The cube is dead in Crawford games and 1-point matches; owned-cube
-        # variants would be illegal/meaningless states there
-        if decision.crawford:
-            return ""
-        if decision.match_length == 1:
-            return ""
-
         try:
             from ankigammon.analysis.move_cube_matrix import (
-                generate_move_cube_matrix,
                 best_move_differs,
                 format_move_cube_matrix_as_html
             )
 
-            columns = generate_move_cube_matrix(
-                xgid=decision.xgid,
-                analyzer=self._get_analyzer(),
-                max_moves=self.settings.max_moves,
-                progress_callback=self.progress_callback,
-                cancellation_callback=self.cancellation_callback
-            )
+            columns = self._compute_move_cube_matrix(decision)
+            if columns is None:
+                return ""
 
             # Per issue #50: nothing visible is added when the best move is
             # the same at all three cube positions. The marker lets a later
@@ -2083,6 +2094,70 @@ class CardGenerator:
                 "(card exported without the cube comparison)"
             )
             return CUBE_COMPARISON_FAILED_MARKER
+
+    def study_extras(self, decision: Decision) -> dict:
+        """The optional analyses the settings ask for, as data for a study pack.
+
+        The same analyses the card back shows (score matrix, move score
+        matrix, cube-position comparison), computed the same way; a failed
+        one is left out and noted in generation_warnings, like on a card.
+        """
+        from dataclasses import asdict
+
+        extras = {}
+        label = self._analysis_label()
+        if decision.decision_type == DecisionType.CUBE_ACTION:
+            if self.settings.generate_score_matrix:
+                try:
+                    result = self._compute_score_matrix(decision)
+                    if result is not None:
+                        self._warn_score_matrix(decision, result)
+                        unlimited = result['unlimited']
+                        extras['score_matrix'] = {
+                            'cells': [[asdict(c) for c in row] for row in result['matrix']],
+                            'current': (
+                                {'player_away': result['current_player_away'],
+                                 'opponent_away': result['current_opponent_away']}
+                                if result['current_player_away'] is not None else None
+                            ),
+                            'caption': result['caption'],
+                            'projection': result['is_projection'],
+                            'unlimited': asdict(unlimited) if unlimited is not None else None,
+                            'analysis': label,
+                        }
+                except InterruptedError:
+                    raise
+                except Exception:
+                    logger.exception("Failed to generate score matrix for xgid=%r", decision.xgid)
+                    self.generation_warnings.append(f"Score matrix failed for {decision.xgid}")
+            return extras
+
+        if self.settings.generate_move_score_matrix:
+            try:
+                columns = self._compute_move_score_matrix(decision)
+                if columns:
+                    extras['move_score_matrix'] = {'columns': [asdict(c) for c in columns], 'analysis': label}
+            except InterruptedError:
+                raise
+            except Exception:
+                logger.exception("Failed to generate move score matrix for xgid=%r", decision.xgid)
+                self.generation_warnings.append(f"Move score matrix failed for {decision.xgid}")
+        if self.settings.generate_move_cube_matrix:
+            try:
+                from ankigammon.analysis.move_cube_matrix import best_move_differs
+                columns = self._compute_move_cube_matrix(decision)
+                if columns:
+                    extras['cube_matrix'] = {
+                        'columns': [asdict(c) for c in columns],
+                        'best_move_differs': best_move_differs(columns),
+                        'analysis': label,
+                    }
+            except InterruptedError:
+                raise
+            except Exception:
+                logger.exception("Failed to generate move cube matrix for xgid=%r", decision.xgid)
+                self.generation_warnings.append(f"Cube-position analysis failed for {decision.xgid}")
+        return extras
 
     def _generate_note_html(self, decision: Decision) -> str:
         """Generate note HTML if a note exists."""

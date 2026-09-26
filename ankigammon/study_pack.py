@@ -10,7 +10,7 @@ as decision_serialize writes it.
 
 import json
 from pathlib import Path
-from typing import List, Sequence
+from typing import List, Optional, Sequence
 
 from ankigammon.anki.decision_serialize import decision_to_json
 from ankigammon.models import Decision
@@ -31,18 +31,26 @@ def decision_tags(decision: Decision) -> List[str]:
     return tags
 
 
-def build_pack(decisions: Sequence[Decision], title: str) -> dict:
+def build_pack(decisions: Sequence[Decision], title: str,
+               extras: Optional[Sequence[Optional[dict]]] = None) -> dict:
     """The pack for `decisions`. Positions without an XGID or without
-    analysis are left out: the trainer can neither draw nor grade them."""
-    positions = [
-        {
+    analysis are left out: the trainer can neither draw nor grade them.
+
+    `extras`, one per decision, adds the optional analyses a card back would
+    show (CardGenerator.study_extras); a position gets them under "extras".
+    """
+    positions = []
+    for i, d in enumerate(decisions):
+        if not (d.xgid and d.candidate_moves):
+            continue
+        position = {
             "xgid": d.xgid,
             "tags": decision_tags(d),
             "analysis": json.loads(decision_to_json(d)),
         }
-        for d in decisions
-        if d.xgid and d.candidate_moves
-    ]
+        if extras is not None and extras[i]:
+            position["extras"] = extras[i]
+        positions.append(position)
     return {
         "format": PACK_FORMAT,
         "version": PACK_VERSION,
@@ -51,8 +59,12 @@ def build_pack(decisions: Sequence[Decision], title: str) -> dict:
     }
 
 
-def write_pack(decisions: Sequence[Decision], path: Path, title: str) -> int:
-    """Write the pack to `path` and return how many positions it holds."""
-    pack = build_pack(decisions, title)
+def save_pack(pack: dict, path: Path) -> int:
+    """Write a built pack to `path` and return how many positions it holds."""
     Path(path).write_text(json.dumps(pack, separators=(",", ":")), encoding="utf-8")
     return len(pack["positions"])
+
+
+def write_pack(decisions: Sequence[Decision], path: Path, title: str) -> int:
+    """Write the pack to `path` and return how many positions it holds."""
+    return save_pack(build_pack(decisions, title), path)

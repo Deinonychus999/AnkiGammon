@@ -21,6 +21,13 @@ from ankigammon.settings import Settings
 from ankigammon.renderer.color_schemes import list_schemes
 from ankigammon.utils.subprocess_env import external_subprocess_env
 
+# (settings value, label) for the Default Export Method choice, in combo order
+EXPORT_METHODS = [
+    ("ankiconnect", "AnkiConnect"),
+    ("apkg", "APKG File"),
+    ("trainer", "Trainer (browser)"),
+]
+
 
 class GnuBGValidationWorker(QThread):
     """Worker thread for validating GnuBG executable without blocking UI."""
@@ -192,7 +199,7 @@ class SettingsDialog(QDialog):
 
         # Export method
         self.cmb_export_method = QComboBox()
-        self.cmb_export_method.addItems(["AnkiConnect", "APKG File"])
+        self.cmb_export_method.addItems([label for _, label in EXPORT_METHODS])
         self.cmb_export_method.setCursor(Qt.PointingHandCursor)
         form.addRow("Default Export Method:", self.cmb_export_method)
 
@@ -673,8 +680,9 @@ class SettingsDialog(QDialog):
         self.chk_clear_after_export.setChecked(self.settings.clear_positions_after_export)
 
         # Export method
-        method_index = 0 if self.settings.export_method == "ankiconnect" else 1
-        self.cmb_export_method.setCurrentIndex(method_index)
+        methods = [value for value, _ in EXPORT_METHODS]
+        method = self.settings.export_method
+        self.cmb_export_method.setCurrentIndex(methods.index(method) if method in methods else 0)
 
         # Color scheme
         scheme_index = list_schemes().index(self.settings.color_scheme)
@@ -843,7 +851,7 @@ class SettingsDialog(QDialog):
         self.settings.use_subdecks_by_type = self.chk_use_subdecks.isChecked()
         self.settings.clear_positions_after_export = self.chk_clear_after_export.isChecked()
         self.settings.export_method = (
-            "ankiconnect" if self.cmb_export_method.currentIndex() == 0 else "apkg"
+            EXPORT_METHODS[self.cmb_export_method.currentIndex()][0]
         )
         self.settings.color_scheme = self.cmb_color_scheme.currentText()
         self.settings.swap_checker_colors = self.chk_swap_checker_colors.isChecked()

@@ -222,6 +222,8 @@ class MainWindow(QMainWindow):
         self._setup_connections()
         self._restore_window_state()
 
+        self._update_export_labels()
+
         # Create drop overlay (will be shown during drag operations)
         self._create_drop_overlay()
         self._create_deck_drop_highlight()
@@ -543,6 +545,7 @@ class MainWindow(QMainWindow):
         act_export.setShortcut("Ctrl+E")
         act_export.triggered.connect(self.on_export_clicked)
         file_menu.addAction(act_export)
+        self.act_export = act_export
 
         act_study_trainer = QAction("St&udy in Trainer", self)
         act_study_trainer.triggered.connect(self.on_study_in_trainer_clicked)
@@ -968,9 +971,16 @@ class MainWindow(QMainWindow):
         dialog.settings_changed.connect(self.on_settings_changed)
         dialog.exec()
 
+    def _update_export_labels(self):
+        """Name the export after where it goes: Anki, or the browser trainer."""
+        to_trainer = self.settings.export_method == "trainer"
+        self.btn_export.setText("  Send to Trainer" if to_trainer else "  Export to Anki")
+        self.act_export.setText("&Send to Trainer..." if to_trainer else "&Export to Anki...")
+
     @Slot(Settings)
     def on_settings_changed(self, settings: Settings):
         """Handle settings changes."""
+        self._update_export_labels()
         # Update renderer with new color scheme and orientation
         scheme = get_scheme(settings.color_scheme)
         if settings.swap_checker_colors:

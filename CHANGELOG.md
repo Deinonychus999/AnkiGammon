@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- A third export method, Trainer (browser): Send to Trainer runs the same analysis as an Anki export, including the score matrix, move score matrix and cube-position comparison, and hands the positions to the [trainer](https://ankigammon.com/train/), which shows those tables on the answer. Choose it under Settings → Default Export Method.
+
 ## [1.14.0] - 2026-09-25
 
 ### Added

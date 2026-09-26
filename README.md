@@ -181,9 +181,17 @@ Generate a package file for manual import:
 - Import into Anki: File → Import → Select the .apkg file
 - Useful for offline card generation
 
+### Trainer (browser)
+
+Send the positions to the [AnkiGammon trainer](https://ankigammon.com/train/) instead of Anki:
+- Select "Trainer (browser)" in Settings; the button becomes **Send to Trainer**
+- Runs the same analysis as an Anki export, including the score matrix, move score matrix and cube-position comparison when they are turned on, and the trainer shows them on the answer
+- Opens the trainer in your browser and hands it the positions directly (Chrome, Edge, Firefox; allow local network access the first time). Safari can't connect, so AnkiGammon offers to save the study pack as a file instead
+- Sending the same deck again updates its positions and keeps your review progress
+
 ### Regenerating Cards
 
-Both export methods support updating existing cards when you change settings (color scheme, board orientation, etc.):
+Both Anki export methods support updating existing cards when you change settings (color scheme, board orientation, etc.):
 - Cards are matched by their XGID position identifier
 - Re-exporting updates the card content while preserving your Anki review history
 - Useful for applying new color schemes or enabling features like move score matrices
@@ -253,7 +261,7 @@ Open Settings with **Ctrl+,** to configure:
 
 **Export:**
 - **Deck Name**: Customize your Anki deck name
-- **Export Method**: Choose between AnkiConnect or APKG output
+- **Export Method**: Choose AnkiConnect, APKG output, or the browser trainer
 - **Use Subdecks**: Split checker and cube decisions into separate subdecks
 - **Clear After Export**: Automatically clear the position list after successful export
 

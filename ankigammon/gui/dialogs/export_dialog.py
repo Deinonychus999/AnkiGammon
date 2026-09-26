@@ -1,5 +1,5 @@
 """
-Export progress dialog with AnkiConnect/APKG support.
+Export progress dialog: AnkiConnect, APKG file, or the browser trainer.
 """
 
 from typing import Dict, List
@@ -38,6 +38,42 @@ def _append_warnings(message: str, card_gen: CardGenerator) -> str:
         return message
     details = "\n".join(f"  - {w}" for w in warnings)
     return f"{message}\nWarning(s):\n{details}"
+
+
+def _analysis_substeps(decision: Decision, settings: Settings) -> int:
+    """How many engine runs the optional analyses of one position take, so
+    progress can advance per run; at least 1."""
+    analyzer_available = (
+        settings.is_xg_available() if getattr(settings, 'analyzer_type', 'gnubg') == 'xg'
+        else settings.is_gnubg_available()
+    )
+    has_cube_score_matrix = (
+        decision.decision_type.name == 'CUBE_ACTION' and
+        settings.get('generate_score_matrix', False) and
+        analyzer_available
+    )
+    has_move_score_matrix = (
+        decision.decision_type.name == 'CHECKER_PLAY' and
+        decision.dice and
+        settings.get('generate_move_score_matrix', False) and
+        analyzer_available
+    )
+    has_move_cube_matrix = (
+        decision.decision_type.name == 'CHECKER_PLAY' and
+        decision.dice and
+        settings.get('generate_move_cube_matrix', False) and
+        analyzer_available and
+        not decision.crawford and
+        decision.match_length != 1
+    )
+    cube_matrix_steps = count_score_matrix_analyses(
+        decision.match_length,
+        settings.get('score_matrix_max_size', 0),
+        decision.cube_owner == CubeState.CENTERED,
+    ) if has_cube_score_matrix else 0
+    move_matrix_steps = 4 if has_move_score_matrix else 0  # 4 score types analyzed
+    cube_variant_steps = 3 if has_move_cube_matrix else 0  # 3 cube positions analyzed
+    return max(1, cube_matrix_steps + move_matrix_steps + cube_variant_steps)
 
 
 class AnalysisWorker(QThread):
@@ -192,6 +228,8 @@ class ExportWorker(QThread):
         self._cancelled = False
         self._analyzer = analyzer
         self._card_gen = None
+        # The trainer export's result, for the dialog to hand to the trainer
+        self.pack = None
 
     def cancel(self):
         """Request cancellation of the export."""
@@ -202,6 +240,8 @@ class ExportWorker(QThread):
         try:
             if self.export_method == "ankiconnect":
                 self._export_ankiconnect()
+            elif self.export_method == "trainer":
+                self._export_trainer()
             else:
                 self._export_apkg()
         except Exception as e:
@@ -296,38 +336,7 @@ class ExportWorker(QThread):
                 base_progress = i / total
                 position_progress_range = 1.0 / total
 
-                # Calculate sub-steps for progress tracking
-                analyzer_available = (
-                    self.settings.is_xg_available() if getattr(self.settings, 'analyzer_type', 'gnubg') == 'xg'
-                    else self.settings.is_gnubg_available()
-                )
-                has_cube_score_matrix = (
-                    decision.decision_type.name == 'CUBE_ACTION' and
-                    self.settings.get('generate_score_matrix', False) and
-                    analyzer_available
-                )
-                has_move_score_matrix = (
-                    decision.decision_type.name == 'CHECKER_PLAY' and
-                    decision.dice and
-                    self.settings.get('generate_move_score_matrix', False) and
-                    analyzer_available
-                )
-                has_move_cube_matrix = (
-                    decision.decision_type.name == 'CHECKER_PLAY' and
-                    decision.dice and
-                    self.settings.get('generate_move_cube_matrix', False) and
-                    analyzer_available and
-                    not decision.crawford and
-                    decision.match_length != 1
-                )
-                cube_matrix_steps = count_score_matrix_analyses(
-                    decision.match_length,
-                    self.settings.get('score_matrix_max_size', 0),
-                    decision.cube_owner == CubeState.CENTERED,
-                ) if has_cube_score_matrix else 0
-                move_matrix_steps = 4 if has_move_score_matrix else 0
-                cube_variant_steps = 3 if has_move_cube_matrix else 0
-                total_substeps = max(1, cube_matrix_steps + move_matrix_steps + cube_variant_steps)
+                total_substeps = _analysis_substeps(decision, self.settings)
 
                 current_substep = [0]
 
@@ -392,6 +401,61 @@ class ExportWorker(QThread):
         else:
             message = f"Successfully exported {total} card(s) to Anki"
         self.finished.emit(True, _append_warnings(message, card_gen))
+
+    def _export_trainer(self):
+        """Build a study pack for the browser trainer, with the optional
+        analyses a card back would show (score matrices, cube comparison).
+
+        The dialog hands `self.pack` to the trainer; the trainer keeps one
+        deck per pack, named after the deck name's last part.
+        """
+        from ankigammon.study_pack import build_pack
+
+        self.status_message.emit("Preparing positions for the trainer...")
+        self.progress.emit(0.0)
+
+        card_gen = CardGenerator(
+            output_dir=Path.home() / '.ankigammon' / 'cards',
+            show_options=self.settings.show_options,
+            interactive_moves=self.settings.interactive_moves,
+            cancellation_callback=lambda: self._cancelled,
+            analyzer=self._analyzer,
+        )
+        self._card_gen = card_gen
+
+        total = len(self.all_decisions)
+        extras = []
+        for i, decision in enumerate(self.all_decisions):
+            if self._cancelled:
+                self.finished.emit(False, "Export cancelled by user")
+                return
+
+            base_progress = i / total
+            total_substeps = _analysis_substeps(decision, self.settings)
+            current_substep = [0]
+
+            def progress_callback(message: str, _i=i, _base=base_progress, _steps=total_substeps):
+                current_substep[0] += 1
+                self.progress.emit(_base + min(current_substep[0] / _steps, 0.95) / total)
+                self.status_message.emit(f"Position {_i+1}/{total}: {message}")
+
+            card_gen.progress_callback = progress_callback
+            self.progress.emit(base_progress)
+            try:
+                extras.append(card_gen.study_extras(decision))
+            except InterruptedError:
+                self.finished.emit(False, "Export cancelled by user")
+                return
+            self.progress.emit((i + 1) / total)
+
+        self.pack = build_pack(self.all_decisions, self.settings.deck_name.split('::')[-1], extras)
+        count = len(self.pack["positions"])
+        if not count:
+            self.pack = None
+            self.finished.emit(False, "No analyzed positions to send to the trainer")
+            return
+        self.progress.emit(1.0)
+        self.finished.emit(True, _append_warnings(f"Prepared {count} position(s) for the trainer", card_gen))
 
     def _export_apkg(self):
         """Export to APKG file."""
@@ -462,38 +526,7 @@ class ExportWorker(QThread):
                     base_progress = card_index / total
                     position_progress_range = 1.0 / total
 
-                    # Calculate sub-steps for progress tracking
-                    apkg_analyzer_available = (
-                        self.settings.is_xg_available() if getattr(self.settings, 'analyzer_type', 'gnubg') == 'xg'
-                        else self.settings.is_gnubg_available()
-                    )
-                    has_cube_score_matrix = (
-                        decision.decision_type.name == 'CUBE_ACTION' and
-                        self.settings.get('generate_score_matrix', False) and
-                        apkg_analyzer_available
-                    )
-                    has_move_score_matrix = (
-                        decision.decision_type.name == 'CHECKER_PLAY' and
-                        decision.dice and
-                        self.settings.get('generate_move_score_matrix', False) and
-                        apkg_analyzer_available
-                    )
-                    has_move_cube_matrix = (
-                        decision.decision_type.name == 'CHECKER_PLAY' and
-                        decision.dice and
-                        self.settings.get('generate_move_cube_matrix', False) and
-                        apkg_analyzer_available and
-                        not decision.crawford and
-                        decision.match_length != 1
-                    )
-                    cube_matrix_steps = count_score_matrix_analyses(
-                        decision.match_length,
-                        self.settings.get('score_matrix_max_size', 0),
-                        decision.cube_owner == CubeState.CENTERED,
-                    ) if has_cube_score_matrix else 0
-                    move_matrix_steps = 4 if has_move_score_matrix else 0  # 4 score types analyzed
-                    cube_variant_steps = 3 if has_move_cube_matrix else 0  # 3 cube positions analyzed
-                    total_substeps = max(1, cube_matrix_steps + move_matrix_steps + cube_variant_steps)
+                    total_substeps = _analysis_substeps(decision, self.settings)
 
                     current_substep = [0]
                     current_card_index = card_index  # Capture for closure
@@ -566,7 +599,7 @@ class ExportWorker(QThread):
 
 
 class ExportDialog(QDialog):
-    """Dialog for exporting positions to Anki."""
+    """Dialog for exporting positions to Anki, or sending them to the trainer."""
 
     # Signal emitted when export completes successfully
     export_succeeded = Signal()
@@ -584,8 +617,9 @@ class ExportDialog(QDialog):
         self.worker = None
         self.analysis_worker = None
         self._closing = False  # Flag to track if user requested close
+        self._to_trainer = settings.export_method == "trainer"
 
-        self.setWindowTitle("Export to Anki")
+        self.setWindowTitle("Send to Trainer" if self._to_trainer else "Export to Anki")
         self.setModal(True)
         self.setMinimumWidth(500)
 
@@ -598,13 +632,17 @@ class ExportDialog(QDialog):
         # Info label with position count and deck breakdown
         num_decks = len(self.grouped_decisions)
         total_positions = len(self.all_decisions)
+        verb = "Sending" if self._to_trainer else "Exporting"
         if num_decks == 1:
             deck_name = next(iter(self.grouped_decisions))
-            info_text = f"Exporting {total_positions} position(s)"
+            info_text = f"{verb} {total_positions} position(s)"
             deck_display = deck_name
         else:
-            info_text = f"Exporting {total_positions} position(s) across {num_decks} decks"
+            info_text = f"{verb} {total_positions} position(s) across {num_decks} decks"
             deck_display = ", ".join(self.grouped_decisions.keys())
+        if self._to_trainer:
+            # The trainer keeps one deck per pack.
+            deck_display = self.settings.deck_name.split('::')[-1]
 
         info = QLabel(info_text)
         info.setStyleSheet("font-size: 13px; color: #a6adc8; margin-bottom: 4px;")
@@ -622,7 +660,10 @@ class ExportDialog(QDialog):
         layout.addWidget(self.progress_bar)
 
         # Status label
-        self.status_label = QLabel(f"Ready to export {len(self.all_decisions)} position(s)")
+        self.status_label = QLabel(
+            f"Ready to send {len(self.all_decisions)} position(s) to the trainer" if self._to_trainer
+            else f"Ready to export {len(self.all_decisions)} position(s)"
+        )
         layout.addWidget(self.status_label)
 
         # Log text (hidden initially)
@@ -635,7 +676,7 @@ class ExportDialog(QDialog):
 
         # Buttons
         self.button_box = QDialogButtonBox()
-        self.btn_export = QPushButton("Export")
+        self.btn_export = QPushButton("Send" if self._to_trainer else "Export")
         self.btn_export.setCursor(Qt.PointingHandCursor)
         self.btn_export.clicked.connect(self.start_export)
         self.btn_close = QPushButton("Cancel")
@@ -708,7 +749,7 @@ class ExportDialog(QDialog):
         # so duplicate XGIDs in the input result in fewer cards than expected.
         # Surface them up front rather than letting the user discover the
         # silent loss after import.
-        duplicates = find_duplicate_xgids(self.all_decisions)
+        duplicates = find_duplicate_xgids(self.all_decisions) if not self._to_trainer else {}
         if duplicates:
             total = len(self.all_decisions)
             duplicate_count = sum(n - 1 for n in duplicates.values())
@@ -889,6 +930,34 @@ class ExportDialog(QDialog):
         if self.log_text.isHidden():
             self.log_text.show()
 
+    def _hand_to_trainer(self, message: str):
+        """Hand the built pack to the trainer in the browser, or save it as a
+        file when the browser can't pick it up. (success, message)."""
+        from ankigammon.gui.dialogs.trainer_handoff_dialog import TrainerHandoffDialog
+        from ankigammon.study_pack import save_pack
+
+        pack = self.worker.pack
+        count = len(pack["positions"])
+        handoff = TrainerHandoffDialog(self, pack, count)
+        handoff.exec()
+        warnings = message.partition("\n")[2]
+        suffix = f"\n{warnings}" if warnings else ""
+        if handoff.outcome == "sent":
+            return True, f"Sent {count} position(s) to the trainer{suffix}"
+        if handoff.outcome == "save_file":
+            start = Path(self.settings.last_collection_path).parent if self.settings.last_collection_path else Path.home()
+            path, _ = QFileDialog.getSaveFileName(
+                self, "Save Study Pack", str(start / f"{pack['deck']['title']}.json"), "AnkiGammon Study Pack (*.json)"
+            )
+            if path:
+                try:
+                    save_pack(pack, Path(path))
+                except OSError as e:
+                    return False, f"Could not save the study pack: {e}"
+                return True, (f"Saved {count} position(s) to {path}. Open it in the trainer at "
+                              f"ankigammon.com/train.{suffix}")
+        return False, "Not sent to the trainer. Press Send to try again."
+
     @Slot(bool, str)
     def on_finished(self, success, message):
         """Handle export completion."""
@@ -899,6 +968,9 @@ class ExportDialog(QDialog):
         if self._closing:
             self.reject()
             return
+
+        if success and self._to_trainer:
+            success, message = self._hand_to_trainer(message)
 
         self.status_label.setText(message)
         self.log_text.append(f"\n{'SUCCESS' if success else 'FAILED'}: {message}")
