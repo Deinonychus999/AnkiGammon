@@ -110,7 +110,7 @@ class TestOGIDParsing:
         assert metadata['cube_value'] == 1
         assert metadata['cube_owner'] == CubeState.CENTERED
         assert metadata['dice'] == (6, 5)
-        assert metadata['on_roll'] == Player.X  # W = White = X
+        assert metadata['on_roll'] == Player.O  # W reached the position, so Black (O) acts
         assert metadata['game_state'] == 'IW'
         assert metadata['score_x'] == 0
         assert metadata['score_o'] == 0
@@ -129,7 +129,7 @@ class TestOGIDParsing:
 
         # Check other metadata
         assert metadata['dice'] == (4, 3)
-        assert metadata['on_roll'] == Player.O  # B = Black = O
+        assert metadata['on_roll'] == Player.O  # a pending double names the doubler: B = Black = O
         assert metadata['score_x'] == 2
         assert metadata['score_o'] == 1
         assert metadata['match_length'] == 7
@@ -199,7 +199,7 @@ class TestOGIDParsing:
         # Check key fields
         assert parts[2] == "W2T"  # Cube: White owns 4 (2^2), Taken
         assert parts[3] == "65"   # Dice
-        assert parts[4] == "W"    # White to move
+        assert parts[4] == "B"    # White (X) to move, so Black reached the position
         assert parts[5] == "IW"   # Game state
         assert parts[6] == "2"    # White score
         assert parts[7] == "1"    # Black score

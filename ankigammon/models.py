@@ -247,6 +247,16 @@ class Position:
             o_off=self.o_off
         )
 
+    def flipped(self) -> 'Position':
+        """The same board seen from the other side: points mirrored, bars
+        swapped and every checker's sign inverted."""
+        points = [0] * 26
+        points[0] = -self.points[25]
+        points[25] = -self.points[0]
+        for i in range(1, 25):
+            points[i] = -self.points[25 - i]
+        return Position(points=points, x_off=self.o_off, o_off=self.x_off)
+
 
 @dataclass
 class Move:

@@ -3,15 +3,16 @@
 OGID (OpenGammon Position ID) is a colon-separated format for representing
 complete backgammon board states.
 
-Format: P1:P2:CUBE[:DICE[:TURN[:STATE[:S1[:S2[:ML[:MID[:NCHECKERS]]]]]]]]
+Format: P1:P2:CUBE[:DICE[:COLOR[:STATE[:S1[:S2[:ML[:MID[:NCHECKERS]]]]]]]]
 
 Fields:
 1. P1 (White/X checkers): Base-26 encoded positions with repeated characters
 2. P2 (Black/O checkers): Base-26 encoded positions with repeated characters
 3. CUBE: Three-character cube state (owner, value, action)
 4. DICE: Two-character dice roll (optional)
-5. TURN: Player to move - W or B (optional)
-6. STATE: Two-character game state (optional)
+5. COLOR: The player who reached this position - W or B (optional); the
+   other player acts next, except at a pending double, where it is the doubler
+6. STATE: Game state code (optional)
 7. S1: White/X score (optional)
 8. S2: Black/O score (optional)
 9. ML: Match length with modifiers (optional)
@@ -20,28 +21,28 @@ Fields:
 
 Position encoding uses base-26:
 - Characters '0'-'9' = points 0-9
-- Characters 'a'-'p' = points 10-25
-- Point 0 = White's bar (X in our model)
-- Points 1-24 = board points
-- Point 25 = Black's bar (O in our model)
+- Characters 'a'-'p' = points 10-25, 'q' = borne off
+- Point 0 = White's bar, points 1-24 = board points, point 25 = Black's bar
 - Repeated characters = multiple checkers on same point
 
-Example starting position:
-  White: 11jjjjjhhhccccc (2 on pt1, 5 on pt9, 3 on pt17, 5 on pt12)
-  Black: ooddddd88866666 (2 on pt24, 5 on pt13, 3 on pt8, 5 on pt6)
-  Full: 11jjjjjhhhccccc:ooddddd88866666:N0N::W:IW:0:0:1:0
+The OGID board is absolute: White moves from 1 towards 24, Black from 24
+towards 1. A Position is stored from the view of the player on roll, so the
+board is flipped whenever White (X) is the player on roll.
 
-Note: In our internal model:
-  - White = Player.X (TOP player)
-  - Black = Player.O (BOTTOM player)
-  - Positive values = X checkers
-  - Negative values = O checkers
+Example starting position:
+  11jjjjjhhhccccc:ooddddd88866666:N0N::W:IW:0:0:1:0
 """
 
 import re
 from typing import Optional, Tuple, Dict
 
 from ankigammon.models import Position, Player, CubeState
+
+BORNE_OFF = 26
+
+
+def _is_pending_double(cube_action: str, game_state: str) -> bool:
+    return cube_action == 'O' or game_state == 'D'
 
 
 # Character to point mapping for base-26 encoding
@@ -51,6 +52,8 @@ def _char_to_point(char: str) -> int:
         return ord(char) - ord('0')
     elif 'a' <= char <= 'p':
         return ord(char) - ord('a') + 10
+    elif char == 'q':
+        return BORNE_OFF
     else:
         raise ValueError(f"Invalid position character: {char}")
 
@@ -126,13 +129,7 @@ def parse_ogid(ogid: str) -> Tuple[Position, Dict]:
             if 1 <= d1 <= 6 and 1 <= d2 <= 6:
                 metadata['dice'] = (d1, d2)
 
-    if len(parts) > 4 and parts[4]:
-        # Field 5: Turn (W or B)
-        turn_str = parts[4].upper()
-        if turn_str == 'W':
-            metadata['on_roll'] = Player.X
-        elif turn_str == 'B':
-            metadata['on_roll'] = Player.O
+    color = parts[4].upper() if len(parts) > 4 else ''
 
     if len(parts) > 5 and parts[5]:
         # Field 6: Game state (e.g., IW, FB)
@@ -166,6 +163,14 @@ def parse_ogid(ogid: str) -> Tuple[Position, Dict]:
         # Field 11: Number of checkers per side (default 15)
         metadata['num_checkers'] = int(parts[10])
 
+    if color in ('W', 'B'):
+        white_acts = color == 'W'
+        if not _is_pending_double(metadata.get('cube_action', 'N'), metadata.get('game_state', '')):
+            white_acts = not white_acts
+        metadata['on_roll'] = Player.X if white_acts else Player.O
+        if white_acts:
+            position = position.flipped()
+
     return position, metadata
 
 
@@ -185,12 +190,14 @@ def _parse_ogid_position(white_str: str, black_str: str) -> Position:
     # Parse X checkers (positive values)
     for char in white_str:
         point = _char_to_point(char)
-        position.points[point] += 1
+        if point != BORNE_OFF:
+            position.points[point] += 1
 
     # Parse O checkers (negative values)
     for char in black_str:
         point = _char_to_point(char)
-        position.points[point] -= 1
+        if point != BORNE_OFF:
+            position.points[point] -= 1
 
     # Calculate borne-off checkers
     total_x = sum(count for count in position.points if count > 0)
@@ -228,7 +235,7 @@ def encode_ogid(
         cube_owner: Who owns the cube
         cube_action: Cube action (N=Normal, O=Offered, T=Taken, P=Passed)
         dice: Dice values
-        on_roll: Player on roll
+        on_roll: Player on roll (at a pending double, the doubler)
         game_state: Game state code (e.g., "IW", "FB")
         score_x: X player's score
         score_o: O player's score
@@ -242,6 +249,9 @@ def encode_ogid(
     Returns:
         OGID string
     """
+    if on_roll == Player.X:
+        position = position.flipped()
+
     # Encode position strings
     white_chars = []
     black_chars = []
@@ -288,10 +298,13 @@ def encode_ogid(
     else:
         ogid_parts.append('')
 
-    # Field 5: Turn
+    # Field 5: the player who reached the position
     if on_roll:
-        turn_char = 'W' if on_roll == Player.X else 'B'
-        ogid_parts.append(turn_char)
+        white_acts = on_roll == Player.X
+        if _is_pending_double(cube_action, game_state):
+            ogid_parts.append('W' if white_acts else 'B')
+        else:
+            ogid_parts.append('B' if white_acts else 'W')
     else:
         ogid_parts.append('')
 
