@@ -97,6 +97,28 @@ Used for icon support in the GUI.
 
 ---
 
+### keyring (MIT License)
+
+**Copyright:** Copyright Jason R. Coombs
+**License:** MIT License
+**Website:** https://github.com/jaraco/keyring
+
+Keeps the HedgeHog account tokens in the operating system's credential store.
+
+---
+
+### HedgeHog match equity table (MIT License)
+
+**Copyright:** Copyright (c) 2026 Eran Lambooij
+**License:** MIT License
+**Website:** https://gitlab.com/eranlambooij/hedgehog-public
+
+`ankigammon/utils/hedgehog_met.py` reproduces the Rockwell-Kazaross match equity table
+and post-Crawford vector from HedgeHog's `src/cube/met.h`, so match cube equities read
+from HedgeHog analyses are normalized exactly as HedgeHog shows them.
+
+---
+
 ## Position Format Specifications
 
 ### XGID Format (eXtreme Gammon)
@@ -110,6 +132,14 @@ Our implementation is based on the public specification and is original code.
 ### GNUID Format (GNU Backgammon)
 
 The GNUID format is used by GNU Backgammon, which is licensed under GPL-3.0. Our implementation is original code that reads and writes this format but does not incorporate any GPL code from GNU Backgammon itself.
+
+---
+
+### OGID and OGXM Formats (HedgeHog / OpenGammon)
+
+The OGID position format and the OGXM v2 match format are published in HedgeHog's public
+repository (https://gitlab.com/eranlambooij/hedgehog-public, MIT License). Our reader is
+original Python code written from those specifications.
 
 ---
 

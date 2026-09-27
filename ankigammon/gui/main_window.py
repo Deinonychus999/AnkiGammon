@@ -91,8 +91,6 @@ class MatchAnalysisWorker(QThread):
                 self.finished.emit(False, "Cancelled", [], 0)
                 return
 
-            # Create analyzer via factory
-            analyzer_type = getattr(self.settings, 'analyzer_type', 'gnubg')
             self.status_message.emit(f"Analyzing match...")
 
             self._analyzer = create_analyzer(self.settings)
@@ -365,7 +363,7 @@ class MainWindow(QMainWindow):
         self.btn_import_file.setIcon(qta.icon('fa6s.file-import', color='#1e1e2e'))
         self.btn_import_file.setIconSize(QSize(18, 18))
         self.btn_import_file.clicked.connect(self.on_import_file_clicked)
-        self.btn_import_file.setToolTip("Import .xg, .xgp, .mat, .txt, or .sgf files (supports multi-select)")
+        self.btn_import_file.setToolTip("Import .xg, .xgp, .ogxm, .mat, .txt, or .sgf files (supports multi-select)")
         self.btn_import_file.setCursor(Qt.PointingHandCursor)
         btn_row_layout.addWidget(self.btn_import_file, stretch=1)
 
@@ -1183,6 +1181,7 @@ class MainWindow(QMainWindow):
                     f"GnuBG Version: {self._gnubg_version()}",
                     f"XG Path: {self.settings.xg_exe_path or '(not configured)'}",
                     f"XG Analysis Level: {self.settings.xg_analysis_level}",
+                    "HedgeHog: " + ("connected" if self.settings.is_hedgehog_available() else "not connected"),
                 ]
                 zf.writestr("system_info.txt", "\n".join(system_info_lines) + "\n")
 
@@ -1243,6 +1242,10 @@ class MainWindow(QMainWindow):
             try:
                 if ext == '.xg':
                     names = XGBinaryParser.extract_player_names(file_path)
+                    is_match = True
+                elif ext == '.ogxm':
+                    from ankigammon.parsers.ogxm_parser import extract_player_names
+                    names = extract_player_names(file_path)
                     is_match = True
                 elif ext in ('.mat', '.txt'):
                     names = GNUBGMatchParser.extract_player_names_from_mat(file_path)
@@ -1440,16 +1443,8 @@ class MainWindow(QMainWindow):
 
         logger = logging.getLogger(__name__)
 
-        # Check if analyzer is configured
-        analyzer_type = getattr(self.settings, 'analyzer_type', 'gnubg')
-        if analyzer_type == "xg":
-            analyzer_available = self.settings.is_xg_available()
-            engine_name = "eXtreme Gammon"
-        else:
-            analyzer_available = self.settings.is_gnubg_available()
-            engine_name = "GNU Backgammon"
-
-        if not analyzer_available:
+        engine_name = self.settings.engine_display_name()
+        if not self.settings.is_engine_available():
             # Only show the dialog once per import batch
             if not self._gnubg_check_shown:
                 self._gnubg_check_shown = True
@@ -1457,7 +1452,7 @@ class MainWindow(QMainWindow):
                     self,
                     f"{engine_name} Required",
                     f"Match file analysis requires {engine_name}.\n\n"
-                    "Would you like to configure it in Settings?",
+                    "Would you like to set it up in Settings?",
                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
                 )
                 if result == QMessageBox.StandardButton.Yes:
@@ -1644,7 +1639,7 @@ class MainWindow(QMainWindow):
             )
         if missing:
             lines.append(f"\n{len(missing)} source file(s) could not be found and will be skipped.")
-        if any(not s.path.lower().endswith(('.xg', '.xgp')) for s in collection.files):
+        if any(not s.path.lower().endswith(('.xg', '.xgp', '.ogxm')) for s in collection.files):
             lines.append("\nMatch files (.mat, .sgf) are analyzed again by the engine.")
         reply = silent_messagebox.question(
             self, "Open Collection", "\n".join(lines),
@@ -1802,7 +1797,8 @@ class MainWindow(QMainWindow):
             self,
             "Import Backgammon File(s)",
             "",
-            "All Supported Files (*.xg *.xgp *.mat *.txt *.sgf);;XG Files (*.xg *.xgp);;Match Files (*.mat *.txt *.sgf);;All Files (*)"
+            "All Supported Files (*.xg *.xgp *.ogxm *.mat *.txt *.sgf);;XG Files (*.xg *.xgp);;"
+            "HedgeHog Files (*.ogxm);;Match Files (*.mat *.txt *.sgf);;All Files (*)"
         )
 
         if not file_paths:
@@ -2077,19 +2073,25 @@ class MainWindow(QMainWindow):
             total_count = 0  # Track total before filtering (for XG binary)
             source = self._source_for(file_path, None)
 
-            if result.format == InputFormat.XG_BINARY:
-                # Check if this is a position file (.xgp) or match file (.xg)
+            if result.format in (InputFormat.XG_BINARY, InputFormat.OGXM_FILE):
+                # Analyzed files: parsed directly, then filtered like a match
+                if result.format == InputFormat.OGXM_FILE:
+                    from ankigammon.parsers import ogxm_parser
+                    parse_file = ogxm_parser.parse_ogxm_file
+                    extract_player_names = ogxm_parser.extract_player_names
+                else:
+                    parse_file = XGBinaryParser.parse_file
+                    extract_player_names = XGBinaryParser.extract_player_names
                 is_position_file = file_path.lower().endswith('.xgp')
 
                 if is_position_file:
                     # Position files contain a single position - import directly without filtering
-                    decisions = XGBinaryParser.parse_file(file_path)
+                    decisions = parse_file(file_path)
                     total_count = len(decisions)
                     logger.info(f"Imported {len(decisions)} position(s) from .xgp file")
                 else:
                     # Match files may contain many positions - need filtering options
-                    # Extract player names from XG file
-                    player1_name, player2_name = XGBinaryParser.extract_player_names(file_path)
+                    player1_name, player2_name = extract_player_names(file_path)
 
                     if options is not None:
                         filter_used = self._filter_from_options(
@@ -2098,7 +2100,7 @@ class MainWindow(QMainWindow):
                         if filter_used is None:
                             return
                         checker_threshold, cube_threshold, include_player_x, include_player_o = filter_used
-                        all_decisions = XGBinaryParser.parse_file(file_path)
+                        all_decisions = parse_file(file_path)
                         total_count = len(all_decisions)
                         decisions = self._filter_decisions_by_import_options(
                             all_decisions,
@@ -2119,7 +2121,7 @@ class MainWindow(QMainWindow):
                         if import_dialog.exec():
                             filter_used = import_dialog.get_options()
                             checker_threshold, cube_threshold, include_player_x, include_player_o = filter_used
-                            all_decisions = XGBinaryParser.parse_file(file_path)
+                            all_decisions = parse_file(file_path)
                             total_count = len(all_decisions)
                             decisions = self._filter_decisions_by_import_options(
                                 all_decisions,
@@ -2273,6 +2275,7 @@ class MainWindow(QMainWindow):
                     "Could not detect file format.\n\n"
                     "Supported formats:\n"
                     "- XG files (.xg, .xgp)\n"
+                    "- HedgeHog files (.ogxm)\n"
                     "- Match files (.mat, .txt)\n"
                     "- SGF files (.sgf)\n"
                     "- Text with XGID/OGID/GNUID position IDs or XG analysis\n\n"

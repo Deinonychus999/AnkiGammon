@@ -1,0 +1,2121 @@
+{
+ "data": {
+  "black_score": 3,
+  "crawford": true,
+  "cube_limit": 64,
+  "games": [
+   {
+    "first_to_move": 1,
+    "game_index": 0,
+    "is_crawford": false,
+    "is_default_board": true,
+    "is_lastgame": false,
+    "plies": [
+     {
+      "action_id": 17,
+      "color": 1,
+      "d1": 4,
+      "d2": 6,
+      "moves": [
+       {
+        "from": 12,
+        "pips": 4
+       },
+       {
+        "from": 1,
+        "pips": 6
+       }
+      ],
+      "ogid_after": "17ccccghhhjjjjj:66666888dddddoo:N0N::W:C:0:0:3:1",
+      "ogid_before": "11ccccchhhjjjjj:66666888dddddoo:N0N:46:B:IB:0:0:3:0"
+     },
+     {
+      "action_id": 17,
+      "color": 0,
+      "d1": 4,
+      "d2": 6,
+      "moves": [
+       {
+        "from": 6,
+        "pips": 4
+       },
+       {
+        "from": 8,
+        "pips": 6
+       }
+      ],
+      "ogid_after": "17ccccghhhjjjjj:22666688dddddoo:N0N::B:C:0:0:3:2",
+      "ogid_before": "17ccccghhhjjjjj:66666888dddddoo:N0N:46:W:R:0:0:3:1"
+     },
+     {
+      "action_id": 3,
+      "color": 1,
+      "d1": 1,
+      "d2": 4,
+      "moves": [
+       {
+        "from": 7,
+        "pips": 4
+       },
+       {
+        "from": 11,
+        "pips": 1
+       }
+      ],
+      "ogid_after": "1cccccghhhjjjjj:22666688dddddoo:N0N::W:C:0:0:3:3",
+      "ogid_before": "17ccccghhhjjjjj:22666688dddddoo:N0N:14:B:R:0:0:3:2"
+     },
+     {
+      "action_id": 18,
+      "color": 0,
+      "d1": 5,
+      "d2": 5,
+      "moves": [
+       {
+        "from": 6,
+        "pips": 5
+       },
+       {
+        "from": 6,
+        "pips": 5
+       },
+       {
+        "from": 8,
+        "pips": 5
+       },
+       {
+        "from": 8,
+        "pips": 5
+       }
+      ],
+      "ogid_after": "0cccccghhhjjjjj:11223366dddddoo:N0N::B:C:0:0:3:4",
+      "ogid_before": "1cccccghhhjjjjj:22666688dddddoo:N0N:55:W:R:0:0:3:3"
+     },
+     {
+      "action_id": 5,
+      "color": 1,
+      "d1": 1,
+      "d2": 6,
+      "moves": [],
+      "ogid_after": "0cccccghhhjjjjj:11223366dddddoo:N0N::W:C:0:0:3:5",
+      "ogid_before": "0cccccghhhjjjjj:11223366dddddoo:N0N:16:B:R:0:0:3:4"
+     },
+     {
+      "action_id": 1,
+      "color": 0,
+      "d1": 1,
+      "d2": 2,
+      "moves": [
+       {
+        "from": 24,
+        "pips": 2
+       },
+       {
+        "from": 22,
+        "pips": 1
+       }
+      ],
+      "ogid_after": "0cccccghhhjjjjj:11223366dddddlo:N0N::B:C:0:0:3:6",
+      "ogid_before": "0cccccghhhjjjjj:11223366dddddoo:N0N:12:W:R:0:0:3:5"
+     },
+     {
+      "action_id": 10,
+      "color": 1,
+      "d1": 2,
+      "d2": 6,
+      "moves": [],
+      "ogid_after": "0cccccghhhjjjjj:11223366dddddlo:N0N::W:C:0:0:3:7",
+      "ogid_before": "0cccccghhhjjjjj:11223366dddddlo:N0N:26:B:R:0:0:3:6"
+     },
+     {
+      "action_id": 20,
+      "color": 0,
+      "d1": 6,
+      "d2": 6,
+      "moves": [
+       {
+        "from": 13,
+        "pips": 6
+       },
+       {
+        "from": 13,
+        "pips": 6
+       },
+       {
+        "from": 13,
+        "pips": 6
+       },
+       {
+        "from": 13,
+        "pips": 6
+       }
+      ],
+      "ogid_after": "0cccccghhhjjjjj:112233667777dlo:N0N::B:C:0:0:3:8",
+      "ogid_before": "0cccccghhhjjjjj:11223366dddddlo:N0N:66:W:R:0:0:3:7"
+     },
+     {
+      "action_id": 16,
+      "color": 1,
+      "d1": 4,
+      "d2": 5,
+      "moves": [
+       {
+        "from": 0,
+        "pips": 5
+       },
+       {
+        "from": 12,
+        "pips": 4
+       }
+      ],
+      "ogid_after": "5ccccgghhhjjjjj:112233667777dlo:N0N::W:C:0:0:3:9",
+      "ogid_before": "0cccccghhhjjjjj:112233667777dlo:N0N:45:B:R:0:0:3:8"
+     },
+     {
+      "action_id": 2,
+      "color": 0,
+      "d1": 1,
+      "d2": 3,
+      "moves": [
+       {
+        "from": 7,
+        "pips": 1
+       },
+       {
+        "from": 24,
+        "pips": 3
+       }
+      ],
+      "ogid_after": "5ccccgghhhjjjjj:112233666777dll:N0N::B:C:0:0:3:10",
+      "ogid_before": "5ccccgghhhjjjjj:112233667777dlo:N0N:13:W:R:0:0:3:9"
+     },
+     {
+      "action_id": 9,
+      "color": 1,
+      "d1": 2,
+      "d2": 5,
+      "moves": [
+       {
+        "from": 5,
+        "pips": 5
+       },
+       {
+        "from": 10,
+        "pips": 2
+       }
+      ],
+      "ogid_after": "cccccgghhhjjjjj:112233666777dll:N0N::W:C:0:0:3:11",
+      "ogid_before": "5ccccgghhhjjjjj:112233666777dll:N0N:25:B:R:0:0:3:10"
+     },
+     {
+      "action_id": 21,
+      "color": 0,
+      "ogid_after": "cccccgghhhjjjjj:112233666777dll:N0O::B:D:0:0:3:11",
+      "ogid_before": "cccccgghhhjjjjj:112233666777dll:N0N::W:C:0:0:3:11"
+     },
+     {
+      "action_id": 23,
+      "color": 1,
+      "ogid_after": "cccccgghhhjjjjj:112233666777dll:N0P::W:G:0:0:3:11",
+      "ogid_before": "cccccgghhhjjjjj:112233666777dll:N0O::B:D:0:0:3:11"
+     }
+    ],
+    "points_won": 1,
+    "winner": 1
+   },
+   {
+    "first_to_move": 1,
+    "game_index": 1,
+    "is_crawford": false,
+    "is_default_board": true,
+    "is_lastgame": false,
+    "plies": [
+     {
+      "action_id": 9,
+      "color": 1,
+      "d1": 2,
+      "d2": 5,
+      "moves": [
+       {
+        "from": 1,
+        "pips": 2
+       },
+       {
+        "from": 12,
+        "pips": 5
+       }
+      ],
+      "ogid_after": "13cccchhhhjjjjj:66666888dddddoo:N0N::W:C:0:1:3:1",
+      "ogid_before": "11ccccchhhjjjjj:66666888dddddoo:N0N:25:B:IB:0:1:3:0"
+     },
+     {
+      "action_id": 7,
+      "color": 0,
+      "d1": 2,
+      "d2": 3,
+      "moves": [
+       {
+        "from": 6,
+        "pips": 3
+       },
+       {
+        "from": 3,
+        "pips": 2
+       }
+      ],
+      "ogid_after": "00cccchhhhjjjjj:16666888dddddoo:N0N::B:C:0:1:3:2",
+      "ogid_before": "13cccchhhhjjjjj:66666888dddddoo:N0N:23:W:R:0:1:3:1"
+     },
+     {
+      "action_id": 14,
+      "color": 1,
+      "d1": 3,
+      "d2": 6,
+      "moves": [
+       {
+        "from": 0,
+        "pips": 3
+       }
+      ],
+      "ogid_after": "03cccchhhhjjjjj:16666888dddddoo:N0N::W:C:0:1:3:3",
+      "ogid_before": "00cccchhhhjjjjj:16666888dddddoo:N0N:36:B:R:0:1:3:2"
+     },
+     {
+      "action_id": 11,
+      "color": 0,
+      "d1": 3,
+      "d2": 3,
+      "moves": [
+       {
+        "from": 13,
+        "pips": 3
+       },
+       {
+        "from": 10,
+        "pips": 3
+       },
+       {
+        "from": 7,
+        "pips": 3
+       },
+       {
+        "from": 4,
+        "pips": 3
+       }
+      ],
+      "ogid_after": "03cccchhhhjjjjj:116666888ddddoo:N0N::B:C:0:1:3:4",
+      "ogid_before": "03cccchhhhjjjjj:16666888dddddoo:N0N:33:W:R:0:1:3:3"
+     },
+     {
+      "action_id": 3,
+      "color": 1,
+      "d1": 1,
+      "d2": 4,
+      "moves": [
+       {
+        "from": 0,
+        "pips": 4
+       },
+       {
+        "from": 3,
+        "pips": 1
+       }
+      ],
+      "ogid_after": "44cccchhhhjjjjj:116666888ddddoo:N0N::W:C:0:1:3:5",
+      "ogid_before": "03cccchhhhjjjjj:116666888ddddoo:N0N:14:B:R:0:1:3:4"
+     },
+     {
+      "action_id": 7,
+      "color": 0,
+      "d1": 2,
+      "d2": 3,
+      "moves": [
+       {
+        "from": 24,
+        "pips": 3
+       },
+       {
+        "from": 24,
+        "pips": 2
+       }
+      ],
+      "ogid_after": "44cccchhhhjjjjj:116666888ddddlm:N0N::B:C:0:1:3:6",
+      "ogid_before": "44cccchhhhjjjjj:116666888ddddoo:N0N:23:W:R:0:1:3:5"
+     },
+     {
+      "action_id": 13,
+      "color": 1,
+      "d1": 3,
+      "d2": 5,
+      "moves": [
+       {
+        "from": 19,
+        "pips": 3
+       },
+       {
+        "from": 17,
+        "pips": 5
+       }
+      ],
+      "ogid_after": "44cccchhhjjjjmm:116666888ddddlp:N0N::W:C:0:1:3:7",
+      "ogid_before": "44cccchhhhjjjjj:116666888ddddlm:N0N:35:B:R:0:1:3:6"
+     },
+     {
+      "action_id": 19,
+      "color": 0,
+      "d1": 5,
+      "d2": 6,
+      "moves": [
+       {
+        "from": 25,
+        "pips": 5
+       },
+       {
+        "from": 21,
+        "pips": 6
+       }
+      ],
+      "ogid_after": "44cccchhhjjjjmm:116666888ddddfk:N0N::B:C:0:1:3:8",
+      "ogid_before": "44cccchhhjjjjmm:116666888ddddlp:N0N:56:W:R:0:1:3:7"
+     },
+     {
+      "action_id": 5,
+      "color": 1,
+      "d1": 1,
+      "d2": 6,
+      "moves": [
+       {
+        "from": 17,
+        "pips": 1
+       },
+       {
+        "from": 12,
+        "pips": 6
+       }
+      ],
+      "ogid_after": "44ccchhiijjjjmm:116666888ddddfk:N0N::W:C:0:1:3:9",
+      "ogid_before": "44cccchhhjjjjmm:116666888ddddfk:N0N:16:B:R:0:1:3:8"
+     },
+     {
+      "action_id": 2,
+      "color": 0,
+      "d1": 1,
+      "d2": 3,
+      "moves": [
+       {
+        "from": 8,
+        "pips": 3
+       },
+       {
+        "from": 6,
+        "pips": 1
+       }
+      ],
+      "ogid_after": "44ccchhiijjjjmm:115566688ddddfk:N0N::B:C:0:1:3:10",
+      "ogid_before": "44ccchhiijjjjmm:116666888ddddfk:N0N:13:W:R:0:1:3:9"
+     },
+     {
+      "action_id": 12,
+      "color": 1,
+      "d1": 3,
+      "d2": 4,
+      "moves": [
+       {
+        "from": 12,
+        "pips": 3
+       },
+       {
+        "from": 15,
+        "pips": 4
+       }
+      ],
+      "ogid_after": "44cchhiijjjjjmm:115566688ddddkp:N0N::W:C:0:1:3:11",
+      "ogid_before": "44ccchhiijjjjmm:115566688ddddfk:N0N:34:B:R:0:1:3:10"
+     },
+     {
+      "action_id": 3,
+      "color": 0,
+      "d1": 1,
+      "d2": 4,
+      "moves": [
+       {
+        "from": 25,
+        "pips": 4
+       },
+       {
+        "from": 21,
+        "pips": 1
+       }
+      ],
+      "ogid_after": "44cchhiijjjjjmm:115566688ddddkk:N0N::B:C:0:1:3:12",
+      "ogid_before": "44cchhiijjjjjmm:115566688ddddkp:N0N:14:W:R:0:1:3:11"
+     },
+     {
+      "action_id": 4,
+      "color": 1,
+      "d1": 1,
+      "d2": 5,
+      "moves": [
+       {
+        "from": 17,
+        "pips": 1
+       },
+       {
+        "from": 17,
+        "pips": 5
+       }
+      ],
+      "ogid_after": "44cciiijjjjjmmm:115566688ddddkk:N0N::W:C:0:1:3:13",
+      "ogid_before": "44cchhiijjjjjmm:115566688ddddkk:N0N:15:B:R:0:1:3:12"
+     },
+     {
+      "action_id": 11,
+      "color": 0,
+      "d1": 3,
+      "d2": 3,
+      "moves": [
+       {
+        "from": 13,
+        "pips": 3
+       },
+       {
+        "from": 13,
+        "pips": 3
+       },
+       {
+        "from": 20,
+        "pips": 3
+       },
+       {
+        "from": 20,
+        "pips": 3
+       }
+      ],
+      "ogid_after": "44cciiijjjjjmmm:115566688aaddhh:N0N::B:C:0:1:3:14",
+      "ogid_before": "44cciiijjjjjmmm:115566688ddddkk:N0N:33:W:R:0:1:3:13"
+     },
+     {
+      "action_id": 9,
+      "color": 1,
+      "d1": 2,
+      "d2": 5,
+      "moves": [
+       {
+        "from": 18,
+        "pips": 5
+       },
+       {
+        "from": 19,
+        "pips": 2
+       }
+      ],
+      "ogid_after": "44cciijjjjlmmmn:115566688aaddhh:N0N::W:C:0:1:3:15",
+      "ogid_before": "44cciiijjjjjmmm:115566688aaddhh:N0N:25:B:R:0:1:3:14"
+     },
+     {
+      "action_id": 3,
+      "color": 0,
+      "d1": 1,
+      "d2": 4,
+      "moves": [
+       {
+        "from": 17,
+        "pips": 1
+       },
+       {
+        "from": 17,
+        "pips": 4
+       }
+      ],
+      "ogid_after": "44cciijjjjlmmmn:115566688aadddg:N0N::B:C:0:1:3:16",
+      "ogid_before": "44cciijjjjlmmmn:115566688aaddhh:N0N:14:W:R:0:1:3:15"
+     },
+     {
+      "action_id": 2,
+      "color": 1,
+      "d1": 1,
+      "d2": 3,
+      "moves": [
+       {
+        "from": 22,
+        "pips": 1
+       },
+       {
+        "from": 18,
+        "pips": 3
+       }
+      ],
+      "ogid_after": "44ccijjjjllmmnn:115566688aadddg:N0N::W:C:0:1:3:17",
+      "ogid_before": "44cciijjjjlmmmn:115566688aadddg:N0N:13:B:R:0:1:3:16"
+     },
+     {
+      "action_id": 8,
+      "color": 0,
+      "d1": 2,
+      "d2": 4,
+      "moves": [
+       {
+        "from": 16,
+        "pips": 2
+       },
+       {
+        "from": 14,
+        "pips": 4
+       }
+      ],
+      "ogid_after": "44ccijjjjllmmnn:115566688aaaddd:N0N::B:C:0:1:3:18",
+      "ogid_before": "44ccijjjjllmmnn:115566688aadddg:N0N:24:W:R:0:1:3:17"
+     },
+     {
+      "action_id": 10,
+      "color": 1,
+      "d1": 2,
+      "d2": 6,
+      "moves": [
+       {
+        "from": 12,
+        "pips": 6
+       },
+       {
+        "from": 12,
+        "pips": 2
+       }
+      ],
+      "ogid_after": "44eiijjjjllmmnn:115566688aaaddd:N0N::W:C:0:1:3:19",
+      "ogid_before": "44ccijjjjllmmnn:115566688aaaddd:N0N:26:B:R:0:1:3:18"
+     },
+     {
+      "action_id": 16,
+      "color": 0,
+      "d1": 4,
+      "d2": 5,
+      "moves": [
+       {
+        "from": 13,
+        "pips": 5
+       },
+       {
+        "from": 10,
+        "pips": 4
+       }
+      ],
+      "ogid_after": "44eiijjjjllmmnn:11556666888aadd:N0N::B:C:0:1:3:20",
+      "ogid_before": "44eiijjjjllmmnn:115566688aaaddd:N0N:45:W:R:0:1:3:19"
+     },
+     {
+      "action_id": 7,
+      "color": 1,
+      "d1": 2,
+      "d2": 3,
+      "moves": [
+       {
+        "from": 14,
+        "pips": 3
+       },
+       {
+        "from": 18,
+        "pips": 2
+       }
+      ],
+      "ogid_after": "44hijjjjkllmmnn:11556666888aadd:N0N::W:C:0:1:3:21",
+      "ogid_before": "44eiijjjjllmmnn:11556666888aadd:N0N:23:B:R:0:1:3:20"
+     },
+     {
+      "action_id": 1,
+      "color": 0,
+      "d1": 1,
+      "d2": 2,
+      "moves": [
+       {
+        "from": 6,
+        "pips": 1
+       },
+       {
+        "from": 5,
+        "pips": 2
+       }
+      ],
+      "ogid_after": "44hijjjjkllmmnn:11355666888aadd:N0N::B:C:0:1:3:22",
+      "ogid_before": "44hijjjjkllmmnn:11556666888aadd:N0N:12:W:R:0:1:3:21"
+     },
+     {
+      "action_id": 8,
+      "color": 1,
+      "d1": 2,
+      "d2": 4,
+      "moves": [
+       {
+        "from": 18,
+        "pips": 2
+       },
+       {
+        "from": 19,
+        "pips": 4
+       }
+      ],
+      "ogid_after": "44hjjjkkllmmnnn:11355666888aadd:N0N::W:C:0:1:3:23",
+      "ogid_before": "44hijjjjkllmmnn:11355666888aadd:N0N:24:B:R:0:1:3:22"
+     },
+     {
+      "action_id": 5,
+      "color": 0,
+      "d1": 1,
+      "d2": 6,
+      "moves": [
+       {
+        "from": 8,
+        "pips": 6
+       },
+       {
+        "from": 3,
+        "pips": 1
+       }
+      ],
+      "ogid_after": "44hjjjkkllmmnnn:11225566688aadd:N0N::B:C:0:1:3:24",
+      "ogid_before": "44hjjjkkllmmnnn:11355666888aadd:N0N:16:W:R:0:1:3:23"
+     },
+     {
+      "action_id": 5,
+      "color": 1,
+      "d1": 1,
+      "d2": 6,
+      "moves": [
+       {
+        "from": 17,
+        "pips": 1
+       },
+       {
+        "from": 18,
+        "pips": 6
+       }
+      ],
+      "ogid_after": "44jjjkkllmmnnno:11225566688aadd:N0N::W:C:0:1:3:25",
+      "ogid_before": "44hjjjkkllmmnnn:11225566688aadd:N0N:16:B:R:0:1:3:24"
+     },
+     {
+      "action_id": 8,
+      "color": 0,
+      "d1": 2,
+      "d2": 4,
+      "moves": [
+       {
+        "from": 10,
+        "pips": 2
+       },
+       {
+        "from": 10,
+        "pips": 4
+       }
+      ],
+      "ogid_after": "44jjjkkllmmnnno:1122556666888dd:N0N::B:C:0:1:3:26",
+      "ogid_before": "44jjjkkllmmnnno:11225566688aadd:N0N:24:W:R:0:1:3:25"
+     },
+     {
+      "action_id": 2,
+      "color": 1,
+      "d1": 1,
+      "d2": 3,
+      "moves": [
+       {
+        "from": 19,
+        "pips": 3
+       },
+       {
+        "from": 23,
+        "pips": 1
+       }
+      ],
+      "ogid_after": "44jjkkllmmmnnoo:1122556666888dd:N0N::W:C:0:1:3:27",
+      "ogid_before": "44jjjkkllmmnnno:1122556666888dd:N0N:13:B:R:0:1:3:26"
+     },
+     {
+      "action_id": 3,
+      "color": 0,
+      "d1": 1,
+      "d2": 4,
+      "moves": [
+       {
+        "from": 8,
+        "pips": 1
+       },
+       {
+        "from": 7,
+        "pips": 4
+       }
+      ],
+      "ogid_after": "44jjkkllmmmnnoo:1122355666688dd:N0N::B:C:0:1:3:28",
+      "ogid_before": "44jjkkllmmmnnoo:1122556666888dd:N0N:14:W:R:0:1:3:27"
+     },
+     {
+      "action_id": 7,
+      "color": 1,
+      "d1": 2,
+      "d2": 3,
+      "moves": [
+       {
+        "from": 4,
+        "pips": 3
+       },
+       {
+        "from": 7,
+        "pips": 2
+       }
+      ],
+      "ogid_after": "49jjkkllmmmnnoo:1122355666688dd:N0N::W:C:0:1:3:29",
+      "ogid_before": "44jjkkllmmmnnoo:1122355666688dd:N0N:23:B:R:0:1:3:28"
+     },
+     {
+      "action_id": 8,
+      "color": 0,
+      "d1": 2,
+      "d2": 4,
+      "moves": [
+       {
+        "from": 3,
+        "pips": 2
+       },
+       {
+        "from": 13,
+        "pips": 4
+       }
+      ],
+      "ogid_after": "04jjkkllmmmnnoo:11122556666889d:N0N::B:C:0:1:3:30",
+      "ogid_before": "49jjkkllmmmnnoo:1122355666688dd:N0N:24:W:R:0:1:3:29"
+     },
+     {
+      "action_id": 13,
+      "color": 1,
+      "d1": 3,
+      "d2": 5,
+      "moves": [
+       {
+        "from": 0,
+        "pips": 3
+       },
+       {
+        "from": 4,
+        "pips": 5
+       }
+      ],
+      "ogid_after": "39jjkkllmmmnnoo:1112255666688dp:N0N::W:C:0:1:3:31",
+      "ogid_before": "04jjkkllmmmnnoo:11122556666889d:N0N:35:B:R:0:1:3:30"
+     },
+     {
+      "action_id": 9,
+      "color": 0,
+      "d1": 2,
+      "d2": 5,
+      "moves": [],
+      "ogid_after": "39jjkkllmmmnnoo:1112255666688dp:N0N::B:C:0:1:3:32",
+      "ogid_before": "39jjkkllmmmnnoo:1112255666688dp:N0N:25:W:R:0:1:3:31"
+     },
+     {
+      "action_id": 17,
+      "color": 1,
+      "d1": 4,
+      "d2": 6,
+      "moves": [
+       {
+        "from": 3,
+        "pips": 4
+       },
+       {
+        "from": 7,
+        "pips": 6
+       }
+      ],
+      "ogid_after": "9djjkkllmmmnnoo:1112255666688pp:N0N::W:C:0:1:3:33",
+      "ogid_before": "39jjkkllmmmnnoo:1112255666688dp:N0N:46:B:R:0:1:3:32"
+     },
+     {
+      "action_id": 5,
+      "color": 0,
+      "d1": 1,
+      "d2": 6,
+      "moves": [],
+      "ogid_after": "9djjkkllmmmnnoo:1112255666688pp:N0N::B:C:0:1:3:34",
+      "ogid_before": "9djjkkllmmmnnoo:1112255666688pp:N0N:16:W:R:0:1:3:33"
+     },
+     {
+      "action_id": 7,
+      "color": 1,
+      "d1": 2,
+      "d2": 3,
+      "moves": [
+       {
+        "from": 9,
+        "pips": 3
+       },
+       {
+        "from": 12,
+        "pips": 2
+       }
+      ],
+      "ogid_after": "dejjkkllmmmnnoo:1112255666688pp:N0N::W:C:0:1:3:35",
+      "ogid_before": "9djjkkllmmmnnoo:1112255666688pp:N0N:23:B:R:0:1:3:34"
+     },
+     {
+      "action_id": 5,
+      "color": 0,
+      "d1": 1,
+      "d2": 6,
+      "moves": [],
+      "ogid_after": "dejjkkllmmmnnoo:1112255666688pp:N0N::B:C:0:1:3:36",
+      "ogid_before": "dejjkkllmmmnnoo:1112255666688pp:N0N:16:W:R:0:1:3:35"
+     },
+     {
+      "action_id": 18,
+      "color": 1,
+      "d1": 5,
+      "d2": 5,
+      "moves": [
+       {
+        "from": 13,
+        "pips": 5
+       },
+       {
+        "from": 14,
+        "pips": 5
+       },
+       {
+        "from": 18,
+        "pips": 5
+       },
+       {
+        "from": 19,
+        "pips": 5
+       }
+      ],
+      "ogid_after": "jjkkllmmmnnnooo:1112255666688pp:N0N::W:C:0:1:3:37",
+      "ogid_before": "dejjkkllmmmnnoo:1112255666688pp:N0N:55:B:R:0:1:3:36"
+     },
+     {
+      "action_id": 7,
+      "color": 0,
+      "d1": 2,
+      "d2": 3,
+      "moves": [],
+      "ogid_after": "jjkkllmmmnnnooo:1112255666688pp:N0N::B:C:0:1:3:38",
+      "ogid_before": "jjkkllmmmnnnooo:1112255666688pp:N0N:23:W:R:0:1:3:37"
+     },
+     {
+      "action_id": 4,
+      "color": 1,
+      "d1": 1,
+      "d2": 5,
+      "moves": [
+       {
+        "from": 19,
+        "pips": 1
+       },
+       {
+        "from": 19,
+        "pips": 5
+       }
+      ],
+      "ogid_after": "kkkllmmmnnnoooo:1112255666688pp:N0N::W:C:0:1:3:39",
+      "ogid_before": "jjkkllmmmnnnooo:1112255666688pp:N0N:15:B:R:0:1:3:38"
+     },
+     {
+      "action_id": 1,
+      "color": 0,
+      "d1": 1,
+      "d2": 2,
+      "moves": [],
+      "ogid_after": "kkkllmmmnnnoooo:1112255666688pp:N0N::B:C:0:1:3:40",
+      "ogid_before": "kkkllmmmnnnoooo:1112255666688pp:N0N:12:W:R:0:1:3:39"
+     },
+     {
+      "action_id": 2,
+      "color": 1,
+      "d1": 1,
+      "d2": 3,
+      "moves": [
+       {
+        "from": 20,
+        "pips": 3
+       },
+       {
+        "from": 24,
+        "pips": 1
+       }
+      ],
+      "ogid_after": "kkllmmmnnnnooo:1112255666688pp:N0N::W:C:0:1:3:41",
+      "ogid_before": "kkkllmmmnnnoooo:1112255666688pp:N0N:13:B:R:0:1:3:40"
+     },
+     {
+      "action_id": 10,
+      "color": 0,
+      "d1": 2,
+      "d2": 6,
+      "moves": [
+       {
+        "from": 25,
+        "pips": 6
+       }
+      ],
+      "ogid_after": "kkllmmmnnnnooo:1112255666688jp:N0N::B:C:0:1:3:42",
+      "ogid_before": "kkllmmmnnnnooo:1112255666688pp:N0N:26:W:R:0:1:3:41"
+     },
+     {
+      "action_id": 4,
+      "color": 1,
+      "d1": 1,
+      "d2": 5,
+      "moves": [
+       {
+        "from": 20,
+        "pips": 5
+       },
+       {
+        "from": 20,
+        "pips": 1
+       }
+      ],
+      "ogid_after": "lllmmmnnnnooo:1112255666688jp:N0N::W:C:0:1:3:43",
+      "ogid_before": "kkllmmmnnnnooo:1112255666688jp:N0N:15:B:R:0:1:3:42"
+     },
+     {
+      "action_id": 15,
+      "color": 0,
+      "d1": 4,
+      "d2": 4,
+      "moves": [],
+      "ogid_after": "lllmmmnnnnooo:1112255666688jp:N0N::B:C:0:1:3:44",
+      "ogid_before": "lllmmmnnnnooo:1112255666688jp:N0N:44:W:R:0:1:3:43"
+     },
+     {
+      "action_id": 10,
+      "color": 1,
+      "d1": 2,
+      "d2": 6,
+      "moves": [
+       {
+        "from": 21,
+        "pips": 4
+       },
+       {
+        "from": 23,
+        "pips": 2
+       }
+      ],
+      "ogid_after": "llmmmnnnooo:1112255666688jp:N0N::W:C:0:1:3:45",
+      "ogid_before": "lllmmmnnnnooo:1112255666688jp:N0N:26:B:R:0:1:3:44"
+     },
+     {
+      "action_id": 10,
+      "color": 0,
+      "d1": 2,
+      "d2": 6,
+      "moves": [
+       {
+        "from": 25,
+        "pips": 6
+       },
+       {
+        "from": 8,
+        "pips": 2
+       }
+      ],
+      "ogid_after": "llmmmnnnooo:1112255666668jj:N0N::B:C:0:1:3:46",
+      "ogid_before": "llmmmnnnooo:1112255666688jp:N0N:26:W:R:0:1:3:45"
+     },
+     {
+      "action_id": 3,
+      "color": 1,
+      "d1": 1,
+      "d2": 4,
+      "moves": [
+       {
+        "from": 24,
+        "pips": 1
+       },
+       {
+        "from": 21,
+        "pips": 4
+       }
+      ],
+      "ogid_after": "lmmmnnnoo:1112255666668jj:N0N::W:C:0:1:3:47",
+      "ogid_before": "llmmmnnnooo:1112255666668jj:N0N:14:B:R:0:1:3:46"
+     },
+     {
+      "action_id": 4,
+      "color": 0,
+      "d1": 1,
+      "d2": 5,
+      "moves": [
+       {
+        "from": 19,
+        "pips": 5
+       },
+       {
+        "from": 14,
+        "pips": 1
+       }
+      ],
+      "ogid_after": "lmmmnnnoo:1112255666668dj:N0N::B:C:0:1:3:48",
+      "ogid_before": "lmmmnnnoo:1112255666668jj:N0N:15:W:R:0:1:3:47"
+     },
+     {
+      "action_id": 9,
+      "color": 1,
+      "d1": 2,
+      "d2": 5,
+      "moves": [
+       {
+        "from": 23,
+        "pips": 2
+       },
+       {
+        "from": 21,
+        "pips": 4
+       }
+      ],
+      "ogid_after": "mmmnnoo:1112255666668dj:N0N::W:C:0:1:3:49",
+      "ogid_before": "lmmmnnnoo:1112255666668dj:N0N:25:B:R:0:1:3:48"
+     },
+     {
+      "action_id": 19,
+      "color": 0,
+      "d1": 5,
+      "d2": 6,
+      "moves": [
+       {
+        "from": 13,
+        "pips": 5
+       },
+       {
+        "from": 19,
+        "pips": 6
+       }
+      ],
+      "ogid_after": "mmmnnoo:11122556666688d:N0N::B:C:0:1:3:50",
+      "ogid_before": "mmmnnoo:1112255666668dj:N0N:56:W:R:0:1:3:49"
+     },
+     {
+      "action_id": 8,
+      "color": 1,
+      "d1": 2,
+      "d2": 4,
+      "moves": [
+       {
+        "from": 23,
+        "pips": 2
+       },
+       {
+        "from": 22,
+        "pips": 3
+       }
+      ],
+      "ogid_after": "mmnoo:11122556666688d:N0N::W:C:0:1:3:51",
+      "ogid_before": "mmmnnoo:11122556666688d:N0N:24:B:R:0:1:3:50"
+     },
+     {
+      "action_id": 13,
+      "color": 0,
+      "d1": 3,
+      "d2": 5,
+      "moves": [
+       {
+        "from": 8,
+        "pips": 3
+       },
+       {
+        "from": 8,
+        "pips": 5
+       }
+      ],
+      "ogid_after": "mmnoo:11122355566666d:N0N::B:C:0:1:3:52",
+      "ogid_before": "mmnoo:11122556666688d:N0N:35:W:R:0:1:3:51"
+     },
+     {
+      "action_id": 7,
+      "color": 1,
+      "d1": 2,
+      "d2": 3,
+      "moves": [
+       {
+        "from": 23,
+        "pips": 2
+       },
+       {
+        "from": 22,
+        "pips": 3
+       }
+      ],
+      "ogid_after": "moo:11122355566666d:N0N::W:C:0:1:3:53",
+      "ogid_before": "mmnoo:11122355566666d:N0N:23:B:R:0:1:3:52"
+     },
+     {
+      "action_id": 13,
+      "color": 0,
+      "d1": 3,
+      "d2": 5,
+      "moves": [
+       {
+        "from": 13,
+        "pips": 5
+       },
+       {
+        "from": 8,
+        "pips": 3
+       }
+      ],
+      "ogid_after": "moo:111223555566666:N0N::B:C:0:1:3:54",
+      "ogid_before": "moo:11122355566666d:N0N:35:W:R:0:1:3:53"
+     },
+     {
+      "action_id": 12,
+      "color": 1,
+      "d1": 3,
+      "d2": 4,
+      "moves": [
+       {
+        "from": 22,
+        "pips": 3
+       },
+       {
+        "from": 24,
+        "pips": 1
+       }
+      ],
+      "ogid_after": "o:111223555566666:N0N::W:C:0:1:3:55",
+      "ogid_before": "moo:111223555566666:N0N:34:B:R:0:1:3:54"
+     },
+     {
+      "action_id": 3,
+      "color": 0,
+      "d1": 1,
+      "d2": 4,
+      "moves": [
+       {
+        "from": 5,
+        "pips": 4
+       },
+       {
+        "from": 1,
+        "pips": 1
+       }
+      ],
+      "ogid_after": "o:11122355566666:N0N::B:C:0:1:3:56",
+      "ogid_before": "o:111223555566666:N0N:14:W:R:0:1:3:55"
+     },
+     {
+      "action_id": 16,
+      "color": 1,
+      "d1": 4,
+      "d2": 5,
+      "moves": [
+       {
+        "from": 24,
+        "pips": 1
+       }
+      ],
+      "ogid_after": ":11122355566666:N0N::W:C:0:1:3:57",
+      "ogid_before": "o:11122355566666:N0N:45:B:R:0:1:3:56"
+     }
+    ],
+    "points_won": 1,
+    "winner": 0
+   },
+   {
+    "first_to_move": 1,
+    "game_index": 2,
+    "is_crawford": false,
+    "is_default_board": true,
+    "is_lastgame": false,
+    "plies": [
+     {
+      "action_id": 19,
+      "color": 1,
+      "d1": 5,
+      "d2": 6,
+      "moves": [
+       {
+        "from": 1,
+        "pips": 6
+       },
+       {
+        "from": 7,
+        "pips": 5
+       }
+      ],
+      "ogid_after": "1cccccchhhjjjjj:66666888dddddoo:N0N::W:C:1:1:3:1",
+      "ogid_before": "11ccccchhhjjjjj:66666888dddddoo:N0N:56:B:IB:1:1:3:0"
+     },
+     {
+      "action_id": 15,
+      "color": 0,
+      "d1": 4,
+      "d2": 4,
+      "moves": [
+       {
+        "from": 13,
+        "pips": 4
+       },
+       {
+        "from": 13,
+        "pips": 4
+       },
+       {
+        "from": 24,
+        "pips": 4
+       },
+       {
+        "from": 24,
+        "pips": 4
+       }
+      ],
+      "ogid_after": "1cccccchhhjjjjj:6666688899dddkk:N0N::B:C:1:1:3:2",
+      "ogid_before": "1cccccchhhjjjjj:66666888dddddoo:N0N:44:W:R:1:1:3:1"
+     },
+     {
+      "action_id": 12,
+      "color": 1,
+      "d1": 3,
+      "d2": 4,
+      "moves": [
+       {
+        "from": 1,
+        "pips": 4
+       },
+       {
+        "from": 19,
+        "pips": 3
+       }
+      ],
+      "ogid_after": "5cccccchhhjjjjm:6666688899dddkk:N0N::W:C:1:1:3:3",
+      "ogid_before": "1cccccchhhjjjjj:6666688899dddkk:N0N:34:B:R:1:1:3:2"
+     },
+     {
+      "action_id": 19,
+      "color": 0,
+      "d1": 5,
+      "d2": 6,
+      "moves": [
+       {
+        "from": 8,
+        "pips": 6
+       },
+       {
+        "from": 13,
+        "pips": 5
+       }
+      ],
+      "ogid_after": "5cccccchhhjjjjm:26666688899ddkk:N0N::B:C:1:1:3:4",
+      "ogid_before": "5cccccchhhjjjjm:6666688899dddkk:N0N:56:W:R:1:1:3:3"
+     },
+     {
+      "action_id": 17,
+      "color": 1,
+      "d1": 4,
+      "d2": 6,
+      "moves": [
+       {
+        "from": 5,
+        "pips": 6
+       },
+       {
+        "from": 17,
+        "pips": 4
+       }
+      ],
+      "ogid_after": "bcccccchhjjjjlm:26666688899ddkk:N0N::W:C:1:1:3:5",
+      "ogid_before": "5cccccchhhjjjjm:26666688899ddkk:N0N:46:B:R:1:1:3:4"
+     },
+     {
+      "action_id": 2,
+      "color": 0,
+      "d1": 1,
+      "d2": 3,
+      "moves": [
+       {
+        "from": 6,
+        "pips": 1
+       },
+       {
+        "from": 8,
+        "pips": 3
+       }
+      ],
+      "ogid_after": "bcccccchhjjjjlm:25566668899ddkk:N0N::B:C:1:1:3:6",
+      "ogid_before": "bcccccchhjjjjlm:26666688899ddkk:N0N:13:W:R:1:1:3:5"
+     },
+     {
+      "action_id": 10,
+      "color": 1,
+      "d1": 2,
+      "d2": 6,
+      "moves": [
+       {
+        "from": 11,
+        "pips": 6
+       },
+       {
+        "from": 19,
+        "pips": 2
+       }
+      ],
+      "ogid_after": "cccccchhhjjjllm:25566668899ddkk:N0N::W:C:1:1:3:7",
+      "ogid_before": "bcccccchhjjjjlm:25566668899ddkk:N0N:26:B:R:1:1:3:6"
+     },
+     {
+      "action_id": 3,
+      "color": 0,
+      "d1": 1,
+      "d2": 4,
+      "moves": [
+       {
+        "from": 6,
+        "pips": 1
+       },
+       {
+        "from": 8,
+        "pips": 4
+       }
+      ],
+      "ogid_after": "cccccchhhjjjllm:24555666899ddkk:N0N::B:C:1:1:3:8",
+      "ogid_before": "cccccchhhjjjllm:25566668899ddkk:N0N:14:W:R:1:1:3:7"
+     },
+     {
+      "action_id": 17,
+      "color": 1,
+      "d1": 4,
+      "d2": 6,
+      "moves": [
+       {
+        "from": 12,
+        "pips": 4
+       },
+       {
+        "from": 16,
+        "pips": 6
+       }
+      ],
+      "ogid_after": "ccccchhhjjjllmm:24555666899ddkk:N0N::W:C:1:1:3:9",
+      "ogid_before": "cccccchhhjjjllm:24555666899ddkk:N0N:46:B:R:1:1:3:8"
+     },
+     {
+      "action_id": 2,
+      "color": 0,
+      "d1": 1,
+      "d2": 3,
+      "moves": [
+       {
+        "from": 5,
+        "pips": 1
+       },
+       {
+        "from": 8,
+        "pips": 3
+       }
+      ],
+      "ogid_after": "ccccchhhjjjllmm:24455566699ddkk:N0N::B:C:1:1:3:10",
+      "ogid_before": "ccccchhhjjjllmm:24555666899ddkk:N0N:13:W:R:1:1:3:9"
+     },
+     {
+      "action_id": 21,
+      "color": 1,
+      "ogid_after": "ccccchhhjjjllmm:24455566699ddkk:N0O::W:D:1:1:3:10",
+      "ogid_before": "ccccchhhjjjllmm:24455566699ddkk:N0N::B:C:1:1:3:10"
+     },
+     {
+      "action_id": 23,
+      "color": 0,
+      "ogid_after": "ccccchhhjjjllmm:24455566699ddkk:N0P::B:G:1:1:3:10",
+      "ogid_before": "ccccchhhjjjllmm:24455566699ddkk:N0O::W:D:1:1:3:10"
+     }
+    ],
+    "points_won": 1,
+    "winner": 0
+   },
+   {
+    "first_to_move": 0,
+    "game_index": 3,
+    "is_crawford": true,
+    "is_default_board": true,
+    "is_lastgame": false,
+    "plies": [
+     {
+      "action_id": 17,
+      "color": 0,
+      "d1": 4,
+      "d2": 6,
+      "moves": [
+       {
+        "from": 8,
+        "pips": 6
+       },
+       {
+        "from": 6,
+        "pips": 4
+       }
+      ],
+      "ogid_after": "11ccccchhhjjjjj:22666688dddddoo:N0N::B:C:2:1:3C:1",
+      "ogid_before": "11ccccchhhjjjjj:66666888dddddoo:N0N:46:W:IB:2:1:3C:0"
+     },
+     {
+      "action_id": 9,
+      "color": 1,
+      "d1": 2,
+      "d2": 5,
+      "moves": [
+       {
+        "from": 12,
+        "pips": 5
+       },
+       {
+        "from": 1,
+        "pips": 2
+       }
+      ],
+      "ogid_after": "13cccchhhhjjjjj:22666688dddddoo:N0N::W:C:2:1:3C:2",
+      "ogid_before": "11ccccchhhjjjjj:22666688dddddoo:N0N:25:B:R:2:1:3C:1"
+     },
+     {
+      "action_id": 6,
+      "color": 0,
+      "d1": 2,
+      "d2": 2,
+      "moves": [
+       {
+        "from": 6,
+        "pips": 2
+       },
+       {
+        "from": 6,
+        "pips": 2
+       },
+       {
+        "from": 13,
+        "pips": 2
+       },
+       {
+        "from": 13,
+        "pips": 2
+       }
+      ],
+      "ogid_after": "13cccchhhhjjjjj:22446688bbdddoo:N0N::B:C:2:1:3C:3",
+      "ogid_before": "13cccchhhhjjjjj:22666688dddddoo:N0N:22:W:R:2:1:3C:2"
+     },
+     {
+      "action_id": 2,
+      "color": 1,
+      "d1": 1,
+      "d2": 3,
+      "moves": [
+       {
+        "from": 17,
+        "pips": 3
+       },
+       {
+        "from": 19,
+        "pips": 1
+       }
+      ],
+      "ogid_after": "13cccchhhjjjjkk:22446688bbdddoo:N0N::W:C:2:1:3C:4",
+      "ogid_before": "13cccchhhhjjjjj:22446688bbdddoo:N0N:13:B:R:2:1:3C:3"
+     },
+     {
+      "action_id": 4,
+      "color": 0,
+      "d1": 1,
+      "d2": 5,
+      "moves": [
+       {
+        "from": 24,
+        "pips": 1
+       },
+       {
+        "from": 13,
+        "pips": 5
+       }
+      ],
+      "ogid_after": "13cccchhhjjjjkk:224466888bbddno:N0N::B:C:2:1:3C:5",
+      "ogid_before": "13cccchhhjjjjkk:22446688bbdddoo:N0N:15:W:R:2:1:3C:4"
+     },
+     {
+      "action_id": 17,
+      "color": 1,
+      "d1": 4,
+      "d2": 6,
+      "moves": [
+       {
+        "from": 3,
+        "pips": 4
+       },
+       {
+        "from": 1,
+        "pips": 6
+       }
+      ],
+      "ogid_after": "77cccchhhjjjjkk:224466888bbddno:N0N::W:C:2:1:3C:6",
+      "ogid_before": "13cccchhhjjjjkk:224466888bbddno:N0N:46:B:R:2:1:3C:5"
+     },
+     {
+      "action_id": 13,
+      "color": 0,
+      "d1": 3,
+      "d2": 5,
+      "moves": [
+       {
+        "from": 8,
+        "pips": 3
+       },
+       {
+        "from": 23,
+        "pips": 5
+       }
+      ],
+      "ogid_after": "77cccchhhjjjjkk:224456688bbddio:N0N::B:C:2:1:3C:7",
+      "ogid_before": "77cccchhhjjjjkk:224466888bbddno:N0N:35:W:R:2:1:3C:6"
+     },
+     {
+      "action_id": 13,
+      "color": 1,
+      "d1": 3,
+      "d2": 5,
+      "moves": [
+       {
+        "from": 17,
+        "pips": 5
+       },
+       {
+        "from": 19,
+        "pips": 3
+       }
+      ],
+      "ogid_after": "77cccchhjjjkkmm:224456688bbddio:N0N::W:C:2:1:3C:8",
+      "ogid_before": "77cccchhhjjjjkk:224456688bbddio:N0N:35:B:R:2:1:3C:7"
+     },
+     {
+      "action_id": 7,
+      "color": 0,
+      "d1": 2,
+      "d2": 3,
+      "moves": [
+       {
+        "from": 18,
+        "pips": 2
+       },
+       {
+        "from": 16,
+        "pips": 3
+       }
+      ],
+      "ogid_after": "77cccchhjjjkkmm:224456688bbdddo:N0N::B:C:2:1:3C:9",
+      "ogid_before": "77cccchhjjjkkmm:224456688bbddio:N0N:23:W:R:2:1:3C:8"
+     },
+     {
+      "action_id": 6,
+      "color": 1,
+      "d1": 2,
+      "d2": 2,
+      "moves": [
+       {
+        "from": 7,
+        "pips": 2
+       },
+       {
+        "from": 7,
+        "pips": 2
+       },
+       {
+        "from": 12,
+        "pips": 2
+       },
+       {
+        "from": 12,
+        "pips": 2
+       }
+      ],
+      "ogid_after": "99cceehhjjjkkmm:224456688bbdddo:N0N::W:C:2:1:3C:10",
+      "ogid_before": "77cccchhjjjkkmm:224456688bbdddo:N0N:22:B:R:2:1:3C:9"
+     },
+     {
+      "action_id": 18,
+      "color": 0,
+      "d1": 5,
+      "d2": 5,
+      "moves": [
+       {
+        "from": 8,
+        "pips": 5
+       },
+       {
+        "from": 8,
+        "pips": 5
+       },
+       {
+        "from": 13,
+        "pips": 5
+       },
+       {
+        "from": 8,
+        "pips": 5
+       }
+      ],
+      "ogid_after": "99cceehhjjjkkmm:2233344566bbddo:N0N::B:C:2:1:3C:11",
+      "ogid_before": "99cceehhjjjkkmm:224456688bbdddo:N0N:55:W:R:2:1:3C:10"
+     },
+     {
+      "action_id": 6,
+      "color": 1,
+      "d1": 2,
+      "d2": 2,
+      "moves": [
+       {
+        "from": 14,
+        "pips": 2
+       },
+       {
+        "from": 14,
+        "pips": 2
+       },
+       {
+        "from": 16,
+        "pips": 2
+       },
+       {
+        "from": 16,
+        "pips": 2
+       }
+      ],
+      "ogid_after": "99cchhiijjjkkmm:2233344566bbddo:N0N::W:C:2:1:3C:12",
+      "ogid_before": "99cceehhjjjkkmm:2233344566bbddo:N0N:22:B:R:2:1:3C:11"
+     },
+     {
+      "action_id": 19,
+      "color": 0,
+      "d1": 5,
+      "d2": 6,
+      "moves": [
+       {
+        "from": 11,
+        "pips": 6
+       },
+       {
+        "from": 11,
+        "pips": 5
+       }
+      ],
+      "ogid_after": "99cchhiijjjkkmm:223334455666ddo:N0N::B:C:2:1:3C:13",
+      "ogid_before": "99cchhiijjjkkmm:2233344566bbddo:N0N:56:W:R:2:1:3C:12"
+     },
+     {
+      "action_id": 5,
+      "color": 1,
+      "d1": 1,
+      "d2": 6,
+      "moves": [
+       {
+        "from": 18,
+        "pips": 6
+       },
+       {
+        "from": 18,
+        "pips": 1
+       }
+      ],
+      "ogid_after": "99cchhjjjjkkmmo:223334455666ddp:N0N::W:C:2:1:3C:14",
+      "ogid_before": "99cchhiijjjkkmm:223334455666ddo:N0N:16:B:R:2:1:3C:13"
+     },
+     {
+      "action_id": 4,
+      "color": 0,
+      "d1": 1,
+      "d2": 5,
+      "moves": [
+       {
+        "from": 25,
+        "pips": 1
+       },
+       {
+        "from": 13,
+        "pips": 5
+       }
+      ],
+      "ogid_after": "099cchhjjjjkkmm:2233344556668do:N0N::B:C:2:1:3C:15",
+      "ogid_before": "99cchhjjjjkkmmo:223334455666ddp:N0N:15:W:R:2:1:3C:14"
+     },
+     {
+      "action_id": 17,
+      "color": 1,
+      "d1": 4,
+      "d2": 6,
+      "moves": [],
+      "ogid_after": "099cchhjjjjkkmm:2233344556668do:N0N::W:C:2:1:3C:16",
+      "ogid_before": "099cchhjjjjkkmm:2233344556668do:N0N:46:B:R:2:1:3C:15"
+     },
+     {
+      "action_id": 19,
+      "color": 0,
+      "d1": 5,
+      "d2": 6,
+      "moves": [
+       {
+        "from": 24,
+        "pips": 6
+       },
+       {
+        "from": 18,
+        "pips": 5
+       }
+      ],
+      "ogid_after": "099cchhjjjjkkmm:2233344556668dd:N0N::B:C:2:1:3C:17",
+      "ogid_before": "099cchhjjjjkkmm:2233344556668do:N0N:56:W:R:2:1:3C:16"
+     },
+     {
+      "action_id": 19,
+      "color": 1,
+      "d1": 5,
+      "d2": 6,
+      "moves": [],
+      "ogid_after": "099cchhjjjjkkmm:2233344556668dd:N0N::W:C:2:1:3C:18",
+      "ogid_before": "099cchhjjjjkkmm:2233344556668dd:N0N:56:B:R:2:1:3C:17"
+     },
+     {
+      "action_id": 18,
+      "color": 0,
+      "d1": 5,
+      "d2": 5,
+      "moves": [
+       {
+        "from": 8,
+        "pips": 5
+       },
+       {
+        "from": 13,
+        "pips": 5
+       },
+       {
+        "from": 8,
+        "pips": 5
+       },
+       {
+        "from": 13,
+        "pips": 5
+       }
+      ],
+      "ogid_after": "099cchhjjjjkkmm:223333344556668:N0N::B:C:2:1:3C:19",
+      "ogid_before": "099cchhjjjjkkmm:2233344556668dd:N0N:55:W:R:2:1:3C:18"
+     },
+     {
+      "action_id": 3,
+      "color": 1,
+      "d1": 1,
+      "d2": 4,
+      "moves": [
+       {
+        "from": 0,
+        "pips": 1
+       },
+       {
+        "from": 19,
+        "pips": 4
+       }
+      ],
+      "ogid_after": "199cchhjjjkkmmn:223333344556668:N0N::W:C:2:1:3C:20",
+      "ogid_before": "099cchhjjjjkkmm:223333344556668:N0N:14:B:R:2:1:3C:19"
+     },
+     {
+      "action_id": 3,
+      "color": 0,
+      "d1": 1,
+      "d2": 4,
+      "moves": [
+       {
+        "from": 5,
+        "pips": 4
+       },
+       {
+        "from": 6,
+        "pips": 1
+       }
+      ],
+      "ogid_after": "099cchhjjjkkmmn:122333334455668:N0N::B:C:2:1:3C:21",
+      "ogid_before": "199cchhjjjkkmmn:223333344556668:N0N:14:W:R:2:1:3C:20"
+     },
+     {
+      "action_id": 14,
+      "color": 1,
+      "d1": 3,
+      "d2": 6,
+      "moves": [],
+      "ogid_after": "099cchhjjjkkmmn:122333334455668:N0N::W:C:2:1:3C:22",
+      "ogid_before": "099cchhjjjkkmmn:122333334455668:N0N:36:B:R:2:1:3C:21"
+     },
+     {
+      "action_id": 20,
+      "color": 0,
+      "d1": 6,
+      "d2": 6,
+      "moves": [
+       {
+        "from": 8,
+        "pips": 6
+       },
+       {
+        "from": 6,
+        "pips": 6
+       },
+       {
+        "from": 6,
+        "pips": 6
+       },
+       {
+        "from": 5,
+        "pips": 5
+       }
+      ],
+      "ogid_after": "099cchhjjjkkmmn:122233333445:N0N::B:C:2:1:3C:23",
+      "ogid_before": "099cchhjjjkkmmn:122333334455668:N0N:66:W:R:2:1:3C:22"
+     },
+     {
+      "action_id": 6,
+      "color": 1,
+      "d1": 2,
+      "d2": 2,
+      "moves": [],
+      "ogid_after": "099cchhjjjkkmmn:122233333445:N0N::W:C:2:1:3C:24",
+      "ogid_before": "099cchhjjjkkmmn:122233333445:N0N:22:B:R:2:1:3C:23"
+     },
+     {
+      "action_id": 10,
+      "color": 0,
+      "d1": 2,
+      "d2": 6,
+      "moves": [
+       {
+        "from": 5,
+        "pips": 5
+       },
+       {
+        "from": 3,
+        "pips": 2
+       }
+      ],
+      "ogid_after": "099cchhjjjkkmmn:11222333344:N0N::B:C:2:1:3C:25",
+      "ogid_before": "099cchhjjjkkmmn:122233333445:N0N:26:W:R:2:1:3C:24"
+     },
+     {
+      "action_id": 18,
+      "color": 1,
+      "d1": 5,
+      "d2": 5,
+      "moves": [
+       {
+        "from": 0,
+        "pips": 5
+       },
+       {
+        "from": 5,
+        "pips": 5
+       },
+       {
+        "from": 9,
+        "pips": 5
+       },
+       {
+        "from": 9,
+        "pips": 5
+       }
+      ],
+      "ogid_after": "acceehhjjjkkmmn:11222333344:N0N::W:C:2:1:3C:26",
+      "ogid_before": "099cchhjjjkkmmn:11222333344:N0N:55:B:R:2:1:3C:25"
+     },
+     {
+      "action_id": 8,
+      "color": 0,
+      "d1": 2,
+      "d2": 4,
+      "moves": [
+       {
+        "from": 2,
+        "pips": 2
+       },
+       {
+        "from": 4,
+        "pips": 4
+       }
+      ],
+      "ogid_after": "acceehhjjjkkmmn:112233334:N0N::B:C:2:1:3C:27",
+      "ogid_before": "acceehhjjjkkmmn:11222333344:N0N:24:W:R:2:1:3C:26"
+     },
+     {
+      "action_id": 1,
+      "color": 1,
+      "d1": 1,
+      "d2": 2,
+      "moves": [
+       {
+        "from": 14,
+        "pips": 1
+       },
+       {
+        "from": 17,
+        "pips": 2
+       }
+      ],
+      "ogid_after": "accefhjjjjkkmmn:112233334:N0N::W:C:2:1:3C:28",
+      "ogid_before": "acceehhjjjkkmmn:112233334:N0N:12:B:R:2:1:3C:27"
+     },
+     {
+      "action_id": 8,
+      "color": 0,
+      "d1": 2,
+      "d2": 4,
+      "moves": [
+       {
+        "from": 2,
+        "pips": 2
+       },
+       {
+        "from": 4,
+        "pips": 4
+       }
+      ],
+      "ogid_after": "accefhjjjjkkmmn:1123333:N0N::B:C:2:1:3C:29",
+      "ogid_before": "accefhjjjjkkmmn:112233334:N0N:24:W:R:2:1:3C:28"
+     },
+     {
+      "action_id": 12,
+      "color": 1,
+      "d1": 3,
+      "d2": 4,
+      "moves": [
+       {
+        "from": 10,
+        "pips": 3
+       },
+       {
+        "from": 15,
+        "pips": 4
+       }
+      ],
+      "ogid_after": "ccdehjjjjjkkmmn:1123333:N0N::W:C:2:1:3C:30",
+      "ogid_before": "accefhjjjjkkmmn:1123333:N0N:34:B:R:2:1:3C:29"
+     },
+     {
+      "action_id": 16,
+      "color": 0,
+      "d1": 4,
+      "d2": 5,
+      "moves": [
+       {
+        "from": 3,
+        "pips": 3
+       },
+       {
+        "from": 3,
+        "pips": 3
+       }
+      ],
+      "ogid_after": "ccdehjjjjjkkmmn:11233:N0N::B:C:2:1:3C:31",
+      "ogid_before": "ccdehjjjjjkkmmn:1123333:N0N:45:W:R:2:1:3C:30"
+     },
+     {
+      "action_id": 5,
+      "color": 1,
+      "d1": 1,
+      "d2": 6,
+      "moves": [
+       {
+        "from": 12,
+        "pips": 1
+       },
+       {
+        "from": 13,
+        "pips": 6
+       }
+      ],
+      "ogid_after": "cdehjjjjjjkkmmn:11233:N0N::W:C:2:1:3C:32",
+      "ogid_before": "ccdehjjjjjkkmmn:11233:N0N:16:B:R:2:1:3C:31"
+     },
+     {
+      "action_id": 15,
+      "color": 0,
+      "d1": 4,
+      "d2": 4,
+      "moves": [
+       {
+        "from": 3,
+        "pips": 3
+       },
+       {
+        "from": 3,
+        "pips": 3
+       },
+       {
+        "from": 2,
+        "pips": 2
+       },
+       {
+        "from": 1,
+        "pips": 1
+       }
+      ],
+      "ogid_after": "cdehjjjjjjkkmmn:1:N0N::B:C:2:1:3C:33",
+      "ogid_before": "cdehjjjjjjkkmmn:11233:N0N:44:W:R:2:1:3C:32"
+     },
+     {
+      "action_id": 1,
+      "color": 1,
+      "d1": 1,
+      "d2": 2,
+      "moves": [
+       {
+        "from": 12,
+        "pips": 1
+       },
+       {
+        "from": 17,
+        "pips": 2
+       }
+      ],
+      "ogid_after": "ddejjjjjjjkkmmn:1:N0N::W:C:2:1:3C:34",
+      "ogid_before": "cdehjjjjjjkkmmn:1:N0N:12:B:R:2:1:3C:33"
+     },
+     {
+      "action_id": 8,
+      "color": 0,
+      "d1": 2,
+      "d2": 4,
+      "moves": [
+       {
+        "from": 1,
+        "pips": 1
+       }
+      ],
+      "ogid_after": "ddejjjjjjjkkmmn::N0N::B:C:2:1:3C:35",
+      "ogid_before": "ddejjjjjjjkkmmn:1:N0N:24:W:R:2:1:3C:34"
+     }
+    ],
+    "points_won": 2,
+    "winner": 1
+   }
+  ],
+  "jacoby": false,
+  "match_length": 3,
+  "ogxm": {
+   "major": 2,
+   "minor": 0
+  },
+  "player_black": "Jezebel",
+  "player_white": "rchoice",
+  "replay_complete": true,
+  "result": 2,
+  "source": 1,
+  "started_at": 1790543068000,
+  "timestamp": 1790543068,
+  "variant": "backgammon",
+  "white_score": 2
+ },
+ "report": {
+  "games": 4,
+  "player_black": "Jezebel",
+  "player_white": "rchoice",
+  "plies": 117,
+  "warnings": []
+ }
+}

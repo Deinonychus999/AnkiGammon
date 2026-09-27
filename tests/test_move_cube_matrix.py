@@ -251,6 +251,12 @@ class _FakeSettings:
     def is_xg_available(self):
         return False
 
+    def is_engine_available(self):
+        return True
+
+    def engine_label(self):
+        return "3-ply"
+
 
 def _checker_decision(**overrides):
     position, metadata = parse_xgid(ISSUE_50_XGID)

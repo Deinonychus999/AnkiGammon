@@ -43,10 +43,7 @@ def _append_warnings(message: str, card_gen: CardGenerator) -> str:
 def _analysis_substeps(decision: Decision, settings: Settings) -> int:
     """How many engine runs the optional analyses of one position take, so
     progress can advance per run; at least 1."""
-    analyzer_available = (
-        settings.is_xg_available() if getattr(settings, 'analyzer_type', 'gnubg') == 'xg'
-        else settings.is_gnubg_available()
-    )
+    analyzer_available = settings.is_engine_available()
     has_cube_score_matrix = (
         decision.decision_type.name == 'CUBE_ACTION' and
         settings.get('generate_score_matrix', False) and
@@ -78,7 +75,7 @@ def _analysis_substeps(decision: Decision, settings: Settings) -> int:
 
 class AnalysisWorker(QThread):
     """
-    Background thread for GnuBG analysis of positions.
+    Background thread for engine analysis of positions.
 
     Signals:
         progress(int, int): current, total
@@ -168,16 +165,10 @@ class AnalysisWorker(QThread):
 
                 carry_user_metadata(decision, analyzed_decision)
 
-                # Set source description
-                analyzer_type = getattr(self.settings, 'analyzer_type', 'gnubg')
-                if analyzer_type == "xg":
-                    level = self.settings.xg_analysis_level
-                    engine_name = f"eXtreme Gammon ({level})"
-                else:
-                    ply_level = self.settings.gnubg_analysis_ply
-                    engine_name = f"GnuBG ({ply_level}-ply)"
                 format_name = decision.original_position_format or "XGID"
-                analyzed_decision.source_description = f"Analyzed with {engine_name} from {format_name}"
+                analyzed_decision.source_description = (
+                    f"Analyzed with {self.settings.engine_description()} from {format_name}"
+                )
 
                 analyzed_decisions[pos_idx] = analyzed_decision
 
@@ -803,19 +794,11 @@ class ExportDialog(QDialog):
         needs_analysis = [d for d in self.all_decisions if not d.candidate_moves]
 
         if needs_analysis:
-            # Verify the configured analyzer is available
-            analyzer_type = getattr(self.settings, 'analyzer_type', 'gnubg')
-            if analyzer_type == "xg":
-                analyzer_available = self.settings.is_xg_available()
-                engine_name = "eXtreme Gammon"
-            else:
-                analyzer_available = self.settings.is_gnubg_available()
-                engine_name = "GnuBG"
-
-            if not analyzer_available:
+            engine_name = self.settings.engine_display_name()
+            if not self.settings.is_engine_available():
                 self.status_label.setText(
                     f"Cannot export: {len(needs_analysis)} position(s) need analysis "
-                    f"but {engine_name} is not configured.\n"
+                    f"but {engine_name} is not set up.\n"
                     "Please configure an analysis engine in Settings, or import an analyzed file."
                 )
                 self.btn_export.setEnabled(True)

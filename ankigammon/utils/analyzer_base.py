@@ -1,7 +1,7 @@
 """Abstract base class for backgammon position analyzers.
 
-Defines the interface that both GNUBGAnalyzer and XGAnalyzer implement,
-allowing the rest of the codebase to work with either analysis engine.
+Defines the interface every analysis engine implements (GnuBG, eXtreme Gammon,
+HedgeHog), so the rest of the codebase works with whichever is selected.
 """
 
 from abc import ABC, abstractmethod
@@ -140,16 +140,10 @@ class BackgammonAnalyzer(ABC):
 
 
 def create_analyzer(settings) -> BackgammonAnalyzer:
-    """Factory: create the appropriate analyzer based on settings.
-
-    Args:
-        settings: Settings object with analyzer_type and engine-specific config
-
-    Returns:
-        BackgammonAnalyzer instance (GNUBGAnalyzer or XGAnalyzer)
+    """Factory: create the analyzer for ``settings.analyzer_type``.
 
     Raises:
-        ValueError: If analyzer type is unknown or engine is not available
+        ValueError: If the analyzer type is unknown or the engine is not available
     """
     analyzer_type = getattr(settings, 'analyzer_type', 'gnubg')
 
@@ -164,9 +158,16 @@ def create_analyzer(settings) -> BackgammonAnalyzer:
             xg_path=settings.xg_exe_path,
             analysis_level=settings.xg_analysis_level
         )
-    else:
+    if analyzer_type == "hedgehog":
+        from ankigammon.utils.hedgehog_analyzer import HedgehogAnalyzer
+        return HedgehogAnalyzer(
+            preset=settings.hedgehog_preset,
+            preset_label=settings.hedgehog_preset_label(),
+        )
+    if analyzer_type == "gnubg":
         from ankigammon.utils.gnubg_analyzer import GNUBGAnalyzer
         return GNUBGAnalyzer(
             gnubg_path=settings.gnubg_path,
             analysis_ply=settings.gnubg_analysis_ply
         )
+    raise ValueError(f"Unknown analysis engine: {analyzer_type!r}")

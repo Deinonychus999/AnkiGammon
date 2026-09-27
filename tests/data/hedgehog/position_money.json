@@ -1,0 +1,55 @@
+{
+ "result": {
+  "color": 0,
+  "cube_decision": {
+   "action": "No Double",
+   "cash_point": 0.744273,
+   "double_pass_equity": 1.0,
+   "double_take_equity": 0.1312,
+   "no_double_equity": 0.3012,
+   "should_double": false,
+   "take_point": 0.255727,
+   "window_static": true
+  },
+  "cube_pending": false,
+  "decision_type": "cube",
+  "engine": {
+   "cube_efficiency": 0.68,
+   "cube_ply": 2,
+   "currency": "cubeful",
+   "exact_bearoff": 1,
+   "lagger_win": 1,
+   "race_order": 1,
+   "rules": {
+    "cube_limit": 64,
+    "cube_limit_mode": "auto",
+    "jacoby": 0,
+    "jacoby_mode": "auto"
+   },
+   "tables": {
+    "bg_escape": 1,
+    "cube_race": 1,
+    "endgame": 1,
+    "first_off_exact": 1,
+    "gammon": 1,
+    "gammon_max_outer": 4,
+    "gammon_outer_points": 17,
+    "laggers": 4
+   }
+  },
+  "eval": {
+   "bg_loss": 0.0013,
+   "bg_win": 0.0002,
+   "equity": 0.2114,
+   "gammon_loss": 0.0469,
+   "gammon_win": 0.0954,
+   "win": 0.582
+  },
+  "eval_ply": 2,
+  "ogid": "cccccgghhhjjjjj:112233666777dll:N0N::W:C:0:0:0:11",
+  "ply": 2,
+  "rolled_out": false,
+  "success": true
+ },
+ "status": "completed"
+}

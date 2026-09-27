@@ -7,10 +7,10 @@ A graphical application for converting backgammon positions into Anki flashcards
 ## Features
 
 - **Modern GUI interface** - Easy-to-use graphical application with drag-and-drop support
-- **Multiple input formats** - XGID/OGID/GNUID position IDs, XG binary files (.xg, .xgp), match files (.mat), SGF files
+- **Multiple input formats** - XGID/OGID/GNUID position IDs, XG binary files (.xg, .xgp), HedgeHog analysis files (.ogxm), match files (.mat), SGF files
 - **Direct XG export support** - Copy/paste pre-analyzed positions from eXtreme Gammon
 - **File import with filtering** - Drag-and-drop files with error threshold and player selection
-- **Dual analysis engines** - Analyze positions using GNU Backgammon (cross-platform) or eXtreme Gammon (Windows, experimental; see [Position Analysis](#position-analysis))
+- **Three analysis engines** - Analyze positions using GNU Backgammon (cross-platform), eXtreme Gammon (Windows, experimental) or HedgeHog (online, with your HedgeHog account); see [Position Analysis](#position-analysis)
 - **Automatic format detection** - Paste any supported format, the app detects it automatically
 - **Two export methods**:
   - AnkiConnect: Push directly to Anki (recommended)
@@ -112,12 +112,17 @@ ankigammon  # Launches the GUI
 
 ### Position Analysis
 
-Unanalyzed positions (position IDs, match files, SGF files) can be analyzed using one of two engines:
+Unanalyzed positions (position IDs, match files, SGF files) can be analyzed using one of three engines:
 
 - **GNU Backgammon**: Open-source CLI tool, works on Windows/macOS/Linux
 - **eXtreme Gammon**: Commercial software via UI automation, Windows only.
   - ⚠ **Experimental**: likely to fail on setups different from those tested. If it doesn't work for you, fall back to GNU Backgammon and send diagnostic logs (Help → Send Diagnostic Logs).
   - Supports XG 2.10 and 2.19, with auto-detected menu commands across English, German, French, Spanish, Japanese, Greek, and Russian Windows.
+- **HedgeHog**: Online engine at [hedgehog-bg.com](https://hedgehog-bg.com), on every platform. Needs a HedgeHog account and an internet connection.
+  - Select HedgeHog in Settings → Analysis Engine and click **Connect**. Your browser opens HedgeHog; sign in and click Allow. AnkiGammon never sees your password, and keeps its access in your operating system's credential store.
+  - Every analysis counts toward your own HedgeHog plan: the free plan has a small daily allowance and the lower depths, paid plans every depth. Settings shows what is left today.
+  - Score matrices are sent in small batches, so a whole matrix usually counts as a few analyses rather than one per score.
+  - Disconnect in Settings, or under Connected apps on HedgeHog.
 
 Configure your preferred engine in Settings → Analysis (see Customization Options below).
 
@@ -135,7 +140,7 @@ Import **pre-analyzed positions** directly from eXtreme Gammon:
 
 ### Position ID Formats (Unanalyzed)
 
-Position IDs encode positions without move analysis. Configure GNU Backgammon in Settings to enable automatic analysis.
+Position IDs encode positions without move analysis. Set up an analysis engine in Settings to enable automatic analysis.
 
 - **XGID (eXtreme Gammon ID)** - 26-character position string + metadata fields
   - Example: `XGID=---BBBBAAA---Ac-bbccbAA-A-:1:1:-1:63:4:3:0:5:8`
@@ -151,8 +156,9 @@ All formats fully support position encoding, cube state, dice, and match metadat
 ### File Formats
 
 - **XG Binary files (.xg, .xgp)** - eXtreme Gammon match and position files (includes pre-analysis from XG)
-- **Match files (.mat, .txt)** - GNU Backgammon match exports (requires GNU Backgammon for analysis)
-- **SGF files (.sgf)** - Smart Game Format for backgammon (requires GNU Backgammon for analysis)
+- **HedgeHog files (.ogxm)** - HedgeHog match files with their analysis (OGXM v2)
+- **Match files (.mat, .txt)** - GNU Backgammon match exports (analyzed by the selected engine)
+- **SGF files (.sgf)** - Smart Game Format for backgammon (analyzed by the selected engine)
 
 Import via Ctrl+O or drag-and-drop directly onto the window.
 
@@ -365,7 +371,7 @@ User preferences (color scheme, deck name, board orientation, etc.) are automati
 - macOS: `~/.ankigammon/config.json`
 - Linux: `~/.ankigammon/config.json`
 
-Settings persist across application restarts, even when using the standalone executable.
+Settings persist across application restarts, even when using the standalone executable. A connected HedgeHog account's tokens are kept in the operating system's credential store (Windows Credential Manager, macOS Keychain), not in this file.
 
 ### Troubleshooting Build Issues
 
@@ -379,7 +385,7 @@ Settings persist across application restarts, even when using the standalone exe
 ## Requirements
 
 - Python 3.8+ (for development install only)
-- Dependencies automatically installed via `pip install .`: genanki, requests, PySide6, qtawesome, pywinauto/pyautogui (Windows only, for XG integration)
+- Dependencies automatically installed via `pip install .`: genanki, requests, keyring, PySide6, qtawesome, pywinauto/pyautogui (Windows only, for XG integration)
 - For standalone executable: No requirements - Python and all dependencies are bundled
 
 ## License

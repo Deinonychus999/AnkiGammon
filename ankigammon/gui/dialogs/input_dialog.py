@@ -2,7 +2,7 @@
 Smart input dialog for adding positions via paste.
 
 Supports:
-- Position IDs (XGID/OGID/GNUID) - analyzed with GnuBG
+- Position IDs (XGID/OGID/GNUID) - analyzed with the selected engine
 - Full XG analysis text - parsed directly
 """
 
@@ -61,7 +61,7 @@ class PendingPositionItem(QListWidgetItem):
         # Tooltip with metadata + analysis status
         tooltip = self.decision.get_metadata_text(self.score_format)
         if self.needs_analysis:
-            tooltip += "\n\nNeeds GnuBG analysis"
+            tooltip += "\n\nNeeds engine analysis"
         else:
             tooltip += f"\n\n{len(self.decision.candidate_moves)} moves analyzed"
 
@@ -168,7 +168,7 @@ class PendingListWidget(QListWidget):
             # Update tooltip to reflect the new note
             tooltip = item.decision.get_metadata_text(self.settings.score_format)
             if item.needs_analysis:
-                tooltip += "\n\nNeeds GnuBG analysis"
+                tooltip += "\n\nNeeds engine analysis"
             else:
                 tooltip += f"\n\n{len(item.decision.candidate_moves)} moves analyzed"
             if item.decision.note:
@@ -223,7 +223,7 @@ class InputDialog(QDialog):
 
     Allows users to paste:
     - Full XG analysis text (parsed directly)
-    - Position IDs (XGID/OGID/GNUID) - analyzed with GnuBG
+    - Position IDs (XGID/OGID/GNUID) - analyzed with the selected engine
 
     Signals:
         positions_added(List[Decision]): Emitted when positions are added
@@ -490,17 +490,16 @@ class InputDialog(QDialog):
             )
             return
 
-        # Check for GnuBG requirement
-        if result.format == InputFormat.POSITION_IDS and not self.settings.is_gnubg_available():
+        if result.format == InputFormat.POSITION_IDS and not self.settings.is_engine_available():
+            engine_name = self.settings.engine_display_name()
             reply = silent_messagebox.question(
                 self,
-                "GnuBG Required",
-                "Position IDs require GnuBG analysis, but GnuBG is not configured.\n\n"
-                "Would you like to configure GnuBG in Settings?",
+                f"{engine_name} Required",
+                f"Position IDs need {engine_name} analysis, but {engine_name} is not set up.\n\n"
+                f"Would you like to set up {engine_name} in Settings?",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
             )
             if reply == QMessageBox.StandardButton.Yes:
-                # Open settings dialog to configure GnuBG
                 dialog = SettingsDialog(self.settings, self)
                 dialog.exec()
             return
@@ -743,7 +742,7 @@ class InputDialog(QDialog):
             cube_value=metadata.get('cube_value', 1),
             cube_owner=metadata.get('cube_owner', CubeState.CENTERED),
             decision_type=DecisionType.CUBE_ACTION if not metadata.get('dice') else DecisionType.CHECKER_PLAY,
-            candidate_moves=[],  # Will be populated by GnuBG analysis
+            candidate_moves=[],  # Will be populated by engine analysis
             original_position_format=original_format
         )
 

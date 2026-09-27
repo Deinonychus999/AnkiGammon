@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal, QThread
 
-from ankigammon.settings import Settings
+from ankigammon.settings import HEDGEHOG_PRESET_LABELS, Settings
 from ankigammon.renderer.color_schemes import list_schemes
 from ankigammon.utils.subprocess_env import external_subprocess_env
 
@@ -127,6 +127,20 @@ class GnuBGValidationWorker(QThread):
                     os.unlink(command_file)
                 except OSError:
                     pass
+
+
+class HedgehogStatusWorker(QThread):
+    """Asks HedgeHog what the connected account may do, off the UI thread."""
+
+    succeeded = Signal(dict)
+    failed = Signal(str, str)  # (refusal code, message for the user)
+
+    def run(self):
+        from ankigammon.utils.hedgehog_client import HedgehogClient, HedgehogRefusal
+        try:
+            self.succeeded.emit(HedgehogClient().me())
+        except HedgehogRefusal as refusal:
+            self.failed.emit(refusal.code, refusal.message)
 
 
 class SettingsDialog(QDialog):
@@ -369,11 +383,13 @@ class SettingsDialog(QDialog):
         self.cmb_analyzer_type.addItem("GNU Backgammon", "gnubg")
         if sys.platform == 'win32':
             self.cmb_analyzer_type.addItem("eXtreme Gammon", "xg")
+        self.cmb_analyzer_type.addItem("HedgeHog", "hedgehog")
         self.cmb_analyzer_type.setCursor(Qt.PointingHandCursor)
         self.cmb_analyzer_type.setToolTip(
             "Select the analysis engine:\n"
             "• GNU Backgammon: Open-source CLI tool (cross-platform)\n"
-            "• eXtreme Gammon: Commercial software via UI automation (Windows only)"
+            "• eXtreme Gammon: Commercial software via UI automation (Windows only)\n"
+            "• HedgeHog: Online engine at hedgehog-bg.com, using your HedgeHog account"
         )
         self.cmb_analyzer_type.currentIndexChanged.connect(self._on_analyzer_type_changed)
         form.addRow("Engine:", self.cmb_analyzer_type)
@@ -497,7 +513,40 @@ class SettingsDialog(QDialog):
             self.lbl_xg_status_text
         ])
 
-        # --- Shared fields (both engines) ---
+        # --- HedgeHog-specific fields ---
+        self.hedgehog_widgets = []
+
+        account_layout = QHBoxLayout()
+        self.lbl_hedgehog_status_icon = QLabel()
+        self.lbl_hedgehog_status_text = QLabel()
+        self.lbl_hedgehog_status_text.setWordWrap(True)
+        self.btn_hedgehog_connect = QPushButton("Connect...")
+        self.btn_hedgehog_connect.setCursor(Qt.PointingHandCursor)
+        self.btn_hedgehog_connect.clicked.connect(self._on_hedgehog_connect_clicked)
+        account_layout.addWidget(self.lbl_hedgehog_status_icon)
+        account_layout.addWidget(self.lbl_hedgehog_status_text, 1)
+        account_layout.addWidget(self.btn_hedgehog_connect)
+        self.lbl_hedgehog_account = QLabel("Account:")
+        form.addRow(self.lbl_hedgehog_account, account_layout)
+        self.hedgehog_widgets.extend([
+            self.lbl_hedgehog_account, self.lbl_hedgehog_status_icon,
+            self.lbl_hedgehog_status_text, self.btn_hedgehog_connect,
+        ])
+
+        self.cmb_hedgehog_preset = QComboBox()
+        self.cmb_hedgehog_preset.setCursor(Qt.PointingHandCursor)
+        self.cmb_hedgehog_preset.setMaximumWidth(175)
+        self.cmb_hedgehog_preset.setToolTip(
+            "HedgeHog analysis depth. Deeper levels and rollouts need a paid HedgeHog plan.\n"
+            "Every analysis counts toward your own HedgeHog plan."
+        )
+        self.lbl_hedgehog_preset = QLabel("Analysis Depth:")
+        form.addRow(self.lbl_hedgehog_preset, self.cmb_hedgehog_preset)
+        self.hedgehog_widgets.extend([self.lbl_hedgehog_preset, self.cmb_hedgehog_preset])
+        self._fill_hedgehog_presets(list(HEDGEHOG_PRESET_LABELS), self.settings.hedgehog_preset)
+        self.hedgehog_worker: Optional[HedgehogStatusWorker] = None
+
+        # --- Shared fields (every engine) ---
 
         # Score matrix generation
         matrix_layout = QHBoxLayout()
@@ -589,14 +638,19 @@ class SettingsDialog(QDialog):
 
     def _on_analyzer_type_changed(self, index: int):
         """Show/hide engine-specific fields based on selected analyzer type."""
-        is_gnubg = self.cmb_analyzer_type.currentData() == "gnubg"
-        is_xg = not is_gnubg
+        engine = self.cmb_analyzer_type.currentData()
+        is_gnubg = engine == "gnubg"
+        is_xg = engine == "xg"
+        is_hedgehog = engine == "hedgehog"
 
         for widget in self.gnubg_widgets:
             widget.setVisible(is_gnubg)
 
         for widget in self.xg_widgets:
             widget.setVisible(is_xg)
+
+        for widget in self.hedgehog_widgets:
+            widget.setVisible(is_hedgehog)
 
         # Only surfaces when there is actually a name clash to report.
         self.lbl_xg_level_warning.setVisible(
@@ -606,8 +660,10 @@ class SettingsDialog(QDialog):
         # Update status for the visible engine
         if is_gnubg:
             self._update_gnubg_status()
-        else:
+        elif is_xg:
             self._update_xg_status()
+        else:
+            self._update_hedgehog_status()
 
     def _browse_xg(self):
         """Browse for eXtreme Gammon executable."""
@@ -742,6 +798,11 @@ class SettingsDialog(QDialog):
                 match_idx = 0
         self.cmb_xg_level.setCurrentIndex(match_idx)
 
+        # HedgeHog
+        index = self.cmb_hedgehog_preset.findData(self.settings.hedgehog_preset)
+        if index >= 0:
+            self.cmb_hedgehog_preset.setCurrentIndex(index)
+
         # Shared
         self.chk_generate_score_matrix.setChecked(self.settings.generate_score_matrix)
         # Restore matrix max-size selection (fall back to "Auto" if value is unknown)
@@ -814,6 +875,80 @@ class SettingsDialog(QDialog):
         self.lbl_gnubg_status_text.setText(status_text)
         self.lbl_gnubg_status_text.setStyleSheet("")
 
+    def _fill_hedgehog_presets(self, presets: list, selected: str) -> None:
+        self.cmb_hedgehog_preset.clear()
+        for preset in presets:
+            self.cmb_hedgehog_preset.addItem(self.settings.hedgehog_preset_label(preset), preset)
+        index = self.cmb_hedgehog_preset.findData(selected)
+        if index < 0:
+            index = self.cmb_hedgehog_preset.findData("2ply")
+        self.cmb_hedgehog_preset.setCurrentIndex(max(index, 0))
+
+    def _set_hedgehog_status(self, text: str, icon_name: str, color: str) -> None:
+        self.lbl_hedgehog_status_icon.setPixmap(qta.icon(icon_name, color=color).pixmap(18, 18))
+        self.lbl_hedgehog_status_text.setText(text)
+
+    def _update_hedgehog_status(self) -> None:
+        """Show the connected account, then ask HedgeHog what it may do today."""
+        if not self.settings.is_hedgehog_available():
+            self._set_hedgehog_status("Not connected", 'fa6s.circle', '#6c7086')
+            self.btn_hedgehog_connect.setText("Connect...")
+            return
+        self.btn_hedgehog_connect.setText("Disconnect")
+        self._set_hedgehog_status(
+            f"Connected as {self.settings.hedgehog_username or 'your HedgeHog account'}",
+            'fa6s.circle-check', '#a6e3a1',
+        )
+        if self.hedgehog_worker is not None and self.hedgehog_worker.isRunning():
+            return
+        self.hedgehog_worker = HedgehogStatusWorker()
+        self.hedgehog_worker.succeeded.connect(self._on_hedgehog_me)
+        self.hedgehog_worker.failed.connect(self._on_hedgehog_status_failed)
+        self.hedgehog_worker.start()
+
+    def _on_hedgehog_me(self, me: dict) -> None:
+        labels = me.get("preset_labels")
+        if labels:
+            self.settings.set("hedgehog_preset_labels", labels)
+        presets = (me.get("presets") or {}).get("position") or list(HEDGEHOG_PRESET_LABELS)
+        current = self.cmb_hedgehog_preset.currentData() or self.settings.hedgehog_preset
+        self._fill_hedgehog_presets(presets, current)
+        name = me.get("username") or self.settings.hedgehog_username or "your HedgeHog account"
+        allowance = (me.get("allowance") or {}).get("position")
+        if allowance and allowance.get("limit") is not None:
+            left = allowance["limit"] - allowance["used"] + allowance.get("credits", 0)
+            name += f" ({max(left, 0)} free position analyses left today)"
+        self._set_hedgehog_status(f"Connected as {name}", 'fa6s.circle-check', '#a6e3a1')
+
+    def _on_hedgehog_status_failed(self, code: str, message: str) -> None:
+        if not self.settings.is_hedgehog_available():
+            return
+        if code == "not_connected":
+            self.settings.set_hedgehog_account(None, None)
+            self._update_hedgehog_status()
+            return
+        self._set_hedgehog_status(message, 'fa6s.triangle-exclamation', '#fab387')
+
+    def _on_hedgehog_connect_clicked(self) -> None:
+        if self.settings.is_hedgehog_available():
+            from ankigammon.utils.hedgehog_client import HedgehogClient
+            self._stop_hedgehog_worker()
+            HedgehogClient().revoke()
+            self.settings.set_hedgehog_account(None, None)
+            self._update_hedgehog_status()
+            return
+        from ankigammon.gui.dialogs.hedgehog_connect_dialog import HedgehogConnectDialog
+        dialog = HedgehogConnectDialog(self)
+        dialog.exec()
+        if dialog.me:
+            self.settings.set_hedgehog_account(dialog.me.get("user_id"), dialog.me.get("username"))
+            self._update_hedgehog_status()
+            self._on_hedgehog_me(dialog.me)
+
+    def _stop_hedgehog_worker(self) -> None:
+        if self.hedgehog_worker is not None and self.hedgehog_worker.isRunning():
+            self.hedgehog_worker.wait()
+
     def _on_score_matrix_toggled(self, checked: bool):
         """Grey out the matrix max-size control when matrix generation is off."""
         self.cmb_matrix_max_size.setEnabled(checked)
@@ -882,6 +1017,9 @@ class SettingsDialog(QDialog):
         self.settings.score_matrix_max_size = int(self.cmb_matrix_max_size.currentData())
         self.settings.generate_move_score_matrix = self.chk_generate_move_score_matrix.isChecked()
         self.settings.generate_move_cube_matrix = self.chk_generate_move_cube_matrix.isChecked()
+        if self.cmb_hedgehog_preset.currentData():
+            self.settings.hedgehog_preset = self.cmb_hedgehog_preset.currentData()
+        self._stop_hedgehog_worker()
 
         # Emit signal
         self.settings_changed.emit(self.settings)
@@ -894,6 +1032,7 @@ class SettingsDialog(QDialog):
         if self.validation_worker and self.validation_worker.isRunning():
             self.validation_worker.quit()
             self.validation_worker.wait()
+        self._stop_hedgehog_worker()
         # Don't modify settings object
         super().reject()
 
@@ -903,4 +1042,5 @@ class SettingsDialog(QDialog):
         if self.validation_worker and self.validation_worker.isRunning():
             self.validation_worker.quit()
             self.validation_worker.wait()
+        self._stop_hedgehog_worker()
         super().closeEvent(event)

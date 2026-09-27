@@ -56,6 +56,7 @@ def _enabled(name: str) -> bool:
 def pytest_configure(config):
     config.addinivalue_line("markers", "live_xg: drives a real eXtreme Gammon 2")
     config.addinivalue_line("markers", "live_anki: writes to a real Anki collection")
+    config.addinivalue_line("markers", "live_hedgehog: analyses on hedgehog-bg.com with the connected account")
 
 
 # --------------------------------------------------------------------------
@@ -198,6 +199,17 @@ def live_anki():
     if not anki_reachable():
         pytest.skip("Anki is not running with AnkiConnect on " + ANKI_URL)
     return ANKI_URL
+
+
+@pytest.fixture
+def live_hedgehog():
+    """The HedgeHog account connected in AnkiGammon's Settings, or skip.
+    Every analysis counts toward that account's HedgeHog plan."""
+    if not _enabled("ANKIGAMMON_LIVE_HEDGEHOG"):
+        pytest.skip("live HedgeHog tests are opt-in (ANKIGAMMON_LIVE_HEDGEHOG=1)")
+    from ankigammon.utils.hedgehog_client import TokenStore
+    if not TokenStore().load():
+        pytest.skip("no HedgeHog account connected (Settings > Analysis Engine > Connect)")
 
 
 @pytest.fixture

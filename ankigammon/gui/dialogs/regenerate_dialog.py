@@ -402,11 +402,7 @@ class RegenerateWorker(QThread):
             return
 
         self.status_message.emit("Parsing analysis results...")
-        analyzer_type = getattr(self.settings, 'analyzer_type', 'gnubg')
-        if analyzer_type == "xg":
-            engine_desc = f"eXtreme Gammon ({self.settings.xg_analysis_level})"
-        else:
-            engine_desc = f"GnuBG ({self.settings.gnubg_analysis_ply}-ply)"
+        engine_desc = self.settings.engine_description()
 
         xgid_to_decision = {}
         for xgid, (raw_output, decision_type) in zip(unique_xgids, analysis_results):
@@ -619,17 +615,10 @@ class RegenerateDialog(QDialog):
 
         # Re-analyze path requires a working analyzer; render-only does not.
         if mode == MODE_REANALYZE:
-            analyzer_type = getattr(self.settings, 'analyzer_type', 'gnubg')
-            if analyzer_type == "xg":
-                analyzer_available = self.settings.is_xg_available()
-                engine_name = "eXtreme Gammon"
-            else:
-                analyzer_available = self.settings.is_gnubg_available()
-                engine_name = "GnuBG"
-            if not analyzer_available:
+            if not self.settings.is_engine_available():
                 self.status_label.setText(
-                    f"{engine_name} is required for re-analyze. "
-                    "Configure it in Settings, or pick 'Re-render cards only'."
+                    f"{self.settings.engine_display_name()} is required for re-analyze. "
+                    "Set it up in Settings, or pick 'Re-render cards only'."
                 )
                 return
 

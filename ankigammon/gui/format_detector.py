@@ -2,7 +2,7 @@
 Format detection for smart input handling.
 
 Detects whether pasted text contains:
-- Position IDs only (XGID/OGID/GNUID) - requires GnuBG analysis
+- Position IDs only (XGID/OGID/GNUID) - requires engine analysis
 - Full XG analysis text - ready to parse
 """
 
@@ -20,6 +20,7 @@ class InputFormat(Enum):
     POSITION_IDS = "position_ids"
     FULL_ANALYSIS = "full_analysis"
     XG_BINARY = "xg_binary"
+    OGXM_FILE = "ogxm_file"
     MATCH_FILE = "match_file"
     SGF_FILE = "sgf_file"
     UNKNOWN = "unknown"
@@ -88,8 +89,8 @@ class FormatDetector:
         # Aggregate results
         if all(pt == "position_id" for pt in position_types):
             warnings = []
-            if not self.settings.is_gnubg_available():
-                warnings.append("GnuBG not configured - analysis required")
+            if not self.settings.is_engine_available():
+                warnings.append(f"{self.settings.engine_display_name()} not set up - analysis required")
 
             return DetectionResult(
                 format=InputFormat.POSITION_IDS,
@@ -113,8 +114,10 @@ class FormatDetector:
             id_count = sum(1 for pt in position_types if pt == "position_id")
 
             warnings = []
-            if id_count > 0 and not self.settings.is_gnubg_available():
-                warnings.append(f"{id_count} position(s) need GnuBG analysis (not configured)")
+            if id_count > 0 and not self.settings.is_engine_available():
+                warnings.append(
+                    f"{id_count} position(s) need {self.settings.engine_display_name()} analysis (not set up)"
+                )
 
             return DetectionResult(
                 format=InputFormat.FULL_ANALYSIS,
@@ -158,10 +161,21 @@ class FormatDetector:
                 position_previews=["XG binary format"]
             )
 
+        if data[:4] == b'OGXM':
+            return DetectionResult(
+                format=InputFormat.OGXM_FILE,
+                count=1,
+                details="HedgeHog match analysis (.ogxm)",
+                warnings=[],
+                position_previews=["OGXM match analysis"]
+            )
+
         if FormatDetector.is_sgf_file(data):
             warnings = []
-            if not self.settings.is_gnubg_available():
-                warnings.append("GnuBG required for match analysis (not configured)")
+            if not self.settings.is_engine_available():
+                warnings.append(
+                    f"{self.settings.engine_display_name()} required for match analysis (not set up)"
+                )
 
             return DetectionResult(
                 format=InputFormat.SGF_FILE,
@@ -173,8 +187,10 @@ class FormatDetector:
 
         if ext == 'mat' or FormatDetector.is_match_file(data):
             warnings = []
-            if not self.settings.is_gnubg_available():
-                warnings.append("GnuBG required for match analysis (not configured)")
+            if not self.settings.is_engine_available():
+                warnings.append(
+                    f"{self.settings.engine_display_name()} required for match analysis (not set up)"
+                )
 
             return DetectionResult(
                 format=InputFormat.MATCH_FILE,

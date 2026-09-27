@@ -1,0 +1,425 @@
+{
+ "result": {
+  "alternatives": [
+   {
+    "equity": -0.1159,
+    "equity_nply": -0.1159,
+    "eval": {
+     "bg_loss": 0.0011,
+     "bg_win": 0.0031,
+     "equity": -0.1159,
+     "gammon_loss": 0.1461,
+     "gammon_win": 0.0728,
+     "win": 0.5882
+    },
+    "is_best": true,
+    "move_notation": "13/7 6/5",
+    "resulting_ogid": "99chhiiijjkkkmm:223334455666ddo:N0N::B:IW:0:0:0:0"
+   },
+   {
+    "equity": -0.1339,
+    "equity_nply": -0.1339,
+    "eval": {
+     "bg_loss": 0.0023,
+     "bg_win": 0.0016,
+     "equity": -0.1339,
+     "gammon_loss": 0.175,
+     "gammon_win": 0.0537,
+     "win": 0.6081
+    },
+    "is_best": false,
+    "move_notation": "16/15 16/10",
+    "resulting_ogid": "accfhhiijjjkkmm:223334455666ddo:N0N::B:IW:0:0:0:0"
+   },
+   {
+    "equity": -0.1476,
+    "equity_nply": -0.1476,
+    "eval": {
+     "bg_loss": 0.001,
+     "bg_win": 0.003,
+     "equity": -0.1476,
+     "gammon_loss": 0.1427,
+     "gammon_win": 0.0685,
+     "win": 0.5689
+    },
+    "is_best": false,
+    "move_notation": "13/7 7/6",
+    "resulting_ogid": "99chhiijjjjkkmm:223334455666ddo:N0N::B:IW:0:0:0:0"
+   },
+   {
+    "equity": -0.3572,
+    "equity_nply": -0.3572,
+    "eval": {
+     "bg_loss": 0.0026,
+     "bg_win": 0.0017,
+     "equity": -0.3572,
+     "gammon_loss": 0.2156,
+     "gammon_win": 0.055,
+     "win": 0.5371
+    },
+    "is_best": false,
+    "move_notation": "16/15 15/9",
+    "resulting_ogid": "9ccghhiijjjkkmm:223334455666ddo:N0N::B:IW:0:0:0:0"
+   },
+   {
+    "equity": -0.3711,
+    "equity_nply": -0.3711,
+    "eval": {
+     "bg_loss": 0.0027,
+     "bg_win": 0.0018,
+     "equity": -0.3711,
+     "gammon_loss": 0.2174,
+     "gammon_win": 0.0545,
+     "win": 0.5318
+    },
+    "is_best": false,
+    "move_notation": "16/10 6/5",
+    "resulting_ogid": "9ccfhhiijjkkkmm:223334455666ddo:N0N::B:IW:0:0:0:0"
+   },
+   {
+    "equity": -0.5026,
+    "equity_nply": -0.5026,
+    "eval": {
+     "bg_loss": 0.0032,
+     "bg_win": 0.0017,
+     "equity": -0.5026,
+     "gammon_loss": 0.2359,
+     "gammon_win": 0.0489,
+     "win": 0.4846
+    },
+    "is_best": false,
+    "move_notation": "13/7 8/7",
+    "resulting_ogid": "99chiiiijjjkkmm:223334455666ddo:N0N::B:IW:0:0:0:0"
+   },
+   {
+    "equity": -0.514,
+    "equity_nply": -0.514,
+    "eval": {
+     "bg_loss": 0.0014,
+     "bg_win": 0.0015,
+     "equity": -0.514,
+     "gammon_loss": 0.2218,
+     "gammon_win": 0.0505,
+     "win": 0.4648
+    },
+    "is_best": false,
+    "move_notation": "8/7 8/2",
+    "resulting_ogid": "99cciiijjjkkmmn:223334455666ddo:N0N::B:IW:0:0:0:0"
+   },
+   {
+    "equity": -0.6733,
+    "equity_nply": -0.6733,
+    "eval": {
+     "bg_loss": 0.0036,
+     "bg_win": 0.0017,
+     "equity": -0.6733,
+     "gammon_loss": 0.2913,
+     "gammon_win": 0.0549,
+     "win": 0.4546
+    },
+    "is_best": false,
+    "move_notation": "8/2 6/5",
+    "resulting_ogid": "99cchiijjkkkmmn:223334455666ddo:N0N::B:IW:0:0:0:0"
+   },
+   {
+    "equity": -0.6772,
+    "equity_nply": -0.6772,
+    "eval": {
+     "bg_loss": 0.0017,
+     "bg_win": 0.0011,
+     "equity": -0.6772,
+     "gammon_loss": 0.2419,
+     "gammon_win": 0.0497,
+     "win": 0.4033
+    },
+    "is_best": false,
+    "move_notation": "7/6 7/1*",
+    "resulting_ogid": "99cchhjjjjkkmmo:223334455666ddp:N0N::B:IW:0:0:0:0"
+   },
+   {
+    "equity": -0.7345,
+    "equity_nply": -0.7345,
+    "eval": {
+     "bg_loss": 0.0038,
+     "bg_win": 0.0014,
+     "equity": -0.7345,
+     "gammon_loss": 0.2952,
+     "gammon_win": 0.0465,
+     "win": 0.428
+    },
+    "is_best": false,
+    "move_notation": "8/2 3/2",
+    "resulting_ogid": "99cchiijjjkkmnn:223334455666ddo:N0N::B:IW:0:0:0:0"
+   },
+   {
+    "equity": -0.7409,
+    "equity_nply": -0.7409,
+    "eval": {
+     "bg_loss": 0.0033,
+     "bg_win": 0.0011,
+     "equity": -0.7409,
+     "gammon_loss": 0.2881,
+     "gammon_win": 0.0527,
+     "win": 0.4177
+    },
+    "is_best": false,
+    "move_notation": "8/7 7/1*",
+    "resulting_ogid": "99cchiijjjkkmmo:223334455666ddp:N0N::B:IW:0:0:0:0"
+   },
+   {
+    "equity": -0.7811,
+    "equity_nply": -0.7811,
+    "eval": {
+     "bg_loss": 0.009,
+     "bg_win": 0.0013,
+     "equity": -0.7811,
+     "gammon_loss": 0.3266,
+     "gammon_win": 0.0453,
+     "win": 0.436
+    },
+    "is_best": false,
+    "move_notation": "16/10 8/7",
+    "resulting_ogid": "9ccfhiiijjjkkmm:223334455666ddo:N0N::B:IW:0:0:0:0"
+   },
+   {
+    "equity": -0.8808,
+    "equity_nply": -0.8808,
+    "eval": {
+     "bg_loss": 0.004,
+     "bg_win": 0.001,
+     "equity": -0.8808,
+     "gammon_loss": 0.3306,
+     "gammon_win": 0.0494,
+     "win": 0.3902
+    },
+    "is_best": false,
+    "move_notation": "7/1* 6/5",
+    "resulting_ogid": "99cchhijjkkkmmo:223334455666ddp:N0N::B:IW:0:0:0:0"
+   },
+   {
+    "equity": -0.9974,
+    "equity_nply": -0.9974,
+    "eval": {
+     "bg_loss": 0.0183,
+     "bg_win": 0.0022,
+     "equity": -0.9974,
+     "gammon_loss": 0.4062,
+     "gammon_win": 0.0466,
+     "win": 0.4075
+    },
+    "is_best": false,
+    "move_notation": "16/15 13/7",
+    "resulting_ogid": "9achhiiijjjkkmm:223334455666ddo:N0N::B:IW:0:0:0:0"
+   },
+   {
+    "equity": -1.0527,
+    "equity_nply": -1.0527,
+    "eval": {
+     "bg_loss": 0.0082,
+     "bg_win": 0.0015,
+     "equity": -1.0527,
+     "gammon_loss": 0.3909,
+     "gammon_win": 0.0418,
+     "win": 0.3646
+    },
+    "is_best": false,
+    "move_notation": "13/7 3/2",
+    "resulting_ogid": "99chhiiijjjkkmn:223334455666ddo:N0N::B:IW:0:0:0:0"
+   },
+   {
+    "equity": -1.3737,
+    "equity_nply": -1.3737,
+    "eval": {
+     "bg_loss": 0.0393,
+     "bg_win": 0.0009,
+     "equity": -1.3737,
+     "gammon_loss": 0.4919,
+     "gammon_win": 0.0394,
+     "win": 0.305
+    },
+    "is_best": false,
+    "move_notation": "16/15 7/1*",
+    "resulting_ogid": "9acchhijjjkkmmo:223334455666ddp:N0N::B:IW:0:0:0:0"
+   },
+   {
+    "equity": -1.3774,
+    "equity_nply": -1.3774,
+    "eval": {
+     "bg_loss": 0.0101,
+     "bg_win": 0.0011,
+     "equity": -1.3774,
+     "gammon_loss": 0.4738,
+     "gammon_win": 0.0355,
+     "win": 0.2851
+    },
+    "is_best": false,
+    "move_notation": "8/2 7/6",
+    "resulting_ogid": "99cchijjjjkkmmn:223334455666ddo:N0N::B:IW:0:0:0:0"
+   },
+   {
+    "equity": -1.4341,
+    "equity_nply": -1.4341,
+    "eval": {
+     "bg_loss": 0.043,
+     "bg_win": 0.0011,
+     "equity": -1.4341,
+     "gammon_loss": 0.542,
+     "gammon_win": 0.0351,
+     "win": 0.3249
+    },
+    "is_best": false,
+    "move_notation": "16/10 5/4",
+    "resulting_ogid": "9ccfhhiijjjklmm:223334455666ddo:N0N::B:IW:0:0:0:0"
+   },
+   {
+    "equity": -1.4709,
+    "equity_nply": -1.4709,
+    "eval": {
+     "bg_loss": 0.0176,
+     "bg_win": 0.001,
+     "equity": -1.4709,
+     "gammon_loss": 0.5002,
+     "gammon_win": 0.0292,
+     "win": 0.2647
+    },
+    "is_best": false,
+    "move_notation": "16/10 7/6",
+    "resulting_ogid": "9ccfhhijjjjkkmm:223334455666ddo:N0N::B:IW:0:0:0:0"
+   },
+   {
+    "equity": -1.5398,
+    "equity_nply": -1.5398,
+    "eval": {
+     "bg_loss": 0.0155,
+     "bg_win": 0.0017,
+     "equity": -1.5398,
+     "gammon_loss": 0.5607,
+     "gammon_win": 0.0393,
+     "win": 0.2908
+    },
+    "is_best": false,
+    "move_notation": "13/7 5/4",
+    "resulting_ogid": "99chhiiijjjklmm:223334455666ddo:N0N::B:IW:0:0:0:0"
+   },
+   {
+    "equity": -1.5533,
+    "equity_nply": -1.5533,
+    "eval": {
+     "bg_loss": 0.0465,
+     "bg_win": 0.0015,
+     "equity": -1.5533,
+     "gammon_loss": 0.5632,
+     "gammon_win": 0.0373,
+     "win": 0.2865
+    },
+    "is_best": false,
+    "move_notation": "16/15 8/2",
+    "resulting_ogid": "9acchiijjjkkmmn:223334455666ddo:N0N::B:IW:0:0:0:0"
+   },
+   {
+    "equity": -1.6194,
+    "equity_nply": -1.6194,
+    "eval": {
+     "bg_loss": 0.0261,
+     "bg_win": 0.0012,
+     "equity": -1.6194,
+     "gammon_loss": 0.5664,
+     "gammon_win": 0.0282,
+     "win": 0.2567
+    },
+    "is_best": false,
+    "move_notation": "16/10 3/2",
+    "resulting_ogid": "9ccfhhiijjjkkmn:223334455666ddo:N0N::B:IW:0:0:0:0"
+   },
+   {
+    "equity": -1.7716,
+    "equity_nply": -1.7716,
+    "eval": {
+     "bg_loss": 0.021,
+     "bg_win": 0.001,
+     "equity": -1.7716,
+     "gammon_loss": 0.6121,
+     "gammon_win": 0.0268,
+     "win": 0.2264
+    },
+    "is_best": false,
+    "move_notation": "8/2 5/4",
+    "resulting_ogid": "99cchiijjjklmmn:223334455666ddo:N0N::B:IW:0:0:0:0"
+   },
+   {
+    "equity": -1.8058,
+    "equity_nply": -1.8058,
+    "eval": {
+     "bg_loss": 0.02,
+     "bg_win": 0.0005,
+     "equity": -1.8058,
+     "gammon_loss": 0.6013,
+     "gammon_win": 0.0232,
+     "win": 0.1984
+    },
+    "is_best": false,
+    "move_notation": "7/1* 3/2",
+    "resulting_ogid": "99cchhijjjkkmno:223334455666ddp:N0N::B:IW:0:0:0:0"
+   },
+   {
+    "equity": -1.9866,
+    "equity_nply": -1.9866,
+    "eval": {
+     "bg_loss": 0.0234,
+     "bg_win": 0.0006,
+     "equity": -1.9866,
+     "gammon_loss": 0.6705,
+     "gammon_win": 0.0221,
+     "win": 0.1772
+    },
+    "is_best": false,
+    "move_notation": "7/1* 5/4",
+    "resulting_ogid": "99cchhijjjklmmo:223334455666ddp:N0N::B:IW:0:0:0:0"
+   }
+  ],
+  "best_equity": -0.1159,
+  "color": 1,
+  "currency": "cubeless",
+  "decision_type": "checker",
+  "dice": [
+   1,
+   6
+  ],
+  "engine": {
+   "cube_efficiency": 0.68,
+   "cube_ply": 2,
+   "currency": "cubeful",
+   "exact_bearoff": 1,
+   "lagger_win": 1,
+   "race_order": 1,
+   "rules": {
+    "cube_limit": 64,
+    "cube_limit_mode": "auto",
+    "jacoby": 0,
+    "jacoby_mode": "auto"
+   },
+   "tables": {
+    "bg_escape": 1,
+    "cube_race": 1,
+    "endgame": 1,
+    "first_off_exact": 1,
+    "gammon": 1,
+    "gammon_max_outer": 4,
+    "gammon_outer_points": 17,
+    "laggers": 4
+   }
+  },
+  "eval": {
+   "bg_loss": 0.0004,
+   "bg_win": 0.0011,
+   "equity": 0.2684,
+   "gammon_loss": 0.0594,
+   "gammon_win": 0.0526,
+   "win": 0.6936
+  },
+  "ogid": "99cchhiijjjkkmm:223334455666ddo:N0N:16:B:R:2:1:3C:13",
+  "ply": 2,
+  "success": true
+ },
+ "status": "completed"
+}

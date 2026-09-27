@@ -7,7 +7,14 @@ Handles loading and saving user preferences such as color scheme selection.
 import json
 import os
 from pathlib import Path
+import sys
 from typing import Optional
+
+ENGINE_NAMES = {"gnubg": "GnuBG", "xg": "eXtreme Gammon", "hedgehog": "HedgeHog"}
+
+# HedgeHog names each preset one ply deeper than its API id; `me` reports the
+# live labels, and these stand in until the first `me` call.
+HEDGEHOG_PRESET_LABELS = {"1ply": "2-ply", "2ply": "3-ply", "3ply": "4-ply", "+": "+", "++": "++"}
 
 
 class Settings:
@@ -43,6 +50,10 @@ class Settings:
         "analyzer_type": "gnubg",
         "xg_exe_path": None,
         "xg_analysis_level": "world class",
+        "hedgehog_preset": "2ply",
+        "hedgehog_preset_labels": {},
+        "hedgehog_user_id": None,
+        "hedgehog_username": None,
         "saved_deck_names": [],
         "last_collection_path": None,
         "check_for_updates": True,
@@ -396,15 +407,75 @@ class Settings:
 
     @property
     def analyzer_type(self) -> str:
-        """Get the analysis engine type ('gnubg' or 'xg')."""
+        """Get the analysis engine type ('gnubg', 'xg' or 'hedgehog')."""
         return self._settings.get("analyzer_type", "gnubg")
 
     @analyzer_type.setter
     def analyzer_type(self, value: str) -> None:
-        """Set the analysis engine type ('gnubg' or 'xg')."""
-        if value not in ("gnubg", "xg"):
-            raise ValueError("analyzer_type must be 'gnubg' or 'xg'")
+        """Set the analysis engine type ('gnubg', 'xg' or 'hedgehog')."""
+        if value not in ENGINE_NAMES:
+            raise ValueError(f"analyzer_type must be one of {', '.join(ENGINE_NAMES)}")
         self.set("analyzer_type", value)
+
+    @property
+    def hedgehog_preset(self) -> str:
+        return self._settings.get("hedgehog_preset", "2ply")
+
+    @hedgehog_preset.setter
+    def hedgehog_preset(self, value: str) -> None:
+        self.set("hedgehog_preset", value)
+
+    @property
+    def hedgehog_user_id(self) -> Optional[str]:
+        return self._settings.get("hedgehog_user_id", None)
+
+    @property
+    def hedgehog_username(self) -> Optional[str]:
+        return self._settings.get("hedgehog_username", None)
+
+    def set_hedgehog_account(self, user_id: Optional[str], username: Optional[str]) -> None:
+        """Record which HedgeHog account is connected, or None when disconnected.
+        The tokens themselves live in the OS keychain, never in this file."""
+        self._settings["hedgehog_user_id"] = user_id
+        self._settings["hedgehog_username"] = username
+        self._save()
+
+    def hedgehog_preset_label(self, preset: Optional[str] = None) -> str:
+        preset = preset or self.hedgehog_preset
+        labels = self._settings.get("hedgehog_preset_labels") or HEDGEHOG_PRESET_LABELS
+        return labels.get(preset, HEDGEHOG_PRESET_LABELS.get(preset, preset))
+
+    def is_hedgehog_available(self) -> bool:
+        """Whether a HedgeHog account is connected. Deliberately cheap: it reads
+        no keychain and makes no request, since it is checked per card."""
+        if sys.platform == "emscripten":
+            return False
+        return bool(self.hedgehog_user_id)
+
+    def is_engine_available(self) -> bool:
+        """Whether the selected analysis engine can run."""
+        engine = self.analyzer_type
+        if engine == "xg":
+            return self.is_xg_available()
+        if engine == "hedgehog":
+            return self.is_hedgehog_available()
+        return self.is_gnubg_available()
+
+    def engine_display_name(self) -> str:
+        return ENGINE_NAMES.get(self.analyzer_type, ENGINE_NAMES["gnubg"])
+
+    def engine_label(self) -> str:
+        """The selected engine's analysis depth as users know it."""
+        engine = self.analyzer_type
+        if engine == "xg":
+            return self.xg_analysis_level.title()
+        if engine == "hedgehog":
+            return self.hedgehog_preset_label()
+        return f"{self.gnubg_analysis_ply}-ply"
+
+    def engine_description(self) -> str:
+        """Engine and depth together, e.g. 'GnuBG (3-ply)'."""
+        return f"{self.engine_display_name()} ({self.engine_label()})"
 
     @property
     def xg_exe_path(self) -> Optional[str]:
@@ -432,7 +503,6 @@ class Settings:
         Returns:
             True if xg_exe_path is set and the file exists.
         """
-        import sys
         if sys.platform != 'win32':
             return False
         path = self.xg_exe_path

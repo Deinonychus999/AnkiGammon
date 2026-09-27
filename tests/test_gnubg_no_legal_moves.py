@@ -96,6 +96,9 @@ class _Settings:
     analyzer_type = "gnubg"
     gnubg_analysis_ply = 2
 
+    def engine_description(self):
+        return "GnuBG (2-ply)"
+
 
 def _decision(xgid: str) -> Decision:
     position, metadata = parse_xgid(xgid)

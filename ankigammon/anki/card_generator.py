@@ -96,10 +96,7 @@ class CardGenerator:
 
     def _analysis_label(self) -> str:
         """Return a display label for the current analyzer's depth setting."""
-        analyzer_type = getattr(self.settings, 'analyzer_type', 'gnubg')
-        if analyzer_type == "xg":
-            return self.settings.xg_analysis_level.title()
-        return f"{self.settings.gnubg_analysis_ply}-ply"
+        return self.settings.engine_label()
 
     def generate_card(self, decision: Decision, card_id: Optional[str] = None) -> Dict[str, any]:
         """
@@ -137,7 +134,7 @@ class CardGenerator:
         if not decision.candidate_moves:
             raise ValueError(
                 "Cannot generate card: decision has no candidate moves. "
-                "For XGID-only input, use GnuBG analysis to populate moves."
+                "For XGID-only input, analyze it with an engine to populate moves."
             )
 
         # If split_cube_decisions is on and the import filter tagged this
@@ -1842,10 +1839,18 @@ class CardGenerator:
 '''
         return html
 
+    def _note_engine_refusal(self, error: Exception) -> None:
+        """An optional analysis the engine refused (e.g. a HedgeHog allowance
+        running out) would otherwise surface only as "failed"; keep the
+        engine's own explanation, once, for the run summary."""
+        from ankigammon.utils.hedgehog_client import HedgehogRefusal
+        if isinstance(error, HedgehogRefusal):
+            warning = f"HedgeHog: {error.message}"
+            if warning not in self.generation_warnings:
+                self.generation_warnings.append(warning)
+
     def _engine_available(self) -> bool:
-        if getattr(self.settings, 'analyzer_type', 'gnubg') == "xg":
-            return self.settings.is_xg_available()
-        return self.settings.is_gnubg_available()
+        return self.settings.is_engine_available()
 
     def _compute_score_matrix(self, decision: Decision) -> Optional[dict]:
         """The score matrix of a cube decision and where the live score sits in
@@ -1964,7 +1969,8 @@ class CardGenerator:
         except InterruptedError:
             # Cancellation must propagate so the export worker can stop cleanly
             raise
-        except Exception:
+        except Exception as e:
+            self._note_engine_refusal(e)
             # Returning "" writes the card back with no matrix at all. On a
             # regenerate that silently destroys a table the card already had,
             # so the failure has to reach the run summary rather than only
@@ -2021,6 +2027,7 @@ class CardGenerator:
             )
 
         except Exception as e:
+            self._note_engine_refusal(e)
             print(f"Warning: Failed to generate move score matrix: {e}")
             return ""
 
@@ -2084,7 +2091,8 @@ class CardGenerator:
         except InterruptedError:
             # Cancellation must propagate so the export worker can stop cleanly
             raise
-        except Exception:
+        except Exception as e:
+            self._note_engine_refusal(e)
             # A missing spoiler normally means "the best move is the same at
             # all cube positions", so an analysis failure must not be silent:
             # record it for the export summary.

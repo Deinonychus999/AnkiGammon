@@ -201,13 +201,14 @@ class SmartInputWidget(QWidget):
         # Update icon and styling based on result
         if result.format == InputFormat.POSITION_IDS:
             if result.warnings:
-                # Warning state (GnuBG not configured)
+                # Warning state (engine not set up)
                 self._set_feedback_icon('fa6s.triangle-exclamation', '#fab387')
                 self._set_feedback_style('#2e2416', '#f9e2af')
                 self.feedback_title.setStyleSheet("font-weight: 600; font-size: 13px; color: #f9e2af;")
                 self.feedback_title.setText(f"{result.details}")
                 self.feedback_detail.setText(
-                    result.warnings[0] + "\nConfigure GnuBG in Settings to analyze positions."
+                    result.warnings[0]
+                    + f"\nSet up {self.settings.engine_display_name()} in Settings to analyze positions."
                 )
             else:
                 # Success state
@@ -219,7 +220,7 @@ class SmartInputWidget(QWidget):
                 # Calculate estimated time
                 est_seconds = result.count * 5  # ~5 seconds per position
                 self.feedback_detail.setText(
-                    f"Will analyze with GnuBG ({self.settings.gnubg_analysis_ply}-ply)\n"
+                    f"Will analyze with {self.settings.engine_description()}\n"
                     f"Estimated time: ~{est_seconds} seconds"
                 )
 
