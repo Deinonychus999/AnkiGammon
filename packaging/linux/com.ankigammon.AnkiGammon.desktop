@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=AnkiGammon
+Exec=ankigammon
+Icon=ankigammon
+Categories=Education;
+Comment=Turn backgammon analysis from eXtreme Gammon, GNU Backgammon or OpenGammon into Anki flashcards

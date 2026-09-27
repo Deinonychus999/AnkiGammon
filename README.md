@@ -49,7 +49,7 @@ Download pre-built executables from [GitHub Releases](https://github.com/Deinony
 AnkiGammon is not code-signed because that requires a $99/year Apple Developer account. The app is open-source and safe to use.
 
 **Linux:**
-1. Download `AnkiGammon-x86_64.AppImage` from the latest release
+1. Download `AnkiGammon-x86_64.AppImage` from the latest release (also listed in the [AppImage catalog](https://appimage.github.io/AnkiGammon/))
 2. Make it executable:
    - Right-click → Properties → Permissions → "Allow executing file as program"
    - Or via terminal: `chmod +x AnkiGammon-x86_64.AppImage`

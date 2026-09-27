@@ -147,21 +147,17 @@ jobs:
         run: |
           mkdir -p AppDir/usr/bin
           mkdir -p AppDir/usr/share/applications
+          mkdir -p AppDir/usr/share/metainfo
           mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
           cp dist/ankigammon AppDir/usr/bin/
           cp ankigammon/gui/resources/icon.png AppDir/usr/share/icons/hicolor/256x256/apps/ankigammon.png
+          cp packaging/linux/com.ankigammon.AnkiGammon.desktop AppDir/usr/share/applications/
+          cp packaging/linux/com.ankigammon.AnkiGammon.metainfo.xml AppDir/usr/share/metainfo/
 
-      - name: Create desktop entry
+      - name: Validate AppStream metainfo
         run: |
-          cat > AppDir/usr/share/applications/ankigammon.desktop << 'EOF'
-          [Desktop Entry]
-          Type=Application
-          Name=AnkiGammon
-          Exec=ankigammon
-          Icon=ankigammon
-          Categories=Education;
-          Comment=Turn backgammon analysis from eXtreme Gammon, GNU Backgammon or OpenGammon into Anki flashcards
-          EOF
+          sudo apt-get install -y appstream
+          appstreamcli validate --no-net AppDir/usr/share/metainfo/com.ankigammon.AnkiGammon.metainfo.xml
 
       - name: Build AppImage
         env:

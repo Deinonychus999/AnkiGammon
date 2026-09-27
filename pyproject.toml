@@ -106,6 +106,12 @@ search = '__version__ = "{current_version}"'
 replace = '__version__ = "{new_version}"'
 
 [[tool.bumpversion.files]]
+filename = "packaging/linux/com.ankigammon.AnkiGammon.metainfo.xml"
+search = '<release version="{current_version}"'
+replace = '''<release version="{new_version}" date="{now:%Y-%m-%d}"/>
+    <release version="{current_version}"'''
+
+[[tool.bumpversion.files]]
 filename = "ankigammon.spec"
 search = "'CFBundleShortVersionString': '{current_version}'"
 replace = "'CFBundleShortVersionString': '{new_version}'"
