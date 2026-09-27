@@ -160,22 +160,26 @@ jobs:
           Exec=ankigammon
           Icon=ankigammon
           Categories=Education;
-          Comment=Convert eXtreme Gammon analysis to Anki flashcards
+          Comment=Turn backgammon analysis from eXtreme Gammon, GNU Backgammon or OpenGammon into Anki flashcards
           EOF
 
       - name: Build AppImage
+        env:
+          LDAI_UPDATE_INFORMATION: "gh-releases-zsync|Deinonychus999|AnkiGammon|latest|AnkiGammon-x86_64.AppImage.zsync"
         run: |
           ./linuxdeploy-x86_64.AppImage --appdir AppDir --output appimage
 
       - name: Verify AppImage
         run: |
-          ls -lh *.AppImage
+          ls -lh *.AppImage *.zsync
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ankigammon-linux
-          path: "AnkiGammon-x86_64.AppImage"
+          path: |
+            AnkiGammon-x86_64.AppImage
+            AnkiGammon-x86_64.AppImage.zsync
           retention-days: 7
 
   publish-pypi:
@@ -259,5 +263,6 @@ jobs:
             ankigammon-windows*.zip
             AnkiGammon-macOS.dmg
             AnkiGammon-x86_64.AppImage
+            AnkiGammon-x86_64.AppImage.zsync
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
