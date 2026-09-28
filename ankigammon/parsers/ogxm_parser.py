@@ -6,7 +6,7 @@ HedgeHog's own match equity table so cards show the numbers HedgeHog shows.
 """
 
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from ankigammon.models import CubeState, Decision, DecisionType, Move, Player, Position
 from ankigammon.parsers import hedgehog_parser
@@ -86,6 +86,35 @@ class _Converter:
         self.level = level
         self.source = source_description or "HedgeHog analysis"
         self.plies = match.plies
+        self.notes = self._index_notes()
+
+    def _index_notes(self) -> Dict[tuple, List[tuple]]:
+        """Prose annotations (spec 8.4) by target; notes on another analysis
+        block's decisions are left out, since only the first block is read."""
+        block = self.match.analysis.analysis_id
+        notes: Dict[tuple, List[tuple]] = {}
+        for note in self.match.annotations:
+            if note.key is not None or not note.value.strip():
+                continue
+            if note.scope == ogxm.PLY_SCOPE:
+                target = ("ply", note.ref)
+            elif note.scope in (ogxm.DECISION_SCOPE, ogxm.ALTERNATIVE_SCOPE) and note.analysis_id == block:
+                target = ("decision", note.kind, note.ref)
+            else:
+                continue
+            alt_index = note.alt_index if note.scope == ogxm.ALTERNATIVE_SCOPE else None
+            notes.setdefault(target, []).append((alt_index, note.value.strip()))
+        return notes
+
+    def _note(self, targets: List[tuple], moves: Optional[List[Move]] = None) -> Optional[str]:
+        parts = []
+        for target in targets:
+            for alt_index, text in self.notes.get(target, []):
+                if alt_index is None:
+                    parts.append(text)
+                elif moves is not None and alt_index < len(moves):
+                    parts.append(f"{moves[alt_index].notation}: {text}")
+        return "\n\n".join(parts) or None
 
     def decisions(self) -> List[Decision]:
         analysis = self.match.analysis
@@ -152,6 +181,7 @@ class _Converter:
             moves.append(move)
         decision.candidate_moves = moves
         decision.xg_error_move = record.loss
+        decision.note = self._note([("ply", ply.ply_ref), ("decision", ogxm.CHECKER_KIND, ply.ply_ref)], moves)
         return decision
 
     def _cube_decision(self, ply: Ply, offer: Optional[CubeRecord],
@@ -203,4 +233,11 @@ class _Converter:
             decision.double_cubeless_equity = decision.cubeless_equity * 2
         decision.cube_error = offer.equity_loss if offer is not None else None
         decision.take_error = response_record.equity_loss if response_record is not None else None
+        # A roll's own notes are about the move, so only a double's go on the cube card.
+        if ply.action == ogxm.DOUBLE:
+            refs = [ply.ply_ref] + ([response.ply_ref] if response is not None else [])
+            targets = [t for ref in refs for t in (("ply", ref), ("decision", ogxm.CUBE_KIND, ref))]
+        else:
+            targets = [("decision", ogxm.CUBE_KIND, ply.ply_ref)]
+        decision.note = self._note(targets)
         return decision

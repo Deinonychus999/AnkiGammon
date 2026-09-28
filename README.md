@@ -21,7 +21,7 @@ No install? The [web app](https://ankigammon.com/app/) makes the same cards in y
 - **Deck tree organization** - Drag-and-drop positions into named decks and subdecks; tree syncs with Anki via AnkiConnect (automatic on startup)
 - **Position management** - Multi-select, add notes, preview positions before export
 - **Automatic update notifications** - Get notified when new versions are available
-- **Comments extraction** - Automatically imports comments and notes from XG files (.xg, .xgp)
+- **Comments extraction** - Automatically imports comments and notes from XG files (.xg, .xgp) and annotations from HedgeHog files (.ogxm)
 
 ## Installation
 

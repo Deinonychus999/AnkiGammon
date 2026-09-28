@@ -15,6 +15,8 @@ from typing import Dict, List, Optional, Tuple
 WHITE, BLACK, CENTRED = 0, 1, 2
 
 DOUBLE, TAKE, DROP = 21, 22, 23
+CHECKER_KIND, CUBE_KIND = 0, 1                   # decision kind, 9.12
+PLY_SCOPE, DECISION_SCOPE, ALTERNATIVE_SCOPE = 2, 3, 4  # annotation scope, 9.20
 MARKERS = (24, 25, 26, 30)
 RESIGN_GAME, RESIGN_MATCH = 27, 28
 SET_POSITION, BEAVER, RACCOON, CUBE_SET, ESCAPE = 31, 32, 33, 36, 63
@@ -109,7 +111,19 @@ class Game:
 
 
 @dataclass
+class Annotation:
+    scope: int
+    ref: int
+    value: str
+    key: Optional[str] = None
+    kind: Optional[int] = None
+    alt_index: Optional[int] = None
+    analysis_id: Optional[bytes] = None
+
+
+@dataclass
 class Analysis:
+    analysis_id: bytes = b""
     model_name: Optional[str] = None
     checker_ply: Optional[int] = None
     preset: Optional[str] = None
@@ -129,6 +143,7 @@ class Match:
     crawford_before_start: bool = False
     games: List[Game] = field(default_factory=list)
     analysis: Optional[Analysis] = None
+    annotations: List[Annotation] = field(default_factory=list)
 
     @property
     def plies(self) -> List[Ply]:
@@ -199,7 +214,8 @@ class _Bytes:
         return self.varint(), end
 
     def skip_record(self) -> None:
-        self.pos = self.pos + self.varint()
+        length = self.varint()
+        self.pos += length
 
 
 def _step(byte: int) -> Tuple[int, int]:
@@ -231,6 +247,7 @@ def read_ogxm(data: bytes) -> Match:
     match: Optional[Match] = None
     games: List[Game] = []
     analysis: Optional[Analysis] = None
+    annotations: List[Annotation] = []
     reading_first_block = False
     pos = 16
     while pos < size - 4:
@@ -254,9 +271,11 @@ def read_ogxm(data: bytes) -> Match:
         elif kind == "DECS":
             if reading_first_block and analysis is not None:
                 _read_decisions(section, analysis)
+        elif kind == "ANNO":
+            annotations = _read_annotations(section)
         elif kind == "CSUM":
             _check_checksum(section, data[:pos])
-        elif kind not in ("SIGN", "CLCK", "VIDO", "ANNO", "MSIG") and critical:
+        elif kind not in ("SIGN", "CLCK", "VIDO", "MSIG") and critical:
             raise OgxmError(f"OGXM file has a critical section this reader does not know: {kind}")
         pos = end
 
@@ -264,6 +283,7 @@ def read_ogxm(data: bytes) -> Match:
         raise OgxmError("OGXM file has no match (only an analysis stored apart from it)")
     match.games = games
     match.analysis = analysis
+    match.annotations = annotations
     _replay(match)
     return match
 
@@ -374,8 +394,7 @@ def _read_level(section: _Bytes) -> Tuple[Optional[str], Optional[int]]:
 
 def _read_analysis(section: _Bytes) -> Analysis:
     mask, end = section.record()
-    analysis = Analysis()
-    section.take(16)  # analysis_id
+    analysis = Analysis(analysis_id=section.take(16))
     if _bit(mask, 0):
         section.take(32)
     if _bit(mask, 1):
@@ -403,14 +422,41 @@ def _read_analysis(section: _Bytes) -> Analysis:
     return analysis
 
 
+def _read_annotations(section: _Bytes) -> List[Annotation]:
+    annotations = []
+    while section.pos < section.end:
+        mask, end = section.record()
+        annotation = Annotation(scope=section.varint(), ref=section.varint(), value=section.string())
+        if _bit(mask, 0):
+            annotation.key = section.string()
+        if _bit(mask, 1):
+            annotation.kind = section.varint()
+        if _bit(mask, 2):
+            annotation.alt_index = section.varint()
+        if _bit(mask, 3):
+            section.string()  # lang
+        if _bit(mask, 4):
+            section.string()  # author
+        if _bit(mask, 5):
+            section.varint()  # at
+        if _bit(mask, 6):
+            for _ in range(section.varint()):
+                section.skip_record()
+        if _bit(mask, 7):
+            annotation.analysis_id = section.take(16)
+        annotations.append(annotation)
+        section.pos = end
+    return annotations
+
+
 def _read_decisions(section: _Bytes, analysis: Analysis) -> None:
     while section.pos < section.end:
         mask, end = section.record()
         ply_ref = section.varint()
         kind = section.varint()
-        if kind == 0:
+        if kind == CHECKER_KIND:
             analysis.checker[ply_ref] = _read_checker(section, mask)
-        elif kind == 1:
+        elif kind == CUBE_KIND:
             analysis.cube[ply_ref] = _read_cube(section, mask)
         section.pos = end
 
