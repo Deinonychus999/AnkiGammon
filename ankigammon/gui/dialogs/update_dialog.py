@@ -5,15 +5,36 @@ from datetime import datetime, timedelta
 from typing import Dict
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QFont
+from PySide6.QtGui import QColor, QFont, QTextCharFormat, QTextCursor, QTextDocument
 from PySide6.QtWidgets import (
     QDialog,
     QVBoxLayout,
     QHBoxLayout,
     QLabel,
     QPushButton,
-    QTextEdit,
+    QTextBrowser,
 )
+
+
+def _recolor_links(document: QTextDocument, color: QColor) -> None:
+    # The Markdown importer bakes the application palette's dark link blue into
+    # each anchor, so a widget palette or stylesheet can't lighten it afterwards.
+    link_format = QTextCharFormat()
+    link_format.setForeground(color)
+    block = document.begin()
+    while block.isValid():
+        it = block.begin()
+        while not it.atEnd():
+            fragment = it.fragment()
+            if fragment.charFormat().isAnchor():
+                cursor = QTextCursor(document)
+                cursor.setPosition(fragment.position())
+                cursor.setPosition(
+                    fragment.position() + fragment.length(), QTextCursor.KeepAnchor
+                )
+                cursor.mergeCharFormat(link_format)
+            it += 1
+        block = block.next()
 
 
 class UpdateDialog(QDialog):
@@ -88,14 +109,15 @@ class UpdateDialog(QDialog):
         layout.addWidget(notes_label)
 
         # Release notes text
-        notes_text = QTextEdit()
-        notes_text.setReadOnly(True)
+        notes_text = QTextBrowser()
+        notes_text.setOpenExternalLinks(True)
         notes_text.setMarkdown(
             self.release_info.get('release_notes', 'No release notes available.')
         )
+        _recolor_links(notes_text.document(), QColor("#89b4fa"))
         notes_text.setMinimumHeight(150)
         notes_text.setStyleSheet("""
-            QTextEdit {
+            QTextBrowser {
                 background-color: #313244;
                 color: #cdd6f4;
                 border: 1px solid #45475a;
