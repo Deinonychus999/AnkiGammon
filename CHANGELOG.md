@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.17.1] - 2026-09-28
+
+### Fixed
+- The Linux AppImage's page in the [AppImage catalog](https://appimage.github.io/AnkiGammon/) shows AnkiGammon's own description and screenshots.
+
 ## [1.17.0] - 2026-09-28
 
 ### Added
