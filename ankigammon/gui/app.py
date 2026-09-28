@@ -178,6 +178,9 @@ def main():
     app.setOrganizationName("AnkiGammon")
     app.setOrganizationDomain("github.com/Deinonychus999/AnkiGammon")
 
+    from ankigammon.gui import url_opener
+    url_opener.install()
+
     # Use Fusion style for consistent cross-platform appearance
     app.setStyle('Fusion')
 

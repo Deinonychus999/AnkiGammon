@@ -1,6 +1,5 @@
 """Dialog for displaying version update information."""
 
-import webbrowser
 from datetime import datetime, timedelta
 from typing import Dict
 
@@ -14,6 +13,8 @@ from PySide6.QtWidgets import (
     QPushButton,
     QTextBrowser,
 )
+
+from ankigammon.gui.url_opener import open_url
 
 
 def _recolor_links(document: QTextDocument, color: QColor) -> None:
@@ -210,7 +211,7 @@ class UpdateDialog(QDialog):
         self.user_action = 'update'
         download_url = self.release_info.get('download_url', '')
         if download_url:
-            webbrowser.open(download_url)
+            open_url(download_url)
         self.accept()
 
     def _on_snooze(self):

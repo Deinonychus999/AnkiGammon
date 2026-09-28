@@ -1199,7 +1199,7 @@ class MainWindow(QMainWindow):
             elif sys.platform == 'darwin':
                 subprocess.Popen(['open', folder])
             else:
-                subprocess.Popen(['xdg-open', folder])
+                QDesktopServices.openUrl(QUrl.fromLocalFile(folder))
 
         except Exception as e:
             QMessageBox.critical(
