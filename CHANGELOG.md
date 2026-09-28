@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.17.0] - 2026-09-28
+
+### Added
+- Notes written on a move or a cube decision in HedgeHog come along in .ogxm files and appear on the back of the card, like comments from eXtreme Gammon.
+
+### Fixed
+- In the Linux AppImage, links open in your browser again on desktops with a newer Qt than the one AnkiGammon bundles, such as Fedora KDE. Before, HedgeHog's Connect, the trainer, update downloads and the About links did nothing there.
+- Links in the release notes of the update dialog open in your browser, and are easy to read on the dark background.
+
 ## [1.16.0] - 2026-09-27
 
 ### Added
