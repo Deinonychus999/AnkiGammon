@@ -152,12 +152,14 @@ jobs:
           cp dist/ankigammon AppDir/usr/bin/
           cp ankigammon/gui/resources/icon.png AppDir/usr/share/icons/hicolor/256x256/apps/ankigammon.png
           cp packaging/linux/com.ankigammon.AnkiGammon.desktop AppDir/usr/share/applications/
-          cp packaging/linux/com.ankigammon.AnkiGammon.metainfo.xml AppDir/usr/share/metainfo/
+          # The AppImage catalog (appimage.github.io) builds its page only from a
+          # file named *.appdata.xml, the older name for the same AppStream format.
+          cp packaging/linux/com.ankigammon.AnkiGammon.metainfo.xml AppDir/usr/share/metainfo/com.ankigammon.AnkiGammon.appdata.xml
 
       - name: Validate AppStream metainfo
         run: |
           sudo apt-get install -y appstream
-          appstreamcli validate --no-net AppDir/usr/share/metainfo/com.ankigammon.AnkiGammon.metainfo.xml
+          appstreamcli validate --no-net AppDir/usr/share/metainfo/com.ankigammon.AnkiGammon.appdata.xml
 
       - name: Build AppImage
         env:
