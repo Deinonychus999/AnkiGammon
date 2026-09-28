@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.17.2] - 2026-09-28
+
+### Fixed
+- Connecting HedgeHog works in the Linux AppImage on Fedora and other distributions that keep their certificates somewhere other than Ubuntu does; before, it stopped with "certificate verify failed".
+- On KDE with Wayland, links from the Linux AppImage open in your browser; 1.17.1 fixed this on X11 only.
+- On first launch the window fits the screen, so on smaller laptop screens its bottom no longer runs off the edge.
+
 ## [1.17.1] - 2026-09-28
 
 ### Fixed
