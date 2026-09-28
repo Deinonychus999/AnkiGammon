@@ -28,6 +28,7 @@ dependencies = [
     # Core dependencies
     "genanki>=0.13.0",
     "requests>=2.31.0",
+    "certifi",
     "striprtf>=0.0.26",
     "keyring>=24.0",
     # GUI dependencies

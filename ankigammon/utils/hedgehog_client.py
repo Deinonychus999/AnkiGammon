@@ -7,6 +7,7 @@ gitlab.com/eranlambooij/hedgehog-public. Standard library only, and Qt-free.
 
 import json
 import os
+import ssl
 import threading
 import time
 import urllib.error
@@ -119,6 +120,27 @@ class TokenStore:
             pass
 
 
+def ssl_context() -> ssl.SSLContext:
+    """The system's trusted certificates, or certifi's when OpenSSL finds none:
+    the Linux AppImage's OpenSSL looks where Ubuntu keeps them (/usr/lib/ssl),
+    which Fedora and others don't have."""
+    context = ssl.create_default_context()
+    if not context.get_ca_certs():
+        import certifi
+        context.load_verify_locations(certifi.where())
+    return context
+
+
+_shared_context: Optional[ssl.SSLContext] = None
+
+
+def _context() -> ssl.SSLContext:
+    global _shared_context
+    if _shared_context is None:
+        _shared_context = ssl_context()
+    return _shared_context
+
+
 class HedgehogClient:
     """One connected user's view of the partner API."""
 
@@ -134,7 +156,7 @@ class HedgehogClient:
               data: Optional[bytes]) -> Tuple[int, Dict[str, str], bytes]:
         request = urllib.request.Request(self.base + path, data=data, headers=headers, method=method)
         try:
-            with urllib.request.urlopen(request, timeout=60) as response:
+            with urllib.request.urlopen(request, timeout=60, context=_context()) as response:
                 return response.status, dict(response.headers), response.read()
         except urllib.error.HTTPError as err:
             return err.code, dict(err.headers or {}), err.read()
