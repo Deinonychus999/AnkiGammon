@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.16.0] - 2026-09-27
+
+### Added
+- HedgeHog as a third analysis engine, next to GNU Backgammon and eXtreme Gammon. [HedgeHog](https://hedgehog-bg.com) analyzes on its own servers with your HedgeHog account: pick it under Settings → Analysis Engine, click Connect and approve AnkiGammon in your browser. It analyzes positions, match files, score matrices and the other card-back tables, and every analysis counts toward your own HedgeHog plan; on the free plan, AnkiGammon asks before an export would need more analyses than you have left today.
+- HedgeHog .ogxm files open directly, with the same mistake filter as XG match files.
+- The browser version at [ankigammon.com/app](https://ankigammon.com/app/) analyzes too, with HedgeHog: open a .mat, .sgf or .txt match or paste XGID, GNU BG or OGID positions, and turn on score matrices in HedgeHog's settings. It also opens .ogxm files.
+- The Linux AppImage can update itself with AppImageUpdate, and lists its details in AppImage catalogs.
+
+### Fixed
+- OGID positions with White to move are read the right way round; before, the player on roll and the board were swapped.
+
 ## [1.15.0] - 2026-09-26
 
 ### Added
