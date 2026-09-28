@@ -47,10 +47,25 @@ def _first_existing(candidates):
 
 XG_EXE = _first_existing(_XG_CANDIDATES)
 GNUBG_EXE = _first_existing(_GNUBG_CANDIDATES)
+# Taken before any test redirects the home directory.
+REAL_HOME = Path.home()
 
 
 def _enabled(name: str) -> bool:
     return os.environ.get("ANKIGAMMON_LIVE") == "1" or os.environ.get(name) == "1"
+
+
+@pytest.fixture(autouse=True)
+def isolated_home(tmp_path_factory, monkeypatch):
+    """Point Path.home() at a throwaway folder, so Settings(), logs and card
+    output never read or write the developer's real ~/.ankigammon."""
+    from ankigammon import settings as settings_module
+
+    home = tmp_path_factory.mktemp("home")
+    monkeypatch.setenv("USERPROFILE", str(home))
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setattr(settings_module, "_settings", None)
+    return home
 
 
 def pytest_configure(config):
