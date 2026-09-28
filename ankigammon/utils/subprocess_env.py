@@ -40,4 +40,17 @@ def external_subprocess_env() -> dict:
             env[var] = orig
         else:
             env.pop(var, None)
+    # PyInstaller's PySide6 hook points these at the bundled Qt without saving
+    # the old value; a system Qt program (kde-open) then loads our older plugins.
+    bundle = getattr(sys, '_MEIPASS', None)
+    if bundle:
+        for var in ('QT_PLUGIN_PATH', 'QML2_IMPORT_PATH'):
+            if var not in env:
+                continue
+            kept = [p for p in env[var].split(os.pathsep)
+                    if p and not os.path.normpath(p).startswith(os.path.normpath(bundle))]
+            if kept:
+                env[var] = os.pathsep.join(kept)
+            else:
+                del env[var]
     return env

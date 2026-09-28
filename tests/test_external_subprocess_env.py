@@ -100,3 +100,39 @@ def test_does_not_mutate_os_environ():
         external_subprocess_env()
         assert os.environ['LD_LIBRARY_PATH'] == '/tmp/_MEI/lib'
         assert os.environ['LD_LIBRARY_PATH_ORIG'] == '/usr/lib'
+
+
+def _bundle(path):
+    return mock.patch.object(sys, '_MEIPASS', path, create=True)
+
+
+def test_drops_qt_paths_that_point_into_the_bundle():
+    """PyInstaller's PySide6 hook points QT_PLUGIN_PATH at the bundled plugins;
+    kde-open, on the system's newer Qt, then fails to load our Wayland plugin."""
+    fake_env = {
+        'QT_PLUGIN_PATH': '/tmp/_MEI12345/PySide6/Qt/plugins',
+        'QML2_IMPORT_PATH': '/tmp/_MEI12345/PySide6/Qt/qml',
+        'PATH': '/usr/bin',
+    }
+    with _frozen(), _bundle('/tmp/_MEI12345'), mock.patch.dict(os.environ, fake_env, clear=True):
+        env = external_subprocess_env()
+
+    assert 'QT_PLUGIN_PATH' not in env
+    assert 'QML2_IMPORT_PATH' not in env
+    assert env['PATH'] == '/usr/bin'
+
+
+def test_keeps_the_users_own_qt_plugin_paths():
+    fake_env = {'QT_PLUGIN_PATH': os.pathsep.join(['/tmp/_MEI12345/PySide6/Qt/plugins', '/opt/qt/plugins'])}
+    with _frozen(), _bundle('/tmp/_MEI12345'), mock.patch.dict(os.environ, fake_env, clear=True):
+        env = external_subprocess_env()
+
+    assert env['QT_PLUGIN_PATH'] == '/opt/qt/plugins'
+
+
+def test_qt_paths_untouched_when_not_frozen():
+    fake_env = {'QT_PLUGIN_PATH': '/tmp/_MEI12345/PySide6/Qt/plugins'}
+    with mock.patch.object(sys, 'frozen', False, create=True), mock.patch.dict(os.environ, fake_env, clear=True):
+        env = external_subprocess_env()
+
+    assert env['QT_PLUGIN_PATH'] == '/tmp/_MEI12345/PySide6/Qt/plugins'
