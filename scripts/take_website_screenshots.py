@@ -5,12 +5,17 @@ Drives the real app and the real Anki, then writes each image as .webp:
     python scripts/take_website_screenshots.py                  # everything
     python scripts/take_website_screenshots.py --skip-anki      # app windows only
     python scripts/take_website_screenshots.py --only settings,edit-note
+    python scripts/take_website_screenshots.py --only settings --engine gnubg
     python scripts/take_website_screenshots.py --out some/dir   # review before installing
 
 Windows only, and needs GnuBG (score matrix), Anki with AnkiConnect, and the
 websocket-client package. App windows are captured from the screen, so each
 one is raised on top for a few seconds - leave the desktop alone while it
 runs. Anki shots are cropped to the card itself, captured from the page.
+
+The settings shot shows the HedgeHog engine by default (--engine picks
+another) as a connected account, with HedgeHog's reply faked: it needs no
+network, keychain or HedgeHog account.
 
 The app runs against a throwaway home directory and QSettings store, so the
 user's settings, saved decks and window geometry are never read or written.
@@ -60,6 +65,9 @@ CHECKER_NOTE = (
     "When the opponent has blots in my home board, attack first; the quiet play can wait."
 )
 
+ENGINES = ["hedgehog", "gnubg", "xg"]
+HEDGEHOG_USERNAME = "PlayerOne"
+
 TEMP_DECK = "AnkiGammon Screenshots (temp)"
 ANKI_DEVTOOLS_PORT = 9229
 # Wide enough for the card back's two-column layout: board beside analysis.
@@ -77,7 +85,7 @@ os.environ["USERPROFILE"] = os.environ["HOME"] = _TEMP_HOME
 sys.path.insert(0, str(REPO))
 
 from PIL import Image, ImageGrab  # noqa: E402
-from PySide6.QtCore import QEventLoop, QSettings, Qt, QTimer  # noqa: E402
+from PySide6.QtCore import QEventLoop, QSettings, QThread, Qt, QTimer, Signal  # noqa: E402
 from PySide6.QtGui import QIcon  # noqa: E402
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
@@ -229,12 +237,13 @@ def configure_settings():
 # --- AnkiGammon windows ----------------------------------------------------
 
 class AppShots:
-    def __init__(self, out_dir: Path, settings, match):
+    def __init__(self, out_dir: Path, settings, match, engine: str):
         from ankigammon.gui.main_window import MainWindow
 
         self.out = out_dir
         self.settings = settings
         self.match = match
+        self.engine = engine
         self.window = MainWindow(settings)
         self.window.resize(1300, 720)
         self.window.move(80, 60)
@@ -311,16 +320,27 @@ class AppShots:
         dialog.close()
 
     def shot_settings(self) -> None:
-        from ankigammon.gui.dialogs.settings_dialog import SettingsDialog
+        from ankigammon.gui.dialogs import settings_dialog
         # Show the defaults users see; apkg was only to keep the window off AnkiConnect.
         self.settings.export_method = "ankiconnect"
         self.settings.generate_score_matrix = True
-        dialog = SettingsDialog(self.settings, self.window)
-        dialog.setModal(False)
-        dialog.show()
-        wait(1500)  # GnuBG validation runs in a worker thread
-        self.grab(dialog, "settings")
-        dialog.close()
+        engine_before = self.settings.analyzer_type
+        real_worker = settings_dialog.HedgehogStatusWorker
+        if self.engine == "hedgehog":
+            self.settings.set_hedgehog_account("screenshots", HEDGEHOG_USERNAME)
+            settings_dialog.HedgehogStatusWorker = FakeHedgehogStatusWorker
+        self.settings.analyzer_type = self.engine
+        try:
+            dialog = settings_dialog.SettingsDialog(self.settings, self.window)
+            dialog.setModal(False)
+            dialog.show()
+            wait(1500)  # engine validation and the HedgeHog status run in worker threads
+            self.grab(dialog, "settings")
+            dialog.close()
+        finally:
+            settings_dialog.HedgehogStatusWorker = real_worker
+            self.settings.analyzer_type = engine_before
+            self.settings.set_hedgehog_account(None, None)
 
     def shot_add_positions(self, checker) -> None:
         from ankigammon.gui.dialogs.input_dialog import InputDialog
@@ -343,8 +363,19 @@ class AppShots:
         dialog.close()
 
 
-def run_app_shots(out_dir: Path, only: set, settings, match) -> None:
-    shots = AppShots(out_dir, settings, match)
+class FakeHedgehogStatusWorker(QThread):
+    """HedgeHog's `me` reply for a connected account, without the network.
+    No allowance, so the shot doesn't claim a plan's daily numbers."""
+
+    succeeded = Signal(dict)
+    failed = Signal(str, str)
+
+    def run(self):
+        self.succeeded.emit({"username": HEDGEHOG_USERNAME})
+
+
+def run_app_shots(out_dir: Path, only: set, settings, match, engine: str) -> None:
+    shots = AppShots(out_dir, settings, match, engine)
     checker = match[CHECKER_INDEX]
     # Before importing: the drop hint reads best over the empty-state screen.
     if "drag-and-drop" in only:
@@ -603,6 +634,8 @@ def main() -> int:
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
     parser.add_argument("--only", help="comma-separated shot names: " + ", ".join(APP_SHOTS + ANKI_SHOTS))
     parser.add_argument("--skip-anki", action="store_true")
+    parser.add_argument("--engine", choices=ENGINES, default="hedgehog",
+                        help="analysis engine the settings shot shows (default: hedgehog)")
     parser.add_argument("--restart-anki", action="store_true",
                         help="close a running Anki that lacks the DevTools port and start it with it")
     args = parser.parse_args()
@@ -634,7 +667,7 @@ def main() -> int:
     try:
         if only & set(APP_SHOTS):
             print("AnkiGammon windows")
-            run_app_shots(args.out, only, settings, match)
+            run_app_shots(args.out, only, settings, match, args.engine)
         if only & set(ANKI_SHOTS):
             print("Anki")
             run_anki_shots(args.out, only, settings, match, args.restart_anki)

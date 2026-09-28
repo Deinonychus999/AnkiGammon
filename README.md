@@ -1,6 +1,8 @@
 # AnkiGammon
 
-A graphical application for converting backgammon positions into Anki flashcards. Analyze positions from eXtreme Gammon, OpenGammon, or GNU Backgammon and create smart study cards.
+A graphical application for converting backgammon positions into Anki flashcards. Analyze positions and matches with GNU Backgammon, eXtreme Gammon or HedgeHog, read files from eXtreme Gammon, HedgeHog, OpenGammon and GNU Backgammon, and create smart study cards.
+
+No install? The [web app](https://ankigammon.com/app/) makes the same cards in your browser, analyzing with HedgeHog, and the [trainer](https://ankigammon.com/train/) studies them without Anki.
 
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/X8X31NIT0H)
 
@@ -90,8 +92,8 @@ ankigammon  # Launches the GUI
    - From PyPI install: Run `ankigammon` in terminal
 2. **Add positions** (choose one or more methods):
    - **Paste XG analysis**: Press Ctrl+N, paste pre-analyzed positions from eXtreme Gammon (Ctrl+C)
-   - **Paste position IDs**: Press Ctrl+N, paste XGID/OGID/GNUID strings (requires GNU Backgammon for analysis)
-   - **Import files**: Press Ctrl+O or drag-and-drop files (.xg, .xgp, .mat, .sgf, .txt)
+   - **Paste position IDs**: Press Ctrl+N, paste XGID/OGID/GNUID strings (requires an analysis engine: GNU Backgammon, eXtreme Gammon or HedgeHog)
+   - **Import files**: Press Ctrl+O or drag-and-drop files (.xg, .xgp, .ogxm, .mat, .sgf, .txt)
      - For match files: Choose error threshold and which player's mistakes to import
      - Drop files directly onto a deck in the deck tree to import into that deck
 3. **Organize into decks** - Use the deck tree on the left to create named decks/subdecks and drag positions between them. Decks stay expanded or collapsed as you leave them across imports; use the expand/collapse-all buttons above the tree, or right-click a deck to expand or collapse its subdecks. The tree syncs with Anki via AnkiConnect (automatic on startup, or manually via File → Sync Decks from Anki, Ctrl+Shift+D).
@@ -272,11 +274,13 @@ Open Settings with **Ctrl+,** to configure:
 - **Clear After Export**: Automatically clear the position list after successful export
 
 **Analysis:**
-- **Analysis Engine**: Choose between GNU Backgammon (cross-platform) or eXtreme Gammon (Windows only, experimental)
+- **Analysis Engine**: Choose GNU Backgammon (cross-platform), eXtreme Gammon (Windows only, experimental) or HedgeHog (online)
 - **GNU Backgammon Path**: Configure path to `gnubg-cli` executable
 - **Analysis Ply**: Set GnuBG depth (0-4, default: 3)
 - **eXtreme Gammon Path**: Configure path to `eXtremeGammon2.exe` (Windows only, experimental)
 - **XG Analysis Level**: Set XG depth (Very Quick → Extensive, default: World Class)
+- **HedgeHog Account**: Connect or disconnect your HedgeHog account, and see what is left of today's allowance
+- **HedgeHog Analysis Depth**: 2-ply to 4-ply, + and ++ (deeper levels need a paid HedgeHog plan)
 - **Score Matrix**: Generate cube decision matrix for all match scores, plus an unlimited-game reference for match positions, without and with the Jacoby rule (two extra analyses per card, one for redoubles; no beavers) (optional, time-consuming)
 - **Score Matrix Max Size**: Cap the matrix size in points to save time on long matches; with "Auto" it uses the match length, or a 7-point view for unlimited (money) games
 - **Move Score Matrix**: Generate move analysis at different match contexts - Neutral, DMP, Gammon-Save, Gammon-Go (optional, time-consuming)
@@ -387,6 +391,7 @@ Settings persist across application restarts, even when using the standalone exe
 - Python 3.8+ (for development install only)
 - Dependencies automatically installed via `pip install .`: genanki, requests, keyring, PySide6, qtawesome, pywinauto/pyautogui (Windows only, for XG integration)
 - For standalone executable: No requirements - Python and all dependencies are bundled
+- For HedgeHog analysis: an internet connection and a HedgeHog account
 
 ## License
 
