@@ -22,13 +22,11 @@ from PySide6.QtGui import QAction, QKeyEvent
 from PySide6.QtWebEngineWidgets import QWebEngineView
 
 from ankigammon.settings import Settings
-from ankigammon.models import Decision, Position, Player, CubeState, DecisionType
+from ankigammon.models import Decision, Position
 from ankigammon.parsers.xg_text_parser import XGTextParser
 from ankigammon.gui.dialogs.settings_dialog import SettingsDialog
 from ankigammon.gui import silent_messagebox
-from ankigammon.utils.gnuid import parse_gnuid
-from ankigammon.utils.ogid import parse_ogid
-from ankigammon.utils.xgid import parse_xgid
+from ankigammon.parsers import position_ids
 from ankigammon.renderer.svg_board_renderer import SVGBoardRenderer
 from ankigammon.renderer.color_schemes import get_scheme
 from ankigammon.gui.format_detector import InputFormat
@@ -581,170 +579,20 @@ class InputDialog(QDialog):
         return []
 
     def _parse_position_id_lines(self, text: str) -> List[Decision]:
-        """Parse pasted position IDs, keeping any prose pasted with them.
-
-        A bare ID has none of the structure XGTextParser reads a note out of,
-        so free-text lines are attached to the position they sit with: prose
-        follows its position, except before the first ID where it leads one.
-        """
-        decisions: List[Decision] = []
-        pending: List[str] = []
-        current: Optional[Decision] = None
-
-        def attach(target: Optional[Decision]) -> None:
-            note = '\n'.join(pending).strip()
-            pending.clear()
-            if note and target is not None:
-                target.note = f"{target.note}\n{note}" if target.note else note
-
-        for line in (raw.strip() for raw in text.split('\n')):
-            if not line:
-                continue
-
-            decision = self._parse_position_id(line)
-            if decision is not None:
-                attach(current if current is not None else decision)
-                decisions.append(decision)
-                current = decision
-            elif self._looks_like_position_id(line):
-                self.rejected_position_ids.append(line)
-            else:
-                pending.append(line)
-
-        attach(current)
+        decisions, rejected = position_ids.parse_position_id_lines(text)
+        self.rejected_position_ids.extend(rejected)
         return decisions
 
-    # A GNU BG Position ID is always exactly this long; a truncated Match ID
-    # after it is the common paste error worth naming.
-    _GNUID_POSITION_ID_LEN = 14
+    _looks_like_position_id = staticmethod(position_ids.looks_like_position_id)
+    _describe_rejected_id = staticmethod(position_ids.describe_rejected_id)
 
-    @staticmethod
-    def _looks_like_position_id(line: str) -> bool:
-        """Tell a mistyped ID from a note, so prose isn't reported as an error.
+    def _parse_position_id(self, position_id: str) -> Optional[Decision]:
+        return position_ids.parse_position_id(position_id)
 
-        Deliberately narrow: a line misread as an ID is only reported, but a
-        line misread as prose would hide a real paste error.
-        """
-        if line.upper().startswith('XGID='):
-            return True
-        if any(ch.isspace() for ch in line):
-            return False
-        parts = line.split(':')
-        # An OGID carries three or more fields; a GNU BG ID has one colon after
-        # a fixed-length half. Short prose like "ND:+0.05" matches neither.
-        return len(parts) > 2 or (
-            len(parts) == 2
-            and len(parts[0]) == InputDialog._GNUID_POSITION_ID_LEN
-        )
-
-    @staticmethod
-    def _describe_rejected_id(position_id: str) -> str:
-        """Say why a position ID was rejected, not just that it was."""
-        shown = position_id if len(position_id) <= 60 else position_id[:57] + "..."
-        parts = position_id.split(':')
-        # A 14-character Position ID means the user meant a GNU BG ID, so the
-        # Match ID half is what to point at.
-        if len(parts) == 2 and len(parts[0]) == 14 and len(parts[1]) != 12:
-            return (
-                f"{shown}\nGNU BG IDs need a 12-character Match ID; "
-                f"this one has {len(parts[1])}. Copy it again from GnuBG "
-                f"(Edit > Copy ID to Clipboard > GNU Backgammon ID)."
-            )
-        return f"{shown}\nNot a valid XGID, GNU BG ID, or OGID."
-
-    def _parse_position_id(self, position_id: str) -> Decision:
-        """Parse a single position ID (XGID, GNUID, or OGID) into a Decision."""
-        # Try XGID
-        if 'XGID=' in position_id or ':' in position_id:
-            try:
-                position, metadata = parse_xgid(position_id)
-                return self._create_decision_from_metadata(
-                    position, metadata, original_xgid=position_id
-                )
-            except:
-                pass
-
-        # Try GNUID
-        if ':' in position_id:
-            parts = position_id.split(':')
-            if len(parts) >= 2 and len(parts[0]) == 14 and len(parts[1]) == 12:
-                try:
-                    position, metadata = parse_gnuid(position_id)
-                    return self._create_decision_from_metadata(position, metadata, original_format="GNUID")
-                except:
-                    pass
-
-        # Try OGID
-        if ':' in position_id:
-            try:
-                position, metadata = parse_ogid(position_id)
-                return self._create_decision_from_metadata(position, metadata, original_format="OGID")
-            except:
-                pass
-
-        return None
-
-    def _create_decision_from_metadata(
-        self,
-        position: Position,
-        metadata: dict,
-        original_format: str = "XGID",
-        original_xgid: Optional[str] = None,
-    ) -> Decision:
-        """Create a Decision object from position and metadata.
-
-        When ``original_xgid`` is provided, it is stored verbatim as
-        ``Decision.xgid`` to avoid lossy round-tripping through ``encode_xgid``
-        (which would normalize away the cube-action flag and the max-cube
-        field, causing GUID collisions in Anki for distinct user inputs).
-        """
-        from ankigammon.utils.xgid import encode_xgid
-
-        # Determine Crawford status (only applies to match play, not unlimited games)
-        match_length = metadata.get('match_length', 0)
-        crawford = False
-
-        if match_length > 0:
-            if 'crawford' in metadata and metadata['crawford']:
-                crawford = True
-            elif 'crawford_jacoby' in metadata and metadata['crawford_jacoby'] > 0:
-                crawford = True
-            elif 'match_modifier' in metadata and metadata['match_modifier'] == 'C':
-                crawford = True
-
-        if original_xgid is not None:
-            xgid = original_xgid
-        else:
-            # Re-encode for OGID/GNUID inputs (analyzers consume XGID).
-            # Pass max_cube through so it survives the round-trip.
-            xgid = encode_xgid(
-                position=position,
-                cube_value=metadata.get('cube_value', 1),
-                cube_owner=metadata.get('cube_owner', CubeState.CENTERED),
-                dice=metadata.get('dice'),
-                on_roll=metadata.get('on_roll', Player.X),
-                score_x=metadata.get('score_x', 0),
-                score_o=metadata.get('score_o', 0),
-                match_length=metadata.get('match_length', 0),
-                crawford_jacoby=metadata.get('crawford_jacoby', 1 if crawford else 0),
-                max_cube=metadata.get('max_cube', 256),
-            )
-
-        return Decision(
-            position=position,
-            xgid=xgid,
-            on_roll=metadata.get('on_roll', Player.X),
-            dice=metadata.get('dice'),
-            score_x=metadata.get('score_x', 0),
-            score_o=metadata.get('score_o', 0),
-            match_length=metadata.get('match_length', 0),
-            crawford=crawford,
-            cube_value=metadata.get('cube_value', 1),
-            cube_owner=metadata.get('cube_owner', CubeState.CENTERED),
-            decision_type=DecisionType.CUBE_ACTION if not metadata.get('dice') else DecisionType.CHECKER_PLAY,
-            candidate_moves=[],  # Will be populated by engine analysis
-            original_position_format=original_format
-        )
+    def _create_decision_from_metadata(self, position: Position, metadata: dict,
+                                       original_format: str = "XGID",
+                                       original_xgid: Optional[str] = None) -> Decision:
+        return position_ids.decision_from_metadata(position, metadata, original_format, original_xgid)
 
     @Slot()
     def _on_clear_all_clicked(self):
