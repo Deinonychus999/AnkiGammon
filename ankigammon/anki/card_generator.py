@@ -1850,7 +1850,8 @@ class CardGenerator:
                 self.generation_warnings.append(warning)
 
     def _engine_available(self) -> bool:
-        return self.settings.is_engine_available()
+        # An analyzer handed in is the engine, e.g. the browser's answers fetched ahead of time.
+        return self._analyzer is not None or self.settings.is_engine_available()
 
     def _compute_score_matrix(self, decision: Decision) -> Optional[dict]:
         """The score matrix of a cube decision and where the live score sits in

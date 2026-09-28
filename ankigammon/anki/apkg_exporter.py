@@ -75,6 +75,7 @@ class ApkgExporter:
 
         self.model = self._create_model()
         self.deck = genanki.Deck(self.deck_id, self.deck_name)
+        self.generation_warnings: List[str] = []
 
     def _create_model(self) -> genanki.Model:
         """Create the Anki note model."""
@@ -107,7 +108,8 @@ class ApkgExporter:
         interactive_moves: bool = False,
         orientation: str = "counter-clockwise",
         progress_callback: callable = None,
-        use_subdecks: bool = False
+        use_subdecks: bool = False,
+        analyzer=None
     ) -> str:
         """
         Export decisions to an APKG file.
@@ -121,6 +123,7 @@ class ApkgExporter:
             orientation: Board orientation
             progress_callback: Optional callback for progress updates
             use_subdecks: Whether to organize into subdecks by decision type
+            analyzer: Engine for the optional analyses (score matrix etc.); None uses the configured one
 
         Returns:
             Path to generated APKG file
@@ -139,8 +142,10 @@ class ApkgExporter:
             show_options=show_options,
             interactive_moves=interactive_moves,
             renderer=renderer,
-            progress_callback=progress_callback
+            progress_callback=progress_callback,
+            analyzer=analyzer
         )
+        self.generation_warnings = card_gen.generation_warnings
 
         # Group decisions by deck
         decisions_by_deck = group_decisions_by_deck(decisions, self.deck_name, use_subdecks)

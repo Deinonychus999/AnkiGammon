@@ -12,6 +12,11 @@ from ankigammon.models import Decision, DecisionType, Move, Player
 from ankigammon.utils.ogid import encode_ogid
 from ankigammon.utils.xgid import parse_xgid
 
+# A batch counts as one analysis only when the whole of it takes under a second
+# of engine time. About 12 positions fit at 2ply; deeper presets are counted per
+# position however they are sent, so they only need fewer requests.
+BATCH_SIZES = {"1ply": 64, "2ply": 12, "3ply": 64, "+": 8, "++": 8}
+
 PCT_ATTRS = (
     "player_win_pct", "player_gammon_pct", "player_backgammon_pct",
     "opponent_win_pct", "opponent_gammon_pct", "opponent_backgammon_pct",
@@ -113,6 +118,73 @@ def xgid_to_ogid(xgid: str) -> Tuple[str, DecisionType, bool]:
     )
     decision_type = DecisionType.CHECKER_PLAY if dice else DecisionType.CUBE_ACTION
     return ogid, decision_type, bool(metadata.get("jacoby", False)) and match_length == 0
+
+
+def plan_batches(xgids: List[str], preset: str) -> Tuple[List[dict], List[DecisionType]]:
+    """The batch requests that analyse `xgids` at `preset`, and each position's
+    decision type. A batch is {"ogids", "jacoby", "indices"}: `jacoby` applies
+    to a whole batch, so the two rules go in separate batches, and `indices`
+    say which input each answer belongs to."""
+    prepared = [xgid_to_ogid(xgid) for xgid in xgids]
+    groups: dict = {}
+    for index, (_, _, jacoby) in enumerate(prepared):
+        groups.setdefault(jacoby, []).append(index)
+    size = BATCH_SIZES.get(preset, 8)
+    batches = []
+    for jacoby, indices in groups.items():
+        for start in range(0, len(indices), size):
+            chunk = indices[start:start + size]
+            batches.append({"ogids": [prepared[i][0] for i in chunk], "jacoby": jacoby, "indices": chunk})
+    return batches, [decision_type for _, decision_type, _ in prepared]
+
+
+def estimated_cost(batches: List[dict], preset: str) -> int:
+    """How many position analyses `batches` should count against a HedgeHog
+    allowance. A batch that finishes in under a second of engine time counts
+    once; the batch sizes keep 1ply and 2ply batches there, and deeper
+    presets count per position."""
+    if preset in ("1ply", "2ply"):
+        return len(batches)
+    return sum(len(batch["indices"]) for batch in batches)
+
+
+class PositionResultParsing:
+    """The BackgammonAnalyzer parse methods for analyzers whose raw output is
+    one HedgeHog position result (JSON). Needs `preset_label`."""
+
+    preset_label = "HedgeHog"
+
+    def parse_analysis(self, raw_output: str, xgid: str, decision_type: DecisionType) -> Decision:
+        return parse_position_result(raw_output, xgid, decision_type, self.preset_label)
+
+    def parse_checker_play(self, raw_output: str) -> List[Move]:
+        result = json.loads(raw_output)
+        return checker_moves(result, self._decision_for(result), self.preset_label)
+
+    def parse_cube_decision(self, raw_output: str, cube_value: int = 1) -> List[Move]:
+        result = json.loads(raw_output)
+        try:
+            return cube_decision_moves(result, self._decision_for(result))
+        except ValueError:
+            return []
+
+    @staticmethod
+    def _decision_for(result: dict) -> Decision:
+        """The game context of a bare result, read from the OGID HedgeHog analysed."""
+        from ankigammon.utils.ogid import parse_ogid
+        from ankigammon.utils.xgid import encode_xgid
+        position, metadata = parse_ogid(result["ogid"])
+        xgid = encode_xgid(
+            position, cube_value=metadata.get("cube_value", 1), cube_owner=metadata.get("cube_owner"),
+            dice=metadata.get("dice"), on_roll=metadata["on_roll"],
+            score_x=metadata.get("score_x", 0), score_o=metadata.get("score_o", 0),
+            match_length=metadata.get("match_length", 0),
+            crawford_jacoby=1 if metadata.get("match_modifier") == "C" else 0,
+        )
+        decision_type = (
+            DecisionType.CHECKER_PLAY if result.get("decision_type") == "checker" else DecisionType.CUBE_ACTION
+        )
+        return decision_from_xgid(xgid, decision_type)
 
 
 def checker_moves(result: dict, decision: Decision, level: str) -> List[Move]:

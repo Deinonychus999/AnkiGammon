@@ -733,6 +733,39 @@ class ExportDialog(QDialog):
                 pass
             self.analysis_worker.analyzer = None
 
+    def _hedgehog_allowance_ok(self) -> bool:
+        """On HedgeHog's free plan, ask before an export needs more analyses
+        than are left today; HedgeHog would refuse the rest part way through."""
+        if self.settings.analyzer_type != "hedgehog" or not self.settings.is_hedgehog_available():
+            return True
+        import tempfile
+        from ankigammon.utils.hedgehog_client import HedgehogClient, HedgehogRefusal
+        from ankigammon.utils.prefetch_analyzer import estimate_hedgehog_cost
+
+        cost = estimate_hedgehog_cost(self.all_decisions, self.settings.hedgehog_preset, Path(tempfile.gettempdir()))
+        if not cost:
+            return True
+        try:
+            me = HedgehogClient().me()
+        except HedgehogRefusal:
+            return True  # the export itself shows what HedgeHog says
+        allowance = (me.get("allowance") or {}).get("position")
+        if not allowance or allowance.get("limit") is None:
+            return True
+        left = max(0, allowance["limit"] - allowance["used"] + allowance.get("credits", 0))
+        if cost <= left:
+            return True
+        reply = silent_messagebox.question(
+            self,
+            "HedgeHog Allowance",
+            f"This export needs about {cost} HedgeHog position analyses, and your free "
+            f"plan has {left} left today.\n\n"
+            "HedgeHog will refuse the rest: positions without analysis are then skipped, "
+            "and score matrices left off their cards.\n\nContinue anyway?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        return reply == QMessageBox.StandardButton.Yes
+
     @Slot()
     def start_export(self):
         """Start export process in background thread."""
@@ -765,6 +798,9 @@ class ExportDialog(QDialog):
             )
             if reply != QMessageBox.StandardButton.Yes:
                 return
+
+        if not self._hedgehog_allowance_ok():
+            return
 
         self.btn_export.setEnabled(False)
 

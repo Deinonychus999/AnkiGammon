@@ -19,6 +19,9 @@ from conftest import read_apkg_notes
 
 DATA = Path(__file__).parent / "data"
 SAMPLE = str(DATA / "sample_match.xg")
+OGXM = str(DATA / "hedgehog" / "analysis.ogxm")
+CUBE_ANSWER = str(DATA / "hedgehog" / "position_cube.json")
+PASTED_CUBE = "XGID=-BBB--CC----eA--bc-e-B----:0:0:1:00:0:0:0:3:8"
 
 ANALYZED = """XGID=-b----E-C--AeD---bAdb---A-:0:0:1:52:0:0:3:0:10
 
@@ -94,7 +97,7 @@ def test_player_names_come_back_by_side(session):
 def test_formats_that_need_an_engine_are_refused_with_a_pointer(session, tmp_path, name):
     path = tmp_path / name
     path.write_bytes(b"irrelevant")
-    with pytest.raises(ValueError, match="desktop app"):
+    with pytest.raises(ValueError, match="HedgeHog can analyze it"):
         web.load_file(str(path))
 
 
@@ -117,7 +120,7 @@ def test_pasted_xg_text_keeps_analyzed_positions_and_counts_the_rest(session):
 
 
 def test_paste_without_analysis_explains_what_is_needed(session):
-    with pytest.raises(ValueError, match="desktop app"):
+    with pytest.raises(ValueError, match="No analyzed positions or position IDs"):
         web.load_text(UNANALYZED)
 
 
@@ -218,7 +221,21 @@ web.configure(json.dumps({{"color_scheme": "ocean"}}))
 web.preview(0)
 web.export_apkg("[]", "probe")
 web.load_text({ANALYZED!r})
-banned = [m for m in sys.modules if m.startswith(("ankigammon.gui", "ankigammon.utils.xg_auto", "PySide6"))]
+web.read_player_names({OGXM!r})
+web.load_file({OGXM!r})
+web.analysis_kind({OGXM!r})
+request = json.loads(web.position_requests({PASTED_CUBE!r}))
+cube = json.load(open({CUBE_ANSWER!r}))["result"]
+web.apply_position_analysis(json.dumps([cube]), "3-ply", request["request"])
+web.configure(json.dumps({{"generate_score_matrix": True, "generate_move_score_matrix": True,
+                          "generate_move_cube_matrix": True}}))
+matrix = json.loads(web.matrix_requests("[]"))
+web.apply_matrix_analysis(json.dumps(matrix["xgids"]), json.dumps([None] * len(matrix["xgids"])))
+web.export_pack("[]", "probe")
+web.generation_warnings()
+banned = [m for m in sys.modules if m.startswith((
+    "ankigammon.gui", "ankigammon.utils.xg_auto", "PySide6",
+    "ankigammon.utils.hedgehog_client", "ankigammon.utils.hedgehog_analyzer", "keyring"))]
 print(banned)
 sys.exit(1 if banned else 0)
 """, tmp_path)
