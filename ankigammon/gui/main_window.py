@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (
     QPushButton, QLabel, QMessageBox, QApplication
 )
 from PySide6.QtCore import Qt, Signal, Slot, QUrl, QSettings, QSize, QThread, QTimer
-from PySide6.QtGui import QAction, QKeySequence, QDesktopServices
+from PySide6.QtGui import QAction, QKeySequence, QDesktopServices, QGuiApplication
 from PySide6.QtWebEngineWidgets import QWebEngineView
 import qtawesome as qta
 import base64
@@ -170,6 +170,14 @@ class _QueuedImport:
     path: str
     options: Optional[dict] = None
     placement: Optional[Dict[str, List[str]]] = None
+
+
+def fitted_window_size(default: QSize, minimum: QSize, available: QSize) -> QSize:
+    """The first-launch size: the default where it fits, else 90% of the
+    screen's free area, which leaves room for the title bar that the window
+    doesn't have yet; never below the minimum."""
+    room = QSize(int(available.width() * 0.9), int(available.height() * 0.9))
+    return default.boundedTo(room).expandedTo(minimum)
 
 
 class MainWindow(QMainWindow):
@@ -708,6 +716,16 @@ class MainWindow(QMainWindow):
             "Make sure Anki is running with the AnkiConnect addon installed."
         )
 
+    def _fit_to_screen(self) -> None:
+        screen = self.screen() or QGuiApplication.primaryScreen()
+        if screen is None:
+            return
+        available = screen.availableGeometry()
+        self.resize(fitted_window_size(self.size(), self.minimumSize(), available.size()))
+        frame = self.frameGeometry()
+        frame.moveCenter(available.center())
+        self.move(frame.topLeft())
+
     def _restore_window_state(self):
         """Restore window size and position from QSettings."""
         settings = QSettings()
@@ -716,6 +734,8 @@ class MainWindow(QMainWindow):
         geometry = settings.value("window/geometry")
         if geometry:
             self.restoreGeometry(geometry)
+        else:
+            self._fit_to_screen()
 
         # Window state (splitter positions, etc.)
         state = settings.value("window/state")
