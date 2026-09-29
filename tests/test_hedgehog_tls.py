@@ -33,27 +33,9 @@ def test_keeps_the_systems_store_when_it_has_certificates():
         assert ssl_context().get_ca_certs() == system
 
 
-def test_requests_use_that_context(monkeypatch):
-    sent = {}
+def test_requests_use_that_context():
+    session = HedgehogClient(store=object())._session()
+    context = session.get_adapter("https://hedgehog-bg.com").poolmanager.connection_pool_kw["ssl_context"]
 
-    class Response:
-        status, headers = 200, {}
-
-        def read(self):
-            return b"{}"
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *exc):
-            return False
-
-    def urlopen(request, timeout=None, context=None):
-        sent["context"] = context
-        return Response()
-
-    monkeypatch.setattr(hedgehog_client.urllib.request, "urlopen", urlopen)
-    HedgehogClient(store=object())._send("GET", "/api/v1/oauth/me", {}, None)
-
-    assert isinstance(sent["context"], ssl.SSLContext)
-    assert sent["context"].get_ca_certs()
+    assert isinstance(context, ssl.SSLContext)
+    assert context.get_ca_certs()

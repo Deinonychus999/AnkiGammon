@@ -2,7 +2,7 @@
 
 HedgeHog (hedgehog-bg.com) analyses on its own servers, on behalf of a user who
 connected their account over OAuth. The contract is docs/PARTNER_API.md in
-gitlab.com/eranlambooij/hedgehog-public. Standard library only, and Qt-free.
+gitlab.com/eranlambooij/hedgehog-public. Qt-free.
 """
 
 import json
@@ -10,11 +10,12 @@ import os
 import ssl
 import threading
 import time
-import urllib.error
 import urllib.parse
-import urllib.request
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
+
+import requests
+from requests.adapters import HTTPAdapter
 
 BASE = os.environ.get("ANKIGAMMON_HEDGEHOG_URL", "https://hedgehog-bg.com").rstrip("/")
 CLIENT_ID = "https://ankigammon.com/oauth/client.json"
@@ -131,6 +132,8 @@ def ssl_context() -> ssl.SSLContext:
     return context
 
 
+NETWORK_RETRY_PAUSES = (2.0, 5.0)
+
 _shared_context: Optional[ssl.SSLContext] = None
 
 
@@ -141,6 +144,19 @@ def _context() -> ssl.SSLContext:
     return _shared_context
 
 
+def _reason(err: BaseException) -> str:
+    # requests wraps the socket or TLS error a few levels down; show that one.
+    while err.__cause__ or err.__context__:
+        err = err.__cause__ or err.__context__
+    return str(err)
+
+
+class _TrustedAdapter(HTTPAdapter):
+    def init_poolmanager(self, *args, **kwargs):
+        kwargs["ssl_context"] = _context()
+        return super().init_poolmanager(*args, **kwargs)
+
+
 class HedgehogClient:
     """One connected user's view of the partner API."""
 
@@ -149,22 +165,45 @@ class HedgehogClient:
         self.store = store or TokenStore()
         self.base = base
         self._sleep = sleep
+        self._sessions = threading.local()
 
     # --- HTTP ---------------------------------------------------------------
 
+    def _session(self):
+        """This thread's session: its connection stays open between requests,
+        so an analysis costs one TLS handshake instead of one per status check."""
+        session = getattr(self._sessions, "session", None)
+        if session is None:
+            session = requests.Session()
+            session.mount("https://", _TrustedAdapter())
+            self._sessions.session = session
+        return session
+
     def _send(self, method: str, path: str, headers: Dict[str, str],
               data: Optional[bytes]) -> Tuple[int, Dict[str, str], bytes]:
-        request = urllib.request.Request(self.base + path, data=data, headers=headers, method=method)
         try:
-            with urllib.request.urlopen(request, timeout=60, context=_context()) as response:
-                return response.status, dict(response.headers), response.read()
-        except urllib.error.HTTPError as err:
-            return err.code, dict(err.headers or {}), err.read()
-        except (urllib.error.URLError, OSError) as err:
+            response = self._session().request(method, self.base + path, headers=headers,
+                                               data=data, timeout=60, allow_redirects=False)
+        except requests.RequestException as err:
             raise HedgehogRefusal(
-                "unreachable", f"Could not reach HedgeHog ({getattr(err, 'reason', err)}). "
+                "unreachable", f"Could not reach HedgeHog ({_reason(err)}). "
                 "Check your internet connection and try again.",
             ) from err
+        return response.status_code, dict(response.headers), response.content
+
+    def _send_retrying(self, method: str, path: str, headers: Dict[str, str],
+                       data: Optional[bytes]) -> Tuple[int, Dict[str, str], bytes]:
+        """Repeat a GET that failed on the network. A POST is sent once: a lost
+        reply could mean a second job, or a refresh token HedgeHog has rotated."""
+        pauses = NETWORK_RETRY_PAUSES if method == "GET" else ()
+        for pause in pauses:
+            try:
+                return self._send(method, path, headers, data)
+            except HedgehogRefusal as refusal:
+                if refusal.code != "unreachable":
+                    raise
+            self._sleep(pause)
+        return self._send(method, path, headers, data)
 
     def request(self, method: str, path: str, *, json_body=None, raw: Optional[bytes] = None,
                 form: Optional[dict] = None, auth: bool = True, retry: bool = True,
@@ -187,7 +226,7 @@ class HedgehogClient:
         elif raw is not None:
             headers["Content-Type"] = "application/octet-stream"
             data = raw
-        status, _, body = self._send(method, path, headers, data)
+        status, _, body = self._send_retrying(method, path, headers, data)
         if expect_binary and status < 400:
             return status, body
         try:
