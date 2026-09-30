@@ -25,7 +25,7 @@ CHECKER_XGID = "XGID=-b----E-C--AeD---bAdb---A-:0:0:1:52:0:0:3:0:10"
 
 def _cell(pa, oa, action="D/T"):
     return ScoreMatrixCell(player_away=pa, opponent_away=oa, best_action=action,
-                           error_no_double=0.05, error_double=0.0, error_pass=0.3,
+                           doubler_error=0.05, taker_error=0.3,
                            equity_no_double=0.4, equity_double_take=0.45, equity_double_pass=1.0)
 
 

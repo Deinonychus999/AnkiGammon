@@ -118,7 +118,7 @@ class FakeAnalyzer:
 def _cell(action="D/T", **equities) -> ScoreMatrixCell:
     return ScoreMatrixCell(
         player_away=2, opponent_away=2, best_action=action,
-        error_no_double=0.05, error_double=0.0, error_pass=0.02, **equities,
+        doubler_error=0.05, taker_error=0.02, **equities,
     )
 
 

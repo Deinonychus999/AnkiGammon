@@ -19,9 +19,10 @@ class ScoreMatrixCell:
     player_away: int  # Player on roll's score (away from match)
     opponent_away: int  # Opponent's score (away from match)
     best_action: str  # "D/T", "D/P", "N/T", "TG/T", "TG/P"
-    error_no_double: Optional[float]  # Error if don't double
-    error_double: Optional[float]  # Error if double/take
-    error_pass: Optional[float]  # Error if pass
+    # The doubler's error assumes the opponent answers correctly; the taker's
+    # is take-vs-pass once doubled.
+    doubler_error: Optional[float]
+    taker_error: Optional[float]
     # Cubeful equities of the three cube actions; both engines normalise
     # double/pass to +1.000, so it carries no per-cell information.
     equity_no_double: Optional[float] = None
@@ -45,88 +46,35 @@ class ScoreMatrixCell:
 
     def format_errors(self) -> str:
         """
-        Format error values for display in matrix.
-
-        Always displays errors in order: ND, D/T, D/P (skipping the cell's best action).
-        For example:
-        - N/T cell: shows D/T error, then D/P error
-        - D/T cell: shows ND error, then D/P error
-        - D/P cell: shows ND error, then D/T error
+        Format the doubler's and taker's errors for display in matrix.
 
         Returns:
-            String like "24/543" (errors scaled by 1000), or "—" if no alternatives exist
+            String like "24/543" (errors scaled by 1000), or "—" if unavailable
         """
-        if self.error_no_double is None and self.error_double is None and self.error_pass is None:
+        if self.doubler_error is None or self.taker_error is None:
             return "—"
-
-        def scale_error(error: Optional[float]) -> int:
-            return int(round(error * 1000)) if error is not None else 0
-
-        nd_error = scale_error(self.error_no_double)
-        dt_error = scale_error(self.error_double)
-        dp_error = scale_error(self.error_pass)
-
-        best_action_upper = self.best_action.upper()
-
-        if best_action_upper in ["N/T", "TG/T", "TG/P"]:
-            displayed_errors = [dt_error, dp_error]
-        elif best_action_upper == "D/T":
-            displayed_errors = [nd_error, dp_error]
-        elif best_action_upper == "D/P":
-            displayed_errors = [nd_error, dt_error]
-        else:
-            displayed_errors = [nd_error, dt_error]
-
-        if self.error_double is None and self.error_pass is None and best_action_upper in ["N/T", "TG/T", "TG/P"]:
-            return "—"
-        if self.error_no_double is None and self.error_pass is None and best_action_upper == "D/T":
-            return "—"
-        if self.error_no_double is None and self.error_double is None and best_action_upper == "D/P":
-            return "—"
-
-        return f"{displayed_errors[0]}/{displayed_errors[1]}"
+        return f"{_thousandths(self.doubler_error)}/{_thousandths(self.taker_error)}"
 
     def has_low_errors(self, threshold: int = 20) -> bool:
-        """
-        Check if the minimum displayed error is below the threshold.
+        """True if the doubler's or taker's error (scaled by 1000) is below threshold."""
+        if self.doubler_error is None or self.taker_error is None:
+            return False
+        return min(_thousandths(self.doubler_error), _thousandths(self.taker_error)) < threshold
 
-        This checks the two errors shown in the cell (not the one matching the best action).
-        If the smallest shown error is < threshold, it means at least one alternative
-        action is very close to the best action, indicating a close decision.
 
-        Args:
-            threshold: Error threshold (scaled by 1000). Default 20 = 0.020
+def _thousandths(error: float) -> int:
+    return int(round(error * 1000))
 
-        Returns:
-            True if minimum of displayed errors is below threshold (close decision)
-        """
-        # Helper to scale error
-        def scale_error(error: Optional[float]) -> int:
-            return int(round(error * 1000)) if error is not None else 0
 
-        # Get all three errors
-        nd_error = scale_error(self.error_no_double)
-        dt_error = scale_error(self.error_double)
-        dp_error = scale_error(self.error_pass)
-
-        # Determine which two errors are displayed based on best action
-        best_action_upper = self.best_action.upper()
-
-        if best_action_upper in ["N/T", "TG/T", "TG/P"]:
-            # Display DT and DP errors
-            displayed_errors = [dt_error, dp_error]
-        elif best_action_upper == "D/T":
-            # Display ND and DP errors
-            displayed_errors = [nd_error, dp_error]
-        elif best_action_upper == "D/P":
-            # Display ND and DT errors
-            displayed_errors = [nd_error, dt_error]
-        else:
-            # Fallback: use ND and DT
-            displayed_errors = [nd_error, dt_error]
-
-        # Check if minimum of displayed errors is below threshold
-        return min(displayed_errors) < threshold
+def cube_errors(
+    no_double: Optional[float],
+    double_take: Optional[float],
+    double_pass: Optional[float],
+) -> Tuple[Optional[float], Optional[float]]:
+    """The doubler's and taker's errors at a cube decision, or (None, None)."""
+    if no_double is None or double_take is None or double_pass is None:
+        return None, None
+    return abs(no_double - min(double_take, double_pass)), abs(double_take - double_pass)
 
 
 @dataclass
@@ -431,25 +379,14 @@ def _parse_cell(
 
     best_action_simplified = BackgammonAnalyzer.simplify_cube_notation(best_move.notation)
 
-    best_equity = best_move.equity
-    error_no_double = None
-    error_double = None
-    error_pass = None
-
-    if no_double_eq is not None:
-        error_no_double = abs(best_equity - no_double_eq) if best_action_simplified != "N/T" else 0.0
-    if double_take_eq is not None:
-        error_double = abs(best_equity - double_take_eq) if best_action_simplified not in ["D/T", "TG/T"] else 0.0
-    if double_pass_eq is not None:
-        error_pass = abs(best_equity - double_pass_eq) if best_action_simplified != "D/P" else 0.0
+    doubler_error, taker_error = cube_errors(no_double_eq, double_take_eq, double_pass_eq)
 
     return ScoreMatrixCell(
         player_away=player_away,
         opponent_away=opponent_away,
         best_action=best_action_simplified,
-        error_no_double=error_no_double,
-        error_double=error_double,
-        error_pass=error_pass,
+        doubler_error=doubler_error,
+        taker_error=taker_error,
         equity_no_double=no_double_eq,
         equity_double_take=double_take_eq,
         equity_double_pass=double_pass_eq

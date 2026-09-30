@@ -559,13 +559,13 @@ class GNUBGAnalyzer(BackgammonAnalyzer):
                 - equity_no_double: Equity for no double
                 - equity_double_take: Equity for double/take
                 - equity_double_pass: Equity for double/pass
-                - error_no_double: Error if don't double
-                - error_double: Error if double
-                - error_pass: Error if pass
+                - doubler_error: The doubler's error
+                - taker_error: The taker's error
 
         Raises:
             ValueError: If position_id format is invalid or analysis fails
         """
+        from ankigammon.analysis.score_matrix import cube_errors
         from ankigammon.utils.xgid import parse_xgid, encode_xgid
 
         position, metadata = parse_xgid(position_id)
@@ -615,26 +615,15 @@ class GNUBGAnalyzer(BackgammonAnalyzer):
 
         best_action_simplified = self._simplify_cube_notation(best_move.notation)
 
-        best_equity = best_move.equity
-        error_no_double = None
-        error_double = None
-        error_pass = None
-
-        if no_double_eq is not None:
-            error_no_double = abs(best_equity - no_double_eq) if best_action_simplified != "N/T" else 0.0
-        if double_take_eq is not None:
-            error_double = abs(best_equity - double_take_eq) if best_action_simplified not in ["D/T", "TG/T"] else 0.0
-        if double_pass_eq is not None:
-            error_pass = abs(best_equity - double_pass_eq) if best_action_simplified != "D/P" else 0.0
+        doubler_error, taker_error = cube_errors(no_double_eq, double_take_eq, double_pass_eq)
 
         return {
             'best_action': best_action_simplified,
             'equity_no_double': no_double_eq,
             'equity_double_take': double_take_eq,
             'equity_double_pass': double_pass_eq,
-            'error_no_double': error_no_double,
-            'error_double': error_double,
-            'error_pass': error_pass
+            'doubler_error': doubler_error,
+            'taker_error': taker_error
         }
 
     @staticmethod

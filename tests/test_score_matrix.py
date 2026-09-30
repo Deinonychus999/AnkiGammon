@@ -13,12 +13,14 @@ Covers:
 - `ScoreMatrixCell.format_equities` and the errors/equities toggle markup
   (issue #56): the card's toggle script keys off the `has-equities` class and
   the toggle element, so their presence is part of the contract.
+- `cube_errors`: each cell's doubler/taker error pair, for every cube action.
 """
 
 import pytest
 
 from ankigammon.analysis.score_matrix import (
     ScoreMatrixCell,
+    cube_errors,
     format_matrix_as_html,
     resolve_effective_match_length,
 )
@@ -54,9 +56,8 @@ def _minimal_matrix(**equities):
         player_away=2,
         opponent_away=2,
         best_action="D/T",
-        error_no_double=0.05,
-        error_double=0.0,
-        error_pass=0.02,
+        doubler_error=0.05,
+        taker_error=0.02,
         **equities,
     )
     return [[cell]]
@@ -85,6 +86,41 @@ class TestFormatMatrixCaption:
         # Caption sits after the closing </table> tag, inside the wrapping div
         # (rindex for the outer </div> — the inner <div class="action"> cells also close)
         assert html.index("</table>") < html.index("matrix-caption") < html.rindex("</div>")
+
+
+class TestCubeErrors:
+    """The doubler's error assumes a correct answer; the taker's is take-vs-pass.
+    Cells are a 4-ply redouble-to-4 matrix."""
+
+    @pytest.mark.parametrize("action,nd,dt,expected", [
+        ("N/T", 0.699, 0.519, "180/481"),
+        ("N/T", 0.645, 0.109, "536/891"),
+        ("TG/T", 1.093, 0.782, "311/218"),
+        ("TG/P", 1.122, 1.160, "122/160"),
+        ("D/T", 0.744, 0.794, "50/206"),
+        ("D/P", 0.944, 1.431, "56/431"),
+    ])
+    def test_every_cube_action(self, action, nd, dt, expected):
+        doubler, taker = cube_errors(nd, dt, 1.0)
+        cell = ScoreMatrixCell(
+            player_away=4, opponent_away=3, best_action=action,
+            doubler_error=doubler, taker_error=taker,
+        )
+        assert cell.format_errors() == expected
+
+    @pytest.mark.parametrize("equities", [
+        (None, 0.5, 1.0), (0.5, None, 1.0), (0.5, 0.6, None),
+    ])
+    def test_none_without_all_three_equities(self, equities):
+        assert cube_errors(*equities) == (None, None)
+
+    def test_dash_without_errors(self):
+        cell = ScoreMatrixCell(
+            player_away=4, opponent_away=3, best_action="N/T",
+            doubler_error=None, taker_error=None,
+        )
+        assert cell.format_errors() == "—"
+        assert not cell.has_low_errors()
 
 
 class TestFormatEquities:
