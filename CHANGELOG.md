@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.17.3] - 2026-09-30
+
+### Fixed
+- Score matrices show the right errors when not doubling is correct (No double/Take, Too good/Take and Too good/Pass): the first number is the doubler's error and the second the taker's, as in double cells. Before, a Too good/Pass cell could read 38/122 instead of 122/160, and Too good/Take showed 0 for doubling. The trainer at [ankigammon.com/train](https://ankigammon.com/train/) shows the corrected numbers for packs from this version on.
+- HedgeHog analysis keeps one connection open instead of opening a new one for every request, and retries a status check the network dropped, so a single slow connection no longer stops a whole analysis.
+
 ## [1.17.2] - 2026-09-28
 
 ### Fixed
