@@ -206,6 +206,28 @@ jobs:
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
 
+      # The website bundles whatever pypi.org/pypi/ankigammon/json calls latest,
+      # which lags an upload by a few minutes.
+      - name: Rebuild the website once PyPI serves this release
+        env:
+          GH_TOKEN: ${{ secrets.WEBSITE_DISPATCH_TOKEN }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::notice::WEBSITE_DISPATCH_TOKEN is not set; the website picks up this release on its daily rebuild."
+            exit 0
+          fi
+          version="${GITHUB_REF_NAME#v}"
+          for i in $(seq 60); do
+            latest=$(curl -fsS https://pypi.org/pypi/ankigammon/json | jq -r .info.version) || latest=""
+            if [ "$latest" = "$version" ]; then
+              gh api repos/Deinonychus999/AnkiGammonWebsite/dispatches -f event_type=ankigammon-released \
+                || echo "::warning::Could not trigger the website rebuild; check WEBSITE_DISPATCH_TOKEN (expired?)."
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "::warning::PyPI still reports ${latest:-nothing} after 15 minutes; the website picks up $version on its daily rebuild."
+
   create-release:
     name: Create GitHub Release
     needs: [build-windows, build-macos, build-linux]
