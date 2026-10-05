@@ -39,6 +39,7 @@ from ankigammon.gui.dialogs.update_dialog import UpdateDialog, CheckingUpdateDia
 from ankigammon.gui.update_checker import VersionCheckerThread
 from ankigammon.gui.resources import get_resource_path
 from ankigammon.gui import silent_messagebox
+from ankigammon.gui.thread_lifetime import after_threads_stop
 from ankigammon.utils.subprocess_env import external_subprocess_env
 from ankigammon.utils.analysis_debug import DEBUG_FILENAME
 
@@ -97,8 +98,10 @@ class MatchAnalysisWorker(QThread):
 
             # Analyze match — parsing is now internal to each analyzer
             def progress_callback(status: str):
+                # A cancel that lands before the engine starts has nothing for
+                # terminate() to kill, so the engine would run the whole match.
                 if self._cancelled:
-                    return
+                    raise InterruptedError("Cancelled")
                 self.status_message.emit(status)
 
             all_decisions = self._analyzer.analyze_match_file(
@@ -206,6 +209,7 @@ class MainWindow(QMainWindow):
         self._import_queue: List[_QueuedImport] = []
         self._import_filters: Dict[str, CollectionSource] = {}  # by file_key, for Save Collection
         self._import_in_progress = False  # Track if an import is currently being processed
+        self._finishing_workers: List[MatchAnalysisWorker] = []
         self._batch_import_results = []  # Accumulate results from batch imports (for combined success message)
         self._in_batch_import = False  # Flag to track whether we are in a multi-file batch import
         self._batch_import_options: Optional[dict] = None  # Cached ImportOptionsDialog choices for the current batch
@@ -1600,10 +1604,18 @@ class MainWindow(QMainWindow):
             self._analysis_results = (None, None)
             progress_dialog.close()
 
-        # Cleanup worker
+        self._release_analysis_worker()
+
+    def _release_analysis_worker(self) -> None:
         if hasattr(self, '_analysis_worker'):
-            self._analysis_worker.deleteLater()
+            worker = self._analysis_worker
             del self._analysis_worker
+            self._finishing_workers.append(worker)
+
+            def release():
+                self._finishing_workers.remove(worker)
+                worker.deleteLater()
+            after_threads_stop((worker,), release, self)
 
     def _collection_dialog_start(self) -> str:
         last = self.settings.last_collection_path
@@ -2503,5 +2515,12 @@ class MainWindow(QMainWindow):
                     thread.wait(2000)
             except RuntimeError:
                 pass
+
+        # Quitting while a cancelled import's engine still runs would destroy
+        # its worker mid-run, which aborts the app.
+        for worker in [getattr(self, '_analysis_worker', None), *self._finishing_workers]:
+            if worker is not None:
+                worker.cancel()
+                worker.wait()
 
         event.accept()

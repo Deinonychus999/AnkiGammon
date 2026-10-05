@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, QThread, Signal, Slot
 
+from ankigammon.gui.thread_lifetime import after_threads_stop
 from ankigammon.utils.analysis_debug import record_failed_analysis
 from ankigammon.anki.ankiconnect import AnkiConnect
 from ankigammon.anki.card_styles import MODEL_NAME
@@ -483,6 +484,7 @@ class RegenerateDialog(QDialog):
         super().__init__(parent)
         self.settings = settings
         self.worker = None
+        self._working = False
         self._closing = False
 
         self.setWindowTitle("Regenerate Cards in Anki")
@@ -577,33 +579,22 @@ class RegenerateDialog(QDialog):
         self.btn_regenerate.clicked.connect(self.start_regenerate)
         self.btn_close = QPushButton("Cancel")
         self.btn_close.setCursor(Qt.PointingHandCursor)
-        self.btn_close.clicked.connect(self.close_dialog)
+        self.btn_close.clicked.connect(self.reject)
 
         self.button_box.addButton(self.btn_regenerate, QDialogButtonBox.AcceptRole)
         self.button_box.addButton(self.btn_close, QDialogButtonBox.RejectRole)
         layout.addWidget(self.button_box)
 
-    def closeEvent(self, event):
-        """Handle window close event."""
-        if self.worker and self.worker.isRunning():
-            self._closing = True
-            self.btn_close.setEnabled(False)
-            self.worker.cancel()
-            self.status_label.setText("Cancelling...")
-            event.ignore()
-            return
-        event.accept()
-
-    @Slot()
-    def close_dialog(self):
-        """Handle close button click."""
-        if self.worker and self.worker.isRunning():
-            self._closing = True
+    def reject(self):
+        """Cancel, Esc and the window's close button: cancel a running
+        regeneration first, and close once the worker's thread has ended."""
+        if self._working:
+            self._closing = True  # on_finished closes the dialog
             self.btn_close.setEnabled(False)
             self.worker.cancel()
             self.status_label.setText("Cancelling...")
             return
-        self.reject()
+        after_threads_stop((self.worker,), super().reject, self)
 
     def _selected_mode(self) -> str:
         return MODE_RENDER_ONLY if self.radio_render_only.isChecked() else MODE_REANALYZE
@@ -635,6 +626,7 @@ class RegenerateDialog(QDialog):
         self.worker.progress.connect(self.on_progress)
         self.worker.status_message.connect(self.on_status_message)
         self.worker.finished.connect(self.on_finished)
+        self._working = True
         self.worker.start()
 
     @Slot(int, int)
@@ -654,6 +646,7 @@ class RegenerateDialog(QDialog):
     @Slot(bool, str)
     def on_finished(self, success, message):
         """Handle completion."""
+        self._working = False
         if self._closing:
             self.reject()
             return

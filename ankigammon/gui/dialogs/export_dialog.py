@@ -17,6 +17,7 @@ from ankigammon.analysis.score_matrix import count_score_matrix_analyses
 from ankigammon.anki.card_generator import CardGenerator
 from ankigammon.anki.deck_utils import find_duplicate_xgids
 from ankigammon.gui import silent_messagebox
+from ankigammon.gui.thread_lifetime import after_threads_stop
 from ankigammon.renderer.svg_board_renderer import SVGBoardRenderer
 from ankigammon.renderer.color_schemes import SCHEMES
 from ankigammon.settings import Settings
@@ -607,6 +608,7 @@ class ExportDialog(QDialog):
         self.settings = settings
         self.worker = None
         self.analysis_worker = None
+        self._working = False
         self._closing = False  # Flag to track if user requested close
         self._to_trainer = settings.export_method == "trainer"
 
@@ -672,35 +674,19 @@ class ExportDialog(QDialog):
         self.btn_export.clicked.connect(self.start_export)
         self.btn_close = QPushButton("Cancel")
         self.btn_close.setCursor(Qt.PointingHandCursor)
-        self.btn_close.clicked.connect(self.close_dialog)
+        self.btn_close.clicked.connect(self.reject)
 
         self.button_box.addButton(self.btn_export, QDialogButtonBox.AcceptRole)
         self.button_box.addButton(self.btn_close, QDialogButtonBox.RejectRole)
         layout.addWidget(self.button_box)
 
-    def closeEvent(self, event):
-        """Handle window close event (X button, ESC key, etc)."""
-        analysis_running = self.analysis_worker and self.analysis_worker.isRunning()
-        export_running = self.worker and self.worker.isRunning()
-
-        if analysis_running or export_running:
-            self._cancel_workers()
-            event.ignore()  # Don't close yet — finished signal will close
+    def reject(self):
+        """Cancel, Esc and the window's close button: cancel running work
+        first, and close once the workers' threads have ended."""
+        if self._working:
+            self._cancel_workers()  # the finished handlers close the dialog
             return
-
-        event.accept()
-
-    @Slot()
-    def close_dialog(self):
-        """Handle close button click - cancel any running operations."""
-        analysis_running = self.analysis_worker and self.analysis_worker.isRunning()
-        export_running = self.worker and self.worker.isRunning()
-
-        if analysis_running or export_running:
-            self._cancel_workers()
-            return
-
-        self.reject()
+        after_threads_stop((self.analysis_worker, self.worker), super().reject, self)
 
     def _cancel_workers(self):
         """Cancel running workers and kill the headless XG process.
@@ -842,6 +828,7 @@ class ExportDialog(QDialog):
 
             # Run analysis first (flat list — analysis doesn't care about deck grouping)
             self.status_label.setText(f"Analyzing {len(needs_analysis)} position(s) with {engine_name}...")
+            self._working = True
             self.analysis_worker = AnalysisWorker(self.all_decisions, self.settings)
             self.analysis_worker.progress.connect(self.on_analysis_progress)
             self.analysis_worker.status_message.connect(self.on_status_message)
@@ -876,6 +863,7 @@ class ExportDialog(QDialog):
         self.worker.finished.connect(self.on_finished)
 
         # Start export
+        self._working = True
         self.worker.start()
 
     @Slot(int, int)
@@ -887,6 +875,7 @@ class ExportDialog(QDialog):
     @Slot(bool, str, list)
     def on_analysis_finished(self, success, message, analyzed_decisions):
         """Handle analysis completion."""
+        self._working = False
         # Check if user requested to close
         if self._closing:
             self._cleanup_analyzer()
@@ -980,6 +969,7 @@ class ExportDialog(QDialog):
     @Slot(bool, str)
     def on_finished(self, success, message):
         """Handle export completion."""
+        self._working = False
         # Clean up the headless XG process (if any)
         self._cleanup_analyzer()
 
