@@ -120,7 +120,8 @@ class TestMatrixFailureIsReported:
 
 class TestWarningReachesTheRunSummary:
     def test_regenerate_summary_mentions_the_failure(self, qapp, matrix_settings):
-        """generation_warnings is what regenerate reports back to the user."""
+        """generation_warnings is what regenerate reports back to the user
+        when told to go on without the tables that fail."""
         from ankigammon.gui.dialogs.regenerate_dialog import (
             MODE_RENDER_ONLY,
             RegenerateWorker,
@@ -154,7 +155,7 @@ class TestWarningReachesTheRunSummary:
             def update_note_tags(self, *a, **kw):
                 pass
 
-        worker = RegenerateWorker(matrix_settings, MODE_RENDER_ONLY)
+        worker = RegenerateWorker(matrix_settings, MODE_RENDER_ONLY, require_optional_analysis=False)
         outcome = {}
         worker.finished.connect(lambda ok, msg: outcome.update(ok=ok, msg=msg))
 

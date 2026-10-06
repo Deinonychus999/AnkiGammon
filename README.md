@@ -205,6 +205,10 @@ Both Anki export methods support updating existing cards when you change setting
 - Re-exporting updates the card content while preserving your Anki review history
 - Useful for applying new color schemes or enabling features like move score matrices
 
+### When a Table Can't Be Made
+
+If a score matrix, move score matrix or cube-position comparison that your settings ask for can't be made (the connection to HedgeHog drops, or the engine fails on a position), the export or regenerate stops before that card instead of writing it without the table. Cards finished before it are complete. Press **Export** (or **Regenerate**) to try that card again; Send to Anki picks up where it stopped. If the same position keeps failing, **Export Without Missing Tables** goes on and lists the cards that are missing one; **Regenerate Without Missing Tables** goes on and leaves those cards as they were. An exhausted HedgeHog free allowance is the exception: AnkiGammon asks before the export starts, and if you go ahead the cards it can't analyze are written without their tables.
+
 ### Studying Without Anki
 
 **File → Export to Trainer...** saves the loaded positions as a study pack (`.json`) for the [AnkiGammon trainer](https://ankigammon.com/train/), which runs in the browser on a computer or phone with no Anki and no account. Open the trainer, choose the file, and study: it asks for the best move or cube action, shows the analysis, and schedules reviews with FSRS. Everything stays on that device. On a phone, add the trainer to the Home Screen first, then send the file to the phone and open it from there. The trainer also opens AnkiGammon `.apkg` decks and the community decks.

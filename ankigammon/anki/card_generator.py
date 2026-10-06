@@ -11,7 +11,7 @@ from typing import List, Dict, Optional, Tuple
 from ankigammon.models import Decision, Move, Player, DecisionType, CubeState
 from ankigammon.renderer.svg_board_renderer import SVGBoardRenderer
 from ankigammon.renderer.animation_controller import AnimationController
-from ankigammon.utils.analyzer_base import EngineRefusesRun
+from ankigammon.utils.analyzer_base import AllowanceUsedUp, EngineRefusesRun, OptionalAnalysisFailed
 from ankigammon.utils.move_parser import MoveParser
 from ankigammon.settings import get_settings
 from ankigammon.anki.card_styles import get_error_css_class
@@ -43,7 +43,8 @@ class CardGenerator:
         animation_controller: Optional[AnimationController] = None,
         progress_callback: Optional[callable] = None,
         cancellation_callback: Optional[callable] = None,
-        analyzer=None
+        analyzer=None,
+        require_optional_analysis: bool = False,
     ):
         """
         Initialize the card generator.
@@ -59,6 +60,9 @@ class CardGenerator:
             analyzer: Optional BackgammonAnalyzer instance for score matrix generation.
                       If None, one will be lazily created on first use. Pass an existing
                       instance to reuse a connection across multiple cards.
+            require_optional_analysis: If True, a table the settings ask for that
+                      cannot be made raises OptionalAnalysisFailed instead of the
+                      card being written without it.
         """
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -67,6 +71,7 @@ class CardGenerator:
         self.interactive_moves = interactive_moves
         self.settings = get_settings()
         self._analyzer = analyzer
+        self.require_optional_analysis = require_optional_analysis
 
         # Create default renderer and animation controller with settings if not provided
         from ankigammon.renderer.color_schemes import get_scheme
@@ -1840,6 +1845,14 @@ class CardGenerator:
 '''
         return html
 
+    def _require(self, what: str, decision: Decision, error: Optional[Exception] = None) -> None:
+        """Stop the run over a table that could not be made, when required. A
+        used-up allowance is the exception: the export asked about it up front."""
+        if not self.require_optional_analysis or isinstance(error, AllowanceUsedUp):
+            return
+        reason = f": {error}" if error is not None else "."
+        raise OptionalAnalysisFailed(f"The {what} for {decision.xgid} could not be made{reason}") from error
+
     def _note_engine_refusal(self, error: Exception) -> None:
         """An optional analysis the engine refused (e.g. a HedgeHog allowance
         running out) would otherwise surface only as "failed"; keep the
@@ -1928,6 +1941,7 @@ class CardGenerator:
     def _warn_score_matrix(self, decision: Decision, result: dict) -> bool:
         """Record a missing unlimited reference; True when it went missing."""
         if not result['is_projection'] and result['unlimited'] is None:
+            self._require("unlimited reference of the score matrix", decision)
             self.generation_warnings.append(
                 f"Unlimited reference failed for {decision.xgid} "
                 "(card written without it)"
@@ -1972,6 +1986,7 @@ class CardGenerator:
             # Must propagate so the export worker can stop cleanly
             raise
         except Exception as e:
+            self._require("score matrix", decision, e)
             self._note_engine_refusal(e)
             # Returning "" writes the card back with no matrix at all. On a
             # regenerate that silently destroys a table the card already had,
@@ -2031,8 +2046,13 @@ class CardGenerator:
         except (InterruptedError, EngineRefusesRun):
             raise
         except Exception as e:
+            self._require("move score matrix", decision, e)
             self._note_engine_refusal(e)
-            print(f"Warning: Failed to generate move score matrix: {e}")
+            logger.exception("Failed to generate move score matrix for xgid=%r", decision.xgid)
+            self.generation_warnings.append(
+                f"Move score matrix failed for {decision.xgid} "
+                "(card written without its table)"
+            )
             return ""
 
     def _compute_move_cube_matrix(self, decision: Decision):
@@ -2096,6 +2116,7 @@ class CardGenerator:
             # Must propagate so the export worker can stop cleanly
             raise
         except Exception as e:
+            self._require("cube-position comparison", decision, e)
             self._note_engine_refusal(e)
             # A missing spoiler normally means "the best move is the same at
             # all cube positions", so an analysis failure must not be silent:
@@ -2139,7 +2160,8 @@ class CardGenerator:
                         }
                 except (InterruptedError, EngineRefusesRun):
                     raise
-                except Exception:
+                except Exception as e:
+                    self._require("score matrix", decision, e)
                     logger.exception("Failed to generate score matrix for xgid=%r", decision.xgid)
                     self.generation_warnings.append(f"Score matrix failed for {decision.xgid}")
             return extras
@@ -2151,7 +2173,8 @@ class CardGenerator:
                     extras['move_score_matrix'] = {'columns': [asdict(c) for c in columns], 'analysis': label}
             except (InterruptedError, EngineRefusesRun):
                 raise
-            except Exception:
+            except Exception as e:
+                self._require("move score matrix", decision, e)
                 logger.exception("Failed to generate move score matrix for xgid=%r", decision.xgid)
                 self.generation_warnings.append(f"Move score matrix failed for {decision.xgid}")
         if self.settings.generate_move_cube_matrix:
@@ -2166,7 +2189,8 @@ class CardGenerator:
                     }
             except (InterruptedError, EngineRefusesRun):
                 raise
-            except Exception:
+            except Exception as e:
+                self._require("cube-position comparison", decision, e)
                 logger.exception("Failed to generate move cube matrix for xgid=%r", decision.xgid)
                 self.generation_warnings.append(f"Cube-position analysis failed for {decision.xgid}")
         return extras

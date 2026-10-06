@@ -19,6 +19,16 @@ class EngineRefusesRun(Exception):
     """
 
 
+class OptionalAnalysisFailed(EngineRefusesRun):
+    """A table the settings ask for (score matrix, cube comparison) could not
+    be made, so a desktop run stops before writing the card without it."""
+
+
+class AllowanceUsedUp(Exception):
+    """The user's daily analyses are used up. The export asks before starting
+    whether to finish without the tables then, so this one does not stop it."""
+
+
 class BackgammonAnalyzer(ABC):
     """Abstract interface for backgammon analysis engines."""
 

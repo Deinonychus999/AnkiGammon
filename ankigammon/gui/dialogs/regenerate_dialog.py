@@ -26,7 +26,7 @@ from PySide6.QtCore import Qt, QThread, Signal, Slot
 
 from ankigammon.gui.thread_lifetime import after_threads_stop
 from ankigammon.utils.analysis_debug import record_failed_analysis
-from ankigammon.utils.analyzer_base import EngineRefusesRun
+from ankigammon.utils.analyzer_base import EngineRefusesRun, OptionalAnalysisFailed
 from ankigammon.anki.ankiconnect import AnkiConnect
 from ankigammon.anki.card_styles import MODEL_NAME
 from ankigammon.anki.decision_serialize import carry_user_metadata, decision_from_json
@@ -57,11 +57,14 @@ class RegenerateWorker(QThread):
     status_message = Signal(str)
     finished = Signal(bool, str)
 
-    def __init__(self, settings: Settings, mode: str, only_missing: bool = False):
+    def __init__(self, settings: Settings, mode: str, only_missing: bool = False,
+                 require_optional_analysis: bool = True):
         super().__init__()
         self.settings = settings
         self.mode = mode
         self.only_missing = only_missing
+        self.require_optional_analysis = require_optional_analysis
+        self.stopped_by = None
         self._cancelled = False
         self._analyzer = None
         self._card_gen = None
@@ -178,6 +181,7 @@ class RegenerateWorker(QThread):
 
     def _stop_refused(self, error: EngineRefusesRun, index: int, updated: int, total: int) -> None:
         from ankigammon.gui.dialogs.export_dialog import refused_message
+        self.stopped_by = error
         self.finished.emit(False, refused_message(
             self.settings, error,
             f"Stopped at card {index + 1} of {total} after updating {updated}; "
@@ -230,6 +234,7 @@ class RegenerateWorker(QThread):
             interactive_moves=self.settings.interactive_moves,
             renderer=renderer,
             analyzer=analyzer,
+            require_optional_analysis=self.require_optional_analysis,
         )
         return self._card_gen
 
@@ -501,6 +506,7 @@ class RegenerateDialog(QDialog):
         self.worker = None
         self._working = False
         self._closing = False
+        self._require_tables = True
 
         self.setWindowTitle("Regenerate Cards in Anki")
         self.setModal(True)
@@ -592,11 +598,16 @@ class RegenerateDialog(QDialog):
         self.btn_regenerate = QPushButton("Regenerate")
         self.btn_regenerate.setCursor(Qt.PointingHandCursor)
         self.btn_regenerate.clicked.connect(self.start_regenerate)
+        self.btn_without = QPushButton("Regenerate Without Missing Tables")
+        self.btn_without.setCursor(Qt.PointingHandCursor)
+        self.btn_without.clicked.connect(self._regenerate_without_missing_tables)
         self.btn_close = QPushButton("Cancel")
         self.btn_close.setCursor(Qt.PointingHandCursor)
         self.btn_close.clicked.connect(self.reject)
 
         self.button_box.addButton(self.btn_regenerate, QDialogButtonBox.AcceptRole)
+        self.button_box.addButton(self.btn_without, QDialogButtonBox.ActionRole)
+        self.btn_without.hide()  # after addButton, which shows it
         self.button_box.addButton(self.btn_close, QDialogButtonBox.RejectRole)
         layout.addWidget(self.button_box)
 
@@ -610,6 +621,11 @@ class RegenerateDialog(QDialog):
             self.status_label.setText("Cancelling...")
             return
         after_threads_stop((self.worker,), super().reject, self)
+
+    @Slot()
+    def _regenerate_without_missing_tables(self):
+        self._require_tables = False
+        self.start_regenerate()
 
     def _selected_mode(self) -> str:
         return MODE_RENDER_ONLY if self.radio_render_only.isChecked() else MODE_REANALYZE
@@ -636,8 +652,11 @@ class RegenerateDialog(QDialog):
         self.status_label.setText("Starting regeneration...")
 
         self.worker = RegenerateWorker(
-            self.settings, mode, only_missing=self.chk_only_missing.isChecked()
+            self.settings, mode, only_missing=self.chk_only_missing.isChecked(),
+            require_optional_analysis=self._require_tables,
         )
+        self._require_tables = True
+        self.btn_without.hide()
         self.worker.progress.connect(self.on_progress)
         self.worker.status_message.connect(self.on_status_message)
         self.worker.finished.connect(self.on_finished)
@@ -676,3 +695,10 @@ class RegenerateDialog(QDialog):
             self.btn_regenerate.setEnabled(True)
             self.radio_render_only.setEnabled(True)
             self.radio_reanalyze.setEnabled(True)
+            if isinstance(self.worker.stopped_by, OptionalAnalysisFailed):
+                # A failure that repeats on this position would stop every retry
+                self.btn_without.show()
+                self.status_label.setText(
+                    f"{message}\nRegenerate tries this card again; {self.btn_without.text()} "
+                    "goes on, keeping each card whose tables fail as it is."
+                )

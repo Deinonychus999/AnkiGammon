@@ -21,7 +21,7 @@ from ankigammon.gui.thread_lifetime import after_threads_stop
 from ankigammon.renderer.svg_board_renderer import SVGBoardRenderer
 from ankigammon.renderer.color_schemes import SCHEMES
 from ankigammon.settings import Settings
-from ankigammon.utils.analyzer_base import EngineRefusesRun, create_analyzer
+from ankigammon.utils.analyzer_base import EngineRefusesRun, OptionalAnalysisFailed, create_analyzer
 from ankigammon.anki.decision_serialize import carry_user_metadata
 from ankigammon.utils.analysis_debug import record_failed_analysis
 from PySide6.QtWidgets import QMessageBox
@@ -214,6 +214,8 @@ class ExportWorker(QThread):
         output_path: str = None,
         import_mode: str = "add",
         analyzer=None,
+        require_optional_analysis: bool = True,
+        already_sent: int = 0,
     ):
         super().__init__()
         self.grouped_decisions = grouped_decisions
@@ -225,6 +227,11 @@ class ExportWorker(QThread):
         self._cancelled = False
         self._analyzer = analyzer
         self._card_gen = None
+        self.require_optional_analysis = require_optional_analysis
+        # Cards a stopped Send to Anki already sent complete; a retry resumes after them
+        self.already_sent = already_sent
+        self.sent = already_sent
+        self.stopped_by = None
         # The trainer export's result, for the dialog to hand to the trainer
         self.pack = None
 
@@ -316,6 +323,7 @@ class ExportWorker(QThread):
             renderer=renderer,
             cancellation_callback=lambda: self._cancelled,
             analyzer=self._analyzer,
+            require_optional_analysis=self.require_optional_analysis,
         )
         self._card_gen = card_gen
 
@@ -323,6 +331,8 @@ class ExportWorker(QThread):
             for decision in deck_decisions:
                 i = card_index
                 card_index += 1
+                if i < self.already_sent:
+                    continue
 
                 # Check for cancellation
                 if self._cancelled:
@@ -355,6 +365,7 @@ class ExportWorker(QThread):
                     self.finished.emit(False, "Export cancelled by user")
                     return
                 except EngineRefusesRun as e:
+                    self.stopped_by = e
                     self.finished.emit(False, refused_message(
                         self.settings, e,
                         f"Stopped after sending {i} of {total} card(s) to Anki. The rest were "
@@ -394,6 +405,7 @@ class ExportWorker(QThread):
                     self.finished.emit(False, f"Failed to add card {i+1}: {str(e)}")
                     return
 
+                self.sent = i + 1
                 self.progress.emit((i + 1) / total)
 
         unique_xgids = len({d.xgid for d in self.all_decisions if d.xgid})
@@ -424,6 +436,7 @@ class ExportWorker(QThread):
             interactive_moves=self.settings.interactive_moves,
             cancellation_callback=lambda: self._cancelled,
             analyzer=self._analyzer,
+            require_optional_analysis=self.require_optional_analysis,
         )
         self._card_gen = card_gen
 
@@ -451,6 +464,7 @@ class ExportWorker(QThread):
                 self.finished.emit(False, "Export cancelled by user")
                 return
             except EngineRefusesRun as e:
+                self.stopped_by = e
                 self.finished.emit(False, refused_message(
                     self.settings, e, f"Stopped at position {i + 1} of {total}; nothing was sent to the trainer.",
                 ))
@@ -519,6 +533,7 @@ class ExportWorker(QThread):
                 renderer=renderer,
                 cancellation_callback=lambda: self._cancelled,
                 analyzer=self._analyzer,
+                require_optional_analysis=self.require_optional_analysis,
             )
             self._card_gen = card_gen
 
@@ -561,6 +576,7 @@ class ExportWorker(QThread):
                         self.finished.emit(False, "Export cancelled by user")
                         return
                     except EngineRefusesRun as e:
+                        self.stopped_by = e
                         self.finished.emit(False, refused_message(
                             self.settings, e,
                             f"Stopped at position {card_index + 1} of {total}; no file was written.",
@@ -634,6 +650,8 @@ class ExportDialog(QDialog):
         self._working = False
         self._closing = False  # Flag to track if user requested close
         self._to_trainer = settings.export_method == "trainer"
+        self._require_tables = True
+        self._already_sent = 0
 
         self.setWindowTitle("Send to Trainer" if self._to_trainer else "Export to Anki")
         self.setModal(True)
@@ -695,11 +713,18 @@ class ExportDialog(QDialog):
         self.btn_export = QPushButton("Send" if self._to_trainer else "Export")
         self.btn_export.setCursor(Qt.PointingHandCursor)
         self.btn_export.clicked.connect(self.start_export)
+        self.btn_without = QPushButton(
+            "Send Without Missing Tables" if self._to_trainer else "Export Without Missing Tables"
+        )
+        self.btn_without.setCursor(Qt.PointingHandCursor)
+        self.btn_without.clicked.connect(self._export_without_missing_tables)
         self.btn_close = QPushButton("Cancel")
         self.btn_close.setCursor(Qt.PointingHandCursor)
         self.btn_close.clicked.connect(self.reject)
 
         self.button_box.addButton(self.btn_export, QDialogButtonBox.AcceptRole)
+        self.button_box.addButton(self.btn_without, QDialogButtonBox.ActionRole)
+        self.btn_without.hide()  # after addButton, which shows it
         self.button_box.addButton(self.btn_close, QDialogButtonBox.RejectRole)
         layout.addWidget(self.button_box)
 
@@ -878,7 +903,11 @@ class ExportDialog(QDialog):
             self.output_path,
             import_mode=import_mode,
             analyzer=analyzer,
+            require_optional_analysis=self._require_tables,
+            already_sent=self._already_sent if self.settings.export_method == "ankiconnect" else 0,
         )
+        self._require_tables = True
+        self.btn_without.hide()
 
         # Connect signals
         self.worker.progress.connect(self.on_progress)
@@ -888,6 +917,12 @@ class ExportDialog(QDialog):
         # Start export
         self._working = True
         self.worker.start()
+
+    @Slot()
+    def _export_without_missing_tables(self):
+        self._require_tables = False
+        self.btn_export.setEnabled(False)
+        self._start_export_worker()
 
     @Slot(int, int)
     def on_analysis_progress(self, current, total):
@@ -1014,3 +1049,13 @@ class ExportDialog(QDialog):
             self.export_succeeded.emit()
         else:
             self.btn_export.setEnabled(True)  # Allow retry
+            stopped_by = getattr(self.worker, 'stopped_by', None)
+            if isinstance(stopped_by, EngineRefusesRun):
+                self._already_sent = self.worker.sent
+            if isinstance(stopped_by, OptionalAnalysisFailed):
+                # A failure that repeats on this position would stop every retry
+                self.btn_without.show()
+                self.status_label.setText(
+                    f"{message}\n{self.btn_export.text()} tries this card again; "
+                    f"{self.btn_without.text()} goes on without the tables that fail."
+                )

@@ -16,15 +16,18 @@ from unittest import mock
 
 import pytest
 
+from ankigammon.analysis.score_matrix import ScoreMatrixCell, UnlimitedReference
 from ankigammon.anki.decision_serialize import decision_to_json
 from ankigammon.models import CubeState, Decision, DecisionType, Move, Player, Position
 from ankigammon.settings import Settings
 from ankigammon.utils.analyzer_base import EngineRefusesRun
 from ankigammon.utils.hedgehog_analyzer import HedgehogAnalyzer
-from ankigammon.utils.hedgehog_client import HedgehogRateLimited, HedgehogRefusal
+from ankigammon.utils.hedgehog_client import HedgehogAllowanceUsedUp, HedgehogRateLimited, HedgehogRefusal
 from tests.test_hedgehog_client import _client, fake  # noqa: F401  (fixture)
 
 TOO_MANY = "Too many requests. Try again in 4 hours."
+# A finished matrix as score_matrix returns it: no cells needed, but a real unlimited reference
+MATRIX = ([], UnlimitedReference(no_jacoby=ScoreMatrixCell(0, 0, "D/T", 0.0, 0.0, 0.5, 0.6, 1.0)))
 XGIDS = [
     "XGID=-b----E-C--AeD---bAdb---A-:0:0:1:00:0:0:3:0:10",
     "XGID=-a-BBBB----A---c-bbbbb----:0:0:1:00:2:3:0:7:10",
@@ -37,7 +40,7 @@ def _rate_limited() -> HedgehogRateLimited:
 
 
 def _allowance_exhausted() -> HedgehogRefusal:
-    return HedgehogRefusal("allowance_exhausted", "You've used today's free position analyses.", 429, {})
+    return HedgehogAllowanceUsedUp("allowance_exhausted", "You've used today's free position analyses.", 429, {})
 
 
 def _cube_decision(xgid: str) -> Decision:
@@ -81,9 +84,15 @@ class TestClient:
 
     def test_an_exhausted_allowance_does_not(self, fake):  # noqa: F811
         fake.refusal = {"error": "allowance_exhausted", "message": "You've used today's free position analyses."}
-        with pytest.raises(HedgehogRefusal) as refusal:
+        with pytest.raises(HedgehogAllowanceUsedUp) as refusal:
             _client(fake).analyze_positions(["x"], "2ply")
         assert not isinstance(refusal.value, EngineRefusesRun)
+
+    def test_other_429s_are_plain_refusals(self, fake):  # noqa: F811
+        fake.refusal = {"error": "analysis_in_progress", "message": "Wait for the running one."}
+        with pytest.raises(HedgehogRefusal) as refusal:
+            _client(fake).analyze_positions(["x"], "2ply")
+        assert not isinstance(refusal.value, (EngineRefusesRun, HedgehogAllowanceUsedUp))
 
 
 class TestAnalyzerStopsAsking:
@@ -122,13 +131,13 @@ class FakeAnki:
         self.sent.append(note["xgid"])
 
 
-def _export(qapp, settings, analyzer, matrix, method="ankiconnect", output_path=None):
+def _export(qapp, settings, analyzer, matrix, method="ankiconnect", output_path=None, **worker_options):
     from ankigammon.gui.dialogs.export_dialog import ExportWorker
 
     anki = FakeAnki()
     worker = ExportWorker(
         {settings.deck_name: [_cube_decision(x) for x in XGIDS]}, settings, method,
-        output_path=output_path, import_mode="upsert", analyzer=analyzer,
+        output_path=output_path, import_mode="upsert", analyzer=analyzer, **worker_options,
     )
     results = []
     worker.finished.connect(lambda ok, msg: results.append((ok, msg)))
@@ -144,7 +153,7 @@ def _export(qapp, settings, analyzer, matrix, method="ankiconnect", output_path=
 def _limited_at_second(xgid, analyzer, **kwargs):
     if xgid == XGIDS[1]:
         raise _rate_limited()
-    return object(), object()
+    return MATRIX
 
 
 class TestSendToAnki:
