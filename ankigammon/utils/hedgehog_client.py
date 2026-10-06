@@ -17,6 +17,8 @@ from typing import Callable, Dict, List, Optional, Tuple
 import requests
 from requests.adapters import HTTPAdapter
 
+from ankigammon.utils.analyzer_base import EngineRefusesRun
+
 BASE = os.environ.get("ANKIGAMMON_HEDGEHOG_URL", "https://hedgehog-bg.com").rstrip("/")
 CLIENT_ID = "https://ankigammon.com/oauth/client.json"
 SCOPE = "analyze"
@@ -42,6 +44,13 @@ class HedgehogRefusal(Exception):
 
     def __str__(self) -> str:
         return self.message
+
+
+class HedgehogRateLimited(HedgehogRefusal, EngineRefusesRun):
+    """The user's or AnkiGammon's own rate limit; every request is refused for hours."""
+
+
+RATE_LIMIT_CODES = ("rate_limited", "client_rate_limited")
 
 
 def not_connected() -> HedgehogRefusal:
@@ -249,7 +258,8 @@ class HedgehogClient:
                        or f"HedgeHog answered HTTP {status}.")
             if answer.get("error") == "invalid_match" and answer.get("detail"):
                 message = f"{message} {answer['detail']}"
-            raise HedgehogRefusal(answer.get("error") or f"http_{status}", message, status, answer)
+            refusal = HedgehogRateLimited if answer.get("error") in RATE_LIMIT_CODES else HedgehogRefusal
+            raise refusal(answer.get("error") or f"http_{status}", message, status, answer)
         return (status, answer) if expect_binary else answer
 
     # --- Tokens -------------------------------------------------------------

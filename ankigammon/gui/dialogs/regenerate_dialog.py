@@ -26,6 +26,7 @@ from PySide6.QtCore import Qt, QThread, Signal, Slot
 
 from ankigammon.gui.thread_lifetime import after_threads_stop
 from ankigammon.utils.analysis_debug import record_failed_analysis
+from ankigammon.utils.analyzer_base import EngineRefusesRun
 from ankigammon.anki.ankiconnect import AnkiConnect
 from ankigammon.anki.card_styles import MODEL_NAME
 from ankigammon.anki.decision_serialize import carry_user_metadata, decision_from_json
@@ -175,6 +176,14 @@ class RegenerateWorker(QThread):
                 selected.append(note_data)
         return selected
 
+    def _stop_refused(self, error: EngineRefusesRun, index: int, updated: int, total: int) -> None:
+        from ankigammon.gui.dialogs.export_dialog import refused_message
+        self.finished.emit(False, refused_message(
+            self.settings, error,
+            f"Stopped at card {index + 1} of {total} after updating {updated}; "
+            "it and the rest were left as they are.",
+        ))
+
     def _keeps_previous_card(
         self, card_gen, warnings_before: int, old_back: str, new_back: str, note_id: int
     ) -> bool:
@@ -292,6 +301,9 @@ class RegenerateWorker(QThread):
                 )
                 client.update_note_tags(note_id, card_data.get('tags', []))
                 updated += 1
+            except EngineRefusesRun as e:
+                self._stop_refused(e, i, updated, total)
+                return
             except Exception as e:
                 self.status_message.emit(f"Warning: Failed to re-render note {note_id}: {e}")
                 errors += 1
@@ -453,6 +465,9 @@ class RegenerateWorker(QThread):
                 )
                 client.update_note_tags(note_id, card_data.get('tags', []))
                 updated += 1
+            except EngineRefusesRun as e:
+                self._stop_refused(e, i, updated, total)
+                return
             except Exception as e:
                 self.status_message.emit(f"Warning: Failed to update note {note_id}: {e}")
                 errors += 1

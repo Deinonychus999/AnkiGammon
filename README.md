@@ -124,6 +124,7 @@ Unanalyzed positions (position IDs, match files, SGF files) can be analyzed usin
   - Select HedgeHog in Settings → Analysis Engine and click **Connect**. Your browser opens HedgeHog; sign in and click Allow. AnkiGammon never sees your password, and keeps its access in your operating system's credential store.
   - Every analysis counts toward your own HedgeHog plan: the free plan has a small daily allowance and the lower depths, paid plans every depth. Settings shows what is left today.
   - Score matrices are sent in small batches, so a whole matrix usually counts as a few analyses rather than one per score.
+  - If HedgeHog says you have sent too many requests, an export or regenerate stops there and shows HedgeHog's message. Cards sent before that are complete, and the rest are left as they are, so no card in Anki loses its score matrices.
   - Disconnect in Settings, or under Connected apps on HedgeHog.
 
 Configure your preferred engine in Settings → Analysis (see Customization Options below).

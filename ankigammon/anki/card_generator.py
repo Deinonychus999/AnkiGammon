@@ -11,6 +11,7 @@ from typing import List, Dict, Optional, Tuple
 from ankigammon.models import Decision, Move, Player, DecisionType, CubeState
 from ankigammon.renderer.svg_board_renderer import SVGBoardRenderer
 from ankigammon.renderer.animation_controller import AnimationController
+from ankigammon.utils.analyzer_base import EngineRefusesRun
 from ankigammon.utils.move_parser import MoveParser
 from ankigammon.settings import get_settings
 from ankigammon.anki.card_styles import get_error_css_class
@@ -1967,8 +1968,8 @@ class CardGenerator:
 
             return matrix_html
 
-        except InterruptedError:
-            # Cancellation must propagate so the export worker can stop cleanly
+        except (InterruptedError, EngineRefusesRun):
+            # Must propagate so the export worker can stop cleanly
             raise
         except Exception as e:
             self._note_engine_refusal(e)
@@ -2027,6 +2028,8 @@ class CardGenerator:
                 analysis_label=self._analysis_label()
             )
 
+        except (InterruptedError, EngineRefusesRun):
+            raise
         except Exception as e:
             self._note_engine_refusal(e)
             print(f"Warning: Failed to generate move score matrix: {e}")
@@ -2089,8 +2092,8 @@ class CardGenerator:
                 analysis_label=self._analysis_label()
             )
 
-        except InterruptedError:
-            # Cancellation must propagate so the export worker can stop cleanly
+        except (InterruptedError, EngineRefusesRun):
+            # Must propagate so the export worker can stop cleanly
             raise
         except Exception as e:
             self._note_engine_refusal(e)
@@ -2134,7 +2137,7 @@ class CardGenerator:
                             'unlimited': asdict(unlimited) if unlimited is not None else None,
                             'analysis': label,
                         }
-                except InterruptedError:
+                except (InterruptedError, EngineRefusesRun):
                     raise
                 except Exception:
                     logger.exception("Failed to generate score matrix for xgid=%r", decision.xgid)
@@ -2146,7 +2149,7 @@ class CardGenerator:
                 columns = self._compute_move_score_matrix(decision)
                 if columns:
                     extras['move_score_matrix'] = {'columns': [asdict(c) for c in columns], 'analysis': label}
-            except InterruptedError:
+            except (InterruptedError, EngineRefusesRun):
                 raise
             except Exception:
                 logger.exception("Failed to generate move score matrix for xgid=%r", decision.xgid)
@@ -2161,7 +2164,7 @@ class CardGenerator:
                         'best_move_differs': best_move_differs(columns),
                         'analysis': label,
                     }
-            except InterruptedError:
+            except (InterruptedError, EngineRefusesRun):
                 raise
             except Exception:
                 logger.exception("Failed to generate move cube matrix for xgid=%r", decision.xgid)

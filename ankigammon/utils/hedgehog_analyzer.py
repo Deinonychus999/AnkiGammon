@@ -13,7 +13,7 @@ from ankigammon.models import Decision, DecisionType
 from ankigammon.parsers import hedgehog_parser
 from ankigammon.parsers.hedgehog_parser import BATCH_SIZES
 from ankigammon.utils.analyzer_base import BackgammonAnalyzer
-from ankigammon.utils.hedgehog_client import HedgehogClient
+from ankigammon.utils.hedgehog_client import HedgehogClient, HedgehogRefusal
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +27,7 @@ class HedgehogAnalyzer(hedgehog_parser.PositionResultParsing, BackgammonAnalyzer
         self.preset_label = preset_label or preset
         self.client = client or HedgehogClient()
         self._cancel = threading.Event()
+        self._refused: Optional[HedgehogRefusal] = None
 
     # --- Positions ------------------------------------------------------------
 
@@ -49,9 +50,18 @@ class HedgehogAnalyzer(hedgehog_parser.PositionResultParsing, BackgammonAnalyzer
         for batch in batches:
             if cancelled():
                 raise InterruptedError("Analysis cancelled by user")
-            answers = self.client.analyze_positions(
-                batch["ogids"], self.preset, batch["jacoby"], cancelled=cancelled,
-            )
+            # A 429 holds for hours; asking again for every later table of the
+            # run would only collect the same refusal.
+            if self._refused is not None:
+                raise self._refused.with_traceback(None)
+            try:
+                answers = self.client.analyze_positions(
+                    batch["ogids"], self.preset, batch["jacoby"], cancelled=cancelled,
+                )
+            except HedgehogRefusal as refusal:
+                if refusal.status == 429:
+                    self._refused = refusal
+                raise
             for i, answer in zip(batch["indices"], answers):
                 results[i] = (json.dumps(answer), decision_types[i])
             done += len(batch["indices"])

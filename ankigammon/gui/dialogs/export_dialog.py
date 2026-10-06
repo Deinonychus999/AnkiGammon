@@ -21,7 +21,7 @@ from ankigammon.gui.thread_lifetime import after_threads_stop
 from ankigammon.renderer.svg_board_renderer import SVGBoardRenderer
 from ankigammon.renderer.color_schemes import SCHEMES
 from ankigammon.settings import Settings
-from ankigammon.utils.analyzer_base import create_analyzer
+from ankigammon.utils.analyzer_base import EngineRefusesRun, create_analyzer
 from ankigammon.anki.decision_serialize import carry_user_metadata
 from ankigammon.utils.analysis_debug import record_failed_analysis
 from PySide6.QtWidgets import QMessageBox
@@ -39,6 +39,11 @@ def _append_warnings(message: str, card_gen: CardGenerator) -> str:
         return message
     details = "\n".join(f"  - {w}" for w in warnings)
     return f"{message}\nWarning(s):\n{details}"
+
+
+def refused_message(settings: Settings, error: EngineRefusesRun, outcome: str) -> str:
+    """The engine's own words first; HedgeHog's Developer Terms require showing them as returned."""
+    return f"{settings.engine_display_name()}: {error}\n{outcome}"
 
 
 def _analysis_substeps(decision: Decision, settings: Settings) -> int:
@@ -349,6 +354,13 @@ class ExportWorker(QThread):
                 except InterruptedError:
                     self.finished.emit(False, "Export cancelled by user")
                     return
+                except EngineRefusesRun as e:
+                    self.finished.emit(False, refused_message(
+                        self.settings, e,
+                        f"Stopped after sending {i} of {total} card(s) to Anki. The rest were "
+                        "not sent, so no card already in Anki lost its score matrices.",
+                    ))
+                    return
                 except Exception as e:
                     raise RuntimeError(
                         f"Failed to render position {i+1}/{total} "
@@ -437,6 +449,11 @@ class ExportWorker(QThread):
                 extras.append(card_gen.study_extras(decision))
             except InterruptedError:
                 self.finished.emit(False, "Export cancelled by user")
+                return
+            except EngineRefusesRun as e:
+                self.finished.emit(False, refused_message(
+                    self.settings, e, f"Stopped at position {i + 1} of {total}; nothing was sent to the trainer.",
+                ))
                 return
             self.progress.emit((i + 1) / total)
 
@@ -542,6 +559,12 @@ class ExportWorker(QThread):
                         card_data = card_gen.generate_card(decision, card_id=f"card_{card_index}")
                     except InterruptedError:
                         self.finished.emit(False, "Export cancelled by user")
+                        return
+                    except EngineRefusesRun as e:
+                        self.finished.emit(False, refused_message(
+                            self.settings, e,
+                            f"Stopped at position {card_index + 1} of {total}; no file was written.",
+                        ))
                         return
                     except Exception as e:
                         raise RuntimeError(

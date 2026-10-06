@@ -10,6 +10,15 @@ from typing import Callable, List, Optional, Tuple
 from ankigammon.models import Decision, DecisionType, Move
 
 
+class EngineRefusesRun(Exception):
+    """The engine refuses all further analysis for now, e.g. a rate limit.
+
+    Card generation lets it through instead of writing the card without its
+    score matrices: on Send to Anki that would strip the tables from a card
+    that already had them.
+    """
+
+
 class BackgammonAnalyzer(ABC):
     """Abstract interface for backgammon analysis engines."""
 
