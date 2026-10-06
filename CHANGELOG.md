@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.18.0] - 2026-10-06
+
+### Added
+- File → Open Collection lists the collection's decks, all ticked: untick the ones you don't want to open. After opening only some, Save Collection suggests a new file name and warns before saving over the original.
+
+### Changed
+- When a score matrix, move score matrix or cube-position comparison that your settings ask for can't be made (the connection to HedgeHog drops, or an engine fails on a position), the export or regenerate stops before that card instead of writing it without the table. Every card written before it is complete. Press Export to try again, and Send to Anki picks up where it stopped; if one position keeps failing, "Export Without Missing Tables" finishes the rest and lists the cards missing a table. An exhausted HedgeHog free allowance still finishes without the tables, as the warning before the export says.
+
+### Fixed
+- Cancelling an export, a regenerate or a match import no longer crashes AnkiGammon, and Esc in those windows now cancels the work instead of closing the window while it carries on in the background.
+- When HedgeHog answers "Too many requests", an export stops there with HedgeHog's message. Before, it went on and replaced cards in Anki with versions that had lost their score matrices.
+- Quitting right after cancelling a match import no longer crashes, and cancelling before the engine has started stops it.
+- A failed move score matrix is listed in the export summary like the other tables.
+
 ## [1.17.3] - 2026-09-30
 
 ### Fixed
