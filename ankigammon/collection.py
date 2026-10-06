@@ -12,7 +12,7 @@ import os
 from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Iterable, List, Optional, Tuple
 
 from ankigammon.anki.decision_serialize import decision_from_json, decision_to_json
 from ankigammon.models import Decision
@@ -50,6 +50,30 @@ class Collection:
         names = [deck for source in self.files for deck in source.placement]
         names += list(self.positions)
         return list(dict.fromkeys(names))
+
+    def deck_position_counts(self) -> Dict[str, int]:
+        counts: Dict[str, int] = dict.fromkeys(self.deck_names(), 0)
+        for source in self.files:
+            for deck, xgids in source.placement.items():
+                counts[deck] += len(xgids)
+        for deck, decisions in self.positions.items():
+            counts[deck] += len(decisions)
+        return counts
+
+    def only_decks(self, decks: Iterable[str]) -> "Collection":
+        """The part of this collection in the given decks. A file with no
+        positions left in them is dropped, so it is not read at all."""
+        keep = set(decks)
+        files = []
+        for source in self.files:
+            placement = {d: list(x) for d, x in source.placement.items() if d in keep}
+            if placement:
+                files.append(CollectionSource(
+                    source.path, source.checker_threshold, source.cube_threshold,
+                    source.players, placement,
+                ))
+        positions = {d: list(p) for d, p in self.positions.items() if d in keep}
+        return Collection(files, positions)
 
     @property
     def position_count(self) -> int:

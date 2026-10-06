@@ -208,6 +208,7 @@ class MainWindow(QMainWindow):
         self._gnubg_check_shown = False  # Track if we've shown GnuBG config dialog in current import batch
         self._import_queue: List[_QueuedImport] = []
         self._import_filters: Dict[str, CollectionSource] = {}  # by file_key, for Save Collection
+        self._partial_collection: Optional[Tuple[str, List[str]]] = None  # (path, decks not opened)
         self._import_in_progress = False  # Track if an import is currently being processed
         self._finishing_workers: List[MatchAnalysisWorker] = []
         self._batch_import_results = []  # Accumulate results from batch imports (for combined success message)
@@ -1659,29 +1660,29 @@ class MainWindow(QMainWindow):
             )
             return
 
-        missing = {s.path for s in collection.files if not os.path.isfile(s.path)}
-        lines = [
-            f"Open {collection.position_count} position(s) in "
-            f"{len(collection.deck_names())} deck(s)?"
-        ]
+        from ankigammon.gui.dialogs.collection_open_dialog import CollectionOpenDialog
+
+        warning = None
         if not self.deck_manager.is_empty:
-            lines.append(
-                f"\nThis replaces the {self.deck_manager.total_count} position(s) "
+            warning = (
+                f"This replaces the {self.deck_manager.total_count} position(s) "
                 "currently in AnkiGammon."
             )
-        if missing:
-            lines.append(f"\n{len(missing)} source file(s) could not be found and will be skipped.")
+        notes = []
+        missing_count = sum(1 for s in collection.files if not os.path.isfile(s.path))
+        if missing_count:
+            notes.append(f"{missing_count} source file(s) could not be found and will be skipped.")
         if any(not s.path.lower().endswith(('.xg', '.xgp', '.ogxm')) for s in collection.files):
-            lines.append("\nMatch files (.mat, .sgf) are analyzed again by the engine.")
-        reply = silent_messagebox.question(
-            self, "Open Collection", "\n".join(lines),
-            default_button=(
-                QMessageBox.StandardButton.Yes if self.deck_manager.is_empty
-                else QMessageBox.StandardButton.No
-            )
-        )
-        if reply != QMessageBox.StandardButton.Yes:
+            notes.append("Match files (.mat, .sgf) are analyzed again by the engine.")
+        deck_counts = collection.deck_position_counts()
+        dialog = CollectionOpenDialog(Path(path).name, deck_counts, warning, notes, self)
+        if not dialog.exec():
             return
+        selected = dialog.selected_decks()
+        left_out = [d for d in deck_counts if d not in selected]
+        self._partial_collection = (path, left_out) if left_out else None
+        collection = collection.only_decks(selected)
+        missing = {s.path for s in collection.files if not os.path.isfile(s.path)}
 
         self.settings.last_collection_path = path
         self.deck_manager.clear_all()
@@ -1717,7 +1718,6 @@ class MainWindow(QMainWindow):
             self._import_queue.append(_QueuedImport(source.path, options, source.placement))
         self._process_import_queue()
 
-    @Slot()
     @Slot()
     def on_study_in_trainer_clicked(self):
         """Hand the loaded positions straight to the browser trainer on this computer."""
@@ -1780,6 +1780,7 @@ class MainWindow(QMainWindow):
         if answer == QMessageBox.StandardButton.Yes:
             QDesktopServices.openUrl(QUrl("https://ankigammon.com/train/"))
 
+    @Slot()
     def on_save_collection_clicked(self):
         """Save the loaded positions, and the files they were imported from."""
         from PySide6.QtWidgets import QFileDialog
@@ -1795,14 +1796,34 @@ class MainWindow(QMainWindow):
             )
             return
 
+        start = self._collection_dialog_start()
+        partial = self._partial_collection
+        if partial:
+            source = Path(partial[0])
+            start = str(source.with_name(f"{source.stem} (part){source.suffix}"))
         path, _ = QFileDialog.getSaveFileName(
             self,
             "Save Collection",
-            self._collection_dialog_start(),
+            start,
             "AnkiGammon Collection (*.json)"
         )
         if not path:
             return
+
+        overwrites_source = partial is not None and file_key(path) == file_key(partial[0])
+        if overwrites_source:
+            left_out = partial[1]
+            shown = "\n".join(f"  • {deck}" for deck in left_out[:10])
+            if len(left_out) > 10:
+                shown += f"\n  …and {len(left_out) - 10} more"
+            reply = silent_messagebox.question(
+                self, "Overwrite Collection?",
+                f"You opened only part of {Path(path).name}. Saving over it removes "
+                f"the {len(left_out)} deck(s) you didn't open:\n\n{shown}\n\n"
+                "Save over it anyway?"
+            )
+            if reply != QMessageBox.StandardButton.Yes:
+                return
 
         try:
             save_collection(path, collection)
@@ -1813,6 +1834,8 @@ class MainWindow(QMainWindow):
             return
 
         self.settings.last_collection_path = path
+        if overwrites_source:
+            self._partial_collection = None
         silent_messagebox.information(
             self, "Collection Saved",
             f"Saved {collection.position_count} position(s) in "

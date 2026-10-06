@@ -216,7 +216,8 @@ Both Anki export methods support updating existing cards when you change setting
 A collection file saves the positions currently loaded in AnkiGammon, so you can rebuild your cards later for a new AnkiGammon version, new settings, or after new rollouts in XG.
 
 - **File → Save Collection...** (Ctrl+Shift+S) writes the loaded positions to a `.json` file. Positions imported from a file are saved as a link to that file, with the import filters you used and the deck each position is in. Other positions (pasted analysis or position IDs) are saved whole.
-- **File → Open Collection...** (Ctrl+Shift+O) replaces the loaded positions after a warning. It re-imports each file with its filters and puts every position back into its saved deck. Then export to Anki: existing cards are updated in place and keep their review history.
+- **File → Open Collection...** (Ctrl+Shift+O) lists the collection's decks, all ticked; untick any you don't want to open. Unticking a deck also unticks its subdecks. Opening replaces the loaded positions: each file is re-imported with its filters and every position goes back into its saved deck. Then export to Anki: existing cards are updated in place and keep their review history.
+- After opening only some decks, Save Collection suggests a new file name, and warns before saving over the original, since that would remove the decks you didn't open.
 
 Notes:
 - XG files (.xg, .xgp) keep the analysis and rollouts saved in them. Match files (.mat, .sgf) are analyzed again by the engine.

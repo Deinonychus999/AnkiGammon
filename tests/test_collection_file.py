@@ -259,3 +259,140 @@ class TestImportAndReopen:
         assert harness._batch_notes == [
             "sample_match.xg: 1 saved position(s) no longer found (the file or its analysis may have changed)"
         ]
+
+
+class TestPartialCollection:
+    def _collection(self):
+        return Collection(
+            files=[
+                CollectionSource("/m/a.xg", 0.05, None, ["Frank"], {"A::One": ["X1", "X2"], "A::Two": ["X3"]}),
+                CollectionSource("/m/b.xg", placement={"B": ["Y1"]}),
+            ],
+            positions={"A::Two": [_decision("P1")]},
+        )
+
+    def test_counts_positions_per_deck(self):
+        assert self._collection().deck_position_counts() == {"A::One": 2, "A::Two": 2, "B": 1}
+
+    def test_only_decks_keeps_the_chosen_decks_with_their_filters(self):
+        part = self._collection().only_decks(["A::Two"])
+        assert part.files == [CollectionSource("/m/a.xg", 0.05, None, ["Frank"], {"A::Two": ["X3"]})]
+        assert list(part.positions) == ["A::Two"]
+        assert part.deck_position_counts() == {"A::Two": 2}
+
+    def test_only_decks_leaves_the_full_collection_untouched(self):
+        full = self._collection()
+        full.only_decks(["B"])
+        assert full.deck_position_counts() == {"A::One": 2, "A::Two": 2, "B": 1}
+
+
+class TestCollectionOpenDialog:
+    @pytest.fixture
+    def dialog(self, qapp):
+        from ankigammon.gui.dialogs.collection_open_dialog import CollectionOpenDialog
+        return CollectionOpenDialog("c.json", {"A": 1, "A::One": 2, "A::Two": 3, "B::Sub": 4})
+
+    def _item(self, dialog, name):
+        return dialog._items[name]
+
+    def test_every_deck_starts_ticked(self, dialog):
+        assert sorted(dialog.selected_decks()) == ["A", "A::One", "A::Two", "B::Sub"]
+        assert "10 position(s) in 4 of 4 deck(s)" == dialog.summary.text()
+
+    def test_unticking_a_parent_unticks_its_subdecks_only(self, dialog):
+        from PySide6.QtCore import Qt
+        self._item(dialog, "A").setCheckState(0, Qt.Unchecked)
+        assert dialog.selected_decks() == ["B::Sub"]
+
+    def test_a_parent_can_be_ticked_without_its_subdecks(self, dialog):
+        from PySide6.QtCore import Qt
+        self._item(dialog, "A").setCheckState(0, Qt.Unchecked)
+        dialog.tree.blockSignals(True)
+        self._item(dialog, "A").setCheckState(0, Qt.Checked)
+        dialog.tree.blockSignals(False)
+        dialog._update_summary()
+        assert sorted(dialog.selected_decks()) == ["A", "B::Sub"]
+
+    def test_name_only_parents_are_shown_but_never_returned(self, dialog):
+        from PySide6.QtCore import Qt
+        assert "B" in dialog._items
+        self._item(dialog, "B").setCheckState(0, Qt.Unchecked)
+        assert "B" not in dialog.selected_decks() and "B::Sub" not in dialog.selected_decks()
+
+    def test_open_is_disabled_with_nothing_ticked(self, dialog):
+        from PySide6.QtCore import Qt
+        dialog._set_all(Qt.Unchecked)
+        assert dialog.selected_decks() == []
+        assert not dialog.btn_open.isEnabled()
+
+
+class _SaveHarness(_ImportHarness):
+    from ankigammon.gui.main_window import MainWindow as _MW
+
+    on_save_collection_clicked = _MW.on_save_collection_clicked
+    _collection_dialog_start = _MW._collection_dialog_start
+
+    def __init__(self, settings: Settings, partial):
+        super().__init__(settings)
+        self._partial_collection = partial
+        self.deck_manager.add_decisions([_decision("XGID=kept")], "AnkiGammon")
+
+
+class TestSavingAfterAPartialOpen:
+    """Save writes only what is loaded, so saving a partly opened collection
+    back over its file would silently delete the decks that were left out."""
+
+    @pytest.fixture
+    def original(self, tmp_path):
+        path = tmp_path / "full.json"
+        path.write_text("full collection", encoding="utf-8")
+        return path
+
+    def _save(self, harness, target, answer=None):
+        from PySide6.QtWidgets import QMessageBox
+        from unittest.mock import patch
+        from ankigammon.gui import silent_messagebox
+
+        asked, starts = [], []
+
+        def question(parent, title, text, *a, **k):
+            asked.append(text)
+            return QMessageBox.StandardButton.Yes if answer else QMessageBox.StandardButton.No
+
+        def get_save(parent, title, start, filt):
+            starts.append(start)
+            return str(target), ""
+
+        with patch.object(silent_messagebox, "question", question), \
+             patch.object(silent_messagebox, "information", lambda *a, **k: None), \
+             patch("PySide6.QtWidgets.QFileDialog.getSaveFileName", get_save):
+            harness.on_save_collection_clicked()
+        return asked, starts
+
+    def test_suggests_a_new_name_instead_of_the_original(self, tmp_path, original):
+        harness = _SaveHarness(Settings(config_path=tmp_path / "c.json"), (str(original), ["B"]))
+        asked, starts = self._save(harness, tmp_path / "full (part).json")
+        assert Path(starts[0]).name == "full (part).json"
+        assert asked == []
+        assert (tmp_path / "full (part).json").exists()
+
+    def test_declining_the_warning_leaves_the_original_untouched(self, tmp_path, original):
+        harness = _SaveHarness(Settings(config_path=tmp_path / "c.json"), (str(original), ["B", "C"]))
+        asked, _ = self._save(harness, original, answer=False)
+        assert len(asked) == 1 and "B" in asked[0] and "C" in asked[0]
+        assert original.read_text(encoding="utf-8") == "full collection"
+        assert harness._partial_collection is not None
+
+    def test_confirming_overwrites_and_forgets_the_partial_open(self, tmp_path, original):
+        harness = _SaveHarness(Settings(config_path=tmp_path / "c.json"), (str(original), ["B"]))
+        self._save(harness, original, answer=True)
+        assert load_collection(str(original)).position_count == 1
+        assert harness._partial_collection is None
+
+    def test_a_fully_opened_collection_saves_over_its_file_without_asking(self, tmp_path, original):
+        harness = _SaveHarness(Settings(config_path=tmp_path / "c.json"), None)
+        harness.settings.last_collection_path = str(original)
+        asked, starts = self._save(harness, original)
+        assert starts == [str(original)]
+        assert asked == []
+        assert load_collection(str(original)).position_count == 1
