@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.18.1] - 2026-10-06
+
+### Fixed
+- When HedgeHog analyzes a .mat or .sgf match file, ticking only your own name imports your mistakes. Before, it imported your opponent's, so matches imported that way with one player ticked are worth importing again.
+
 ## [1.18.0] - 2026-10-06
 
 ### Added
