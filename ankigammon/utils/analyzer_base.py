@@ -32,6 +32,10 @@ class AllowanceUsedUp(Exception):
 class BackgammonAnalyzer(ABC):
     """Abstract interface for backgammon analysis engines."""
 
+    # True when the last analyze_match_file seated the file header's player 1
+    # as Player.X: the import dialog seats them as Player.O, as GnuBG does.
+    seats_swapped: bool = False
+
     @abstractmethod
     def analyze_match_file(
         self,

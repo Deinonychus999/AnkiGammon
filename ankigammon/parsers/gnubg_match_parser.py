@@ -1182,3 +1182,12 @@ def parse_gnubg_match_files(file_paths: List[str], is_sgf_source: bool = False, 
         List of Decision objects
     """
     return GNUBGMatchParser.parse_match_files(file_paths, is_sgf_source=is_sgf_source, ply_level=ply_level, source_filename=source_filename)
+
+
+def extract_match_player_names(file_path: str) -> Tuple[str, str]:
+    """(player 1, player 2) from a .mat or .sgf header; the import dialog seats
+    player 1 as Player.O."""
+    if Path(file_path).suffix.lower() == '.sgf':
+        from ankigammon.parsers.sgf_parser import extract_player_names_from_sgf
+        return extract_player_names_from_sgf(file_path)
+    return GNUBGMatchParser.extract_player_names_from_mat(file_path)

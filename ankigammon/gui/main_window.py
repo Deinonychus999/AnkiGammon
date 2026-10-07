@@ -121,12 +121,16 @@ class MatchAnalysisWorker(QThread):
             # Filter based on user options
             self.status_message.emit("Filtering positions by error thresholds...")
 
+            include_player_x, include_player_o = self.include_player_x, self.include_player_o
+            if getattr(self._analyzer, 'seats_swapped', False):
+                include_player_x, include_player_o = include_player_o, include_player_x
+
             decisions = self.filter_func(
                 all_decisions,
                 self.checker_threshold,
                 self.cube_threshold,
-                self.include_player_x,
-                self.include_player_o
+                include_player_x,
+                include_player_o
             )
 
             logger.info(f"Filtered to {len(decisions)} positions (checker: {self.checker_threshold}, cube: {self.cube_threshold})")
@@ -1484,18 +1488,8 @@ class MainWindow(QMainWindow):
                     self.on_settings_clicked()
             return None, None, None
 
-        # Extract player names based on file type
-        from ankigammon.parsers.gnubg_match_parser import GNUBGMatchParser
-        from pathlib import Path
-
-        file_ext = Path(file_path).suffix.lower()
-        if file_ext == '.sgf':
-            # Extract from SGF file
-            from ankigammon.parsers.sgf_parser import extract_player_names_from_sgf
-            player1_name, player2_name = extract_player_names_from_sgf(file_path)
-        else:
-            # Extract from .mat file
-            player1_name, player2_name = GNUBGMatchParser.extract_player_names_from_mat(file_path)
+        from ankigammon.parsers.gnubg_match_parser import extract_match_player_names
+        player1_name, player2_name = extract_match_player_names(file_path)
 
         # Resolve filter options from preset options or by showing the dialog
         if options is not None:

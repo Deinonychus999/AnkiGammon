@@ -26,6 +26,7 @@ class HedgehogAnalyzer(hedgehog_parser.PositionResultParsing, BackgammonAnalyzer
         self.preset = preset
         self.preset_label = preset_label or preset
         self.client = client or HedgehogClient()
+        self.seats_swapped = False
         self._cancel = threading.Event()
         self._refused: Optional[HedgehogRefusal] = None
 
@@ -96,6 +97,7 @@ class HedgehogAnalyzer(hedgehog_parser.PositionResultParsing, BackgammonAnalyzer
 
         report("Downloading HedgeHog's analysis...")
         data = self.client.analysis_file(analysis["id"])
+        self.seats_swapped = _header_player_1_is_white(file_path, data)
         model = analysis.get("model_name") or "HedgeHog"
         return parse_ogxm_bytes(
             data,
@@ -105,3 +107,23 @@ class HedgehogAnalyzer(hedgehog_parser.PositionResultParsing, BackgammonAnalyzer
 
     def terminate(self) -> None:
         self._cancel.set()
+
+
+def _header_player_1_is_white(file_path: str, ogxm_data: bytes) -> bool:
+    """Whether HedgeHog seated the file header's player 1 as White (Player.X)."""
+    from ankigammon.parsers.gnubg_match_parser import extract_match_player_names
+    from ankigammon.utils.ogxm_reader import read_ogxm
+
+    match = read_ogxm(ogxm_data)
+    player1, player2 = (_name_key(n) for n in extract_match_player_names(file_path))
+    black, white = _name_key(match.black_name), _name_key(match.white_name)
+    if player1 != player2 and {player1, player2} == {black, white}:
+        return player1 == white
+    # HedgeHog's conversion puts the .mat left column and the .sgf PW player on White
+    logger.info("Seating %s by HedgeHog's convention: header names %r/%r, OGXM %r/%r",
+                Path(file_path).name, player1, player2, black, white)
+    return True
+
+
+def _name_key(name: Optional[str]) -> str:
+    return (name or "").strip().lower()
