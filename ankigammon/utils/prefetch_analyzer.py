@@ -86,10 +86,12 @@ class CachedAnalyzer(_AnswersInAdvance):
         return json.dumps(result), decision_type
 
 
-def estimate_hedgehog_cost(decisions: List[Decision], preset: str, output_dir) -> int:
+def estimate_hedgehog_cost(decisions: List[Decision], preset: str, output_dir,
+                           answer_cache=None, engine_key: str = "") -> int:
     """About how many position analyses exporting `decisions` costs on
     HedgeHog: the positions without analysis, plus the optional analyses the
-    settings ask for, each card's sent as its own batches as the desktop does."""
+    settings ask for, each card's sent as its own batches as the desktop does.
+    Answers already in `answer_cache` under `engine_key` cost nothing."""
     from ankigammon.anki.card_generator import CardGenerator
     from ankigammon.parsers.hedgehog_parser import estimated_cost, plan_batches
 
@@ -100,6 +102,10 @@ def estimate_hedgehog_cost(decisions: List[Decision], preset: str, output_dir) -
     for decision in decisions:
         recorder.requested = []
         generator.study_extras(decision)
-        if recorder.requested:
-            cost += estimated_cost(plan_batches(recorder.requested, preset)[0], preset)
+        needed = recorder.requested
+        if needed and answer_cache is not None:
+            stored = answer_cache.get_many(engine_key, needed)
+            needed = [xgid for xgid in needed if xgid not in stored]
+        if needed:
+            cost += estimated_cost(plan_batches(needed, preset)[0], preset)
     return cost

@@ -26,8 +26,20 @@ class SpyAnalyzer:
     def __init__(self):
         self.terminated = False
 
+    def request_groups(self, xgids):
+        return [list(range(len(xgids)))]
+
+    def analyze_positions_parallel(self, xgids, **kw):
+        return [("<raw>", DecisionType.CUBE_ACTION) for _ in xgids]
+
     def terminate(self):
         self.terminated = True
+
+
+def _matrix_that_asks_the_engine(**kwargs):
+    """Like the real one, it starts the engine by asking it for answers."""
+    kwargs["analyzer"].analyze_positions_parallel([kwargs["xgid"]])
+    return object(), object()
 
 
 def _analyzed_cube() -> Decision:
@@ -67,7 +79,7 @@ def _run_export(settings, output, analyzer=None):
     worker.finished.connect(lambda ok, msg: result.update(ok=ok, msg=msg))
     with mock.patch("ankigammon.utils.analyzer_base.create_analyzer", side_effect=factory), \
          mock.patch("ankigammon.anki.card_generator.get_settings", return_value=settings), \
-         mock.patch("ankigammon.analysis.score_matrix.generate_score_matrix", return_value=(object(), object())), \
+         mock.patch("ankigammon.analysis.score_matrix.generate_score_matrix", side_effect=_matrix_that_asks_the_engine), \
          mock.patch("ankigammon.analysis.score_matrix.format_matrix_as_html",
                     return_value='<table class="score-matrix-table"></table>'):
         worker.run()

@@ -134,6 +134,13 @@ class BackgammonAnalyzer(ABC):
     def terminate(self) -> None:
         """Terminate any running analysis."""
 
+    def request_groups(self, position_ids: List[str]) -> List[List[int]]:
+        """How analyze_positions_parallel would send `position_ids`, as groups
+        of indices into it. Asking for one group at a time costs the same and
+        lets a caller keep each group's answers before an engine refusal ends
+        the run."""
+        return [list(range(len(position_ids)))]
+
     @staticmethod
     def simplify_cube_notation(notation: str) -> str:
         """Simplify cube notation for display in score matrix.

@@ -41,8 +41,13 @@ class SpyAnalyzer:
         SpyAnalyzer._next_id += 1
         self.id = SpyAnalyzer._next_id
         self.terminated = False
+        self.asked = []
+
+    def request_groups(self, xgids):
+        return [list(range(len(xgids)))]
 
     def analyze_positions_parallel(self, xgids, progress_callback=None, **kw):
+        self.asked.extend(xgids)
         return [("<raw>", DecisionType.CUBE_ACTION) for _ in xgids]
 
     def parse_analysis(self, raw_output, xgid, decision_type):
@@ -145,6 +150,7 @@ def _run(mode, settings, spy_factory, notes=None):
 
     def fake_generate_score_matrix(**kwargs):
         matrix_calls.append(kwargs)
+        kwargs["analyzer"].analyze_positions_parallel([f"{kwargs['xgid']}#matrix"])
         return object(), object()
 
     worker = RegenerateWorker(settings, mode)
@@ -183,7 +189,7 @@ class TestReanalyzeReusesOneEngine:
 
         assert result["ok"], result
         assert matrix_calls, "score matrix was never attempted"
-        assert matrix_calls[0]["analyzer"] is created[0]
+        assert created[0].asked[-1] == f"{CUBE_XGID}#matrix"
 
     def test_the_table_survives_the_regenerate(self, qapp, matrix_settings, spy_factory):
         """The user-visible symptom: the table must still be on the card."""

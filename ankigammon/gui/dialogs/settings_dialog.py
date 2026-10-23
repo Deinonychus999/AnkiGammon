@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal, QThread
 
-from ankigammon.analysis.extras_cache import ExtrasCache
+from ankigammon.analysis.answer_cache import AnswerCache
 from ankigammon.settings import HEDGEHOG_PRESET_LABELS, Settings
 from ankigammon.renderer.color_schemes import list_schemes
 from ankigammon.utils.subprocess_env import external_subprocess_env
@@ -642,9 +642,9 @@ class SettingsDialog(QDialog):
         btn_clear_cache = QPushButton("Clear")
         btn_clear_cache.setCursor(Qt.PointingHandCursor)
         btn_clear_cache.setToolTip(
-            "Finished tables are kept on this computer so exporting or regenerating\n"
-            "a card again does not ask the engine for them twice. Clearing makes the\n"
-            "next export or regenerate analyze them again."
+            "The engine answers behind these tables are kept on this computer, so\n"
+            "exporting or regenerating a card again does not ask for them twice.\n"
+            "Clearing makes the next export or regenerate analyze them again."
         )
         btn_clear_cache.clicked.connect(self._clear_analysis_cache)
         cache_layout.addWidget(btn_clear_cache)
@@ -655,13 +655,13 @@ class SettingsDialog(QDialog):
         return group
 
     def _refresh_analysis_cache_label(self):
-        count, size = ExtrasCache.default().stats()
+        count, size = AnswerCache.default().stats()
         self.lbl_analysis_cache.setText(
-            f"Saved tables: {count} ({size / (1024 * 1024):.1f} MB)"
+            f"Saved analyses: {count} ({size / (1024 * 1024):.1f} MB)"
         )
 
     def _clear_analysis_cache(self):
-        ExtrasCache.default().clear()
+        AnswerCache.default().clear()
         self._refresh_analysis_cache_label()
 
     def _on_analyzer_type_changed(self, index: int):

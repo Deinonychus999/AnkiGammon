@@ -35,6 +35,9 @@ class HedgehogAnalyzer(hedgehog_parser.PositionResultParsing, BackgammonAnalyzer
     def analyze_position(self, position_id: str) -> Tuple[str, DecisionType]:
         return self.analyze_positions_parallel([position_id])[0]
 
+    def request_groups(self, position_ids: List[str]) -> List[List[int]]:
+        return [batch["indices"] for batch in hedgehog_parser.plan_batches(position_ids, self.preset)[0]]
+
     def analyze_positions_parallel(
         self,
         position_ids: List[str],

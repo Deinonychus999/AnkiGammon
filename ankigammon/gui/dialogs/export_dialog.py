@@ -13,7 +13,7 @@ from PySide6.QtCore import Qt, QThread, Signal, Slot
 from ankigammon.models import CubeState, Decision
 from ankigammon.anki.ankiconnect import AnkiConnect
 from ankigammon.anki.apkg_exporter import ApkgExporter, StableNote, _deterministic_id
-from ankigammon.analysis.extras_cache import ExtrasCache
+from ankigammon.analysis.answer_cache import AnswerCache
 from ankigammon.analysis.score_matrix import count_score_matrix_analyses
 from ankigammon.anki.card_generator import CardGenerator
 from ankigammon.anki.deck_utils import find_duplicate_xgids
@@ -325,7 +325,7 @@ class ExportWorker(QThread):
             cancellation_callback=lambda: self._cancelled,
             analyzer=self._analyzer,
             require_optional_analysis=self.require_optional_analysis,
-            extras_cache=ExtrasCache.default(),
+            answer_cache=AnswerCache.default(),
         )
         self._card_gen = card_gen
 
@@ -439,7 +439,7 @@ class ExportWorker(QThread):
             cancellation_callback=lambda: self._cancelled,
             analyzer=self._analyzer,
             require_optional_analysis=self.require_optional_analysis,
-            extras_cache=ExtrasCache.default(),
+            answer_cache=AnswerCache.default(),
         )
         self._card_gen = card_gen
 
@@ -537,7 +537,7 @@ class ExportWorker(QThread):
                 cancellation_callback=lambda: self._cancelled,
                 analyzer=self._analyzer,
                 require_optional_analysis=self.require_optional_analysis,
-                extras_cache=ExtrasCache.default(),
+                answer_cache=AnswerCache.default(),
             )
             self._card_gen = card_gen
 
@@ -780,7 +780,10 @@ class ExportDialog(QDialog):
         from ankigammon.utils.hedgehog_client import HedgehogClient, HedgehogRefusal
         from ankigammon.utils.prefetch_analyzer import estimate_hedgehog_cost
 
-        cost = estimate_hedgehog_cost(self.all_decisions, self.settings.hedgehog_preset, Path(tempfile.gettempdir()))
+        cost = estimate_hedgehog_cost(
+            self.all_decisions, self.settings.hedgehog_preset, Path(tempfile.gettempdir()),
+            answer_cache=AnswerCache.default(), engine_key=self.settings.engine_cache_key(),
+        )
         if not cost:
             return True
         try:
