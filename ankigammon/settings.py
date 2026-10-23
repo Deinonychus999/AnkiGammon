@@ -473,6 +473,14 @@ class Settings:
             return self.hedgehog_preset_label()
         return f"{self.gnubg_analysis_ply}-ply"
 
+    def engine_cache_key(self) -> str:
+        """Engine and depth as a stable identifier for stored analysis; the
+        HedgeHog label can be renamed by the service, its preset cannot."""
+        engine = self.analyzer_type
+        if engine == "hedgehog":
+            return f"{engine}:{self.hedgehog_preset}"
+        return f"{engine}:{self.engine_label()}"
+
     def engine_description(self) -> str:
         """Engine and depth together, e.g. 'GnuBG (3-ply)'."""
         return f"{self.engine_display_name()} ({self.engine_label()})"

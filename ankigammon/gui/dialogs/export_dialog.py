@@ -13,6 +13,7 @@ from PySide6.QtCore import Qt, QThread, Signal, Slot
 from ankigammon.models import CubeState, Decision
 from ankigammon.anki.ankiconnect import AnkiConnect
 from ankigammon.anki.apkg_exporter import ApkgExporter, StableNote, _deterministic_id
+from ankigammon.analysis.extras_cache import ExtrasCache
 from ankigammon.analysis.score_matrix import count_score_matrix_analyses
 from ankigammon.anki.card_generator import CardGenerator
 from ankigammon.anki.deck_utils import find_duplicate_xgids
@@ -324,6 +325,7 @@ class ExportWorker(QThread):
             cancellation_callback=lambda: self._cancelled,
             analyzer=self._analyzer,
             require_optional_analysis=self.require_optional_analysis,
+            extras_cache=ExtrasCache.default(),
         )
         self._card_gen = card_gen
 
@@ -437,6 +439,7 @@ class ExportWorker(QThread):
             cancellation_callback=lambda: self._cancelled,
             analyzer=self._analyzer,
             require_optional_analysis=self.require_optional_analysis,
+            extras_cache=ExtrasCache.default(),
         )
         self._card_gen = card_gen
 
@@ -534,6 +537,7 @@ class ExportWorker(QThread):
                 cancellation_callback=lambda: self._cancelled,
                 analyzer=self._analyzer,
                 require_optional_analysis=self.require_optional_analysis,
+                extras_cache=ExtrasCache.default(),
             )
             self._card_gen = card_gen
 

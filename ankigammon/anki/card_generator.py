@@ -16,6 +16,18 @@ from ankigammon.utils.move_parser import MoveParser
 from ankigammon.settings import get_settings
 from ankigammon.anki.card_styles import get_error_css_class
 from ankigammon.anki.decision_serialize import decision_to_json
+from ankigammon.analysis.extras_cache import (
+    KIND_MOVE_CUBE_MATRIX,
+    KIND_MOVE_SCORE_MATRIX,
+    KIND_SCORE_MATRIX,
+    ExtrasCache,
+    cached_or_compute,
+    decode_move_cube_columns,
+    decode_move_score_columns,
+    decode_score_matrix,
+    encode_columns,
+    encode_score_matrix,
+)
 from ankigammon.anki.optional_analysis import (
     CUBE_COMPARISON_FAILED_MARKER,
     CUBE_COMPARISON_SAME_MARKER,
@@ -45,6 +57,7 @@ class CardGenerator:
         cancellation_callback: Optional[callable] = None,
         analyzer=None,
         require_optional_analysis: bool = False,
+        extras_cache: Optional[ExtrasCache] = None,
     ):
         """
         Initialize the card generator.
@@ -63,6 +76,8 @@ class CardGenerator:
             require_optional_analysis: If True, a table the settings ask for that
                       cannot be made raises OptionalAnalysisFailed instead of the
                       card being written without it.
+            extras_cache: Optional store of finished score matrices and
+                      cube-position tables; a hit skips the engine entirely.
         """
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -72,6 +87,7 @@ class CardGenerator:
         self.settings = get_settings()
         self._analyzer = analyzer
         self.require_optional_analysis = require_optional_analysis
+        self.extras_cache = extras_cache
 
         # Create default renderer and animation controller with settings if not provided
         from ankigammon.renderer.color_schemes import get_scheme
@@ -1919,15 +1935,30 @@ class CardGenerator:
                     "is outside the displayed range."
                 )
 
-        matrix, unlimited = generate_score_matrix(
-            xgid=decision.xgid,
-            match_length=effective_ml,
-            analyzer=self._get_analyzer(),
-            progress_callback=self.progress_callback,
-            cancellation_callback=self.cancellation_callback,
-            cube_value=decision.cube_value,
-            cube_owner=decision.cube_owner,
-            unlimited_reference=not is_projection,
+        matrix, unlimited = cached_or_compute(
+            self.extras_cache,
+            KIND_SCORE_MATRIX,
+            lambda: {
+                'engine': self.settings.engine_cache_key(),
+                'xgid': decision.xgid,
+                'match_length': effective_ml,
+                'cube_value': decision.cube_value,
+                'cube_owner': decision.cube_owner.name if decision.cube_owner else None,
+                'unlimited_reference': not is_projection,
+            },
+            compute=lambda: generate_score_matrix(
+                xgid=decision.xgid,
+                match_length=effective_ml,
+                analyzer=self._get_analyzer(),
+                progress_callback=self.progress_callback,
+                cancellation_callback=self.cancellation_callback,
+                cube_value=decision.cube_value,
+                cube_owner=decision.cube_owner,
+                unlimited_reference=not is_projection,
+            ),
+            encode=lambda result: encode_score_matrix(*result),
+            decode=decode_score_matrix,
+            is_complete=lambda result: is_projection or result[1] is not None,
         )
         return {
             'matrix': matrix,
@@ -2007,12 +2038,24 @@ class CardGenerator:
         if decision.decision_type != DecisionType.CHECKER_PLAY or not decision.dice:
             return None
         from ankigammon.analysis.move_score_matrix import generate_move_score_matrix
-        return generate_move_score_matrix(
-            xgid=decision.xgid,
-            analyzer=self._get_analyzer(),
-            max_moves=self.settings.max_moves,
-            progress_callback=self.progress_callback,
-            cancellation_callback=self.cancellation_callback
+        return cached_or_compute(
+            self.extras_cache,
+            KIND_MOVE_SCORE_MATRIX,
+            lambda: {
+                'engine': self.settings.engine_cache_key(),
+                'xgid': decision.xgid,
+                'max_moves': self.settings.max_moves,
+            },
+            compute=lambda: generate_move_score_matrix(
+                xgid=decision.xgid,
+                analyzer=self._get_analyzer(),
+                max_moves=self.settings.max_moves,
+                progress_callback=self.progress_callback,
+                cancellation_callback=self.cancellation_callback
+            ),
+            encode=encode_columns,
+            decode=decode_move_score_columns,
+            is_complete=bool,
         )
 
     def _generate_move_score_matrix_html(self, decision: Decision) -> str:
@@ -2068,12 +2111,24 @@ class CardGenerator:
         if decision.crawford or decision.match_length == 1:
             return None
         from ankigammon.analysis.move_cube_matrix import generate_move_cube_matrix
-        return generate_move_cube_matrix(
-            xgid=decision.xgid,
-            analyzer=self._get_analyzer(),
-            max_moves=self.settings.max_moves,
-            progress_callback=self.progress_callback,
-            cancellation_callback=self.cancellation_callback
+        return cached_or_compute(
+            self.extras_cache,
+            KIND_MOVE_CUBE_MATRIX,
+            lambda: {
+                'engine': self.settings.engine_cache_key(),
+                'xgid': decision.xgid,
+                'max_moves': self.settings.max_moves,
+            },
+            compute=lambda: generate_move_cube_matrix(
+                xgid=decision.xgid,
+                analyzer=self._get_analyzer(),
+                max_moves=self.settings.max_moves,
+                progress_callback=self.progress_callback,
+                cancellation_callback=self.cancellation_callback
+            ),
+            encode=encode_columns,
+            decode=decode_move_cube_columns,
+            is_complete=bool,
         )
 
     def _generate_move_cube_matrix_html(self, decision: Decision) -> str:

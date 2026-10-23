@@ -7,7 +7,8 @@ Two modes:
   from each note, re-renders with the current cosmetic settings, and writes
   back the new HTML. Never re-analyzes the position, so rollouts and other
   high-precision analyses are preserved. Score matrices are not stored in
-  the blob, so an engine is still started to rebuild those.
+  the blob; they come from the on-disk analysis cache, and only a table
+  never made before starts an engine.
 
 * Re-analyze: queries the analyzer for fresh results before re-rendering.
   This replaces any rollout data with the engine's standard analysis.
@@ -27,6 +28,7 @@ from PySide6.QtCore import Qt, QThread, Signal, Slot
 from ankigammon.gui.thread_lifetime import after_threads_stop
 from ankigammon.utils.analysis_debug import record_failed_analysis
 from ankigammon.utils.analyzer_base import EngineRefusesRun, OptionalAnalysisFailed
+from ankigammon.analysis.extras_cache import ExtrasCache
 from ankigammon.anki.ankiconnect import AnkiConnect
 from ankigammon.anki.card_styles import MODEL_NAME
 from ankigammon.anki.decision_serialize import carry_user_metadata, decision_from_json
@@ -235,6 +237,7 @@ class RegenerateWorker(QThread):
             renderer=renderer,
             analyzer=analyzer,
             require_optional_analysis=self.require_optional_analysis,
+            extras_cache=ExtrasCache.default(),
         )
         return self._card_gen
 

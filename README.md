@@ -231,6 +231,8 @@ Notes:
 
 The **Re-render cards only** mode of File → Regenerate Cards in Anki also keeps rollouts, because it reuses the analysis stored in each card. Use a collection when you want to pick up new analysis from your source files.
 
+Score matrices, move score matrices and cube-position comparisons are saved on your computer (in `~/.ankigammon/analysis_cache`) once they are made, for the engine and depth that made them. Regenerating a card, changing the theme, or exporting the same positions again reuses them instead of asking the engine, so HedgeHog allowance is only spent the first time. Cards exported before this feature get their tables saved the next time they are regenerated or exported. **Clear** in Settings removes them.
+
 ## Card Format
 
 Each position becomes one Anki card:
