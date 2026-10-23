@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.19.1] - 2026-10-22
+
+### Changed
+- Saved analysis now keeps the engine's answers rather than the finished tables. A later fix to how score matrices or cube comparisons are worked out or drawn reaches your cards the next time you regenerate them, without analyzing again. Tables saved by 1.19.0 are made once more.
+- If HedgeHog refuses part way through a score matrix, the analyses it already answered are kept, so trying again only pays for the rest.
+- The HedgeHog allowance warning before an export no longer counts analyses that are already saved.
+
 ## [1.19.0] - 2026-10-22
 
 ### Added
