@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.19.0] - 2026-10-22
+
+### Added
+- Score matrices, move score matrices and cube-position comparisons are now saved on your computer once they are made. Regenerating cards, changing the theme, or exporting the same positions again reuses them instead of analyzing again, so HedgeHog allowance is only spent the first time. Cards made before this version get their tables saved the next time you regenerate or export them. Settings shows how many tables are saved and has a Clear button.
+
 ## [1.18.1] - 2026-10-06
 
 ### Fixed
