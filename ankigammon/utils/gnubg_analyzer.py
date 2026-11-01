@@ -258,6 +258,8 @@ class GNUBGAnalyzer(BackgammonAnalyzer):
                 'stdout': subprocess.PIPE,
                 'stderr': subprocess.PIPE,
                 'text': True,
+                'encoding': 'utf-8',
+                'errors': 'replace',
                 'env': external_subprocess_env(),
             }
             if sys.platform == 'win32':
@@ -335,7 +337,7 @@ class GNUBGAnalyzer(BackgammonAnalyzer):
                             out_f.write(f"{'='*60}\n")
                             out_f.write(f"GAME {i} - {Path(export_file).name}\n")
                             out_f.write(f"{'='*60}\n\n")
-                            with open(export_file, 'r', encoding='utf-8') as in_f:
+                            with open(export_file, 'r', encoding='utf-8', errors='replace') as in_f:
                                 out_f.write(in_f.read())
                             out_f.write("\n\n")
                     logger.info(f"Saved {len(exported_files)} game(s) to {debug_path}")
@@ -344,7 +346,7 @@ class GNUBGAnalyzer(BackgammonAnalyzer):
                     debug_path = None
 
             if exported_files:
-                with open(exported_files[0], 'r', encoding='utf-8') as f:
+                with open(exported_files[0], 'r', encoding='utf-8', errors='replace') as f:
                     content = f.read(5000)
                     # Check for analysis - either with error annotation or without (perfect moves)
                     # Patterns: "Rolled XX (±error):" or just "Rolled XX:"
@@ -515,6 +517,11 @@ class GNUBGAnalyzer(BackgammonAnalyzer):
         kwargs = {
             'capture_output': True,
             'text': True,
+            # Player names from the user's gnubg settings reach the output in
+            # their own codepage (a Cyrillic name arrives as cp1251), and every
+            # pattern that reads it is ASCII.
+            'encoding': 'utf-8',
+            'errors': 'replace',
             'timeout': 120,
             'env': external_subprocess_env(),
         }

@@ -1130,6 +1130,8 @@ class MainWindow(QMainWindow):
             kwargs = {
                 'capture_output': True,
                 'text': True,
+                'encoding': 'utf-8',
+                'errors': 'replace',
                 'timeout': 15,
                 'env': external_subprocess_env(),
             }
@@ -2219,6 +2221,8 @@ class MainWindow(QMainWindow):
                             'stdout': subprocess.PIPE,
                             'stderr': subprocess.PIPE,
                             'text': True,
+                            'encoding': 'utf-8',
+                            'errors': 'replace',
                             'env': external_subprocess_env(),
                         }
                         if sys.platform == 'win32':
@@ -2236,7 +2240,7 @@ class MainWindow(QMainWindow):
                             raise RuntimeError(f"GnuBG failed: {detail}")
 
                         # Parse the exported match file to get position
-                        with open(mat_path, 'r') as f:
+                        with open(mat_path, 'r', encoding='utf-8', errors='replace') as f:
                             mat_content = f.read()
 
                         # Extract GNUID from the exported file
