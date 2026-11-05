@@ -380,7 +380,7 @@ class MainWindow(QMainWindow):
         self.btn_import_file.setIcon(qta.icon('fa6s.file-import', color='#1e1e2e'))
         self.btn_import_file.setIconSize(QSize(18, 18))
         self.btn_import_file.clicked.connect(self.on_import_file_clicked)
-        self.btn_import_file.setToolTip("Import .xg, .xgp, .ogxm, .mat, .txt, or .sgf files (supports multi-select)")
+        self.btn_import_file.setToolTip("Import .xg, .xgp, .ogxm, .bgf, .pos, .mat, .txt, or .sgf files (supports multi-select)")
         self.btn_import_file.setCursor(Qt.PointingHandCursor)
         btn_row_layout.addWidget(self.btn_import_file, stretch=1)
 
@@ -1278,6 +1278,10 @@ class MainWindow(QMainWindow):
                     from ankigammon.parsers.ogxm_parser import extract_player_names
                     names = extract_player_names(file_path)
                     is_match = True
+                elif ext == '.bgf':
+                    from ankigammon.parsers.bgf_parser import extract_player_names
+                    names = extract_player_names(file_path)
+                    is_match = True
                 elif ext in ('.mat', '.txt'):
                     names = GNUBGMatchParser.extract_player_names_from_mat(file_path)
                     is_match = True
@@ -1452,6 +1456,62 @@ class MainWindow(QMainWindow):
             decisions, checker_threshold, cube_threshold,
             include_player_x, include_player_o, self.settings.max_moves,
         )
+
+    @staticmethod
+    def _needs_engine(path: str) -> bool:
+        """Whether importing the file again runs the analysis engine."""
+        lower = path.lower()
+        if lower.endswith(('.xg', '.xgp', '.ogxm')):
+            return False
+        if lower.endswith('.bgf'):
+            from ankigammon.parsers import bgf_parser
+            try:
+                return not bgf_parser.has_analysis(bgf_parser.read_bgf(Path(path).read_bytes()))
+            except (OSError, ValueError):
+                return False
+        return True
+
+    def _import_unanalyzed_bgf(
+        self, file_path: str, options: Optional[dict], placement: Optional[Dict[str, List[str]]]
+    ) -> Tuple[Optional[List[Decision]], Optional[int], Optional[CollectionSource]]:
+        """Offer to analyze a BGBlitz match saved without analysis: it goes to
+        the engine as a .mat file, and the collection remembers the .bgf.
+
+        Returns (decisions, total_count, source), or (None, None, None).
+        """
+        import dataclasses
+        import shutil
+        import tempfile
+        from PySide6.QtWidgets import QMessageBox
+        from ankigammon.parsers import bgf_parser
+
+        match = bgf_parser.read_bgf(Path(file_path).read_bytes())
+        mat_text = bgf_parser.to_mat(match)
+        # Reopening a collection analyzes its match files again without asking.
+        # Without an engine, _import_match_file offers the set-up instead.
+        if placement is None and self.settings.is_engine_available():
+            answer = silent_messagebox.question(
+                self,
+                "No Analysis in File",
+                f"{Path(file_path).name} has no analysis.\n\n"
+                f"Analyze it with {self.settings.engine_display_name()}?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            )
+            if answer != QMessageBox.StandardButton.Yes:
+                if self._in_batch_import:
+                    self._batch_skipped_files.append((file_path, "no analysis, not analyzed"))
+                return None, None, None
+
+        temp_dir = Path(tempfile.mkdtemp(prefix="bgf_import_"))
+        try:
+            mat_path = temp_dir / f"{Path(file_path).stem}.mat"
+            mat_path.write_text(mat_text, encoding="utf-8")
+            decisions, total_count, source = self._import_match_file(str(mat_path), options)
+        finally:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+        if decisions is None:
+            return None, None, None
+        return decisions, total_count, dataclasses.replace(source, path=os.path.abspath(file_path))
 
     def _import_match_file(self, file_path: str, options: Optional[dict] = None):
         """
@@ -1668,8 +1728,8 @@ class MainWindow(QMainWindow):
         missing_count = sum(1 for s in collection.files if not os.path.isfile(s.path))
         if missing_count:
             notes.append(f"{missing_count} source file(s) could not be found and will be skipped.")
-        if any(not s.path.lower().endswith(('.xg', '.xgp', '.ogxm')) for s in collection.files):
-            notes.append("Match files (.mat, .sgf) are analyzed again by the engine.")
+        if any(self._needs_engine(s.path) for s in collection.files):
+            notes.append("Files without analysis are analyzed again by the engine.")
         deck_counts = collection.deck_position_counts()
         dialog = CollectionOpenDialog(Path(path).name, deck_counts, warning, notes, self)
         if not dialog.exec():
@@ -1848,8 +1908,8 @@ class MainWindow(QMainWindow):
             self,
             "Import Backgammon File(s)",
             "",
-            "All Supported Files (*.xg *.xgp *.ogxm *.mat *.txt *.sgf);;XG Files (*.xg *.xgp);;"
-            "HedgeHog Files (*.ogxm);;Match Files (*.mat *.txt *.sgf);;All Files (*)"
+            "All Supported Files (*.xg *.xgp *.ogxm *.bgf *.pos *.mat *.txt *.sgf);;XG Files (*.xg *.xgp);;"
+            "HedgeHog Files (*.ogxm);;BGBlitz Files (*.bgf *.pos);;Match Files (*.mat *.txt *.sgf);;All Files (*)"
         )
 
         if not file_paths:
@@ -2124,12 +2184,26 @@ class MainWindow(QMainWindow):
             total_count = 0  # Track total before filtering (for XG binary)
             source = self._source_for(file_path, None)
 
-            if result.format in (InputFormat.XG_BINARY, InputFormat.OGXM_FILE):
+            unanalyzed_bgf = False
+            if result.format == InputFormat.BGF_FILE:
+                from ankigammon.parsers import bgf_parser
+                unanalyzed_bgf = not bgf_parser.has_analysis(bgf_parser.read_bgf(data))
+
+            if unanalyzed_bgf:
+                decisions, total_count, source = self._import_unanalyzed_bgf(file_path, options, placement)
+                if decisions is None:
+                    return
+
+            elif result.format in (InputFormat.XG_BINARY, InputFormat.OGXM_FILE, InputFormat.BGF_FILE):
                 # Analyzed files: parsed directly, then filtered like a match
                 if result.format == InputFormat.OGXM_FILE:
                     from ankigammon.parsers import ogxm_parser
                     parse_file = ogxm_parser.parse_ogxm_file
                     extract_player_names = ogxm_parser.extract_player_names
+                elif result.format == InputFormat.BGF_FILE:
+                    from ankigammon.parsers import bgf_parser
+                    parse_file = bgf_parser.parse_bgf_file
+                    extract_player_names = bgf_parser.extract_player_names
                 else:
                     parse_file = XGBinaryParser.parse_file
                     extract_player_names = XGBinaryParser.extract_player_names
@@ -2321,6 +2395,17 @@ class MainWindow(QMainWindow):
                         # User cancelled or error occurred
                         return
 
+            elif result.format == InputFormat.BGBLITZ_POSITION:
+                from ankigammon.parsers.bgblitz_pos_parser import parse_position_file
+                try:
+                    decisions = parse_position_file(file_path)
+                except ValueError as e:
+                    silent_messagebox.critical(
+                        self, "Import Failed", f"Failed to import BGBlitz position file:\n\n{e}"
+                    )
+                    return
+                total_count = len(decisions)
+
             else:
                 silent_messagebox.warning(
                     self,
@@ -2329,6 +2414,7 @@ class MainWindow(QMainWindow):
                     "Supported formats:\n"
                     "- XG files (.xg, .xgp)\n"
                     "- HedgeHog files (.ogxm)\n"
+                    "- BGBlitz files (.bgf, .pos)\n"
                     "- Match files (.mat, .txt)\n"
                     "- SGF files (.sgf)\n"
                     "- Text with XGID/OGID/GNUID position IDs or XG analysis\n\n"

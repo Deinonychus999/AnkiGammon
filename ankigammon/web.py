@@ -2,7 +2,8 @@
 package unmodified under Pyodide.
 
 Analyzed input is read directly: XG binary files (.xg, .xgp), HedgeHog's
-.ogxm files and XG text export. Everything else is analyzed by HedgeHog for
+.ogxm files, BGBlitz's .bgf files (which must carry BGBlitz's analysis) and XG
+text export. Everything else is analyzed by HedgeHog for
 the user's connected account; the page makes those requests, since Python in
 the worker cannot wait on them, and hands the answers back here to parse
 (`position_requests` / `apply_position_analysis` for pasted positions,
@@ -41,8 +42,8 @@ CARD_SETTINGS = (
 )
 MATRIX_SETTINGS = ("generate_score_matrix", "generate_move_score_matrix", "generate_move_cube_matrix")
 
-SUPPORTED_EXTENSIONS = (".xg", ".xgp", ".ogxm")
-MATCH_EXTENSIONS = (".xg", ".ogxm")
+SUPPORTED_EXTENSIONS = (".xg", ".xgp", ".ogxm", ".bgf")
+MATCH_EXTENSIONS = (".xg", ".ogxm", ".bgf")
 
 _work_dir: Optional[Path] = None
 _decisions: List[Decision] = []
@@ -126,8 +127,13 @@ def _loaded(total: int) -> str:
 
 def read_player_names(path: str) -> str:
     """{"o": ..., "x": ...} from a match file's header; null where the file has none."""
-    if Path(path).suffix.lower() == ".ogxm":
+    from ankigammon.parsers.bgf_parser import is_bgf
+    suffix = Path(path).suffix.lower()
+    if suffix == ".ogxm":
         from ankigammon.parsers.ogxm_parser import extract_player_names
+        player_o, player_x = extract_player_names(path)
+    elif suffix == ".bgf" or is_bgf(Path(path).read_bytes()[:4096]):
+        from ankigammon.parsers.bgf_parser import extract_player_names
         player_o, player_x = extract_player_names(path)
     else:
         from ankigammon.parsers.xg_binary_parser import XGBinaryParser
@@ -141,9 +147,10 @@ def analysis_kind(path: str) -> str:
     for `load_text`; otherwise `import` is the HedgeHog route that analyzes the
     file, or null when it is no match file. JellyFish text often comes as .txt
     or with no extension, so content decides."""
+    from ankigammon.parsers.bgf_parser import is_bgf
     data = Path(path).read_bytes()
     head = data[:4]
-    if head == b"OGXM" or Path(path).suffix.lower() in SUPPORTED_EXTENSIONS:
+    if head == b"OGXM" or is_bgf(data) or Path(path).suffix.lower() in SUPPORTED_EXTENSIONS:
         return json.dumps({"analyzed": True, "import": None, "text": False})
     if head == b"RGMH":
         return json.dumps({"analyzed": False, "import": "xg", "text": False})
@@ -159,24 +166,37 @@ def analysis_kind(path: str) -> str:
 def load_file(path: str, checker_threshold: float = 0.08, cube_threshold: float = 0.08,
               include_player_x: bool = True, include_player_o: bool = True,
               source_description: Optional[str] = None) -> str:
-    """Parse an XG binary or OGXM file. Match files are filtered like the
+    """Parse an XG binary, OGXM or BGBlitz file. Match files are filtered like the
     desktop import; a position file (.xgp) is taken whole. For an OGXM file,
     `source_description` names where the analysis came from."""
+    from ankigammon.parsers.bgf_parser import BgfError, is_bgf, parse_bgf_bytes
     from ankigammon.parsers.xg_binary_parser import ParseError, XGBinaryParser
     global _decisions
     suffix = Path(path).suffix.lower()
-    is_ogxm = suffix == ".ogxm" or Path(path).read_bytes()[:4] == b"OGXM"
-    if suffix not in SUPPORTED_EXTENSIONS and not is_ogxm:
+    data = Path(path).read_bytes()
+    is_ogxm = suffix == ".ogxm" or data[:4] == b"OGXM"
+    is_bgf_file = suffix == ".bgf" or is_bgf(data)
+    if suffix not in SUPPORTED_EXTENSIONS and not is_ogxm and not is_bgf_file:
         raise ValueError(
             f"{Path(path).name} has no analysis yet. HedgeHog can analyze it: "
             "see HedgeHog at the top of the app."
         )
+    if is_bgf_file:
+        try:
+            parsed = parse_bgf_bytes(data, source_description=f"BGBlitz file '{Path(path).name}'")
+        except BgfError as e:
+            raise ValueError(f"{Path(path).name}: {e}") from e
+        _decisions = filter_decisions(
+            parsed, checker_threshold, cube_threshold,
+            include_player_x, include_player_o, _settings().max_moves,
+        )
+        return _loaded(len(parsed))
     if is_ogxm:
         from ankigammon.parsers.ogxm_parser import parse_ogxm_bytes
         from ankigammon.utils.ogxm_reader import OgxmError
         try:
             parsed = parse_ogxm_bytes(
-                Path(path).read_bytes(),
+                data,
                 source_description=source_description or f"OGXM file '{Path(path).name}'",
             )
         except OgxmError as e:

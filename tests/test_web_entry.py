@@ -20,6 +20,7 @@ from conftest import read_apkg_notes
 DATA = Path(__file__).parent / "data"
 SAMPLE = str(DATA / "sample_match.xg")
 OGXM = str(DATA / "hedgehog" / "analysis.ogxm")
+BGF = str(DATA / "bgblitz" / "match.bgf")
 CUBE_ANSWER = str(DATA / "hedgehog" / "position_cube.json")
 PASTED_CUBE = "XGID=-BBB--CC----eA--bc-e-B----:0:0:1:00:0:0:0:3:8"
 
@@ -91,6 +92,37 @@ def test_player_names_come_back_by_side(session):
     names = json.loads(web.read_player_names(SAMPLE))
     player1, player2 = XGBinaryParser.extract_player_names(SAMPLE)
     assert names == {"o": player1, "x": player2}
+
+
+def test_bgblitz_match_loads_filtered(session, tmp_path):
+    from ankigammon.parsers.bgf_parser import parse_bgf_file
+    assert json.loads(web.read_player_names(BGF)) == {"o": "iddqd43", "x": "DanielS"}
+    renamed = tmp_path / "match"
+    renamed.write_bytes(Path(BGF).read_bytes())
+    assert json.loads(web.analysis_kind(str(renamed)))["analyzed"] is True
+    assert json.loads(web.read_player_names(str(renamed))) == {"o": "iddqd43", "x": "DanielS"}
+
+    result = json.loads(web.load_file(str(renamed), 0.08, 0.08, True, False))
+    expected = filter_decisions(parse_bgf_file(BGF), 0.08, 0.08, True, False, 5)
+    assert result["total"] == 80
+    assert [p["xgid"] for p in result["positions"]] == [d.xgid for d in expected]
+
+
+def test_bgblitz_match_without_analysis_says_what_to_do(session, tmp_path):
+    from ankigammon.parsers.bgf_parser import read_bgf
+    match = read_bgf(Path(BGF).read_bytes())
+    for game in match["games"]:
+        for index, record in enumerate(game["moves"]):
+            record.update(dancingEquity=None, moveAnalysis=[], pr=None)
+            if index == 0 and record.get("equity"):
+                record["equity"]["cubeDecision"] = None
+            else:
+                record["equity"] = None
+    path = tmp_path / "unanalyzed.bgf"
+    path.write_bytes(b'{"format":"BGF","version":"1.0","compress":false,"useSmile":false}\n'
+                     + json.dumps(match).encode())
+    with pytest.raises(ValueError, match="Analyze it in BGBlitz"):
+        web.load_file(str(path))
 
 
 @pytest.mark.parametrize("name", ["match.mat", "match.sgf", "positions.txt", "noextension"])
@@ -224,6 +256,9 @@ web.load_text({ANALYZED!r})
 web.read_player_names({OGXM!r})
 web.load_file({OGXM!r})
 web.analysis_kind({OGXM!r})
+web.read_player_names({BGF!r})
+web.load_file({BGF!r})
+web.analysis_kind({BGF!r})
 request = json.loads(web.position_requests({PASTED_CUBE!r}))
 cube = json.load(open({CUBE_ANSWER!r}))["result"]
 web.apply_position_analysis(json.dumps([cube]), "3-ply", request["request"])

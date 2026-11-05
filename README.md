@@ -9,7 +9,7 @@ No install? The [web app](https://ankigammon.com/app/) makes the same cards in y
 ## Features
 
 - **Modern GUI interface** - Easy-to-use graphical application with drag-and-drop support
-- **Multiple input formats** - XGID/OGID/GNUID position IDs, XG binary files (.xg, .xgp), HedgeHog analysis files (.ogxm), match files (.mat), SGF files
+- **Multiple input formats** - XGID/OGID/GNUID position IDs, XG binary files (.xg, .xgp), HedgeHog analysis files (.ogxm), BGBlitz analysis files (.bgf) and positions (.pos), match files (.mat), SGF files
 - **Direct XG export support** - Copy/paste pre-analyzed positions from eXtreme Gammon
 - **File import with filtering** - Drag-and-drop files with error threshold and player selection
 - **Three analysis engines** - Analyze positions using GNU Backgammon (cross-platform), eXtreme Gammon (Windows, experimental) or HedgeHog (online, with your HedgeHog account); see [Position Analysis](#position-analysis)
@@ -21,7 +21,7 @@ No install? The [web app](https://ankigammon.com/app/) makes the same cards in y
 - **Deck tree organization** - Drag-and-drop positions into named decks and subdecks; tree syncs with Anki via AnkiConnect (automatic on startup)
 - **Position management** - Multi-select, add notes, preview positions before export
 - **Automatic update notifications** - Get notified when new versions are available
-- **Comments extraction** - Automatically imports comments and notes from XG files (.xg, .xgp) and annotations from HedgeHog files (.ogxm)
+- **Comments extraction** - Automatically imports comments and notes from XG files (.xg, .xgp), annotations from HedgeHog files (.ogxm), and comments from BGBlitz files (.bgf)
 
 ## Installation
 
@@ -93,7 +93,7 @@ ankigammon  # Launches the GUI
 2. **Add positions** (choose one or more methods):
    - **Paste XG analysis**: Press Ctrl+N, paste pre-analyzed positions from eXtreme Gammon (Ctrl+C)
    - **Paste position IDs**: Press Ctrl+N, paste XGID/OGID/GNUID strings (requires an analysis engine: GNU Backgammon, eXtreme Gammon or HedgeHog)
-   - **Import files**: Press Ctrl+O or drag-and-drop files (.xg, .xgp, .ogxm, .mat, .sgf, .txt)
+   - **Import files**: Press Ctrl+O or drag-and-drop files (.xg, .xgp, .ogxm, .bgf, .pos, .mat, .sgf, .txt)
      - For match files: Choose error threshold and which player's mistakes to import
      - Drop files directly onto a deck in the deck tree to import into that deck
 3. **Organize into decks** - Use the deck tree on the left to create named decks/subdecks and drag positions between them. Decks stay expanded or collapsed as you leave them across imports; use the expand/collapse-all buttons above the tree, or right-click a deck to expand or collapse its subdecks. The tree syncs with Anki via AnkiConnect (automatic on startup, or manually via File → Sync Decks from Anki, Ctrl+Shift+D).
@@ -160,6 +160,8 @@ All formats fully support position encoding, cube state, dice, and match metadat
 
 - **XG Binary files (.xg, .xgp)** - eXtreme Gammon match and position files (includes pre-analysis from XG)
 - **HedgeHog files (.ogxm)** - HedgeHog match files with their analysis (OGXM v2)
+- **BGBlitz files (.bgf)** - BGBlitz match files with their analysis; match equities are shown as normalized equity (EMG), as BGBlitz shows them. A match saved without analysis can be analyzed by the selected engine instead
+- **Position files (.pos)** - A single position in JellyFish's format, as BGBlitz and JellyFish save them (analyzed by the selected engine)
 - **Match files (.mat, .txt)** - GNU Backgammon match exports (analyzed by the selected engine)
 - **SGF files (.sgf)** - Smart Game Format for backgammon (analyzed by the selected engine)
 

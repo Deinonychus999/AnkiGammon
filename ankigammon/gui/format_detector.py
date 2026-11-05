@@ -12,6 +12,8 @@ from dataclasses import dataclass
 from enum import Enum
 
 from ankigammon.settings import Settings
+from ankigammon.parsers.bgblitz_pos_parser import is_bgblitz_position
+from ankigammon.parsers.bgf_parser import is_bgf
 from ankigammon.parsers.xg_text_parser import POSITION_ID_LINE_RE
 
 
@@ -21,6 +23,8 @@ class InputFormat(Enum):
     FULL_ANALYSIS = "full_analysis"
     XG_BINARY = "xg_binary"
     OGXM_FILE = "ogxm_file"
+    BGF_FILE = "bgf_file"
+    BGBLITZ_POSITION = "bgblitz_position"
     MATCH_FILE = "match_file"
     SGF_FILE = "sgf_file"
     UNKNOWN = "unknown"
@@ -168,6 +172,29 @@ class FormatDetector:
                 details="HedgeHog match analysis (.ogxm)",
                 warnings=[],
                 position_previews=["OGXM match analysis"]
+            )
+
+        if is_bgf(data):
+            return DetectionResult(
+                format=InputFormat.BGF_FILE,
+                count=1,
+                details="BGBlitz match analysis (.bgf)",
+                warnings=[],
+                position_previews=["BGBlitz match analysis"]
+            )
+
+        if is_bgblitz_position(data):
+            warnings = []
+            if not self.settings.is_engine_available():
+                warnings.append(
+                    f"{self.settings.engine_display_name()} required for analysis (not set up)"
+                )
+            return DetectionResult(
+                format=InputFormat.BGBLITZ_POSITION,
+                count=1,
+                details="BGBlitz position (.pos)",
+                warnings=warnings,
+                position_previews=["BGBlitz position - requires analysis"]
             )
 
         if FormatDetector.is_sgf_file(data):
