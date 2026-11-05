@@ -160,7 +160,7 @@ All formats fully support position encoding, cube state, dice, and match metadat
 
 - **XG Binary files (.xg, .xgp)** - eXtreme Gammon match and position files (includes pre-analysis from XG)
 - **HedgeHog files (.ogxm)** - HedgeHog match files with their analysis (OGXM v2)
-- **BGBlitz files (.bgf)** - BGBlitz match files with their analysis; match equities are shown as normalized equity (EMG), as BGBlitz shows them. A match saved without analysis can be analyzed by the selected engine instead
+- **BGBlitz files (.bgf)** - BGBlitz match files with their analysis; match equities are shown as normalized equity (EMG), as BGBlitz shows them
 - **Position files (.pos)** - A single position in JellyFish's format, as BGBlitz and JellyFish save them (analyzed by the selected engine)
 - **Match files (.mat, .txt)** - GNU Backgammon match exports (analyzed by the selected engine)
 - **SGF files (.sgf)** - Smart Game Format for backgammon (analyzed by the selected engine)
