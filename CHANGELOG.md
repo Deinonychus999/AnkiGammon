@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.20.0] - 2026-11-04
+
+### Added
+- BGBlitz match files (.bgf) open directly with BGBlitz's analysis, using the same mistake filter as XG match files. Match equities show as normalized equity, as BGBlitz shows them, and comments written in BGBlitz come along as notes. A match saved without analysis can be analyzed by your engine instead.
+- Position files (.pos), as BGBlitz and JellyFish save them, open too. The position is analyzed by your engine when you export it.
+
+### Fixed
+- Analyzing a match with GnuBG no longer fails when a player's name has accented or other non-English characters.
+
 ## [1.19.1] - 2026-10-22
 
 ### Changed
